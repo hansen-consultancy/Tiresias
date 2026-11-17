@@ -17,9 +17,10 @@ public.
 
 - [x] Logo: a closed eye whose lashes are key teeth (`assets/logo.svg`)
 - [x] Small icon drawn for 16/32 px (`assets/icon-16.svg`)
-- [ ] PNG exports: NuGet icon (128 px), tray `.ico` (16/32/48), social preview
+- [x] Exports in `assets/export/` (regenerate with `python assets/export-icons.py`): NuGet icon, app and
+      tray `.ico` files, social preview
+- [ ] Upload `social-preview.png` in the repository settings
 - [ ] Tray icon states: locked, unlocked, a consent waiting, an error
-- [ ] NuGet package icon, and the GitHub social preview image
 
 ## Documentation
 
