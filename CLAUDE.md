@@ -23,7 +23,7 @@ without it. OS-specific tests use `[Platform]`, never a runtime `Assert.Ignore`.
 
 ## Layout
 
-All projects live in `src/`; `Tiresias.slnx` is hand-written (add new projects to it by hand).
+All projects live in `src/`; `Tiresias.slnx` is hand-written (add new projects to it by hand). `samples/` holds apps for trying Tiresias by hand (docs/testing-on-windows.md): not in the solution, never packed, built by the Windows CI leg.
 
 | Project | Target | Role |
 |---|---|---|

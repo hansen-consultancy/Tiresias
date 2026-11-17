@@ -80,6 +80,24 @@ and so does the Keyring before it hands the broker any key. A control plane (an 
 service) only relays chains, approves known locations and collects audit summaries. It is never
 a root of trust.
 
+## Install from source
+
+There is no installer yet. On Windows 11, with Windows Hello set up and the .NET 11 SDK plus the
+.NET 10 runtime installed:
+
+```powershell
+git clone https://github.com/hansen-consultancy/Tiresias.git
+cd Tiresias
+dotnet publish src/Tiresias.App -c Release -o "$env:LOCALAPPDATA\Programs\Tiresias\app"
+dotnet publish src/Tiresias.Keyring -c Release -o "$env:LOCALAPPDATA\Programs\Tiresias\cli"
+& "$env:LOCALAPPDATA\Programs\Tiresias\app\Tiresias.exe"
+```
+
+The first run sets up Windows Hello, your paper recovery key and solo mode. Add the `cli` folder
+to your PATH for `tir`. [docs/testing-on-windows.md](docs/testing-on-windows.md) walks through
+everything from there: a sample app's protected user secrets, the consent dialog, `tir exec`, and
+activity.
+
 ## Building
 
 ```bash
@@ -87,8 +105,8 @@ dotnet build Tiresias.slnx
 dotnet test src/Tiresias.Tests/Tiresias.Tests.csproj
 ```
 
-You need the .NET 11 SDK, plus the .NET 10 runtime for the `net10.0` libraries. The Keyring
-builds on Windows only.
+You need the .NET 11 SDK, plus the .NET 10 runtime for the `net10.0` libraries. The app and the
+Keyring build on Windows only; the tests run anywhere.
 
 ## License
 

@@ -6,11 +6,13 @@ public.
 
 ## Product
 
-- [ ] Desktop tray app hosting the agent, consent dialogs and the secrets editor
-      ([design](desktop-app.md))
-- [ ] User-secrets agent side: pipe server, keys-only consent, sealing on first load, `tir secrets`
-- [ ] Local activity log, plus `tir activity` and the app's activity window
-- [ ] Solo mode: local broker as a Windows service ([design](desktop-app.md#solo-mode))
+- [x] Desktop tray app hosting the agent, consent dialogs and the secrets editor
+      ([design](desktop-app.md), [try it](testing-on-windows.md))
+- [x] User-secrets agent side: pipe server, keys-only consent, sealing on first load, `tir secrets`
+- [x] Local activity log and the app's activity window
+- [ ] `tir activity`
+- [x] Solo mode, with the broker hosted in the app ([design](desktop-app.md#solo-mode))
+- [ ] Solo mode: local broker as a Windows service
 - [ ] winget + Velopack installer, signed with Azure Trusted Signing
 
 ## Identity
