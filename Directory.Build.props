@@ -10,7 +10,7 @@
     <PackageIcon>icon.png</PackageIcon>
     <PackageTags>secrets;credentials;user-secrets;vault;ai-agents;windows-hello</PackageTags>
     <VersionPrefix>0.1.0</VersionPrefix>
-    <VersionSuffix>preview.1</VersionSuffix>
+    <VersionSuffix>preview.2</VersionSuffix>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <IncludeSymbols>true</IncludeSymbols>

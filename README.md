@@ -40,7 +40,7 @@ tools run as you. Tiresias moves those secrets behind three things:
 ## Protected user secrets, no code change
 
 ```xml
-<PackageReference Include="Tiresias.Extensions.Configuration" Version="0.1.0-preview.1" />
+<PackageReference Include="Tiresias.Extensions.Configuration" Version="0.1.0-preview.2" />
 ```
 
 Your existing `builder.Configuration.AddUserSecrets<Program>()` and
