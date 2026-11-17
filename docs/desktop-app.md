@@ -1,10 +1,50 @@
-# Desktop app (design draft)
+# Desktop app
 
-**Status:** draft for discussion, not built yet.
+**Status:** a first version is built (`src/Tiresias.App`, `Tiresias.exe`). This page is the design;
+[What is built](#what-is-built) says how far it got. Hands-on steps: [testing-on-windows.md](testing-on-windows.md).
 
 Tiresias has to be easy to install and use. A security tool that needs a terminal for daily use
 gets bypassed. So the everyday experience is a **tray app**. The `tir` CLI stays, for scripting,
 CI and people who prefer it, and it talks to the same agent.
+
+## What is built
+
+- **Tray icon** following the taskbar theme (light/dark icon). Its menu shows the state (not set
+  up, locked, unlocked until 18:00, built-in broker not running), **Solo** when the broker runs in
+  the app, Unlock (Windows Hello) / Lock, Edit user secrets, Activity, Status and Quit.
+- **One per user session.** Starting it again brings the running one forward. `tir agent` refuses
+  to start while the app runs.
+- **The agent runs in the app:** the user-secrets pipe server, the lease heartbeat, locking on
+  workstation lock, and in solo mode the broker on `127.0.0.1:7780`.
+- **Consent dialog**, topmost. It shows the program asking (its path) and the keys or what the
+  placeholder gets, never values. Answers are Allow once / Allow for this session / Deny. Deny has
+  focus and is the Esc answer. A countdown runs, and no answer means Deny. Requests that arrive
+  while one is open wait their turn, and the dialog shows how many are waiting. Workstation lock,
+  logoff or sleep answers every open dialog with Deny.
+- **`tir` uses the app when it runs.** `tir grant` and `tir exec` ask in the app's dialog,
+  `tir unlock` and `tir lock` go through it, and `tir status` prints its state. Without the app
+  they work in the terminal as before.
+- **Secrets editor**, excluded from screen capture (`WDA_EXCLUDEFROMCAPTURE`). Values are masked
+  and shown one at a time. It drops every value when the agent locks, and saving always seals.
+- **Activity window** over the local logs: the agent's user-secrets decisions (`activity.jsonl`)
+  and the solo broker's audit (`solo\audit.jsonl`). Filters: period, outcome, source and text.
+- **Status page** running the same checks as `tir doctor`, with copy details.
+- **First-run wizard.** It creates the Hello key, shows the recovery key once, asks two of its
+  groups back, then asks for a mode: solo by default, a broker, or user secrets only. It is
+  resumable: a closed wizard restarts at the first missing step. A solo setup resumed after the key
+  was shown asks for the key to be typed back. If that key is lost and nothing is sealed to it yet,
+  the wizard offers a new one.
+- **Errors** say what happened, why it matters and what to do next, with a button for that next
+  step and "Copy details" (no stack trace; that goes to `%LOCALAPPDATA%\Tiresias\app.log`).
+- **Wording:** every string is in `src/Tiresias.App/Strings.resx`, and a test keeps the file and
+  the code in step. The exception is the doctor checks, whose text comes from `Tiresias.Core` so
+  that `tir doctor` and the status page say the same thing.
+
+**Not built yet:** the Windows service for the solo broker, and the "Move to a broker" wizard. The
+wizard doesn't enrol you with a broker either: use `tir enroll`, which the wizard points to. Other
+gaps: re-sealing secrets with the recovery key after Windows Hello is lost (the problem screen says
+so), the full-JSON editor view, scanning the machine for plaintext secrets, and toasts. winget is
+also not built: install from source.
 
 ## Why the GUI is not optional
 

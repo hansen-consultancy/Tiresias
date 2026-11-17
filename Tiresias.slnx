@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Tiresias.Agent/Tiresias.Agent.csproj" />
+    <Project Path="src/Tiresias.App/Tiresias.App.csproj" />
     <Project Path="src/Tiresias.Broker/Tiresias.Broker.csproj" />
     <Project Path="src/Tiresias.Core/Tiresias.Core.csproj" />
     <Project Path="src/Tiresias.Extensions.Configuration.Generator/Tiresias.Extensions.Configuration.Generator.csproj" />

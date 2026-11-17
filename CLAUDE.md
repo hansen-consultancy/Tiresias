@@ -17,7 +17,7 @@ dotnet test src/Tiresias.Tests/Tiresias.Tests.csproj --filter "FullyQualifiedNam
 dotnet pack Tiresias.slnx -c Release -o artifacts
 ```
 
-Needs the .NET 11 SDK plus the .NET 10 runtime. `Tiresias.Keyring` (`tir`) targets
+Needs the .NET 11 SDK plus the .NET 10 runtime. `Tiresias.Keyring` (`tir`) and `Tiresias.App` target
 `net11.0-windows` (Windows Hello, TPM, DPAPI) and builds on Windows only; CI's Linux leg tests
 without it. OS-specific tests use `[Platform]`, never a runtime `Assert.Ignore`.
 
@@ -34,6 +34,7 @@ All projects live in `src/`; `Tiresias.slnx` is hand-written (add new projects t
 | `Tiresias.Broker`, `Tiresias.Forwarder` | net11.0 | Broker service; loopback relay identifying the calling process |
 | `Tiresias.Agent` | net11.0-windows | The workstation agent's logic, shared by `tir` and the app |
 | `Tiresias.Keyring` | net11.0-windows | The `tir` CLI, a thin console front over `Tiresias.Agent` |
+| `Tiresias.App` | net11.0-windows, WPF | The tray app (`Tiresias.exe`): agent host, consent dialog, editor, activity, status, first run. Its pure decisions live in `Logic/`, compiled into the tests by link; every string is in `Strings.resx` |
 | `Tiresias.Tests` | net11.0 | NUnit, covers all of the above |
 
 ## Invariants

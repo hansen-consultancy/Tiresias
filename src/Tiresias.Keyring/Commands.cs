@@ -157,6 +157,8 @@ static class Commands
 
     public static async Task<int> UnlockAsync(CommandLine args)
     {
+        if (args.Option("--secrets") is null && await AppLink.SendAsync(ControlRequest.Unlock) is { } reply)
+            return reply.Ok ? Done(reply.Message) : Fail($"The Tiresias app couldn't unlock: {reply.Message}");
         await ReachableBrokerAsync();
         var slugs = args.Option("--secrets")?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         UnlockResult result;
@@ -177,6 +179,8 @@ static class Commands
 
     public static async Task<int> LockAsync()
     {
+        if (await AppLink.SendAsync(ControlRequest.Lock) is { } reply)
+            return reply.Ok ? Done(reply.Message) : Fail(reply.Message ?? "The Tiresias app couldn't lock.");
         if (await LeaseControl.LockAsync() is { } refused)
             return Fail($"Broker refused: {refused}");
         Console.WriteLine("Lease ended.");
@@ -191,6 +195,7 @@ static class Commands
         Console.WriteLine($"Device:   {settings.DeviceId}");
         Console.WriteLine($"Vault:    {settings.VaultPath}" + (File.Exists(settings.VaultPath) ? $" ({VaultFile.Load(settings.VaultPath).Secrets.Count} secrets)" : " (missing)"));
         Console.WriteLine($"Recovery: {(settings.RecoveryPublicKey is null ? "NOT SET (run tir recovery init)" : "set")}");
+        Console.WriteLine($"App:      {await AppLink.StateAsync() ?? "not running (start Tiresias, or run tir agent)"}");
 
         var remembered = KeyringStore.Lease;
         var (lease, ended) = await LeaseControl.CheckAsync();
@@ -226,9 +231,10 @@ static class Commands
         if (problems.Count > 0)
             return Fail(string.Join(Environment.NewLine, problems));
 
-        foreach (var line in Consent.Describe(request, service))
+        var lines = Consent.Describe(request, service).ToArray();
+        foreach (var line in lines)
             Console.WriteLine(line);
-        if (!Terminal.Confirm("Approve?"))
+        if (!await AppLink.ApproveAsync($"tir grant {serviceSlug}", lines))
             return Fail("Not approved.");
         HelloKeyWrapper.ConfirmPresence($"grant\n{serviceSlug}\n{request.Consumer}");
 
@@ -255,6 +261,13 @@ static class Commands
         if (!elevated.Ok || elevated.Body is not { } body)
             return Fail($"Not elevated: {elevated.Describe()}");
         Console.WriteLine($"Elevated until {body.GetProperty("expiresAt").GetDateTimeOffset().ToLocalTime():HH:mm}.");
+        return 0;
+    }
+
+    static int Done(string? message)
+    {
+        if (message is not null)
+            Console.WriteLine(message);
         return 0;
     }
 

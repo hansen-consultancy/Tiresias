@@ -36,16 +36,14 @@ static class Exec
         if (problems.Length > 0)
             return Fail(string.Join(Environment.NewLine, problems));
 
-        Console.WriteLine($"Run: {string.Join(' ', args.Rest)}");
+        var lines = new List<string> { $"Run: {string.Join(' ', args.Rest)}" };
         foreach (var (service, request) in requests)
-        {
-            foreach (var line in Consent.Describe(request, service))
-                Console.WriteLine("  " + line);
-            Console.WriteLine();
-        }
+            lines.AddRange(Consent.Describe(request, service).Select(line => "  " + line).Append(""));
         foreach (var service in services.Where(ExecPlan.IsGitHubApp))
-            Console.WriteLine($"  {service.Slug}: a GitHub App installation token in GH_TOKEN (valid up to 1 h)");
-        if (!Terminal.Confirm("Approve?"))
+            lines.Add($"  {service.Slug}: a GitHub App installation token in GH_TOKEN (valid up to 1 h)");
+        foreach (var line in lines)
+            Console.WriteLine(line);
+        if (!await AppLink.ApproveAsync($"tir exec {Path.GetFileName(args.Rest[0])}", lines))
             return Fail("Not approved.");
         HelloKeyWrapper.ConfirmPresence($"exec\n{string.Join(',', slugs)}\n{consumer}");
 

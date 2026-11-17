@@ -16,6 +16,8 @@ const string Usage = """
     tir lock
     tir status
     tir agent
+        When the Tiresias app runs, it is the agent: unlock and lock go through it, and grant and
+        exec ask for approval in its dialog. tir agent is for when the app isn't running.
     tir grant <service> --consumer <name> --purpose <text> --for <duration> [--ceiling <grant>]
     tir elevate <service> <grant> [--for 15m]
     tir exec <service>[,<service>...] --purpose <text> [--for 1h] [--ceiling <grant>] -- <command> [args...]

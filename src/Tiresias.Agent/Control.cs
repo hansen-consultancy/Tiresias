@@ -16,6 +16,8 @@ public sealed record ControlRequest(string Op, IReadOnlyList<string>? Lines = nu
     public const string Consent = "consent";
     public const string Unlock = "unlock";
     public const string Lock = "lock";
+    /// <summary>Bring the app's window forward: a second start of the app sends this, then exits.</summary>
+    public const string Show = "show";
 }
 
 /// <param name="Approved">For a consent: the user allowed it.</param>

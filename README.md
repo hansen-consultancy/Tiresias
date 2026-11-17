@@ -31,6 +31,7 @@ tools run as you. Tiresias moves those secrets behind three things:
 
 | Piece | What it is |
 |---|---|
+| Tiresias app | The Windows tray app: unlock with Windows Hello, approve requests in a dialog, edit user secrets, see activity and status. In solo mode it also hosts the broker |
 | `tir` (Keyring) | The CLI and agent on your workstation: vault, unlock, consent, `tir exec`, `tir doctor` |
 | Broker | Holds the ciphertext. During a lease it injects credentials into HTTP, SQL Server and RavenDB traffic |
 | Forwarder | A loopback relay on your workstation that tells the broker which local process is calling |

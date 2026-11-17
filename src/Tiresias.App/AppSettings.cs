@@ -1,0 +1,30 @@
+using System.Text.Json;
+using Tiresias.Agent;
+
+namespace Tiresias.App;
+
+/// <summary>The app's own preferences, <c>%LOCALAPPDATA%\Tiresias\app.json</c>. A missing or unreadable file means the defaults.</summary>
+/// <param name="SetupSkipped">The user finished the first-run wizard without a broker.</param>
+public sealed record AppSettings(bool SetupSkipped = false, DateTimeOffset? LastUpdateCheck = null)
+{
+    static string Path => System.IO.Path.Combine(KeyringStore.Directory, "app.json");
+
+    public static AppSettings Load()
+    {
+        try
+        {
+            return File.Exists(Path) ? JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(Path), JsonSerializerOptions.Web) ?? new() : new();
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
+        {
+            AppLog.Error(e, "app.json unreadable, using defaults");
+            return new();
+        }
+    }
+
+    public void Save()
+    {
+        Directory.CreateDirectory(KeyringStore.Directory);
+        File.WriteAllText(Path, JsonSerializer.Serialize(this, JsonSerializerOptions.Web));
+    }
+}

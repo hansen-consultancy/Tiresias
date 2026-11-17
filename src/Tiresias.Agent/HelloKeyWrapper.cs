@@ -23,6 +23,11 @@ namespace Tiresias.Agent;
 /// </remarks>
 public sealed class HelloKeyWrapper : IKeyWrapper, IDisposable
 {
+    /// <summary>Whether the Tiresias Hello credential exists. Asks Windows without a prompt.</summary>
+    public static bool Exists() =>
+        KeyCredentialManager.IsSupportedAsync().AsTask().GetAwaiter().GetResult()
+        && KeyCredentialManager.OpenAsync(CredentialName).AsTask().GetAwaiter().GetResult().Status == KeyCredentialStatus.Success;
+
     public const string CredentialName = "Tiresias";
 
     readonly SignatureDerivedWrapper inner;
@@ -51,28 +56,54 @@ public sealed class HelloKeyWrapper : IKeyWrapper, IDisposable
     static KeyCredential OpenCredential(bool create)
     {
         if (!KeyCredentialManager.IsSupportedAsync().AsTask().GetAwaiter().GetResult())
-            throw new InvalidOperationException("Windows Hello is not set up on this machine.");
+            throw new HelloException(HelloProblem.NotSetUp, "Windows Hello is not set up on this machine.");
 
         var opened = KeyCredentialManager.OpenAsync(CredentialName).AsTask().GetAwaiter().GetResult();
         if (opened.Status == KeyCredentialStatus.Success)
             return opened.Credential;
         if (opened.Status != KeyCredentialStatus.NotFound || !create)
-            throw new InvalidOperationException(opened.Status == KeyCredentialStatus.NotFound
-                ? $"No Windows Hello credential '{CredentialName}' on this machine. Re-wrap the vault from the recovery key."
-                : $"Windows Hello credential unavailable: {opened.Status}.");
+            throw opened.Status == KeyCredentialStatus.NotFound
+                ? new HelloException(HelloProblem.CredentialMissing, $"No Windows Hello credential '{CredentialName}' on this machine. Re-wrap the vault from the recovery key.")
+                : new HelloException(Problem(opened.Status), $"Windows Hello credential unavailable: {opened.Status}.");
 
         var created = KeyCredentialManager.RequestCreateAsync(CredentialName, KeyCredentialCreationOption.FailIfExists).AsTask().GetAwaiter().GetResult();
         return created.Status == KeyCredentialStatus.Success
             ? created.Credential
-            : throw new InvalidOperationException($"Could not create the Windows Hello credential: {created.Status}.");
+            : throw new HelloException(Problem(created.Status), $"Could not create the Windows Hello credential: {created.Status}.");
     }
 
     static byte[] Sign(KeyCredential credential, byte[] data)
     {
         var result = credential.RequestSignAsync(CryptographicBuffer.CreateFromByteArray(data)).AsTask().GetAwaiter().GetResult();
         if (result.Status != KeyCredentialStatus.Success)
-            throw new InvalidOperationException($"Windows Hello did not sign: {result.Status}.");
+            throw new HelloException(Problem(result.Status), $"Windows Hello did not sign: {result.Status}.");
         CryptographicBuffer.CopyToByteArray(result.Result, out var signature);
         return signature;
     }
+
+    static HelloProblem Problem(KeyCredentialStatus status) => status switch
+    {
+        KeyCredentialStatus.UserCanceled => HelloProblem.Cancelled,
+        KeyCredentialStatus.NotFound => HelloProblem.CredentialMissing,
+        KeyCredentialStatus.UserPrefersPassword => HelloProblem.Cancelled,
+        _ => HelloProblem.Unavailable,
+    };
+}
+
+public enum HelloProblem
+{
+    /// <summary>No PIN, face or fingerprint is set up for this Windows account.</summary>
+    NotSetUp,
+    /// <summary>The user closed the Hello prompt.</summary>
+    Cancelled,
+    /// <summary>The Tiresias credential is gone (Hello reset, new PC): the recovery key re-wraps.</summary>
+    CredentialMissing,
+    /// <summary>Anything else Windows reported, e.g. the TPM is busy or locked out.</summary>
+    Unavailable,
+}
+
+/// <summary>Windows Hello failed for a reason the caller may explain differently; still an <see cref="InvalidOperationException"/>.</summary>
+public sealed class HelloException(HelloProblem problem, string message) : InvalidOperationException(message)
+{
+    public HelloProblem Problem { get; } = problem;
 }

@@ -1,0 +1,74 @@
+<Window x:Class="Tiresias.App.Views.StatusWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:Tiresias.App"
+        Title="{l:S Status_WindowTitle}"
+        Width="720" Height="600" MinWidth="480" MinHeight="360"
+        WindowStartupLocation="CenterScreen"
+        Icon="pack://application:,,,/Assets/tiresias.ico">
+  <Grid Margin="{StaticResource PagePadding}">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <TextBlock Grid.Row="0" Text="{l:S Status_Heading}" Style="{StaticResource TitleText}" AutomationProperties.HeadingLevel="Level1" />
+
+    <Border Grid.Row="1" Style="{StaticResource Card}">
+      <StackPanel>
+        <TextBlock Text="{Binding Headline}" Style="{StaticResource SubtitleText}" />
+        <TextBlock Text="{Binding Mode}" Style="{StaticResource CaptionText}" />
+      </StackPanel>
+    </Border>
+
+    <Grid Grid.Row="2">
+      <ListView x:Name="Checks" ItemsSource="{Binding Checks}" AutomationProperties.Name="{l:S Status_ChecksName}"
+                ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+        <ListView.ItemTemplate>
+          <DataTemplate>
+            <Grid Margin="0,6" AutomationProperties.Name="{Binding Spoken}">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="28" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <TextBlock Text="{Binding Glyph}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16"
+                         Foreground="{Binding Brush}" VerticalAlignment="Top" Margin="0,2,0,0" />
+              <StackPanel Grid.Column="1">
+                <TextBlock Style="{StaticResource SubtitleText}" Margin="0">
+                  <Run Text="{Binding Name, Mode=OneWay}" /><Run Text=" - " /><Run Text="{Binding StatusText, Mode=OneWay}" />
+                </TextBlock>
+                <TextBlock Text="{Binding Detail}" Style="{StaticResource CaptionText}" />
+              </StackPanel>
+            </Grid>
+          </DataTemplate>
+        </ListView.ItemTemplate>
+      </ListView>
+      <TextBlock Text="{l:S Status_Running}" HorizontalAlignment="Center" VerticalAlignment="Center">
+        <TextBlock.Style>
+          <Style TargetType="TextBlock" BasedOn="{StaticResource BodyText}">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+              <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                <Setter Property="Visibility" Value="Visible" />
+              </DataTrigger>
+            </Style.Triggers>
+          </Style>
+        </TextBlock.Style>
+      </TextBlock>
+    </Grid>
+
+    <Grid Grid.Row="3" Margin="0,16,0,0">
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+        <Button Content="{l:S Status_CopyDetails}" Padding="12,6" Command="{Binding CopyCommand}" />
+        <Button Content="{l:S Problem_Action_DataFolder}" Padding="12,6" Margin="8,0,0,0" Command="{Binding OpenFolderCommand}" />
+      </StackPanel>
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+        <Button Style="{DynamicResource AccentButtonStyle}" MinWidth="96" Padding="12,6" Content="{l:S Status_RunAgain}"
+                Command="{Binding RunCommand}" />
+        <Button Style="{StaticResource RowButton}" Content="{l:S Common_Close}" IsCancel="True" Click="OnClose" />
+      </StackPanel>
+    </Grid>
+  </Grid>
+</Window>
