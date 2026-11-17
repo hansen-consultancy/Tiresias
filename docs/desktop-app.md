@@ -62,19 +62,64 @@ The goal is one command or one download, then a first-run wizard:
 
 1. Create the recovery key: show it once, ask the user to confirm two words from it, then print
    or save it.
-2. Choose a mode (see the open question below).
+2. Choose a mode: **solo** (the default, nothing else to set up) or **with a broker** (see
+   [Solo mode](#solo-mode)).
 3. Enrol this device: pin the broker key, scan or paste the genesis hash.
 4. Optional: scan the machine for plaintext secrets (the `doctor` checks) and offer to import
    them.
 
+## Solo mode
+
+Most individual developers don't run a VPS. They still deserve encryption at rest, placeholders,
+consent and audit. Solo mode runs the broker on the workstation itself, so the first ten minutes
+need nothing but the app.
+
+### What runs where
+
+- The **broker** is the same code as the hosted one, run as a **Windows service under its own
+  virtual account** (`NT SERVICE\Tiresias`) and listening on loopback only. Its own account matters:
+  processes running as the user cannot read a service's memory without admin rights, so an agent
+  running as you cannot lift the leased keys out of it. Installing the service needs admin once;
+  without it the broker runs inside the tray app, and the app says so (see below).
+- The broker identifies the calling process from the loopback connection itself, so the
+  **forwarder** is not needed.
+- The **trust chain** has one device and a genesis created on this machine. The paper recovery key
+  exists as in every mode.
+- The **control plane** is optional, exactly as with a hosted broker.
+
+### What it keeps and what it gives up
+
+| | Solo | With a broker |
+|---|---|---|
+| Encryption at rest, Hello unlock, leases | yes | yes |
+| Placeholders, grants, consent, audit, anchoring | yes | yes |
+| Agents never see a secret value | yes | yes |
+| Fixed egress IP that upstreams can allow-list | **no**, requests leave from your own connection | yes |
+| Secrets held on a different machine from the agents | **no** | yes |
+| Protected from code running as admin on the workstation | **no** | yes, outside the lease's reach |
+| Works offline | yes | no |
+
+Solo mode protects against what reads files, environment variables and prompts: an agent, a
+malicious package, a leaked transcript. It does not protect against an attacker who already has
+admin on the machine. Neither does any tool that keeps the secrets on that machine.
+
+### Saying it plainly
+
+- The tray menu shows **Solo** next to the lease state. `tir doctor` and the status page list the
+  two lines marked **no** above, and say which one applies if the broker fell back to running inside
+  the app ("Broker runs inside the app: install the service for process isolation").
+- The first-run wizard picks solo by default and states the trade-off in one sentence before
+  continuing.
+
+### Moving to a broker later
+
+A **Move to a broker** wizard enrols the new broker host into the existing chain, re-seals the
+vault to the broker's key and switches the local broker off. Placeholders, grants and the audit
+history carry over; only the upstream allow-lists need the new egress IP.
+
 ## Open questions
 
-1. **Solo mode, no separate broker host.** Most individual developers don't run a VPS. A solo mode
-   could run the broker inside the app on the same machine. It keeps encryption at rest,
-   placeholders, consent and audit. It loses the fixed egress IP and the separation between the
-   machine holding secrets and the machine running agents. It would make the first ten minutes
-   trivial. The trade-off has to be stated plainly in the UI.
-2. **Broker install for teams:** a container image, a single-file binary plus a systemd/Windows
+1. **Broker install for teams:** a container image, a single-file binary plus a systemd/Windows
    service, or both. The app could generate the broker's config and the enrolment bundle.
-3. **Notifications:** Windows toast for loud events (new device, break-glass) in addition to the
+2. **Notifications:** Windows toast for loud events (new device, break-glass) in addition to the
    control plane's push.

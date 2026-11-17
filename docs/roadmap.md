@@ -10,7 +10,7 @@ public.
       ([design](desktop-app.md))
 - [ ] User-secrets agent side: pipe server, keys-only consent, sealing on first load, `tir secrets`
 - [ ] Local activity log, plus `tir activity` and the app's activity window
-- [ ] Decision on solo mode (broker in-process, no VPS)
+- [ ] Solo mode: local broker as a Windows service ([design](desktop-app.md#solo-mode))
 - [ ] winget + Velopack installer, signed with Azure Trusted Signing
 
 ## Identity
