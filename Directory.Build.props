@@ -3,8 +3,8 @@
     <Authors>Steve Hansen</Authors>
     <Copyright>Copyright (c) 2026 Steve Hansen</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/stevehansen/Tiresias</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/stevehansen/Tiresias</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/hansen-consultancy/Tiresias</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/hansen-consultancy/Tiresias</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>secrets;credentials;user-secrets;vault;ai-agents;windows-hello</PackageTags>

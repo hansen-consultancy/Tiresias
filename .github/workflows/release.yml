@@ -31,6 +31,8 @@ jobs:
         id: login
         uses: NuGet/login@v1
         with:
+          # nuget.org profile name owning the trusted-publishing policy (not the GitHub owner).
+          # The policy itself names repository owner hansen-consultancy, repo Tiresias, release.yml.
           user: stevehansen
       - name: Push
         shell: bash

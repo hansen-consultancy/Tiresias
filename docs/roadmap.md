@@ -15,9 +15,8 @@ public.
 
 ## Identity
 
-- [ ] Logo: a mark that reads at 16 px (tray, favicon) and at full size (README, docs). See
-      `assets/logo-concept.svg` for a first concept, a closed eye whose lashes are key teeth.
-      Final artwork is better done by a designer.
+- [x] Logo: a closed eye whose lashes are key teeth (`assets/logo.svg`)
+- [ ] Logo variants: checked at 16 px (tray, favicon), a PNG export for NuGet and the README
 - [ ] Tray icon states: locked, unlocked, a consent waiting, an error
 - [ ] NuGet package icon, and the GitHub social preview image
 
