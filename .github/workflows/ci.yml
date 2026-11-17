@@ -15,6 +15,7 @@ jobs:
       matrix:
         os: [windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -28,7 +29,8 @@ jobs:
         if: runner.os == 'Windows'
         run: dotnet build Tiresias.slnx -c Release
       - name: Test
-        run: dotnet test src/Tiresias.Tests/Tiresias.Tests.csproj -c Release
+        # A hung test fails after 5 minutes and is named in the log, instead of holding the runner.
+        run: dotnet test src/Tiresias.Tests/Tiresias.Tests.csproj -c Release --blame-hang-timeout 5m --blame-hang-dump-type none
       - name: Pack
         if: runner.os == 'Windows'
         run: dotnet pack Tiresias.slnx -c Release -o artifacts
