@@ -44,7 +44,7 @@ jobs:
           DENYLIST: ${{ secrets.DENYLIST }}
         run: |
           if [ -z "$DENYLIST" ]; then echo "No denylist secret available; skipped."; exit 0; fi
-          printf '%s\n' "$DENYLIST" | sed '/^[[:space:]]*$/d' > "$RUNNER_TEMP/deny.txt"
+          printf '%s\n' "$DENYLIST" | sed '/^[[:space:]]*$/d; /^[[:space:]]*#/d' > "$RUNNER_TEMP/deny.txt"
           if grep -rliF -f "$RUNNER_TEMP/deny.txt" --exclude-dir=.git . ; then
             echo "::error::Denied names found in the files listed above."
             exit 1
