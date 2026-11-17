@@ -9,12 +9,37 @@ on:
 
 permissions:
   contents: write # create the release and upload the packages
+  id-token: write # sign in to Azure through GitHub OIDC: no stored secret
 
 jobs:
   release:
     runs-on: windows-latest
     timeout-minutes: 30
+    # The Azure federated credential trusts this environment, not a tag name (it takes no wildcards).
+    environment: app-release
     steps:
+      # Everything signing needs comes from variables (repository or environment); no values live in
+      # this file. docs/releasing.md has the one-time Azure setup that produces them.
+      - name: Check signing configuration
+        shell: bash
+        env:
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          AZURE_SIGNING_ENDPOINT: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          AZURE_SIGNING_ACCOUNT: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          AZURE_SIGNING_PROFILE: ${{ vars.AZURE_SIGNING_PROFILE }}
+        run: |
+          missing=""
+          for name in AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID AZURE_SIGNING_ENDPOINT AZURE_SIGNING_ACCOUNT AZURE_SIGNING_PROFILE; do
+            eval "value=\${$name:-}"
+            [ -z "$value" ] && missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error title=Code signing is not set up::Missing repository variables:$missing. An unsigned release is not published. See docs/releasing.md, 'One-time Azure setup'."
+            exit 1
+          fi
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -47,6 +72,24 @@ jobs:
           dotnet publish src/Tiresias.App -c Release -r win-x64 --self-contained -p:Version="$v" -o publish
           dotnet publish src/Tiresias.Keyring -c Release -r win-x64 --self-contained -p:Version="$v" -o publish
 
+      - name: Azure sign-in (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Signing metadata
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/signing.json" <<JSON
+          {
+            "Endpoint": "${{ vars.AZURE_SIGNING_ENDPOINT }}",
+            "CodeSigningAccountName": "${{ vars.AZURE_SIGNING_ACCOUNT }}",
+            "CertificateProfileName": "${{ vars.AZURE_SIGNING_PROFILE }}"
+          }
+          JSON
+
       - name: Install vpk
         run: dotnet tool install --global vpk --version 1.2.161
 
@@ -60,7 +103,25 @@ jobs:
         run: |
           vpk pack --packId Tiresias --packTitle Tiresias --packAuthors "Tiresias contributors" \
             --packVersion "${{ steps.meta.outputs.version }}" --packDir publish --mainExe Tiresias.exe \
-            --icon assets/export/tiresias.ico --releaseNotes "$RUNNER_TEMP/notes.md" --outputDir Releases
+            --icon assets/export/tiresias.ico --releaseNotes "$RUNNER_TEMP/notes.md" --outputDir Releases \
+            --azureTrustedSignFile "$RUNNER_TEMP/signing.json"
+
+      # vpk signs Tiresias.exe, tir.exe and every other unsigned binary in the package, then the
+      # installer. Stop here if anything users run came out unsigned: check the installer and the
+      # two executables inside the full package that updates install.
+      - name: Verify signatures
+        shell: pwsh
+        run: |
+          $full = Get-ChildItem Releases -Filter "*-${{ steps.meta.outputs.version }}-full.nupkg" | Select-Object -First 1
+          Copy-Item $full.FullName "$env:RUNNER_TEMP/full.zip"   # Expand-Archive only takes a .zip name
+          Expand-Archive "$env:RUNNER_TEMP/full.zip" -DestinationPath "$env:RUNNER_TEMP/full" -Force
+          $files = @(Get-ChildItem "$env:RUNNER_TEMP/full" -Include Tiresias.exe, tir.exe -Recurse) + @(Get-ChildItem Releases -Filter *-Setup.exe)
+          $bad = $files | Where-Object { (Get-AuthenticodeSignature $_.FullName).Status -ne 'Valid' }
+          if ($files.Count -lt 3 -or $bad) {
+            Write-Output "::error title=Unsigned files::$($bad.Name -join ', ')"
+            exit 1
+          }
+          $files | ForEach-Object { "{0}: {1}" -f $_.Name, (Get-AuthenticodeSignature $_.FullName).SignerCertificate.Subject }
 
       - name: Publish the release
         shell: bash
