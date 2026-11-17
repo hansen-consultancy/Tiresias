@@ -45,12 +45,16 @@ tools run as you. Tiresias moves those secrets behind three things:
 
 Your existing `builder.Configuration.AddUserSecrets<Program>()` and
 `WebApplication.CreateBuilder(args)` calls are rerouted at compile time by a C# interceptor. The
-library side is done. The agent's side (consent prompt, sealing on first load, `tir secrets`) is
-still being built.
+agent (the tray app, or `tir agent` in a terminal) answers on a per-user named pipe.
 
 - **With the agent running:** the first load converts `secrets.json` into a sealed envelope that
   is still valid JSON. After that, a consent prompt shows the requesting executable and the
   secret *keys* (never values) before the app gets them.
+- **While locked:** a sealed file is refused with a message saying to unlock; a plaintext one is
+  served unchanged and sealed on the first load after you unlock. "Allow for this session" lasts
+  until you lock (or 12 hours).
+- **Editing:** `tir secrets list | set <key> | remove <key>` in the project folder, or the app's
+  editor. No command prints a value or writes the file back in clear.
 - **Without the agent:** a colleague who doesn't use Tiresias keeps the stock plaintext
   behaviour. A sealed file fails loudly instead of silently loading nothing.
 

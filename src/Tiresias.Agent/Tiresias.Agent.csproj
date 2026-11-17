@@ -11,6 +11,8 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <RootNamespace>Tiresias.Agent</RootNamespace>
+    <!-- LibraryImport marshalling of the pipe client PID out-parameter. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>

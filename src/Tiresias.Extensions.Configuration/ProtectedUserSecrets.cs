@@ -137,7 +137,8 @@ sealed class ProtectedUserSecretsProvider(string userSecretsId, string directory
             case AgentStatus.Ok:
                 return reply.Json;
             case AgentStatus.Denied:
-                throw new InvalidOperationException($"Access to user secrets '{userSecretsId}' was denied on the tir consent screen.");
+                throw new InvalidOperationException($"Access to user secrets '{userSecretsId}' was denied by Tiresias: "
+                    + (reply.Message ?? "declined on the consent screen."));
             case AgentStatus.Error:
                 throw new InvalidOperationException($"The tir agent could not load user secrets '{userSecretsId}': {reply.Message}");
         }
@@ -148,7 +149,7 @@ sealed class ProtectedUserSecretsProvider(string userSecretsId, string directory
         {
             SecretsFileKind.Plain => text,
             SecretsFileKind.Sealed => throw new InvalidOperationException(
-                $"User secrets '{userSecretsId}' are protected by tir and no tir agent is running. Start it with 'tir agent'."),
+                $"User secrets '{userSecretsId}' are protected by tir and the Tiresias agent is not running. Start the Tiresias app (or run 'tir agent'), then start this app again."),
             _ when optional => null,
             _ => throw new InvalidDataException($"'{path}' is not valid JSON."),
         };

@@ -10,7 +10,7 @@ static class TenantSelection
     public static void Apply(CommandLine line)
     {
         var command = line.At(0);
-        if (command is null or "enroll" or "recovery")
+        if (command is null or "enroll" or "recovery" or "secrets")
             return;
         var tenants = KeyringStore.Tenants;
         if (tenants.Count == 0)

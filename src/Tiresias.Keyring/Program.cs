@@ -17,6 +17,12 @@ const string Usage = """
     tir elevate <service> <grant> [--for 15m]
     tir exec <service>[,<service>...] --purpose <text> [--for 1h] [--ceiling <grant>] -- <command> [args...]
     tir doctor [--projects <dir>]
+
+    tir secrets list [--project <path> | --id <UserSecretsId>]
+    tir secrets set <key> [--from-stdin] [--project <path> | --id <UserSecretsId>]
+    tir secrets remove <key> [--project <path> | --id <UserSecretsId>]
+        A project's protected user secrets (the project in the current folder by default).
+        Values are typed without echo or piped in; no command prints one.
     """;
 
 var line = new CommandLine(args);
@@ -36,6 +42,7 @@ try
         ("elevate", _) => await Commands.ElevateAsync(line),
         ("exec", _) => await Exec.RunAsync(line),
         ("doctor", _) => await Commands.DoctorAsync(line),
+        ("secrets", _) => SecretsCommand.Run(line),
         _ => throw new UsageException("Unknown command."),
     };
 }
