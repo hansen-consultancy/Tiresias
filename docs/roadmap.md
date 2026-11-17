@@ -13,7 +13,10 @@ public.
 - [ ] `tir activity`
 - [x] Solo mode, with the broker hosted in the app ([design](desktop-app.md#solo-mode))
 - [ ] Solo mode: local broker as a Windows service
-- [ ] winget + Velopack installer, signed with Azure Trusted Signing
+- [x] Velopack installer and auto-update from GitHub Releases (`app-release.yml`)
+- [ ] Signed with Azure Artifact Signing (the workflow is ready; it needs the Azure setup in
+      [releasing.md](releasing.md))
+- [ ] winget
 
 ## Identity
 

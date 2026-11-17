@@ -705,4 +705,29 @@
   <data name="FirstRun_Done_Next" xml:space="preserve">
     <value>Next: add the Tiresias.Extensions.Configuration package to a project and start it. Its secrets are sealed on first run.</value>
   </data>
+  <data name="Update_WindowTitle" xml:space="preserve">
+    <value>Tiresias - update</value>
+  </data>
+  <data name="Update_Heading" xml:space="preserve">
+    <value>Tiresias {0} is ready</value>
+    <comment>{0}: the new version</comment>
+  </data>
+  <data name="Update_Body" xml:space="preserve">
+    <value>It is downloaded. Restarting takes a few seconds: Tiresias locks, updates and starts again, and you unlock once more. If the update can't be applied, the current version keeps running.</value>
+  </data>
+  <data name="Update_NotesName" xml:space="preserve">
+    <value>What's new</value>
+  </data>
+  <data name="Update_NoNotes" xml:space="preserve">
+    <value>This release has no notes.</value>
+  </data>
+  <data name="Update_Restart" xml:space="preserve">
+    <value>Restart now</value>
+  </data>
+  <data name="Update_Later" xml:space="preserve">
+    <value>Later</value>
+  </data>
+  <data name="Update_Busy" xml:space="preserve">
+    <value>Finish what's open first (an approval, the secrets editor or setup), then choose the update in the tray menu again.</value>
+  </data>
 </root>

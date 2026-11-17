@@ -89,14 +89,35 @@ about state. Without the app running, the CLI keeps working standalone, exactly 
 
 The goal is one command or one download, then a first-run wizard:
 
-- **winget:** `winget install Tiresias`. The app and `tir` are installed together, and `tir` is
-  put on the PATH.
+- **winget:** `winget install Tiresias` (not built yet). The app and `tir` are installed together,
+  and `tir` is put on the PATH.
 - **Velopack** for the installer and silent auto-update. MSIX is the alternative, but it
   complicates the named pipe, the startup task and CLI-on-PATH.
-- **Code signing:** Azure Trusted Signing. An unsigned security tool is a non-starter
-  (SmartScreen).
+- **Code signing:** Azure Artifact Signing (formerly Trusted Signing). An unsigned security tool is
+  a non-starter (SmartScreen). Setup and release steps: [releasing.md](releasing.md).
 - **NuGet packages** stay the way to *consume* protected user secrets. The app is not needed to
   build, only to unlock.
+
+### How updates work (built)
+
+- **Where from:** this repository's GitHub Releases, from the `app-v*` tags that
+  `.github/workflows/app-release.yml` publishes. They are separate from the NuGet `v*` releases.
+  The installer is `Tiresias-win-Setup.exe` on each app release. It installs per user, with no
+  admin rights, and `tir.exe` sits next to `Tiresias.exe`.
+- **When:** at start, then daily. A check that fails (no network, GitHub down) is logged and
+  retried an hour later; the user sees nothing. A preview build follows preview releases, a stable
+  build only stable ones.
+- **Silently:** a new version downloads in the background (a delta when possible). The tray menu
+  then offers "Update to X available - restart to apply".
+- **Never in the way:** applying is always the user's click. It first shows the release notes,
+  which are that version's section of `CHANGELOG.md`, the same text as the GitHub release. While
+  a consent dialog, the secrets editor or the setup wizard is open, it says to finish that first.
+- **Rollback-safe:** the app quits the normal way, ending the lease, and Velopack swaps the files
+  after it has exited, then starts the new version. If applying fails, the version that was
+  running stays installed. Settings and the vault live in `%LOCALAPPDATA%\Tiresias`, outside the
+  install folder, so an update never touches them.
+- **A build run from source** (`dotnet run`, `dotnet publish`) doesn't update itself, and says so
+  in its log.
 
 ## First-run wizard
 

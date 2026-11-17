@@ -1,0 +1,75 @@
+name: app-release
+
+# The desktop app (Tiresias.exe plus tir), packaged with Velopack and published as a GitHub
+# release that installed apps update from. Separate from release.yml, which publishes the NuGet
+# packages on v* tags: the app and the libraries version independently.
+on:
+  push:
+    tags: ['app-v*']
+
+permissions:
+  contents: write # create the release and upload the packages
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            10.0.x
+            11.0.x
+          dotnet-quality: preview
+
+      - name: Version and release notes
+        id: meta
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#app-v}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          case "$version" in *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;; *) echo "prerelease=false" >> "$GITHUB_OUTPUT" ;; esac
+          sh .github/scripts/release-notes.sh "$version" > "$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/notes.md"
+
+      - name: Test
+        run: dotnet test src/Tiresias.Tests/Tiresias.Tests.csproj -c Release
+
+      # Self-contained: installing the app doesn't need a .NET runtime. tir ships in the same folder.
+      - name: Publish
+        shell: bash
+        run: |
+          v="${{ steps.meta.outputs.version }}"
+          dotnet publish src/Tiresias.App -c Release -r win-x64 --self-contained -p:Version="$v" -o publish
+          dotnet publish src/Tiresias.Keyring -c Release -r win-x64 --self-contained -p:Version="$v" -o publish
+
+      - name: Install vpk
+        run: dotnet tool install --global vpk --version 1.2.161
+
+      # The previous release's full package lets vpk build a delta, so updates download only what changed.
+      - name: Previous release
+        shell: bash
+        run: vpk download github --repoUrl "https://github.com/${{ github.repository }}" --token "${{ secrets.GITHUB_TOKEN }}" --outputDir Releases --pre || true
+
+      - name: Pack
+        shell: bash
+        run: |
+          vpk pack --packId Tiresias --packTitle Tiresias --packAuthors "Tiresias contributors" \
+            --packVersion "${{ steps.meta.outputs.version }}" --packDir publish --mainExe Tiresias.exe \
+            --icon assets/export/tiresias.ico --releaseNotes "$RUNNER_TEMP/notes.md" --outputDir Releases
+
+      - name: Publish the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          v="${{ steps.meta.outputs.version }}"
+          pre=""; [ "${{ steps.meta.outputs.prerelease }}" = "true" ] && pre="--prerelease"
+          gh release create "$GITHUB_REF_NAME" --verify-tag --title "Tiresias app $v" --notes-file "$RUNNER_TEMP/notes.md" $pre
+          # Only this version's files: the downloaded previous package is already on its own release.
+          find Releases -maxdepth 1 -type f \( -name "*$v*" -o -name "*-Setup.exe" -o -name "*-Portable.zip" -o -name "releases.*.json" -o -name "RELEASES*" -o -name "assets.*.json" \) \
+            -print0 | xargs -0 gh release upload "$GITHUB_REF_NAME"

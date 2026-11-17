@@ -266,3 +266,26 @@ public class AppStringsTests
         Assert.That(XDocument.Load(Path.Combine(App, "Strings.resx")).Root!.Elements("data")
             .Where(d => string.IsNullOrWhiteSpace((string?)d.Element("value"))).Select(d => (string)d.Attribute("name")!), Is.Empty);
 }
+
+public class UpdatePlanTests
+{
+    static readonly DateTimeOffset Now = new(2026, 11, 17, 12, 0, 0, TimeSpan.Zero);
+
+    [Test]
+    public void Checks_at_first_start_then_daily()
+    {
+        Assert.That(UpdatePlan.IsDue(null, Now), Is.True);
+        Assert.That(UpdatePlan.IsDue(Now.AddHours(-23), Now), Is.False);
+        Assert.That(UpdatePlan.IsDue(Now.AddHours(-24), Now), Is.True);
+    }
+
+    [Test]
+    public void A_last_check_in_the_future_after_a_clock_change_does_not_stop_checks() =>
+        Assert.That(UpdatePlan.IsDue(Now.AddDays(3), Now), Is.True);
+
+    [TestCase("0.1.0-preview.3", true)]
+    [TestCase("0.1.0", false)]
+    [TestCase("1.2.0", false)]
+    public void A_preview_build_follows_preview_releases(string version, bool expected) =>
+        Assert.That(UpdatePlan.FollowsPrereleases(version), Is.EqualTo(expected));
+}

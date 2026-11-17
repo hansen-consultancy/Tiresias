@@ -21,6 +21,7 @@ public partial class App : Application
     ConsentPresenter? consent;
     AgentHost? host;
     TrayController? tray;
+    AppUpdates? updates;
     readonly Dictionary<Type, Window> windows = [];
 
     internal AgentHost Host => host!;
@@ -72,6 +73,9 @@ public partial class App : Application
         SystemEvents.SessionSwitch += OnSessionSwitch;
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
         Refresh();
+
+        updates = new AppUpdates(this, tray);
+        updates.Start();
 
         if (FirstRunPlan.Needed(SetupFacts()))
             ShowWindow<FirstRunWindow>();
@@ -215,6 +219,7 @@ public partial class App : Application
     {
         SystemEvents.SessionSwitch -= OnSessionSwitch;
         SystemEvents.PowerModeChanged -= OnPowerModeChanged;
+        updates?.Dispose();
         tray?.Dispose();
         await stop.CancelAsync();
         if (host is not null)
