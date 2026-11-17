@@ -32,7 +32,8 @@ All projects live in `src/`; `Tiresias.slnx` is hand-written (add new projects t
 | `Tiresias.Extensions.Configuration` | net11.0, packed | `AddUserSecrets` replacement; ships the generator and `buildTransitive` props |
 | `…Configuration.Generator` | netstandard2.0 | C# interceptor rerouting `AddUserSecrets` / `CreateBuilder` |
 | `Tiresias.Broker`, `Tiresias.Forwarder` | net11.0 | Broker service; loopback relay identifying the calling process |
-| `Tiresias.Keyring` | net11.0-windows | The `tir` CLI and agent |
+| `Tiresias.Agent` | net11.0-windows | The workstation agent's logic, shared by `tir` and the app |
+| `Tiresias.Keyring` | net11.0-windows | The `tir` CLI, a thin console front over `Tiresias.Agent` |
 | `Tiresias.Tests` | net11.0 | NUnit, covers all of the above |
 
 ## Invariants

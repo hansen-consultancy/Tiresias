@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The workstation agent's logic, shared by the tir CLI and the tray app: the Keyring store, broker
+    client, Windows Hello wrapper, lease keeping and the doctor probe. Windows only (Hello via WinRT,
+    DPAPI, session events), built on the Windows CI leg only.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net11.0-windows10.0.22621.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>Tiresias.Agent</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" />
+    <PackageReference Include="Microsoft.Win32.SystemEvents" />
+    <PackageReference Include="NSec.Cryptography" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Tiresias.Core\Tiresias.Core.csproj" />
+  </ItemGroup>
+
+</Project>

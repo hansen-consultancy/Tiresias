@@ -2,23 +2,23 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using NSec.Cryptography;
 
-namespace Tiresias.Keyring;
+namespace Tiresias.Agent;
 
 /// <summary>The broker this Keyring talks to, pinned at enrolment. Every lease offer must verify against <see cref="IdentityKey"/>.</summary>
-sealed record BrokerPin(Uri Url, string IdentityKey);
+public sealed record BrokerPin(Uri Url, string IdentityKey);
 
 /// <summary>Local settings. <see cref="RecoveryPublicKey"/> is only the public half; the private half exists on paper.</summary>
-sealed record KeyringSettings(string DeviceId, string VaultPath, string? RecoveryPublicKey);
+public sealed record KeyringSettings(string DeviceId, string VaultPath, string? RecoveryPublicKey);
 
 /// <summary>
 /// One broker this Keyring is enrolled with: a tenant (personal, customer), each with its own pinned
 /// identity, vault and trust chain. <see cref="GenesisHash"/> is the trust chain's pinned genesis,
 /// when the tenant runs one.
 /// </summary>
-sealed record TenantConfig(string Name, Uri Url, string IdentityKey, string VaultPath, string? GenesisHash = null);
+public sealed record TenantConfig(string Name, Uri Url, string IdentityKey, string VaultPath, string? GenesisHash = null);
 
 /// <summary>The lease <c>tir unlock</c> opened, so <c>tir agent</c>, <c>tir status</c> and <c>tir lock</c> can find it.</summary>
-sealed record OpenLease(string LeaseId, DateTimeOffset HardCapAt);
+public sealed record OpenLease(string LeaseId, DateTimeOffset HardCapAt);
 
 /// <summary>
 /// Everything the Keyring keeps on disk, under <c>%LOCALAPPDATA%\Tiresias</c>. None of it is a
@@ -27,7 +27,7 @@ sealed record OpenLease(string LeaseId, DateTimeOffset HardCapAt);
 /// <see cref="Use"/>; a Keyring enrolled the old way, with <c>broker.json</c>, is one tenant named
 /// <c>default</c>.
 /// </summary>
-static class KeyringStore
+public static class KeyringStore
 {
     static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
     static readonly byte[] DeviceKeyEntropy = "tiresias/v1/device-key"u8.ToArray();
@@ -93,6 +93,17 @@ static class KeyringStore
 
     public static BrokerPin RequireBroker() =>
         Broker ?? throw new InvalidOperationException("Not enrolled. Run: tir enroll --broker <url> --broker-key <base64>");
+
+    /// <summary>The device's public key as base64 raw Ed25519, for a broker's <c>Devices</c> list. Creates the key on first use.</summary>
+    public static string DevicePublicKey()
+    {
+        using var key = LoadOrCreateDeviceKey();
+        return Convert.ToBase64String(key.PublicKey.Export(KeyBlobFormat.RawPublicKey));
+    }
+
+    /// <summary>Throws when <paramref name="base64"/> isn't a raw Ed25519 public key.</summary>
+    public static void ValidateBrokerKey(string base64) =>
+        PublicKey.Import(SignatureAlgorithm.Ed25519, Convert.FromBase64String(base64), KeyBlobFormat.RawPublicKey);
 
     /// <summary>The device's Ed25519 signing key, created on first use and stored DPAPI-protected (CurrentUser).</summary>
     public static Key LoadOrCreateDeviceKey()

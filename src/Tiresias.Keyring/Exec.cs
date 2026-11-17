@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Tiresias.Access;
 using Tiresias.Client;
+using Tiresias.Agent;
 using Tiresias.Vault;
 
 namespace Tiresias.Keyring;
@@ -47,7 +48,7 @@ static class Exec
             return Fail("Not approved.");
         HelloKeyWrapper.ConfirmPresence($"exec\n{string.Join(',', slugs)}\n{consumer}");
 
-        using var client = Commands.Client(KeyringStore.RequireBroker(), settings);
+        using var client = BrokerClient.For(KeyringStore.RequireBroker());
         var credentials = new List<ExecCredential>();
         var minted = new List<string>();
         try

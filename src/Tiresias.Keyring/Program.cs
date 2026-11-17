@@ -1,3 +1,4 @@
+using Tiresias.Agent;
 using Tiresias.Keyring;
 
 const string Usage = """
@@ -30,11 +31,11 @@ try
         ("unlock", _) => await Commands.UnlockAsync(line),
         ("lock", _) => await Commands.LockAsync(),
         ("status", _) => await Commands.StatusAsync(),
-        ("agent", _) => await Agent.RunAsync(),
+        ("agent", _) => await AgentCommand.RunAsync(),
         ("grant", _) => await Commands.GrantAsync(line),
         ("elevate", _) => await Commands.ElevateAsync(line),
         ("exec", _) => await Exec.RunAsync(line),
-        ("doctor", _) => await DoctorCommand.RunAsync(line),
+        ("doctor", _) => await Commands.DoctorAsync(line),
         _ => throw new UsageException("Unknown command."),
     };
 }

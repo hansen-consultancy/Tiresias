@@ -3,7 +3,7 @@ using Tiresias.Vault;
 using Windows.Security.Credentials;
 using Windows.Security.Cryptography;
 
-namespace Tiresias.Keyring;
+namespace Tiresias.Agent;
 
 /// <summary>
 /// The day-to-day vault key: a Windows Hello credential (<see cref="KeyCredentialManager"/>, named
@@ -21,7 +21,7 @@ namespace Tiresias.Keyring;
 /// and is zeroed after derivation; it exists in this process's memory for that moment.
 /// One instance costs one Hello prompt, on first use.
 /// </remarks>
-sealed class HelloKeyWrapper : IKeyWrapper, IDisposable
+public sealed class HelloKeyWrapper : IKeyWrapper, IDisposable
 {
     public const string CredentialName = "Tiresias";
 

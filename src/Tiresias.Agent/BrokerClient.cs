@@ -3,10 +3,10 @@ using System.Text.Json;
 using Tiresias.Transport;
 using NSec.Cryptography;
 
-namespace Tiresias.Keyring;
+namespace Tiresias.Agent;
 
 /// <summary>The broker's answer: the status, and the JSON body when there was one.</summary>
-sealed record BrokerResponse(HttpStatusCode Status, JsonElement? Body)
+public sealed record BrokerResponse(HttpStatusCode Status, JsonElement? Body)
 {
     public bool Ok => (int)Status is >= 200 and < 300;
 
@@ -23,9 +23,12 @@ sealed record BrokerResponse(HttpStatusCode Status, JsonElement? Body)
 /// Management calls to the broker, each signed with the device key per <see cref="RequestSignature"/>
 /// over the exact request target the broker will see. Owns the device key it is given.
 /// </summary>
-sealed class BrokerClient(BrokerPin broker, string deviceId, Key deviceKey) : IDisposable
+public sealed class BrokerClient(BrokerPin broker, string deviceId, Key deviceKey) : IDisposable
 {
     readonly HttpClient http = new() { Timeout = TimeSpan.FromSeconds(30) };
+
+    /// <summary>A client for <paramref name="broker"/> signing as this device, with the selected tenant's settings.</summary>
+    public static BrokerClient For(BrokerPin broker) => new(broker, KeyringStore.Settings.DeviceId, KeyringStore.LoadOrCreateDeviceKey());
 
     public async Task<BrokerResponse> PostAsync(string endpoint, object? body = null)
     {

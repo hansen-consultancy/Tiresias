@@ -1,4 +1,5 @@
 using Tiresias.Client;
+using Tiresias.Agent;
 using Tiresias.Vault;
 
 namespace Tiresias.Keyring;
