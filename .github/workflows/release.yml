@@ -36,4 +36,9 @@ jobs:
           user: ${{ secrets.NUGET_USER }}
       - name: Push
         shell: bash
-        run: dotnet nuget push "artifacts/*.nupkg" --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+        # One file at a time: on Windows, dotnet nuget push does not expand "artifacts/*.nupkg".
+        # Each .nupkg push also uploads the matching .snupkg.
+        run: |
+          for f in artifacts/*.nupkg; do
+            dotnet nuget push "$f" --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+          done
