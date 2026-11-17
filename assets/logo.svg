@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="t">
+  <title id="t">Tiresias logo: a closed eye whose lashes are key teeth</title>
+  <style>
+    .mark { fill: none; stroke: #1f2a44; stroke-width: 9; stroke-linecap: butt; }
+    @media (prefers-color-scheme: dark) { .mark { stroke: #e6ebf5; } }
+  </style>
+  <g class="mark" transform="translate(0 -3)">
+    <!-- Closed eyelid: y = 46 + 64·t·(1−t) along x = 14 + 100·t -->
+    <path d="M14 46 Q64 78 114 46" />
+    <!-- Lashes start on the lid's centre line; uneven lengths cut them like a key's bitting -->
+    <path d="M26 52.8 V71 M45 59.7 V86 M64 62 V80 M83 59.7 V92 M102 52.8 V67" />
+  </g>
+</svg>

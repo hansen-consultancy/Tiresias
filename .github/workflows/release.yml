@@ -31,7 +31,9 @@ jobs:
         id: login
         uses: NuGet/login@v1
         with:
-          user: stevehansen
+          # nuget.org profile name of the account that created the trusted-publishing policy (owner
+          # hansen-consultancy, repo Tiresias, release.yml). Kept in a secret so it isn't published.
+          user: ${{ secrets.NUGET_USER }}
       - name: Push
         shell: bash
         run: dotnet nuget push "artifacts/*.nupkg" --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate

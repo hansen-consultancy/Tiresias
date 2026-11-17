@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" role="img" aria-labelledby="t">
+  <title id="t">Tiresias icon (16 px grid): closed eye, three key-tooth lashes</title>
+  <style>
+    .mark { fill: none; stroke: #1f2a44; stroke-width: 2; stroke-linecap: butt; }
+    @media (prefers-color-scheme: dark) { .mark { stroke: #e6ebf5; } }
+  </style>
+  <!-- Drawn for 16 and 32 px (tray, favicon); the 128 px mark loses its lashes at that size.
+       Lashes sit on whole pixels, x = 3–5, 7–9, 11–13. -->
+  <g class="mark">
+    <path d="M1 4 Q8 10 15 4" />
+    <path d="M4 6 V10 M8 7 V13 M12 6 V11" />
+  </g>
+</svg>
