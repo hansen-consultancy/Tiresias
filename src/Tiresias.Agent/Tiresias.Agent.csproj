@@ -2,7 +2,8 @@
 
   <!--
     The workstation agent's logic, shared by the tir CLI and the tray app: the Keyring store, broker
-    client, Windows Hello wrapper, lease keeping and the doctor probe. Windows only (Hello via WinRT,
+    client, Windows Hello wrapper, lease keeping, the user-secrets pipe, the
+    solo-mode broker and the doctor probe. Windows only (Hello via WinRT,
     DPAPI, session events), built on the Windows CI leg only.
   -->
   <PropertyGroup>
@@ -23,6 +24,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Solo mode hosts the broker in-process, on loopback. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Tiresias.Broker\Tiresias.Broker.csproj" />
     <ProjectReference Include="..\Tiresias.Core\Tiresias.Core.csproj" />
   </ItemGroup>
 

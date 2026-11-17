@@ -8,6 +8,9 @@ const string Usage = """
     several brokers and the service doesn't settle which.
 
     tir recovery init
+    tir solo init
+        Solo mode: the broker runs inside the Tiresias app on this PC, no server needed. Creates
+        the recovery key if there is none (or asks for it) and a one-device trust chain.
     tir vault add <slug> [--from-stdin]
     tir unlock [--secrets a,b]
     tir lock
@@ -33,6 +36,7 @@ try
     {
         ("enroll", _) => Commands.Enroll(line),
         ("recovery", "init") => Commands.RecoveryInit(),
+        ("solo", "init") => Commands.SoloInit(),
         ("vault", "add") => Commands.VaultAdd(line),
         ("unlock", _) => await Commands.UnlockAsync(line),
         ("lock", _) => await Commands.LockAsync(),

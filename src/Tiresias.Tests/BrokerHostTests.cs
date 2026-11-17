@@ -21,6 +21,7 @@ public class BrokerHostTests
     Key device = null!;
     FakeUpstream upstream = null!;
     WebApplicationFactory<Program> factory = null!;
+    WebApplicationFactory<Program>? parent;
     HttpClient client = null!;
 
     [SetUp]
@@ -48,6 +49,8 @@ public class BrokerHostTests
     {
         client.Dispose();
         factory.Dispose();
+        parent?.Dispose();
+        parent = null;
         upstream.Dispose();
         device.Dispose();
         vault.Dispose();
@@ -161,6 +164,26 @@ public class BrokerHostTests
             .Select(l => JsonDocument.Parse(l).RootElement)
             .Single(r => r.GetProperty("kind").GetString() == "Allow");
         Assert.That(allow.GetProperty("process").GetString(), Is.EqualTo(@"C:\tools\export.exe (pid 4242)"));
+    }
+
+    [Test]
+    public async Task In_solo_mode_a_caller_cannot_claim_a_process_of_its_own()
+    {
+        parent = factory;
+        client.Dispose();
+        factory = parent.WithWebHostBuilder(b => b.UseSetting("Broker:IdentifyLoopbackCaller", "true"));
+        client = factory.CreateClient();
+
+        var token = await OpenLeaseAndMint();
+        var message = Svc(HttpMethod.Get, "/svc/llm/v1/models", token);
+        message.Headers.Add(ForwarderHeaders.ObservedProcess, @"C:\tools\innocent.exe (pid 1)");
+        Assert.That((await client.SendAsync(message)).StatusCode, Is.EqualTo(HttpStatusCode.OK));
+
+        // The test server has no loopback connection to look up, so nothing is recorded: never the claim.
+        var allow = File.ReadLines(Path.Combine(dir, "audit.jsonl"))
+            .Select(l => JsonDocument.Parse(l).RootElement)
+            .Single(r => r.GetProperty("kind").GetString() == "Allow");
+        Assert.That(allow.TryGetProperty("process", out var process) ? process.GetString() : null, Is.Null);
     }
 
     [Test]

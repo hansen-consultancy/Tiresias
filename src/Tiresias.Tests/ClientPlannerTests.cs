@@ -4,6 +4,7 @@ using System.Text.Json;
 using Tiresias.Client;
 using Tiresias.GitHub;
 using Tiresias.Policy;
+using NSec.Cryptography;
 
 namespace Tiresias.Tests;
 
@@ -84,6 +85,7 @@ public class DoctorTests
         public bool Enrolled { get; set; } = true;
         public bool HasDeviceKey { get; set; } = true;
         public bool RecoveryKeySet { get; set; } = true;
+        public bool Solo { get; set; }
         public DoctorVault? Vault { get; set; } = new(2, [], []);
         public int? BrokerStatus { get; set; } = 401;
         public bool Forwarder { get; set; } = true;
@@ -106,6 +108,22 @@ public class DoctorTests
         Assert.That(checks.Select(c => c.Status), Is.All.EqualTo(DoctorStatus.Ok));
         Assert.That(checks.Select(c => c.Name), Is.EqualTo(new[] { "broker pinned", "device key", "recovery key", "vault", "broker reachable", "forwarder" }));
     }
+
+    [Test]
+    public async Task Solo_mode_states_its_trade_offs_and_needs_no_forwarder()
+    {
+        var checks = await Doctor.RunAsync(new FakeProbe { Solo = true, Forwarder = false });
+        Assert.That(checks.Single(c => c.Name == "mode").Detail, Does.StartWith("Solo"));
+        Assert.That(checks.Single(c => c.Name == "forwarder").Status, Is.EqualTo(DoctorStatus.Ok));
+        var warnings = checks.Where(c => c.Status == DoctorStatus.Warn).Select(c => c.Detail).ToArray();
+        Assert.That(warnings, Has.Some.Contains("fixed IP"));
+        Assert.That(warnings, Has.Some.Contains("same machine").And.Some.Contains("admin"));
+        Assert.That(warnings, Has.Some.StartsWith("Broker runs inside the app"));
+    }
+
+    [Test]
+    public async Task An_unreachable_solo_broker_says_to_start_the_app() =>
+        Assert.That((await Check(new FakeProbe { Solo = true, BrokerStatus = null }, "broker reachable")).Detail, Does.Contain("start the app"));
 
     [Test]
     public async Task No_recovery_key_or_an_unrecoverable_secret_fails()
@@ -182,5 +200,63 @@ public class DoctorTests
         var projects = (await Doctor.RunAsync(probe)).Where(c => c.Name.StartsWith("project", StringComparison.Ordinal)).ToArray();
         Assert.That(projects.Select(c => c.Name), Is.EqualTo(new[] { "project bare.csproj" }));
         Assert.That(projects[0].Status, Is.EqualTo(DoctorStatus.Warn));
+    }
+}
+
+public class PaperKeyTests
+{
+    static readonly byte[] Raw = Enumerable.Range(1, 32).Select(i => (byte)(i * 7)).ToArray();
+
+    [Test]
+    public void A_formatted_key_parses_back_however_it_is_typed()
+    {
+        var text = PaperKey.Format(Raw);
+        Assert.That(text.Split('\n'), Has.Length.EqualTo(2));
+        Assert.That(PaperKey.Parse(text), Is.EqualTo(Raw));
+        Assert.That(PaperKey.Parse(text.ToLowerInvariant().Replace(' ', '-').Replace("\n", "  ")), Is.EqualTo(Raw));
+    }
+
+    [TestCase("")]
+    [TestCase("ABCD 1890")]
+    [TestCase("ABCD EFGH")]
+    public void Anything_else_is_not_a_key(string text) => Assert.That(PaperKey.Parse(text), Is.Null);
+
+    [Test]
+    public void Words_are_the_groups_of_four_in_order()
+    {
+        var words = PaperKey.Words(Raw);
+        Assert.That(words, Has.Count.EqualTo(13));
+        Assert.That(string.Join(" ", words), Is.EqualTo(PaperKey.Format(Raw).Replace('\n', ' ')));
+    }
+
+    [TestCase(0, 0, 0, 1)]
+    [TestCase(5, 5, 5, 6)]
+    [TestCase(9, 2, 2, 9)]
+    public void A_challenge_asks_two_different_words_in_order(int first, int second, int expectedFirst, int expectedSecond)
+    {
+        var draws = new Queue<int>([first, second]);
+        Assert.That(PaperKey.Challenge(13, _ => draws.Dequeue()), Is.EqualTo((expectedFirst, expectedSecond)));
+    }
+
+    [Test]
+    public void Confirm_ignores_case_and_spaces_but_not_a_wrong_word()
+    {
+        var words = PaperKey.Words(Raw);
+        Assert.That(PaperKey.Confirm(words, (1, 4), $" {words[1].ToLowerInvariant()}", words[4]), Is.True);
+        Assert.That(PaperKey.Confirm(words, (1, 4), words[4], words[1]), Is.False);
+    }
+
+    [Test]
+    public void The_signing_key_is_stable_and_not_the_recovery_key_itself()
+    {
+        using var a = PaperKey.SigningKey(Raw);
+        using var b = PaperKey.SigningKey(Raw);
+        Assert.That(a.PublicKey.Export(KeyBlobFormat.RawPublicKey), Is.EqualTo(b.PublicKey.Export(KeyBlobFormat.RawPublicKey)));
+
+        using var recovery = Key.Import(KeyAgreementAlgorithm.X25519, Raw, KeyBlobFormat.RawPrivateKey);
+        var recoveryPublic = recovery.PublicKey.Export(KeyBlobFormat.RawPublicKey);
+        Assert.That(a.PublicKey.Export(KeyBlobFormat.RawPublicKey), Is.Not.EqualTo(recoveryPublic));
+        Assert.That(PaperKey.Matches(Raw, recoveryPublic), Is.True);
+        Assert.That(PaperKey.Matches(Raw.Reverse().ToArray(), recoveryPublic), Is.False);
     }
 }

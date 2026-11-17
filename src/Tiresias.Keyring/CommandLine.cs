@@ -116,33 +116,4 @@ static class Terminal
         Console.Write($"{question} [y/N] ");
         return Console.ReadLine()?.Trim().Equals("y", StringComparison.OrdinalIgnoreCase) == true;
     }
-
-    /// <summary>RFC 4648 base32 in groups of four, for writing a key on paper.</summary>
-    public static string PaperBase32(ReadOnlySpan<byte> bytes)
-    {
-        const string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-        var sb = new StringBuilder();
-        int buffer = 0, bits = 0, written = 0;
-        foreach (var b in bytes)
-        {
-            buffer = (buffer << 8) | b;
-            bits += 8;
-            while (bits >= 5)
-            {
-                Append(alphabet[(buffer >> (bits - 5)) & 31]);
-                bits -= 5;
-            }
-        }
-        if (bits > 0)
-            Append(alphabet[(buffer << (5 - bits)) & 31]);
-        return sb.ToString();
-
-        void Append(char c)
-        {
-            if (written > 0 && written % 4 == 0)
-                sb.Append(written % 32 == 0 ? '\n' : ' ');
-            sb.Append(c);
-            written++;
-        }
-    }
 }

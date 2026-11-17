@@ -31,6 +31,9 @@ public interface IDoctorProbe
     bool HasDeviceKey { get; }
     bool RecoveryKeySet { get; }
 
+    /// <summary>Enrolled with the broker this device hosts itself (solo mode) rather than a remote one.</summary>
+    bool Solo => false;
+
     /// <summary><c>null</c> when the vault file is missing.</summary>
     DoctorVault? Vault { get; }
 
@@ -64,21 +67,36 @@ public static partial class Doctor
             Vault(probe.Vault),
         };
 
+        if (probe.Solo)
+            checks.AddRange(SoloTradeOffs);
         if (probe.Enrolled)
             checks.Add(await probe.BrokerStatusAsync() switch
             {
+                null when probe.Solo => new("broker reachable", DoctorStatus.Fail, "no answer: the broker runs inside the Tiresias app; start the app (or tir agent)"),
                 null => new("broker reachable", DoctorStatus.Fail, "no answer (NetBird down, or the broker stopped)"),
                 401 => new("broker reachable", DoctorStatus.Ok, "answers and refuses unsigned calls"),
                 var status => new("broker reachable", DoctorStatus.Warn, $"answered {status} to an unsigned call; expected 401"),
             });
-        checks.Add(await probe.ForwarderListeningAsync()
-            ? new("forwarder", DoctorStatus.Ok, "listening on loopback")
-            : new("forwarder", DoctorStatus.Warn, "not running: placeholders work only against the broker directly"));
+        if (probe.Solo)
+            checks.Add(new("forwarder", DoctorStatus.Ok, "not needed: the solo broker identifies callers itself"));
+        else
+            checks.Add(await probe.ForwarderListeningAsync()
+                ? new("forwarder", DoctorStatus.Ok, "listening on loopback")
+                : new("forwarder", DoctorStatus.Warn, "not running: placeholders work only against the broker directly"));
 
         checks.AddRange(probe.UserSecretsFiles().Select(UserSecretsFile).OfType<DoctorCheck>());
         checks.AddRange(probe.Projects().Select(Project).OfType<DoctorCheck>());
         return checks;
     }
+
+    /// <summary>What solo mode gives up next to a remote broker (docs/desktop-app.md), stated on every run.</summary>
+    static readonly DoctorCheck[] SoloTradeOffs =
+    [
+        new("mode", DoctorStatus.Ok, "Solo: the broker runs on this device; encryption, leases, placeholders, consent and audit all apply"),
+        new("egress", DoctorStatus.Warn, "Solo: requests leave from your own connection, so there is no fixed IP for upstreams to allow-list"),
+        new("isolation", DoctorStatus.Warn, "Solo: secrets live on the same machine as your agents and are not protected from code running as admin"),
+        new("broker process", DoctorStatus.Warn, "Broker runs inside the app: install the service for process isolation (not built yet)"),
+    ];
 
     static DoctorCheck Vault(DoctorVault? vault)
     {

@@ -7,12 +7,14 @@ namespace Tiresias.Agent;
 /// <summary>
 /// The agent of one user session: the unlocked keys, the user-secrets pipe and the lease keeper,
 /// started and stopped together. <c>tir agent</c> hosts one in a terminal, the tray app in the
-/// background; the consent prompt is the only thing they supply differently.
+/// background; the consent prompt is the only thing they supply differently. In solo mode it also
+/// hosts the broker (<see cref="SoloBroker"/>).
 /// </summary>
 public sealed class AgentHost : IAsyncDisposable
 {
     readonly CancellationTokenSource stop = new();
     readonly LeaseKeeper keeper = new();
+    readonly SoloBroker solo = new();
     readonly AuditLog activity;
     readonly List<Task> running = [];
 
@@ -39,18 +41,46 @@ public sealed class AgentHost : IAsyncDisposable
     /// <summary>Unlocked or locked, the lease opened or ended.</summary>
     public event Action? StateChanged;
 
-    /// <summary>Starts the user-secrets pipe and the lease keeper.</summary>
+    /// <summary>Solo mode: whether the broker this agent hosts is up.</summary>
+    public bool SoloBrokerRunning => solo.Running;
+
+    /// <summary>Solo mode: why the broker could not start, until it does.</summary>
+    public string? SoloBrokerProblem { get; private set; }
+
+    /// <summary>Starts the user-secrets pipe, the lease keeper and, in solo mode, the broker.</summary>
     /// <exception cref="IOException">Another agent (the app, or <c>tir agent</c>) already runs in this session.</exception>
-    public Task StartAsync()
+    public async Task StartAsync()
     {
         var server = new AgentPipeServer<AgentRequest, AgentReply>(AgentWire.PipeName, UserSecrets.HandleAsync, PipeCaller.Identify);
         server.ConnectionFailed += e => Say($"A user-secrets request failed: {e.Message}");
         var serving = server.RunAsync(stop.Token);
         if (serving.IsFaulted)
-            return serving;
+            await serving;
         running.Add(serving);
         running.Add(keeper.RunAsync(stop.Token));
-        return Task.CompletedTask;
+        await StartSoloBrokerAsync();
+    }
+
+    /// <summary>Starts the solo broker when this device uses one and it isn't up; a failure is kept in <see cref="SoloBrokerProblem"/>, not thrown.</summary>
+    async Task StartSoloBrokerAsync()
+    {
+        if (KeyringStore.Tenant is not { Solo: true })
+            return;
+        try
+        {
+            if (solo.Running)
+                await solo.RefreshAsync();
+            else
+                await solo.StartAsync();
+            SoloBrokerProblem = null;
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            // The broker refuses to start on a trust chain or vault it can't verify; say so rather than crash the agent.
+            SoloBrokerProblem = e is IOException ? e.Message : $"The solo broker could not start: {e.Message}";
+            Say(SoloBrokerProblem);
+        }
+        StateChanged?.Invoke();
     }
 
     /// <summary>
@@ -63,6 +93,9 @@ public sealed class AgentHost : IAsyncDisposable
         StateChanged?.Invoke();
         if (KeyringStore.Broker is null)
             return null;
+        await StartSoloBrokerAsync();
+        if (SoloBrokerProblem is { } problem)
+            return new(false, problem, [], [], []);
         var result = await LeaseControl.UnlockAsync(Keys.Hello!);
         Say(result.Message);
         StateChanged?.Invoke();
@@ -109,6 +142,7 @@ public sealed class AgentHost : IAsyncDisposable
         catch (Exception e) when (e is OperationCanceledException or IOException)
         {
         }
+        await solo.DisposeAsync();
         Keys.Dispose();
         UserSecrets.Dispose();
         keeper.Dispose();

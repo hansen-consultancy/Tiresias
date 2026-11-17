@@ -58,6 +58,18 @@ agent (the tray app, or `tir agent` in a terminal) answers on a per-user named p
 - **Without the agent:** a colleague who doesn't use Tiresias keeps the stock plaintext
   behaviour. A sealed file fails loudly instead of silently loading nothing.
 
+## Solo mode: no server needed
+
+`tir solo init` sets Tiresias up on one PC with no VPS. The broker runs inside the agent (the tray
+app, or `tir agent`) on `127.0.0.1:7780` and identifies the calling process from the loopback
+connection, so no forwarder is needed. The trust chain has this one device, its genesis
+co-signed by a key derived from the paper recovery key. Encryption at rest, Hello unlock,
+leases, placeholders, consent and audit all work, offline too. What you give up: requests leave
+from your own connection (no fixed IP to allow-list), and the secrets stay on the same machine
+as your agents, with no protection from code running as admin. `tir doctor` lists these every
+time. The broker shares the agent's process for now; running it as a Windows service under its
+own account is planned (see [docs/desktop-app.md](docs/desktop-app.md#solo-mode)).
+
 ## Trust model in one paragraph
 
 Devices are enrolled into a per-tenant **trust chain**: hash-linked, signed links rooted in a

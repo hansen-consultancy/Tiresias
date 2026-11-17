@@ -10,6 +10,7 @@ namespace Tiresias.Agent;
 public sealed class MachineProbe(string? projectsRoot = null) : IDoctorProbe
 {
     public bool Enrolled => KeyringStore.Broker is not null;
+    public bool Solo => KeyringStore.Tenant is { Solo: true };
     public bool HasDeviceKey => KeyringStore.HasDeviceKey;
     public bool RecoveryKeySet => KeyringStore.Settings.RecoveryPublicKey is not null;
 

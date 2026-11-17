@@ -13,6 +13,7 @@ namespace Tiresias.Keyring;
 /// </summary>
 static class Exec
 {
+    /// <summary>Where placeholders are sent: the forwarder, which relays to a remote broker. A solo broker is called directly.</summary>
     static readonly Uri Forwarder = new("http://127.0.0.1:7781");
 
     public static async Task<int> RunAsync(CommandLine args)
@@ -48,7 +49,7 @@ static class Exec
             return Fail("Not approved.");
         HelloKeyWrapper.ConfirmPresence($"exec\n{string.Join(',', slugs)}\n{consumer}");
 
-        using var client = BrokerClient.For(KeyringStore.RequireBroker());
+        using var client = BrokerClient.For(await Commands.ReachableBrokerAsync());
         var credentials = new List<ExecCredential>();
         var minted = new List<string>();
         try
@@ -69,7 +70,7 @@ static class Exec
             var start = new ProcessStartInfo(args.Rest[0]) { UseShellExecute = false };
             foreach (var arg in args.Rest.Skip(1))
                 start.ArgumentList.Add(arg);
-            foreach (var (name, value) in ExecPlan.Environment(credentials, Forwarder))
+            foreach (var (name, value) in ExecPlan.Environment(credentials, KeyringStore.Tenant is { Solo: true } ? SoloBroker.Url : Forwarder))
                 start.Environment[name] = value;
             using var child = Process.Start(start) ?? throw new InvalidOperationException($"Could not start {args.Rest[0]}.");
             await child.WaitForExitAsync();

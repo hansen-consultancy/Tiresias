@@ -84,7 +84,12 @@ need nothing but the app.
 - The broker identifies the calling process from the loopback connection itself, so the
   **forwarder** is not needed.
 - The **trust chain** has one device and a genesis created on this machine. The paper recovery key
-  exists as in every mode.
+  exists as in every mode; genesis is co-signed by an Ed25519 key derived from it (HKDF, label
+  `tiresias/v1/paper-signing-key`), so one sheet of paper serves both.
+- **Built so far:** `tir solo init`, the broker hosted inside the agent on `127.0.0.1:7780`, and
+  the doctor lines below. **Not built yet:** the Windows service; the broker always runs inside the
+  agent, and it restarts at unlock when the vault changed (a new secret), which ends open
+  placeholders.
 - The **control plane** is optional, exactly as with a hosted broker.
 
 ### What it keeps and what it gives up

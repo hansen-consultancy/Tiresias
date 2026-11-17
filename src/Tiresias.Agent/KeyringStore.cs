@@ -13,9 +13,10 @@ public sealed record KeyringSettings(string DeviceId, string VaultPath, string? 
 /// <summary>
 /// One broker this Keyring is enrolled with: a tenant (personal, customer), each with its own pinned
 /// identity, vault and trust chain. <see cref="GenesisHash"/> is the trust chain's pinned genesis,
-/// when the tenant runs one.
+/// when the tenant runs one. <see cref="Solo"/>: the broker is this workstation's own, hosted by the
+/// agent on loopback (see <see cref="SoloBroker"/>).
 /// </summary>
-public sealed record TenantConfig(string Name, Uri Url, string IdentityKey, string VaultPath, string? GenesisHash = null);
+public sealed record TenantConfig(string Name, Uri Url, string IdentityKey, string VaultPath, string? GenesisHash = null, bool Solo = false);
 
 /// <summary>The lease <c>tir unlock</c> opened, so <c>tir agent</c>, <c>tir status</c> and <c>tir lock</c> can find it.</summary>
 public sealed record OpenLease(string LeaseId, DateTimeOffset HardCapAt);
