@@ -108,6 +108,9 @@ dotnet test src/Tiresias.Tests/Tiresias.Tests.csproj
 You need the .NET 11 SDK, plus the .NET 10 runtime for the `net10.0` libraries. The app and the
 Keyring build on Windows only; the tests run anywhere.
 
+What changed in each release: [CHANGELOG.md](CHANGELOG.md). How releases are made and signed:
+[docs/releasing.md](docs/releasing.md).
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
