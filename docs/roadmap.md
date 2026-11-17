@@ -16,7 +16,8 @@ public.
 ## Identity
 
 - [x] Logo: a closed eye whose lashes are key teeth (`assets/logo.svg`)
-- [ ] Logo variants: checked at 16 px (tray, favicon), a PNG export for NuGet and the README
+- [x] Small icon drawn for 16/32 px (`assets/icon-16.svg`)
+- [ ] PNG exports: NuGet icon (128 px), tray `.ico` (16/32/48), social preview
 - [ ] Tray icon states: locked, unlocked, a consent waiting, an error
 - [ ] NuGet package icon, and the GitHub social preview image
 

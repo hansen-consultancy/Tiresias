@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo.svg" width="112" alt=""></p>
+
 # Tiresias
 
 **Let AI agents and tools use your credentials without ever seeing them.**
