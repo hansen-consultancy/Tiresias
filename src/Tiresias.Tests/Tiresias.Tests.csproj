@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <RootNamespace>Tiresias.Tests</RootNamespace>
+    <!-- Gives WebApplication.CreateBuilder a user-secrets source to add in Development, for the interceptor test. Nothing is stored under it. -->
+    <UserSecretsId>tiresias-tests-0d1f</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NUnit" />
+    <PackageReference Include="NUnit.Analyzers">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="NUnit3TestAdapter" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="NUnit.Framework" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Tiresias.Core\Tiresias.Core.csproj" />
+    <ProjectReference Include="..\Tiresias.Broker\Tiresias.Broker.csproj" />
+    <!-- Aliased: the forwarder's top-level Program would otherwise collide with the broker's. -->
+    <ProjectReference Include="..\Tiresias.Forwarder\Tiresias.Forwarder.csproj" Aliases="forwarder" />
+    <ProjectReference Include="..\Tiresias.Extensions.Configuration\Tiresias.Extensions.Configuration.csproj" />
+    <!-- Twice on purpose: as a library to drive it in a GeneratorDriver, and as an analyzer so this
+         assembly's own AddUserSecrets calls are intercepted, which proves the wiring end to end. -->
+    <ProjectReference Include="..\Tiresias.Extensions.Configuration.Generator\Tiresias.Extensions.Configuration.Generator.csproj" />
+    <ProjectReference Include="..\Tiresias.Extensions.Configuration.Generator\Tiresias.Extensions.Configuration.Generator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+  </ItemGroup>
+
+  <!-- What the package's buildTransitive props does for a NuGet consumer. -->
+  <PropertyGroup>
+    <InterceptorsNamespaces>$(InterceptorsNamespaces);Tiresias.Generated</InterceptorsNamespaces>
+  </PropertyGroup>
+
+</Project>

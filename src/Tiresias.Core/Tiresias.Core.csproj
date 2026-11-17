@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>Tiresias.Core</PackageId>
+    <Description>Vault envelope encryption, trust chain verification, grants, leases and audit for the Tiresias credential broker.</Description>
+    <RootNamespace>Tiresias</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NSec.Cryptography" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Wire formats only; never the configuration package, whose analyzer would flow to Core's consumers. -->
+    <ProjectReference Include="..\Tiresias.Protocol\Tiresias.Protocol.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Tiresias.Tests" />
+  </ItemGroup>
+
+</Project>

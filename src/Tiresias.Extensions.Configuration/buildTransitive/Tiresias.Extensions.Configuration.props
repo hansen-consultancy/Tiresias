@@ -1,0 +1,6 @@
+<Project>
+  <!-- Interceptors only apply from namespaces the consuming project opts into. -->
+  <PropertyGroup>
+    <InterceptorsNamespaces>$(InterceptorsNamespaces);Tiresias.Generated</InterceptorsNamespaces>
+  </PropertyGroup>
+</Project>

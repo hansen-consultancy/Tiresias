@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Tiresias.Broker/Tiresias.Broker.csproj" />
+    <Project Path="src/Tiresias.Core/Tiresias.Core.csproj" />
+    <Project Path="src/Tiresias.Extensions.Configuration.Generator/Tiresias.Extensions.Configuration.Generator.csproj" />
+    <Project Path="src/Tiresias.Extensions.Configuration/Tiresias.Extensions.Configuration.csproj" />
+    <Project Path="src/Tiresias.Forwarder/Tiresias.Forwarder.csproj" />
+    <Project Path="src/Tiresias.Keyring/Tiresias.Keyring.csproj" />
+    <Project Path="src/Tiresias.Protocol/Tiresias.Protocol.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="src/Tiresias.Tests/Tiresias.Tests.csproj" />
+  </Folder>
+</Solution>

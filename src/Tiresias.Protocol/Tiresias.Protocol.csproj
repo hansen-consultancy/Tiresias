@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The formats both sides of a Tiresias conversation must agree on: the sealed secrets.json
+    envelope and the agent pipe protocol. Its own package so Tiresias.Core can read them without
+    depending on Tiresias.Extensions.Configuration, whose interceptor generator and props would
+    otherwise flow into every Core consumer. net10.0 to match the configuration package.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Tiresias.Protocol</RootNamespace>
+    <PackageId>Tiresias.Protocol</PackageId>
+    <Description>Wire formats shared by Tiresias components: the sealed secrets.json envelope and the agent pipe protocol.</Description>
+  </PropertyGroup>
+
+</Project>

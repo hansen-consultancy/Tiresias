@@ -1,0 +1,51 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            10.0.x
+            11.0.x
+          dotnet-quality: preview
+      # The Keyring targets Windows (Hello, TPM), so only the Windows leg builds the whole solution.
+      - name: Build (solution)
+        if: runner.os == 'Windows'
+        run: dotnet build Tiresias.slnx -c Release
+      - name: Test
+        run: dotnet test src/Tiresias.Tests/Tiresias.Tests.csproj -c Release
+      - name: Pack
+        if: runner.os == 'Windows'
+        run: dotnet pack Tiresias.slnx -c Release -o artifacts
+
+  denylist:
+    # Names that must never land here (hosts, people, customers). The list lives in a repository
+    # secret so it is not itself published; matches report the file only, never the text.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for denied names
+        env:
+          DENYLIST: ${{ secrets.DENYLIST }}
+        run: |
+          if [ -z "$DENYLIST" ]; then echo "No denylist secret available; skipped."; exit 0; fi
+          printf '%s\n' "$DENYLIST" | sed '/^[[:space:]]*$/d' > "$RUNNER_TEMP/deny.txt"
+          if grep -rliF -f "$RUNNER_TEMP/deny.txt" --exclude-dir=.git . ; then
+            echo "::error::Denied names found in the files listed above."
+            exit 1
+          fi
