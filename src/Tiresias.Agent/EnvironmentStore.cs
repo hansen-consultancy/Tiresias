@@ -97,6 +97,26 @@ public static partial class EnvironmentStore
         return [.. moving.Select(v => v.Name)];
     }
 
+    /// <summary>
+    /// Seals <paramref name="variable"/>, replacing any of the same name, and once the sealed copy
+    /// reads back the same, deletes a copy left in the user's Windows environment: otherwise the old
+    /// value would stay readable, and a later Protect would seal it over the new one.
+    /// </summary>
+    /// <returns>Whether a copy was removed from Windows.</returns>
+    public static bool Set(SealedVariable variable, IKeyWrapper hello)
+    {
+        var (sealedNow, version) = Open(hello);
+        Save(SealedVariables.With(sealedNow, [variable]), version, hello);
+        if (Open(hello).Variables.FirstOrDefault(v => string.Equals(v.Name, variable.Name, StringComparison.OrdinalIgnoreCase)) != variable)
+            throw new InvalidOperationException("The sealed copy didn't read back the same.");
+        using var key = Registry.CurrentUser.OpenSubKey(RegistryKey, writable: true);
+        if (key is null || Raw(key, variable.Name) is null)
+            return false;
+        key.DeleteValue(variable.Name, throwOnMissingValue: false);
+        AnnounceChange();
+        return true;
+    }
+
     /// <summary>Writes <paramref name="names"/> back to the user's environment as they were, then drops them from the sealed one.</summary>
     /// <returns>The names put back.</returns>
     public static IReadOnlyList<string> PutBack(IEnumerable<string> names, IKeyWrapper hello)

@@ -31,7 +31,8 @@ never shown, only their length. Paths and well-known Windows variables are never
    processes stop inheriting it.
 
 Programs already running keep their copy until they restart; the dialog says so. **Put back** on
-a sealed variable writes it to the registry again, so the move is never a trap. Machine-level
+a sealed variable writes it to the registry again, so the move is never a trap. `tir env set` for a name
+still in the registry seals the new value, then deletes the old copy there. Machine-level
 variables need elevation and are reported, not moved, in the first version.
 
 ## The store

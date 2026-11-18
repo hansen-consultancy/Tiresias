@@ -35,6 +35,14 @@ public sealed class AgentHost : IAsyncDisposable
 
     public AgentKeys Keys { get; } = new();
 
+    /// <summary>Records the answer to a request for sealed environment variables in the activity log: the names, never a value.</summary>
+    public void RecordEnvironment(bool allowed, string program, IEnumerable<string> names, string? process) =>
+        activity.Append(EnvironmentRecord(allowed, program, names, process));
+
+    /// <summary>The activity record for an environment hand-over, for <c>tir</c> to write itself when the app isn't running.</summary>
+    public static AuditRecord EnvironmentRecord(bool allowed, string program, IEnumerable<string> names, string? process) =>
+        new(allowed ? AuditKind.Allow : AuditKind.Deny, Consumer: "environment", Service: program, Reason: string.Join(", ", names), Process: process);
+
     public UserSecretsService UserSecrets { get; }
 
     /// <summary>One line per event, for a log view or the terminal. Never a value.</summary>

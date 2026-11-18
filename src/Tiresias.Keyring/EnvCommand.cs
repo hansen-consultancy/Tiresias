@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
 using Tiresias.Agent;
+using Tiresias.Audit;
 using Tiresias.EnvironmentVariables;
 
 namespace Tiresias.Keyring;
@@ -90,8 +91,8 @@ static class EnvCommand
             if (bytes.Length == 0)
                 throw new UsageException("Empty value. To delete one, use tir env remove.");
             using var hello = HelloKeyWrapper.Open(create: false);
-            var (sealedNow, version) = EnvironmentStore.Open(hello);
-            EnvironmentStore.Save(SealedVariables.With(sealedNow, [new(name, Encoding.UTF8.GetString(bytes))]), version, hello);
+            if (EnvironmentStore.Set(new(name, Encoding.UTF8.GetString(bytes)), hello))
+                Console.WriteLine($"Removed the old {name} from your Windows environment. Programs already running keep their copy until they restart.");
         }
         finally
         {
@@ -125,7 +126,7 @@ static class EnvCommand
         if (args.Rest.Count == 0)
             throw new UsageException("Nothing to run. Put the command after --: tir run -- dotnet run.");
         var program = Path.GetFileName(args.Rest[0]);
-        var variables = await FromAppAsync(program, args.Rest) ?? FromTerminal();
+        var variables = await FromAppAsync(program, args.Rest) ?? FromTerminal(program);
         if (ReferenceEquals(variables, Denied))
         {
             Console.Error.WriteLine("Not approved.");
@@ -175,13 +176,16 @@ static class EnvCommand
 
     static readonly IReadOnlyDictionary<string, string> Denied = new Dictionary<string, string>();
 
-    static IReadOnlyDictionary<string, string> FromTerminal()
+    static IReadOnlyDictionary<string, string> FromTerminal(string program)
     {
         Console.WriteLine("Windows Hello will ask you to confirm it's you.");
         using var hello = HelloKeyWrapper.Open(create: false);
         var (variables, _) = EnvironmentStore.Open(hello);
         if (variables.Count > 0)
             Console.WriteLine($"With {string.Join(", ", variables.Select(v => v.Name))}.");
+        // The app isn't running, so tir records the hand-over itself.
+        using (var activity = new AuditLog(AgentHost.ActivityPath, TimeProvider.System))
+            activity.Append(AgentHost.EnvironmentRecord(true, program, variables.Select(v => v.Name), "tir run (Windows Hello)"));
         return variables.ToDictionary(v => v.Name, v => v.Value, StringComparer.OrdinalIgnoreCase);
     }
 }
