@@ -17,21 +17,39 @@
 
     <TextBlock Grid.Row="0" Text="{l:S Status_Heading}" Style="{StaticResource TitleText}" AutomationProperties.HeadingLevel="Level1" />
 
-    <Border Grid.Row="1" Style="{StaticResource Card}">
-      <Grid>
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="*" />
-          <ColumnDefinition Width="Auto" />
-        </Grid.ColumnDefinitions>
-        <StackPanel>
-          <TextBlock Text="{Binding Headline}" Style="{StaticResource SubtitleText}" />
-          <TextBlock Text="{Binding Mode}" Style="{StaticResource CaptionText}" />
-          <TextBlock Text="{Binding Build}" Style="{StaticResource CaptionText}" />
-        </StackPanel>
-        <Button Grid.Column="1" VerticalAlignment="Center" Padding="12,6" Margin="12,0,0,0" MinWidth="96"
-                Content="{Binding LockLabel}" Command="{Binding ToggleLockCommand}" />
-      </Grid>
-    </Border>
+    <StackPanel Grid.Row="1">
+      <Border Style="{StaticResource Card}">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <StackPanel>
+            <TextBlock Text="{Binding Headline}" Style="{StaticResource SubtitleText}" />
+            <TextBlock Text="{Binding Mode}" Style="{StaticResource CaptionText}" />
+            <TextBlock Text="{Binding Build}" Style="{StaticResource CaptionText}" />
+          </StackPanel>
+          <Button Grid.Column="1" VerticalAlignment="Center" Padding="12,6" Margin="12,0,0,0" MinWidth="96"
+                  Content="{Binding LockLabel}" Command="{Binding ToggleLockCommand}" />
+        </Grid>
+      </Border>
+
+      <!-- Sealed secrets this PC's Windows Hello can't open: only the recovery key gives them back. -->
+      <Border Style="{StaticResource Card}" Visibility="{Binding RestoreVisibility}">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <StackPanel>
+            <TextBlock Text="{l:S Status_RestoreTitle}" Style="{StaticResource SubtitleText}" />
+            <TextBlock Text="{Binding RestoreText}" Style="{StaticResource CaptionText}" />
+          </StackPanel>
+          <Button Grid.Column="1" VerticalAlignment="Center" Padding="12,6" Margin="12,0,0,0" MinWidth="96"
+                  Content="{l:S Status_RestoreButton}" Click="OnRestore" />
+        </Grid>
+      </Border>
+    </StackPanel>
 
     <!-- Where to go next sits with the state it acts on; the footer keeps only what acts on this page. -->
     <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,12">

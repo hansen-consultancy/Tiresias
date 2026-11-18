@@ -55,6 +55,48 @@ static class Commands
     }
 
     /// <summary>
+    /// Restores sealed secrets with the paper recovery key: every one this PC's Windows Hello key can't
+    /// open gets a copy for it. Creates the Hello credential when this PC has none yet (one prompt).
+    /// </summary>
+    public static int RecoveryRestore()
+    {
+        Console.WriteLine("Type your recovery key (13 groups of four; spaces and case don't matter).");
+        var raw = PaperKey.Parse(Console.ReadLine() ?? "")
+            ?? throw new UsageException("That is not a recovery key: it should be 13 groups of four letters and digits 2-7.");
+        RestoreSummary summary;
+        try
+        {
+            Console.WriteLine("Windows Hello will ask you to confirm it's you.");
+            using var hello = HelloKeyWrapper.Open(create: true);
+            summary = Agent.RecoveryRestore.Run(raw, hello);
+        }
+        finally
+        {
+            Array.Clear(raw);
+        }
+
+        Console.WriteLine(summary.Restored == 0
+            ? summary.NotOpened.Count == 0
+                ? "Nothing needed restoring: Windows Hello on this PC opens every sealed secret."
+                : "Nothing restored with this recovery key."
+            : $"Restored {summary.Restored} sealed {(summary.Restored == 1 ? "item" : "items")}; Windows Hello on this PC opens {(summary.Restored == 1 ? "it" : "them")} now.");
+        if (summary.AlreadyOpen > 0 && summary.Restored > 0)
+            Console.WriteLine($"{summary.AlreadyOpen} already opened with this PC's Windows Hello.");
+        if (summary.KeyAdopted)
+            Console.WriteLine("This PC now uses this recovery key too, so the same paper covers your secrets here.");
+        if (summary.OtherKeyKept)
+            Console.WriteLine("This PC keeps its own recovery key as well: secrets sealed here since its setup need that paper. Keep both.");
+        if (summary.NotOpened.Count > 0)
+        {
+            Console.WriteLine($"{summary.NotOpened.Count} did not open with this recovery key (sealed with another one, or damaged):");
+            foreach (var name in summary.NotOpened)
+                Console.WriteLine($"  {name}");
+            return 1;
+        }
+        return 0;
+    }
+
+    /// <summary>
     /// Sets up solo mode: the broker runs inside the app (or <c>tir agent</c>) on this device. The
     /// recovery key co-signs the one-device trust chain, so it is created here when there is none,
     /// and asked back when there is.

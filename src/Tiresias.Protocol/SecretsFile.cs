@@ -56,6 +56,16 @@ public static class SecretsFile
             },
         }.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
 
+    /// <summary>The same sealed file with its envelope's blob replaced; plain keys written beside it stay.</summary>
+    public static string WithSealed(string json, byte[] sealedBlob)
+    {
+        var root = JsonNode.Parse(json, documentOptions: new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true })?.AsObject()
+            ?? throw new InvalidDataException("secrets.json is not a JSON object.");
+        var envelope = root[EnvelopeProperty]?.AsObject() ?? throw new InvalidDataException("secrets.json has no sealed envelope.");
+        envelope["sealed"] = Convert.ToBase64String(sealedBlob);
+        return root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+    }
+
     /// <summary>
     /// Splits a sealed file into the envelope's blob and any plain keys written beside it since,
     /// which the agent merges in and seals.

@@ -38,6 +38,15 @@ public partial class StatusWindow : Window
 
     void OnAbout(object sender, RoutedEventArgs e) => App.Current.ShowWindow<AboutWindow>();
 
+    void OnRestore(object sender, RoutedEventArgs e)
+    {
+        var window = App.Current.ShowWindow<RecoveryWindow>();
+        window.Closed -= OnRecoveryClosed;
+        window.Closed += OnRecoveryClosed;
+    }
+
+    void OnRecoveryClosed(object? sender, EventArgs e) => model.Refresh();
+
     /// <summary>Opens the secrets editor on the row's project: the fix for a user-secrets line.</summary>
     void OnReview(object sender, RoutedEventArgs e)
     {
@@ -66,6 +75,12 @@ public sealed partial class StatusViewModel : ObservableObject
 
     [ObservableProperty]
     public partial bool IsRunning { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(RestoreVisibility))]
+    public partial string RestoreText { get; set; } = "";
+
+    public Visibility RestoreVisibility => RestoreText.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
 
     public string Build { get; } = Text.Format("Status_Build", Text.Of(AppBuild.Current.Label), AppBuild.Current.Folder);
 
@@ -124,10 +139,29 @@ public sealed partial class StatusViewModel : ObservableObject
         {
             IsRunning = false;
         }
+        await ShowRestoreAsync();
         if (rerun)
         {
             rerun = false;
             await RunAsync();
+        }
+    }
+
+    /// <summary>Whether anything sealed here needs the recovery key; known only while unlocked, since it takes this PC's Hello key.</summary>
+    async Task ShowRestoreAsync()
+    {
+        var hello = App.Current.Host.Keys.Hello;
+        try
+        {
+            var unopened = hello is null ? [] : await Task.Run(() => RecoveryRestore.Unopened(hello));
+            RestoreText = unopened.Count == 0 ? "" : Text.Format("Status_RestoreBody", unopened.Count);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidDataException
+            or ObjectDisposedException or System.Security.Cryptography.CryptographicException)
+        {
+            // Locked meanwhile, or a damaged file the checks above already report.
+            AppLog.Error(e, "status: sealed secrets this PC can't open");
+            RestoreText = "";
         }
     }
 

@@ -17,6 +17,11 @@ its section below.
   talking to and which `tir` answered.
 - Starting a different copy of the app (a development build while the installed app runs, or the
   other way round) offers to switch instead of only saying Tiresias is already running.
+- **Restore with your recovery key.** On a new PC, or after Windows Hello was reset, the status page
+  notices sealed secrets this Windows Hello can't open and offers **Restore**: type the paper key
+  and they open again. Nothing is decrypted or re-encrypted. `tir recovery restore` does the same.
+- The first run on a PC with sealed secrets copied from another one asks for their recovery key
+  instead of making a new one.
 
 ### Changed
 
