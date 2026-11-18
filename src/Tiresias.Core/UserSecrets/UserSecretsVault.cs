@@ -67,14 +67,44 @@ public static class UserSecretsVault
         var plaintext = Encoding.UTF8.GetBytes(document.ToJsonString());
         try
         {
-            var secret = SecretEnvelope.Seal(Slug(userSecretsId), version, plaintext, wrappers);
-            var blob = JsonSerializer.SerializeToUtf8Bytes(
-                new BlobDto(secret.Version, new Dictionary<string, byte[]>(secret.WrappedDeks), secret.Nonce, secret.Ciphertext), Web);
-            return SecretsFile.Write(blob);
+            return SecretsFile.Write(ToBlob(SecretEnvelope.Seal(Slug(userSecretsId), version, plaintext, wrappers)));
         }
         finally
         {
             Array.Clear(plaintext);
+        }
+    }
+
+    /// <summary>
+    /// A sealed file given back to <paramref name="hello"/> by <paramref name="recovery"/> (see
+    /// <see cref="RecoveryRewrap"/>): the same version and plain keys beside it, with a copy of the DEK
+    /// for this Hello key added. The text comes back unchanged unless the outcome is
+    /// <see cref="RewrapOutcome.Rewrapped"/>.
+    /// </summary>
+    /// <exception cref="InvalidDataException">The file is not a sealed one this version reads.</exception>
+    public static (RewrapOutcome Outcome, string FileText, bool RecoveryOpens) Rewrap(string userSecretsId, string fileText, IKeyWrapper hello, IKeyWrapper recovery)
+    {
+        var (blob, _) = SecretsFile.Read(fileText);
+        var (outcome, secret, recoveryOpens) = RecoveryRewrap.Secret(ToSecret(userSecretsId, blob), hello, recovery);
+        return outcome == RewrapOutcome.Rewrapped
+            ? (outcome, SecretsFile.WithSealed(fileText, ToBlob(secret)), recoveryOpens)
+            : (outcome, fileText, recoveryOpens);
+    }
+
+    /// <summary>Whether <paramref name="wrapper"/> opens this sealed file's DEK; decrypts nothing else. <c>false</c> for a file that isn't sealed or can't be read.</summary>
+    public static bool Opens(string userSecretsId, string fileText, IKeyWrapper wrapper)
+    {
+        try
+        {
+            var dek = SecretEnvelope.UnwrapDek(ToSecret(userSecretsId, SecretsFile.Read(fileText).Sealed), wrapper);
+            if (dek is null)
+                return false;
+            Array.Clear(dek);
+            return true;
+        }
+        catch (Exception e) when (e is InvalidDataException or JsonException or FormatException)
+        {
+            return false;
         }
     }
 
@@ -121,8 +151,7 @@ public static class UserSecretsVault
 
     static (JsonObject Document, int Version) Unseal(string userSecretsId, byte[] blob, IKeyWrapper wrapper)
     {
-        var dto = JsonSerializer.Deserialize<BlobDto>(blob, Web) ?? throw new InvalidDataException("Sealed envelope is empty.");
-        var secret = new SealedSecret(Slug(userSecretsId), dto.Version, dto.WrappedDeks, dto.Nonce, dto.Ciphertext);
+        var secret = ToSecret(userSecretsId, blob);
         var dek = SecretEnvelope.UnwrapDek(secret, wrapper)
             ?? throw new InvalidDataException($"The sealed secrets do not open with key '{wrapper.Id}' (another user's, another folder's, or tampered with).");
         try
@@ -130,7 +159,7 @@ public static class UserSecretsVault
             var plaintext = SecretEnvelope.Open(secret, dek) ?? throw new InvalidDataException("The sealed secrets were tampered with.");
             try
             {
-                return (ParseObject(Encoding.UTF8.GetString(plaintext)), dto.Version);
+                return (ParseObject(Encoding.UTF8.GetString(plaintext)), secret.Version);
             }
             finally
             {
@@ -145,6 +174,15 @@ public static class UserSecretsVault
 
     static JsonObject ParseObject(string json) =>
         JsonNode.Parse(json, documentOptions: Lenient) as JsonObject ?? throw new InvalidDataException("secrets.json is not a JSON object.");
+
+    static SealedSecret ToSecret(string userSecretsId, byte[] blob)
+    {
+        var dto = JsonSerializer.Deserialize<BlobDto>(blob, Web) ?? throw new InvalidDataException("Sealed envelope is empty.");
+        return new(Slug(userSecretsId), dto.Version, dto.WrappedDeks, dto.Nonce, dto.Ciphertext);
+    }
+
+    static byte[] ToBlob(SealedSecret secret) =>
+        JsonSerializer.SerializeToUtf8Bytes(new BlobDto(secret.Version, new Dictionary<string, byte[]>(secret.WrappedDeks), secret.Nonce, secret.Ciphertext), Web);
 
     sealed record BlobDto(int Version, Dictionary<string, byte[]> WrappedDeks, byte[] Nonce, byte[] Ciphertext);
 }

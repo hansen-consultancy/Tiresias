@@ -8,6 +8,9 @@ const string Usage = """
     several brokers and the service doesn't settle which.
 
     tir recovery init
+    tir recovery restore
+        Gives sealed secrets back to this PC's Windows Hello with the paper recovery key: after
+        moving to a new PC, resetting Windows Hello, or copying secrets from another machine.
     tir solo init
         Solo mode: the broker runs inside the Tiresias app on this PC, no server needed. Creates
         the recovery key if there is none (or asks for it) and a one-device trust chain.
@@ -46,6 +49,7 @@ try
     {
         ("enroll", _) => Commands.Enroll(line),
         ("recovery", "init") => Commands.RecoveryInit(),
+        ("recovery", "restore") => Commands.RecoveryRestore(),
         ("solo", "init") => Commands.SoloInit(),
         ("vault", "add") => Commands.VaultAdd(line),
         ("service", _) => ServiceCommand.Run(line),
