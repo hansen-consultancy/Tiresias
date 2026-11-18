@@ -15,6 +15,12 @@ its section below.
   new one before it expires (the reload token fires). No password stays in the file.
 - **Set up a SQL Server** (Services window) prepares a database for those logins: an administrator
   signs in once, for that window only, and the service is saved with a `read` and a `write` grant.
+- **RavenDB in user secrets.** A `secrets.json` value `tiresias:raven/<service>` becomes a URL on
+  this PC that carries a placeholder in its path, so an unchanged RavenDB client works through the
+  broker with no certificate on the PC.
+- RavenDB's Changes API works through the broker and the forwarder, for grants that list the
+  `WEBSOCKET` method. Each tunnel is audited when it opens and when it closes, and closes with the
+  lease.
 - `tir exec` gives a SQL Server child its temporary login in `{SLUG}_CONNECTION_STRING`, for
   grants that hand out logins.
 - The app starts when you sign in to Windows. The installer turns it on; the status page turns it

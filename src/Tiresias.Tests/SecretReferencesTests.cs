@@ -12,6 +12,17 @@ public class SecretReferencesTests
     public void A_sql_reference_names_its_service_and_grant() =>
         Assert.That(SecretReferences.Parse("tiresias:sql/appdb/read"), Is.EqualTo(new SecretReference("sql", "appdb", "read")));
 
+    [TestCase("tiresias:raven/orders", null)]
+    [TestCase("tiresias:raven/orders/read", "read")]
+    public void A_raven_reference_names_its_service_and_maybe_a_ceiling(string value, string? grant) =>
+        Assert.That(SecretReferences.Parse(value), Is.EqualTo(new SecretReference("raven", "orders", grant)));
+
+    [TestCase("tiresias:raven/orders")]
+    [TestCase("tiresias:raven/orders/read")]
+    [TestCase("tiresias:sql/appdb/read")]
+    public void A_reference_reads_back_as_written(string value) =>
+        Assert.That(SecretReferences.Parse(value)!.ToString(), Is.EqualTo(value));
+
     [TestCase("Server=db;Password=x")]
     [TestCase("Tiresias:sql/appdb/read")]
     public void An_ordinary_value_is_not_a_reference(string value) =>
@@ -19,10 +30,14 @@ public class SecretReferencesTests
 
     [TestCase("tiresias:sql/appdb")]
     [TestCase("tiresias:sql//read")]
-    [TestCase("tiresias:raven/appdb/read")]
     [TestCase("tiresias:sql/appdb/read/extra")]
+    [TestCase("tiresias:raven")]
+    [TestCase("tiresias:raven//read")]
+    [TestCase("tiresias:raven/orders/read/extra")]
+    [TestCase("tiresias:mongo/appdb")]
     public void A_malformed_reference_says_what_it_should_look_like(string value) =>
-        Assert.That(() => SecretReferences.Parse(value), Throws.TypeOf<InvalidDataException>().With.Message.Contains("tiresias:sql/<service>/<grant>"));
+        Assert.That(() => SecretReferences.Parse(value), Throws.TypeOf<InvalidDataException>()
+            .With.Message.Contains("tiresias:sql/<service>/<grant>").And.Message.Contains("tiresias:raven/<service>[/<grant>]"));
 
     [Test]
     public void References_are_found_anywhere_with_their_configuration_key()

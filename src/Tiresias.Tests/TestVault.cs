@@ -63,10 +63,12 @@ sealed class TestVault : IDisposable
     ));
 
     /// <summary>Adds <c>ravendb</c> (https://a.raven.example), whose only grant, GET anything, presents <paramref name="pfx"/>.</summary>
-    public static TestVault CreateWithRaven(byte[] pfx) => new(tpm =>
+    /// <param name="changes">The grant also opens WebSockets (the Changes API).</param>
+    public static TestVault CreateWithRaven(byte[] pfx, bool changes = false) => new(tpm =>
     (
         [SecretEnvelope.Seal("raven-read", 1, System.Text.Encoding.ASCII.GetBytes(Convert.ToBase64String(pfx)), [tpm])],
-        [new Service("ravendb", new Uri("https://a.raven.example/"), [new Grant("read", "raven-read", Rule("GET", "^/"))])]
+        [new Service("ravendb", new Uri("https://a.raven.example/"), [new Grant("read", "raven-read",
+            changes ? new(new HashSet<string> { "GET", "WEBSOCKET" }, [VaultFile.Compile("^/")]) : Rule("GET", "^/"))])]
     ));
 
     public Dictionary<string, byte[]> SealTo(LeaseOffer offer) =>

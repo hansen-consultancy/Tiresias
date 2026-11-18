@@ -28,6 +28,8 @@ app.Lifetime.ApplicationStarted.Register(() =>
     }
 });
 
+app.UseWebSockets();
+
 app.Map("/svc/{**rest}", (HttpContext context, SvcForwarder forwarder) => forwarder.HandleAsync(context));
 app.Map("/raven/{**rest}", (HttpContext context, SvcForwarder forwarder) => forwarder.HandleAsync(context));
 app.MapPost("/sql/{**rest}", (HttpContext context, SvcForwarder forwarder) => forwarder.HandleAsync(context));

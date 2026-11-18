@@ -4,13 +4,17 @@ namespace Tiresias.UserSecrets;
 
 /// <summary>
 /// A <c>secrets.json</c> value that names a credential for the agent to fetch at load time instead
-/// of holding one: <c>tiresias:sql/{instance}/{grant}</c> becomes the lease's temporary SQL login.
+/// of holding one: <c>tiresias:sql/{instance}/{grant}</c> becomes the lease's temporary SQL login,
+/// <c>tiresias:raven/{instance}</c> (or <c>/{grant}</c>, the most the app may use) a RavenDB URL on
+/// this PC that carries a placeholder.
 /// </summary>
-public sealed record SecretReference(string Kind, string Service, string Grant)
+/// <param name="Grant">Always set for <see cref="Sql"/>; for <see cref="Raven"/>, <c>null</c> lets every grant through.</param>
+public sealed record SecretReference(string Kind, string Service, string? Grant)
 {
     public const string Sql = "sql";
+    public const string Raven = "raven";
 
-    public override string ToString() => $"{SecretReferences.Prefix}{Kind}/{Service}/{Grant}";
+    public override string ToString() => $"{SecretReferences.Prefix}{Kind}/{Service}" + (Grant is null ? "" : $"/{Grant}");
 }
 
 /// <param name="ExpiresAt">When the value stops working, or <c>null</c> when it doesn't expire.</param>
@@ -37,10 +41,14 @@ public static class SecretReferences
     {
         if (!value.StartsWith(Prefix, StringComparison.Ordinal))
             return null;
-        var parts = value[Prefix.Length..].Split('/');
-        if (parts is not [SecretReference.Sql, { Length: > 0 } service, { Length: > 0 } grant])
-            throw new InvalidDataException($"'{value}' is not a Tiresias reference. The one kind there is: tiresias:sql/<service>/<grant>.");
-        return new(SecretReference.Sql, service, grant);
+        return value[Prefix.Length..].Split('/') switch
+        {
+            [SecretReference.Sql, { Length: > 0 } service, { Length: > 0 } grant] => new(SecretReference.Sql, service, grant),
+            [SecretReference.Raven, { Length: > 0 } service] => new(SecretReference.Raven, service, null),
+            [SecretReference.Raven, { Length: > 0 } service, { Length: > 0 } grant] => new(SecretReference.Raven, service, grant),
+            _ => throw new InvalidDataException(
+                $"'{value}' is not a Tiresias reference. The kinds there are: tiresias:sql/<service>/<grant> and tiresias:raven/<service>[/<grant>]."),
+        };
     }
 
     /// <summary>Every string value in the document that is a reference, with its configuration key (<c>ConnectionStrings:Default</c>).</summary>

@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
+using System.Net.Sockets;
+using System.Net.WebSockets;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
@@ -62,6 +64,19 @@ public class RavenTopologyTests
         Assert.That(RavenTopology.Rewrite("<html>maintenance</html>", Base), Is.EqualTo("<html>maintenance</html>"));
 }
 
+public class RavenPathTests
+{
+    [TestCase("/tirph_db_abc/databases/Orders/docs?id=1", "tirph_db_abc", "/databases/Orders/docs?id=1")]
+    [TestCase("/tirph_db_abc?x=1", "tirph_db_abc", "/?x=1")]
+    [TestCase("/tirph_db_abc", "tirph_db_abc", "/")]
+    [TestCase("/tirph_db_abc/", "tirph_db_abc", "/")]
+    [TestCase("/databases/Orders/docs", null, "/databases/Orders/docs")]
+    [TestCase("/databases/tirph_x/docs", null, "/databases/tirph_x/docs")]
+    [TestCase("/", null, "/")]
+    public void A_placeholder_is_only_ever_the_first_segment(string remainder, string? placeholder, string rest) =>
+        Assert.That(RavenPath.Split(remainder), Is.EqualTo((placeholder, rest)));
+}
+
 /// <summary><c>/raven</c> over HTTP, with a fake TLS stack that records which certificate it was given.</summary>
 public class RavenProxyTests
 {
@@ -76,13 +91,14 @@ public class RavenProxyTests
     [SetUp]
     public void SetUp()
     {
+        var changes = TestContext.CurrentContext.Test.Properties["Category"].Contains("changes");
         dir = Directory.CreateTempSubdirectory("tir-raven-").FullName;
         using (var rsa = RSA.Create(2048))
         {
             var request = new CertificateRequest("CN=tir-test-client", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
             issued = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow.AddHours(1));
         }
-        vault = TestVault.CreateWithRaven(issued.Export(X509ContentType.Pfx));
+        vault = TestVault.CreateWithRaven(issued.Export(X509ContentType.Pfx), changes);
         VaultFile.Save(Path.Combine(dir, "vault.json"), vault.Document);
         device = Key.Create(SignatureAlgorithm.Ed25519);
         raven = new FakeRaven();
@@ -133,10 +149,11 @@ public class RavenProxyTests
         return (await mint.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("token").GetString()!;
     }
 
-    Task<HttpResponseMessage> Get(string path, string token, string? publicBase = null)
+    Task<HttpResponseMessage> Get(string path, string? token, string? publicBase = null)
     {
         var message = new HttpRequestMessage(HttpMethod.Get, path);
-        message.Headers.Authorization = new("Bearer", token);
+        if (token is not null)
+            message.Headers.Authorization = new("Bearer", token);
         message.Headers.Add("Accept-Encoding", "gzip");
         if (publicBase is not null)
             message.Headers.Add(ForwarderHeaders.PublicBase, publicBase);
@@ -203,6 +220,100 @@ public class RavenProxyTests
         Assert.That(raven.Requests, Is.Empty);
     }
 
+    /// <summary>The audit so far, read beside the broker, which keeps the file open.</summary>
+    string Audit()
+    {
+        using var stream = new FileStream(Path.Combine(dir, "audit.jsonl"), FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        return new StreamReader(stream).ReadToEnd();
+    }
+
+    [Test]
+    public async Task A_placeholder_in_the_path_stands_in_for_the_header_and_never_reaches_the_node()
+    {
+        var token = await OpenLeaseAndMint();
+        var response = await Get($"/raven/ravendb/{token}/databases/Orders/docs?id=orders/1", token: null);
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var seen = raven.Requests.Single();
+        Assert.That(seen.Uri, Is.EqualTo("https://a.raven.example/databases/Orders/docs?id=orders/1"));
+        Assert.That(seen.Authorization, Is.Null);
+        Assert.That(Audit(), Does.Not.Contain(token), "the audit keeps a hash of the placeholder, never the placeholder");
+    }
+
+    [Test]
+    public async Task With_the_placeholder_in_the_path_the_topology_keeps_it_in_every_node_url()
+    {
+        var token = await OpenLeaseAndMint();
+        var response = await Get($"/raven/ravendb/{token}/topology?name=Orders", token: null, "http://127.0.0.1:7781");
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.That(body.GetProperty("Nodes")[0].GetProperty("Url").GetString(), Is.EqualTo($"http://127.0.0.1:7781/raven/ravendb/{token}"));
+    }
+
+    [Test]
+    public async Task A_placeholder_in_the_path_that_was_never_minted_is_refused()
+    {
+        await OpenLeaseAndMint();
+        var response = await Get("/raven/ravendb/tirph_ravendb_aaaaaaaaaaaaaaaaaaaaaaaaaa/databases/Orders/stats", token: null);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+        Assert.That(raven.Requests, Is.Empty);
+    }
+
+    Task<WebSocket> OpenChanges(string token)
+    {
+        var sockets = factory.Server.CreateWebSocketClient();
+        return sockets.ConnectAsync(new Uri($"ws://localhost/raven/ravendb/{token}/databases/Orders/changes?id=1"), CancellationToken.None);
+    }
+
+    [Test]
+    public async Task Without_websocket_in_the_grant_the_changes_api_is_refused()
+    {
+        var token = await OpenLeaseAndMint();
+        Assert.That(() => OpenChanges(token), Throws.Exception);
+        Assert.That(raven.Requests, Is.Empty);
+        Assert.That(Audit(), Does.Contain("WEBSOCKET").And.Contain("not-covered"));
+    }
+
+    [Test, Category("changes")]
+    public async Task The_changes_api_is_relayed_to_the_node_with_the_certificate_and_audited_open_and_closed()
+    {
+        var token = await OpenLeaseAndMint();
+        using var socket = await OpenChanges(token);
+
+        await socket.SendAsync("watch-docs"u8.ToArray(), WebSocketMessageType.Text, true, CancellationToken.None);
+        var buffer = new byte[256];
+        var received = await socket.ReceiveAsync(buffer, CancellationToken.None);
+        Assert.That(System.Text.Encoding.UTF8.GetString(buffer, 0, received.Count), Is.EqualTo("watch-docs"), "the fake node echoes");
+        Assert.That(raven.Requests.Single().Uri, Is.EqualTo("wss://a.raven.example/databases/Orders/changes?id=1"));
+        Assert.That(raven.Certificates.Single().Thumbprint, Is.EqualTo(issued.Thumbprint));
+
+        await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "done", CancellationToken.None);
+        Assert.That(socket.CloseStatus, Is.EqualTo(WebSocketCloseStatus.NormalClosure), "the node's close comes back");
+        Assert.That(SpinWait.SpinUntil(() => Audit().Contains("closed: 10 bytes up, 10 bytes down"), TimeSpan.FromSeconds(5)), Is.True, Audit());
+        Assert.That(Audit(), Does.Contain("\"WEBSOCKET\""));
+    }
+
+    [Test, Category("changes")]
+    public async Task A_changes_tunnel_closes_when_the_lease_ends()
+    {
+        var token = await OpenLeaseAndMint();
+        using var socket = await OpenChanges(token);
+
+        await client.SendAsync(Signed("/lease/end"));
+
+        // The broker aborts both sides; the client sees its socket end rather than hang.
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        try
+        {
+            await socket.ReceiveAsync(new byte[16], timeout.Token);
+        }
+        catch (Exception e) when (e is WebSocketException or IOException or OperationCanceledException)
+        {
+        }
+        Assert.That(timeout.IsCancellationRequested, Is.False, "the socket ended before the timeout");
+        Assert.That(SpinWait.SpinUntil(() => Audit().Contains("lease-ended"), TimeSpan.FromSeconds(5)), Is.True, Audit());
+    }
+
     sealed record SeenRequest(string Uri, string? Authorization, string? AcceptEncoding);
 
     sealed class FakeRaven
@@ -219,17 +330,19 @@ public class RavenProxyTests
 
         sealed class Node(FakeRaven owner) : HttpMessageHandler
         {
-            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
             {
                 owner.Requests.Enqueue(new(request.RequestUri!.OriginalString, request.Headers.Authorization?.ToString(),
                     request.Headers.AcceptEncoding.Count == 0 ? null : request.Headers.AcceptEncoding.ToString()));
+                if (request.Headers.TryGetValues("Sec-WebSocket-Key", out var keys))
+                    return await FakeWebSocketNode.UpgradeAsync(keys.Single());
                 var body = request.RequestUri!.AbsolutePath switch
                 {
                     "/topology" => """{"Nodes":[{"Url":"https://a.raven.example","ClusterTag":"A"}],"Etag":1}""",
                     "/cluster/topology" => """{"Topology":{"AllNodes":{"A":"https://a.raven.example"}},"Leader":"A"}""",
                     _ => """{"ok":true}""",
                 };
-                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json") });
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json") };
             }
         }
     }

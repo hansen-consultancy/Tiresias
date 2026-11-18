@@ -1,3 +1,4 @@
+using System.Net.WebSockets;
 using System.Text;
 using Tiresias.Transport;
 using Microsoft.AspNetCore.Http.Features;
@@ -18,9 +19,10 @@ public sealed class ForwarderOptions
 /// and the broker's answer back. All it adds is <see cref="ForwarderHeaders.ObservedProcess"/> and
 /// <see cref="ForwarderHeaders.PublicBase"/>; a client-sent <c>X-Tiresias-*</c>
 /// header is dropped so a client can't speak for the forwarder. It decides nothing and holds no
-/// secret: policy, placeholders and credentials are the broker's.
+/// secret: policy, placeholders and credentials are the broker's. A WebSocket request (RavenDB's
+/// Changes API) becomes a WebSocket to the broker, relayed message by message.
 /// </summary>
-sealed class SvcForwarder(IHttpClientFactory clients, IClientProcessLookup processes, IOptions<ForwarderOptions> options)
+sealed class SvcForwarder(IHttpClientFactory clients, IHttpMessageHandlerFactory handlers, IClientProcessLookup processes, IOptions<ForwarderOptions> options)
 {
     public const string ClientName = "broker";
 
@@ -44,6 +46,11 @@ sealed class SvcForwarder(IHttpClientFactory clients, IClientProcessLookup proce
         if (!PlaceholderRoutes.Any(r => rawTarget.StartsWith(r, StringComparison.Ordinal)))
         {
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            return;
+        }
+        if (context.WebSockets.IsWebSocketRequest)
+        {
+            await RelayWebSocketAsync(context, rawTarget);
             return;
         }
 
@@ -84,6 +91,38 @@ sealed class SvcForwarder(IHttpClientFactory clients, IClientProcessLookup proce
                     context.Response.Headers[name] = values.ToArray();
             await response.Content.CopyToAsync(context.Response.Body, ct);
         }
+    }
+
+    async Task RelayWebSocketAsync(HttpContext context, string rawTarget)
+    {
+        var target = new Uri((broker.Scheme == Uri.UriSchemeHttps ? "wss" : "ws") + broker.AbsoluteUri[broker.Scheme.Length..].TrimEnd('/') + rawTarget,
+            new UriCreationOptions { DangerousDisablePathAndQueryCanonicalization = true });
+        using var upstream = new ClientWebSocket();
+        upstream.Options.CollectHttpResponseDetails = true;
+        if (context.Request.Headers.Authorization is { Count: > 0 } authorization)
+            upstream.Options.SetRequestHeader("Authorization", authorization.ToString());
+        if (processes.Describe(context.Connection) is { } observed)
+            upstream.Options.SetRequestHeader(ForwarderHeaders.ObservedProcess, HeaderSafe(observed));
+        foreach (var protocol in context.WebSockets.WebSocketRequestedProtocols)
+            upstream.Options.AddSubProtocol(protocol);
+        try
+        {
+            // The broker client's handler, not an HttpClient: a client would try to buffer the upgraded stream.
+            using var invoker = new HttpMessageInvoker(handlers.CreateHandler(ClientName), disposeHandler: false);
+            await upstream.ConnectAsync(target, invoker, context.RequestAborted);
+        }
+        catch (WebSocketException)
+        {
+            // The broker's refusal keeps its status (its JSON body can't come through an upgrade).
+            if (upstream.HttpStatusCode is var status and not 0)
+                context.Response.StatusCode = (int)status;
+            else
+                await Results.Json(new { reason = "broker-unreachable" }, statusCode: StatusCodes.Status502BadGateway).ExecuteAsync(context);
+            return;
+        }
+
+        using var local = await context.WebSockets.AcceptWebSocketAsync(upstream.SubProtocol);
+        await WebSocketRelay.RunAsync(local, upstream, context.RequestAborted);
     }
 
     /// <summary>Image paths may hold non-ASCII characters, which a header value can't carry.</summary>
