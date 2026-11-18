@@ -8,6 +8,8 @@ its section below.
 
 ## [Unreleased]
 
+## [0.1.0-preview.3] - 2026-11-18
+
 ### Added
 
 - `tir service add <slug> --upstream <https-url>` sets up a service for `tir exec` in one
@@ -66,6 +68,7 @@ its section below.
   - `Tiresias.Core` is the vault, the trust chain, grants, leases and the audit log.
   - `Tiresias.Protocol` holds the wire formats.
 
-[Unreleased]: https://github.com/hansen-consultancy/Tiresias/compare/v0.1.0-preview.2...HEAD
+[Unreleased]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.1.0-preview.3...HEAD
+[0.1.0-preview.3]: https://github.com/hansen-consultancy/Tiresias/compare/v0.1.0-preview.2...app-v0.1.0-preview.3
 [0.1.0-preview.2]: https://github.com/hansen-consultancy/Tiresias/compare/v0.1.0-preview.1...v0.1.0-preview.2
 [0.1.0-preview.1]: https://github.com/hansen-consultancy/Tiresias/releases/tag/v0.1.0-preview.1
