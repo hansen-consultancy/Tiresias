@@ -18,6 +18,9 @@ its section below.
 - **RavenDB in user secrets.** A `secrets.json` value `tiresias:raven/<service>` becomes a URL on
   this PC that carries a placeholder in its path, so an unchanged RavenDB client works through the
   broker with no certificate on the PC.
+- **Set up a RavenDB** (Services window) checks a client certificate against the database, then
+  seals it in the vault and adds the server as a service. Its password is used only to open the
+  file.
 - RavenDB's Changes API works through the broker and the forwarder, for grants that list the
   `WEBSOCKET` method. Each tunnel is audited when it opens and when it closes, and closes with the
   lease.
