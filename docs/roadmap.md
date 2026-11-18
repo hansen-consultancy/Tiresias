@@ -37,7 +37,7 @@ is not the priority; guides are.
 | Section | Pages |
 |---|---|
 | **Getting started** | What Tiresias is (2 minutes) · Install · First unlock · Solo or with a broker |
-| **Guides** | Protect `secrets.json` in an existing app · Give an AI agent API access without the key · `tir exec` with the GitHub CLI · SQL Server with per-lease logins · RavenDB through the broker · Set up a broker on a VPS · Enrol a second device · Lose a device, revoke it · Recover with the paper key · Teams and tenants · Known locations and alerts · Timestamped audit evidence |
+| **Guides** | [Need no secret at all](avoid-secrets.md) · Protect `secrets.json` in an existing app · Seal environment variables · Give an AI agent API access without the key · `tir exec` with the GitHub CLI · SQL Server with per-lease logins · RavenDB through the broker · Set up a broker on a VPS · Enrol a second device · Lose a device, revoke it · Recover with the paper key · Teams and tenants · Known locations and alerts · Timestamped audit evidence |
 | **Concepts** | Placeholders · Leases · Grants, ceilings and elevation · Consent · Trust chain · Control plane · Audit log and anchoring |
 | **Reference** | CLI · Configuration (Keyring, broker, forwarder) · Broker endpoints · Control-plane protocol · File formats (vault, sealed `secrets.json`, trust links, audit records) |
 | **Security** | Whitepaper (design, threat model, cryptography) · Honest limits · Reporting a vulnerability |

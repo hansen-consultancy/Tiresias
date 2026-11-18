@@ -244,6 +244,18 @@ secrets were sealed with instead of showing a new one. A typo, or the paper from
 says so in place and changes nothing. A solo broker set up on the old PC has to be set up again:
 its device keys belong to that PC's Windows account.
 
+## 9. Environment variables
+
+1. Make a throwaway one: `setx DEMO_API_KEY test-value`.
+2. **Status** shows **environment variables** as a warning naming it. **Review...** opens the
+   **Environment variables** window with it ticked under **In your Windows environment**.
+3. **Seal and remove from Windows**. A new terminal no longer has it: `echo $env:DEMO_API_KEY`
+   prints nothing.
+4. `tir run -- pwsh -NoProfile -Command '$env:DEMO_API_KEY'` asks in the app's dialog, which lists
+   the variable names only, and prints the value once you allow it.
+5. Tick it under **Sealed** and **Put back in Windows**; a new terminal has it again. Then
+   `setx DEMO_API_KEY ""` or delete it in Windows settings.
+
 ## What you can't test yet
 
 These are not built yet (see [desktop-app.md](desktop-app.md#what-is-built)):

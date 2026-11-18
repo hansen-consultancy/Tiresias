@@ -49,6 +49,9 @@ public interface IDoctorProbe
 
     /// <summary>Project files to check for unprotected user secrets; empty unless asked for.</summary>
     IEnumerable<DoctorFile> Projects();
+
+    /// <summary>Names of user environment variables that look like secrets and aren't sealed. Never values.</summary>
+    IReadOnlyList<string> ExposedVariables => [];
 }
 
 /// <summary>
@@ -87,8 +90,17 @@ public static partial class Doctor
 
         checks.AddRange(probe.UserSecretsFiles().Select(UserSecretsFile).OfType<DoctorCheck>());
         checks.AddRange(probe.Projects().Select(Project).OfType<DoctorCheck>());
+        checks.Add(probe.ExposedVariables switch
+        {
+            [] => new(VariablesCheck, DoctorStatus.Ok, "none of your user environment variables look like secrets"),
+            var names => new(VariablesCheck, DoctorStatus.Warn,
+                $"{names.Count} look like secrets and every program you run can read them: {string.Join(", ", names)}. Seal them in the app's Environment variables window, or with tir env protect"),
+        });
         return checks;
     }
+
+    /// <summary>The name of the environment variables check, which a UI offers to fix.</summary>
+    public const string VariablesCheck = "environment variables";
 
     /// <summary>What solo mode gives up next to a remote broker (docs/desktop-app.md), stated on every run.</summary>
     static readonly DoctorCheck[] SoloTradeOffs =

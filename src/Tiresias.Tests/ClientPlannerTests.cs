@@ -85,6 +85,7 @@ public class DoctorTests
         public bool Enrolled { get; set; } = true;
         public bool HasDeviceKey { get; set; } = true;
         public bool RecoveryKeySet { get; set; } = true;
+        public IReadOnlyList<string> ExposedVariables { get; set; } = [];
         public bool Solo { get; set; }
         public DoctorVault? Vault { get; set; } = new(2, [], []);
         public int? BrokerStatus { get; set; } = 401;
@@ -106,7 +107,16 @@ public class DoctorTests
     {
         var checks = await Doctor.RunAsync(new FakeProbe());
         Assert.That(checks.Select(c => c.Status), Is.All.EqualTo(DoctorStatus.Ok));
-        Assert.That(checks.Select(c => c.Name), Is.EqualTo(new[] { "broker pinned", "device key", "recovery key", "vault", "broker reachable", "forwarder" }));
+        Assert.That(checks.Select(c => c.Name), Is.EqualTo(new[] { "broker pinned", "device key", "recovery key", "vault", "broker reachable", "forwarder", "environment variables" }));
+    }
+
+    [Test]
+    public async Task Secret_looking_environment_variables_are_a_warning_naming_them()
+    {
+        var check = (await Doctor.RunAsync(new FakeProbe { ExposedVariables = ["OPENAI_API_KEY", "HF_TOKEN"] }))
+            .Single(c => c.Name == Doctor.VariablesCheck);
+        Assert.That(check.Status, Is.EqualTo(DoctorStatus.Warn));
+        Assert.That(check.Detail, Does.Contain("OPENAI_API_KEY, HF_TOKEN"));
     }
 
     [Test]

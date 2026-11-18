@@ -1,6 +1,7 @@
 # Environment variables
 
-**Status:** design, nothing built yet.
+**Status:** phase 1 is built: the store, **Protect** / **Put back**, `tir env`, `tir run`, the
+**Environment variables** window and the status check. Phases 2 to 4 are design.
 
 Many developers keep API keys and tokens in their Windows user environment (`setx OPENAI_API_KEY
 ...`). That makes them readable by every process the user starts, forever, with no record of who
@@ -35,7 +36,7 @@ variables need elevation and are reported, not moved, in the first version.
 
 ## The store
 
-`%APPDATA%\Tiresias\environment.json`, sealed the way a user-secrets file is: each value encrypted
+`%LOCALAPPDATA%\Tiresias\environment.json`, sealed the way a user-secrets file is: each value encrypted
 under a data key wrapped for Windows Hello and for the recovery key, so the recovery restore
 covers it with no extra step. It holds:
 
@@ -100,7 +101,8 @@ variable, and the editor says so rather than offering it everywhere.
 
 ## Phases
 
-1. Store, **Protect...** / **Put back**, `tir run`, and an Environment tab in the secrets editor.
+1. Store, **Protect** / **Put back**, `tir env`, `tir run`, and an **Environment variables** window
+   (tray menu, and **Review...** on the status check). Built.
 2. The shell hook with session consent and folder sets.
 3. Placeholder delivery through the vault and forwarder.
 4. The NuGet credential provider.

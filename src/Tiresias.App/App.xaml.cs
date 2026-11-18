@@ -287,6 +287,8 @@ public partial class App : Application
             case ControlRequest.Consent:
                 var approved = await consent!.AskPlaceholderAsync(request.Title ?? "tir", request.Lines ?? [], caller, ct);
                 return new(true, Approved: approved);
+            case ControlRequest.Environment:
+                return await EnvironmentForAsync(request, caller, ct);
             case ControlRequest.Unlock:
                 var (ok, message) = await Dispatcher.InvokeAsync(() => UnlockAsync(interactive: false)).Task.Unwrap();
                 return new(ok, message);
@@ -296,6 +298,28 @@ public partial class App : Application
             default:
                 return new(false, Text.Format("Control_Unknown", request.Op));
         }
+    }
+
+    /// <summary><c>tir run</c>: unlocks if needed, then hands the sealed variables over only if the user allows this program.</summary>
+    async Task<ControlReply> EnvironmentForAsync(ControlRequest request, string? caller, CancellationToken ct)
+    {
+        if (!host!.Keys.IsUnlocked)
+        {
+            var (unlocked, message) = await Dispatcher.InvokeAsync(() => UnlockAsync(interactive: false)).Task.Unwrap();
+            if (!unlocked)
+                return new(false, message);
+        }
+        if (host.Keys.Hello is not { } hello)
+            return new(false, Text.Get("Environment_Locked"));
+        var variables = await Task.Run(() => EnvironmentStore.Open(hello).Variables, ct);
+        if (variables.Count == 0)
+            return new(true, Text.Get("Environment_NoneSealed"), Approved: true, Variables: new Dictionary<string, string>());
+        var program = request.Title ?? "tir run";
+        var approved = await consent!.AskEnvironmentAsync(program, [.. variables.Select(v => v.Name)], caller, ct);
+        AppLog.Info($"tir run {program}: {(approved ? "allowed" : "denied")} {variables.Count} environment variable(s)");
+        return approved
+            ? new(true, Approved: true, Variables: variables.ToDictionary(v => v.Name, v => v.Value, StringComparer.OrdinalIgnoreCase))
+            : new(true, Approved: false);
     }
 
     void OnSessionSwitch(object? sender, SessionSwitchEventArgs e)
