@@ -192,7 +192,9 @@ public static class SqlServerSetup
         foreach (var (name, parameter) in parameters)
             command.Parameters.AddWithValue(name, parameter);
         var value = await command.ExecuteScalarAsync(ct);
-        return value is null or DBNull ? default : (T)value;
+        // SQL Server picks the width (DB_ID is smallint, COUNT int), so convert rather than unbox.
+        return value is null or DBNull ? default
+            : (T)Convert.ChangeType(value, Nullable.GetUnderlyingType(typeof(T)) ?? typeof(T), System.Globalization.CultureInfo.InvariantCulture);
     }
 
     static string Bracket(string name) => $"[{name.Replace("]", "]]")}]";
