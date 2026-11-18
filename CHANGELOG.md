@@ -17,6 +17,11 @@ its section below.
   signs in once, for that window only, and the service is saved with a `read` and a `write` grant.
 - `tir exec` gives a SQL Server child its temporary login in `{SLUG}_CONNECTION_STRING`, for
   grants that hand out logins.
+- **This wasn't me** on every consent dialog, for a prompt you didn't expect: it denies the
+  request, locks Tiresias, ends the lease and refuses everything until you unlock from the app,
+  and blocks the asking program until you unblock it on the status page. A follow-up window shows
+  the program's folder, can end the process, and points to a Microsoft Defender scan; Activity
+  records the process and what started it.
 - The app starts when you sign in to Windows. The installer turns it on; the status page turns it
   off.
 - An app with sealed user secrets (or `tiresias:` values) waits up to a minute for the Tiresias app instead of failing at
