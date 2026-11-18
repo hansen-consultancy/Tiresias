@@ -108,7 +108,7 @@ sealed partial class SqlEndpoint(BrokerState state, ISqlGateway gateway, IOption
             }
             catch (SqlStatementException e)
             {
-                allowed.Complete(StatusCodes.Status502BadGateway, $"sql-error {e.Number}");
+                allowed!.Complete(StatusCodes.Status502BadGateway, $"sql-error {e.Number}");
                 return Results.Json(new { reason = "sql-error", number = e.Number, message = e.Message }, statusCode: StatusCodes.Status502BadGateway);
             }
         }

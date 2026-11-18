@@ -1438,4 +1438,112 @@ Store them in clear?</value>
   <data name="Status_Services" xml:space="preserve">
     <value>Services...</value>
   </data>
+  <data name="Services_SetUpSql" xml:space="preserve">
+    <value>Set up a SQL Server...</value>
+  </data>
+  <data name="Services_SqlSaved" xml:space="preserve">
+    <value>Saved {0}. Apps reach it with tiresias:sql/{0}/read or /write in their user secrets.</value>
+  </data>
+  <data name="Sql_WindowTitle" xml:space="preserve">
+    <value>Set up a SQL Server - Tiresias</value>
+  </data>
+  <data name="Sql_Heading" xml:space="preserve">
+    <value>Set up a SQL Server</value>
+  </data>
+  <data name="Sql_Intro" xml:space="preserve">
+    <value>Prepares one database so apps get a temporary login for each lease instead of a password in their user secrets. Logins can read, or read and write; never change the schema. They are dropped when the lease ends.</value>
+  </data>
+  <data name="Sql_DatabaseHeading" xml:space="preserve">
+    <value>The database</value>
+  </data>
+  <data name="Sql_Server" xml:space="preserve">
+    <value>Server</value>
+  </data>
+  <data name="Sql_ServerHint" xml:space="preserve">
+    <value>As SQL Server Management Studio takes it: sql.example.com, sql.example.com,1433 or sql.example.com\SQLEXPRESS.</value>
+  </data>
+  <data name="Sql_Database" xml:space="preserve">
+    <value>Database</value>
+  </data>
+  <data name="Sql_DatabaseHint" xml:space="preserve">
+    <value>It must exist already. One database per server can be set up.</value>
+  </data>
+  <data name="Sql_Slug" xml:space="preserve">
+    <value>Service name</value>
+  </data>
+  <data name="Sql_SlugHint" xml:space="preserve">
+    <value>What apps and tir use to name it. Lower-case letters, digits and dashes.</value>
+  </data>
+  <data name="Sql_Trust" xml:space="preserve">
+    <value>Trust the server's certificate</value>
+  </data>
+  <data name="Sql_TrustHint" xml:space="preserve">
+    <value>The connection is always encrypted. Tick this only for a server you know whose certificate this PC doesn't trust, such as a development server on your own network.</value>
+  </data>
+  <data name="Sql_AdminHeading" xml:space="preserve">
+    <value>Sign in as an administrator</value>
+  </data>
+  <data name="Sql_AdminIntro" xml:space="preserve">
+    <value>Once, to create the logins and procedures. This sign-in is used by this window only and is not saved anywhere.</value>
+  </data>
+  <data name="Sql_Windows" xml:space="preserve">
+    <value>Windows authentication, as {0}</value>
+  </data>
+  <data name="Sql_SqlLogin" xml:space="preserve">
+    <value>A SQL Server login</value>
+  </data>
+  <data name="Sql_User" xml:space="preserve">
+    <value>Login</value>
+  </data>
+  <data name="Sql_Password" xml:space="preserve">
+    <value>Password</value>
+  </data>
+  <data name="Sql_UserMissing" xml:space="preserve">
+    <value>Type the login and its password, or use Windows authentication.</value>
+  </data>
+  <data name="Sql_Locked" xml:space="preserve">
+    <value>Tiresias is locked. Unlock it, then try again: the connection is sealed to Windows Hello.</value>
+  </data>
+  <data name="Sql_SetUp" xml:space="preserve">
+    <value>Set up</value>
+  </data>
+  <data name="Sql_Back" xml:space="preserve">
+    <value>Set up another</value>
+  </data>
+  <data name="Sql_ProgressHeading" xml:space="preserve">
+    <value>Progress</value>
+  </data>
+  <data name="Sql_StepConnecting" xml:space="preserve">
+    <value>Connecting to {0}...</value>
+  </data>
+  <data name="Sql_StepConnected" xml:space="preserve">
+    <value>Connected: SQL Server {0}.</value>
+  </data>
+  <data name="Sql_StepStopped" xml:space="preserve">
+    <value>Stopped. Nothing was saved to the vault; running the setup again is safe.</value>
+  </data>
+  <data name="Sql_ProvisionerExistsTitle" xml:space="preserve">
+    <value>Give the provisioner a new password?</value>
+  </data>
+  <data name="Sql_ProvisionerExistsBody" xml:space="preserve">
+    <value>{0} already has a tiresias_provisioner login, perhaps set up from another PC. Setting up gives it a new password, and any other Tiresias vault that uses it stops getting logins until it is set up again from there.</value>
+  </data>
+  <data name="Sql_DoneHeading" xml:space="preserve">
+    <value>{0} is ready</value>
+  </data>
+  <data name="Sql_DoneAgainHeading" xml:space="preserve">
+    <value>{0} is set up again</value>
+  </data>
+  <data name="Sql_DoneBody" xml:space="preserve">
+    <value>In an app's user secrets (Manage User Secrets in Visual Studio), use this instead of a connection string:</value>
+  </data>
+  <data name="Sql_SnippetName" xml:space="preserve">
+    <value>User secrets line</value>
+  </data>
+  <data name="Sql_Copy" xml:space="preserve">
+    <value>Copy</value>
+  </data>
+  <data name="Sql_DoneWrite" xml:space="preserve">
+    <value>Use /write instead of /read for an app that saves data. The app needs the Tiresias.Extensions.Configuration package, and gets a new login before the old one expires.</value>
+  </data>
 </root>

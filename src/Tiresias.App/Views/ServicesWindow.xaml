@@ -125,6 +125,7 @@
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Visibility="{Binding IsListing, Converter={StaticResource Visible}}">
         <Button Padding="12,6" Content="{l:S Services_Add}" Command="{Binding AddCommand}" />
         <Button Padding="12,6" Margin="8,0,0,0" Content="{l:S Services_Remove}" Command="{Binding RemoveCommand}" />
+        <Button Padding="12,6" Margin="8,0,0,0" Content="{l:S Services_SetUpSql}" Command="{Binding SetUpSqlCommand}" />
       </StackPanel>
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
         <TextBlock Text="{Binding Message}" Style="{StaticResource CaptionText}" VerticalAlignment="Center" Margin="0,0,12,0" MaxWidth="420" />

@@ -187,6 +187,19 @@ public sealed partial class ServicesViewModel : ObservableObject
     bool CanRemove() => SelectedRow is not null;
 
     [RelayCommand]
+    void SetUpSql()
+    {
+        var window = new SqlServerWindow { Owner = Owner() };
+        window.Saved += slug =>
+        {
+            Reload();
+            SelectedRow = Rows.FirstOrDefault(r => r.Slug == slug);
+            Message = Text.Format("Services_SqlSaved", slug);
+        };
+        window.ShowDialog();
+    }
+
+    [RelayCommand]
     void Save()
     {
         attempted = true;
