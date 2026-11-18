@@ -27,7 +27,9 @@ public partial class ConsentWindow : Window
         deadline = DateTimeOffset.Now + timeout;
         Heading.Text = view.Heading;
         ProgramLabel.Text = Text.Get("Consent_ProgramLabel");
-        ProgramPath.Text = view.Program ?? Text.Get("Consent_ProgramUnknown");
+        ProgramName.Text = view.Program is null ? Text.Get("Consent_ProgramUnknown") : Path.GetFileName(view.Program);
+        ProgramFolder.Text = view.Program is null ? "" : Path.GetDirectoryName(view.Program) ?? "";
+        ProgramFolder.Visibility = ProgramFolder.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         ListLabel.Text = view.ListLabel;
         Items.ItemsSource = view.Items.Count > 0 ? view.Items : [Text.Get("Consent_NoKeys")];
         Note.Text = waiting > 0 ? $"{view.Note} {Text.Format("Consent_Waiting", waiting)}" : view.Note;

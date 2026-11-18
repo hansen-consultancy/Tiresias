@@ -20,8 +20,10 @@
     <Border Grid.Row="1" Style="{StaticResource Card}">
       <StackPanel>
         <TextBlock x:Name="ProgramLabel" Style="{StaticResource CaptionText}" />
-        <TextBlock x:Name="ProgramPath" Style="{StaticResource MonoText}" Margin="0,2,0,0"
+        <!-- The file name first, so it reads at a glance; the folder below says which copy it is. -->
+        <TextBlock x:Name="ProgramName" Style="{StaticResource MonoText}" FontWeight="SemiBold" Margin="0,2,0,0"
                    AutomationProperties.LabeledBy="{Binding ElementName=ProgramLabel}" />
+        <TextBlock x:Name="ProgramFolder" Style="{StaticResource MonoText}" Margin="0,2,0,0" TextWrapping="Wrap" Opacity="0.75" />
       </StackPanel>
     </Border>
 

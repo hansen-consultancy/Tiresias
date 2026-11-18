@@ -20,9 +20,10 @@ sealed class ConsentPresenter(Dispatcher dispatcher) : IUserSecretsConsentPrompt
 
     public Task<ConsentAnswer> AskAsync(UserSecretsConsentRequest request, CancellationToken ct) =>
         ShowAsync(new ConsentView(
-            Text.Format("Consent_UserSecrets_Heading", request.UserSecretsId),
+            // A non-breaking hyphen, so an id like my-app-1234 never wraps at its dashes.
+            Text.Format("Consent_UserSecrets_Heading", request.UserSecretsId.Replace('-', '‑')),
             request.Executable,
-            Text.Format("Consent_UserSecrets_KeysLabel", request.Keys.Count),
+            request.Keys.Count == 1 ? Text.Get("Consent_UserSecrets_KeysLabelOne") : Text.Format("Consent_UserSecrets_KeysLabel", request.Keys.Count),
             request.Keys,
             Text.Get("Consent_UserSecrets_Note"),
             AllowSession: true), UserSecretsService.ConsentTimeout, ct);

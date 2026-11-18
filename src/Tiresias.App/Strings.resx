@@ -123,6 +123,9 @@
     <value>It will get these {0} keys (values stay hidden here):</value>
     <comment>{0}: number of keys</comment>
   </data>
+  <data name="Consent_UserSecrets_KeysLabelOne" xml:space="preserve">
+    <value>It will get this key (its value stays hidden here):</value>
+  </data>
   <data name="Consent_UserSecrets_Note" xml:space="preserve">
     <value>Allow for this session lasts until you lock Tiresias or for 12 hours, whichever comes first.</value>
   </data>
@@ -514,12 +517,19 @@
     <value>Tiresias is locked. Unlock to see and edit this project's secrets.</value>
   </data>
   <data name="Secrets_StateSealed" xml:space="preserve">
-    <value>{0} keys, sealed (version {1}).</value>
-    <comment>{0}: key count, {1}: format version</comment>
+    <value>{0}, sealed (version {1}).</value>
+    <comment>{0}: Secrets_KeyCount or Secrets_KeyCountOne, {1}: format version</comment>
   </data>
   <data name="Secrets_StateNotSealed" xml:space="preserve">
-    <value>{0} keys, still in clear on disk. Saving seals them.</value>
-    <comment>{0}: key count</comment>
+    <value>{0}, still in clear on disk. Saving seals them.</value>
+    <comment>{0}: Secrets_KeyCount or Secrets_KeyCountOne</comment>
+  </data>
+  <data name="Secrets_KeyCount" xml:space="preserve">
+    <value>{0} keys</value>
+    <comment>{0}: key count, never 1</comment>
+  </data>
+  <data name="Secrets_KeyCountOne" xml:space="preserve">
+    <value>1 key</value>
   </data>
   <data name="Secrets_StateUnreadable" xml:space="preserve">
     <value>This project's secrets file can't be opened.</value>

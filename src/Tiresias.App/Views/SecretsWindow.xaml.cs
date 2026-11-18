@@ -239,12 +239,14 @@ public sealed partial class SecretsViewModel : ObservableObject
         CanEdit = true;
         NeedsUnlock = false;
         State = loaded.Version == 0
-            ? Text.Format("Secrets_StateNotSealed", Rows.Count)
-            : Text.Format("Secrets_StateSealed", Rows.Count, loaded.Version);
+            ? Text.Format("Secrets_StateNotSealed", KeyCount(Rows.Count))
+            : Text.Format("Secrets_StateSealed", KeyCount(Rows.Count), loaded.Version);
     }
 
     IReadOnlyList<KeyValuePair<string, string>> Edited() =>
         Rows.Select(r => new KeyValuePair<string, string>(r.Key.Trim(), r.Value)).ToArray();
+
+    static string KeyCount(int count) => count == 1 ? Text.Get("Secrets_KeyCountOne") : Text.Format("Secrets_KeyCount", count);
 
     static string Label(UserSecretsFolder f) => f.Kind switch
     {
