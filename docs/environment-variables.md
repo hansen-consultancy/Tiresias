@@ -1,9 +1,8 @@
 # Environment variables
 
-**Status:** phases 1, 2 and 4 are built: the store with folder sets, **Protect** / **Put back**,
-`tir env`, `tir run`, the PowerShell hook with consent once per terminal, the **Environment
-variables** window, the status check and the NuGet credential plugin. Phase 3 (placeholders) is
-design.
+**Status:** built: the store with folder sets, **Protect** / **Put back**, `tir env`, `tir run`,
+the PowerShell hook with consent once per terminal, the **Environment variables** window, the
+status check, placeholder delivery and the NuGet credential plugin.
 
 Many developers keep API keys and tokens in their Windows user environment (`setx OPENAI_API_KEY
 ...`). That makes them readable by every process the user starts, forever, with no record of who
@@ -85,23 +84,58 @@ code page nor PowerShell's parser touches them.
 ### For one command
 
 `tir run -- <command> [args...]` resolves the set for the current directory, asks once, and
-starts the command with the variables in its environment only. For scripts, CI-like runs, and
+starts the command with the variables in its environment only. `--only NAME[,NAME...]` narrows
+that to the names given, in the dialog too; a name not sealed for that folder is an error rather
+than silently missing. The dialog's **Asked by** is `tir`, the program the app can verify on its
+pipe; the heading names the command it is about to start. For scripts, CI-like runs, and
 shells without a hook (cmd, Git Bash).
 
 ### Placeholders instead of values
 
-A variable can be switched to **placeholder** delivery when it is an API key for a service the
-vault knows. The real key moves into the vault as that service; the process gets a placeholder in
-the variable and the forwarder's URL in the tool's base-URL variable (for example
-`OPENAI_BASE_URL`), so it never holds the key at all. It works only for tools that honour such a
-variable, and the editor says so rather than offering it everywhere.
+A variable can be switched to **placeholder** delivery when it is an API key for an https
+service in the vault, whose secret is the key as an `Authorization` header (`Bearer <key>`):
+
+```powershell
+tir service add openai --upstream https://api.openai.com/v1   # secret: Bearer sk-...
+tir env placeholder add OPENAI_API_KEY openai                  # base URL: OPENAI_BASE_URL
+```
+
+From then on a terminal or `tir run` gets a `tirph_` placeholder in `OPENAI_API_KEY` and the
+forwarder's `/svc/openai` (the solo broker's, without a forwarder) in `OPENAI_BASE_URL`, so the
+process never holds the key. The broker swaps the real header in on the way out, under the
+service's grants, and the activity log records each request.
+
+- **The base-URL variable** follows the key's name (`*_API_KEY`, `*_KEY`, `*_TOKEN` become
+  `*_BASE_URL`); `--base-url` names another. It can't be a sealed variable itself.
+- **Consent** lists the variable as a placeholder for its service. The placeholder is minted after
+  the answer, for at most 10 hours and never past the broker's lease (a workday lease ends at its
+  daily cutoff).
+- **A terminal** keeps one placeholder per variable, so changing folder doesn't mint another; one
+  with less than 30 minutes left before the expiry the broker gave it is replaced at the next
+  folder change, and the old one revoked.
+  A terminal's placeholders are revoked once it has exited (noticed at the next request from any
+  terminal), and all of them when Tiresias locks.
+- **`tir run`** revokes its placeholders when the command exits, as `tir exec` does.
+- **No placeholder** (broker unreachable, service missing, no lease): the variable is left out
+  and the reason shown. It never falls back to the real value.
+- `tir env placeholder list` shows the deliveries, `remove` switches a variable back to its value.
+  The environment variables window does both: check a sealed key, pick the service under **Hand
+  out a placeholder instead**, then **Use a placeholder**; **Hand out the value** undoes it.
+  The sealed value stays, so **Put back** and `remove` lose nothing.
+- Only tools that send the key as `Authorization: Bearer` and read a base-URL variable work this
+  way: the OpenAI SDKs and most OpenAI-compatible clients do. A tool sending the key in another
+  header (Anthropic's `x-api-key`) gets refused by the broker: keep that one as a value.
 
 ### Programs started outside a shell
 
 - **NuGet:** `nuget-plugin-tiresias.exe`, installed next to `tir`, speaks NuGet's
-  cross-platform credential plugin protocol (version 2). Map a source to a sealed variable with
-  `tir env nuget add <source-url> <NAME> [--username <name>]`, and remove the token from
-  `NuGet.Config`. When the feed answers 401, NuGet asks the plugin; the plugin asks the app, and
+  cross-platform credential plugin protocol (version 2). `tir env nuget import` (or **Move to
+  Tiresias** under **NuGet feeds** in the environment variables window) finds the sources whose
+  `NuGet.Config` credentials are `%NAME%` or a plain-text token, seals the token (from Windows, or
+  from the file), maps the source, and takes its credentials out of the file: NuGet only asks a
+  plugin when the config has none. An encrypted `Password` can't be read, so it is left with a
+  note. `tir env nuget list` shows what is mapped and what is still in `NuGet.Config`. By hand:
+  `tir env nuget add <source-url> <NAME> [--username <name>]`, then remove the credentials. When the feed answers 401, NuGet asks the plugin; the plugin asks the app, and
   the app asks you once per program (the parent of the plugin: `dotnet`, `devenv`, `MSBuild`...)
   and variable, with **Allow for this session** remembered until Tiresias locks.
   - The plugin answers only for https sources on the mapped host and port: the source itself, or
@@ -141,5 +175,5 @@ variable, and the editor says so rather than offering it everywhere.
    (tray menu, and **Review...** on the status check). Built.
 2. The shell hook with session consent and folder sets (`tir env hook`, `--folder`, a folder field
    in the window). Built.
-3. Placeholder delivery through the vault and forwarder.
+3. Placeholder delivery through the vault and forwarder (`tir env placeholder`). Built.
 4. The NuGet credential plugin (`tir env nuget`, `nuget-plugin-tiresias.exe`). Built.

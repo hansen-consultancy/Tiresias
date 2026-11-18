@@ -65,6 +65,19 @@ public static partial class SealedVariables
     }
 
     /// <summary><paramref name="variables"/> with <paramref name="added"/> replacing any of the same name.</summary>
+    /// <summary>
+    /// The variables a command asked for by name (<c>tir run --only</c>), or all of them when it named
+    /// none; <c>Missing</c> holds the names asked for that aren't among them.
+    /// </summary>
+    public static (IReadOnlyList<SealedVariable> Picked, IReadOnlyList<string> Missing) Pick(IReadOnlyList<SealedVariable> variables, IReadOnlyList<string>? names)
+    {
+        if (names is null || names.Count == 0)
+            return (variables, []);
+        var wanted = names.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return ([.. variables.Where(v => wanted.Contains(v.Name))],
+            [.. names.Where(n => !variables.Any(v => string.Equals(v.Name, n, StringComparison.OrdinalIgnoreCase))).Distinct(StringComparer.OrdinalIgnoreCase)]);
+    }
+
     public static IReadOnlyList<SealedVariable> With(IEnumerable<SealedVariable> variables, IEnumerable<SealedVariable> added) =>
         Distinct(variables.Concat(added));
 

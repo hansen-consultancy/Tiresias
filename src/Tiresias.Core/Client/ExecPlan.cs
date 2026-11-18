@@ -36,10 +36,13 @@ public static class ExecPlan
             if (service.Upstream.Scheme == "mssql")
                 env[$"{name}_SQL_URL"] = $"{origin}/sql/{service.Slug}";
             else
-                env[$"{name}_BASE_URL"] = $"{origin}/svc/{service.Slug}";
+                env[$"{name}_BASE_URL"] = ServiceUrl(service.Slug, forwarder);
         }
         return env;
     }
+
+    /// <summary>Where a placeholder for an HTTP service is sent: the forwarder's <c>/svc/{slug}</c>.</summary>
+    public static string ServiceUrl(string slug, Uri forwarder) => $"{forwarder.GetLeftPart(UriPartial.Authority)}/svc/{slug}";
 
     public static bool IsGitHubApp(Service service) =>
         service.Upstream.Host.Equals(GitHubAppSecret.ApiHost, StringComparison.OrdinalIgnoreCase);

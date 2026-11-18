@@ -252,7 +252,9 @@ its device keys belong to that PC's Windows account.
 3. **Seal and remove from Windows**. A new terminal no longer has it: `echo $env:DEMO_API_KEY`
    prints nothing.
 4. `tir run -- pwsh -NoProfile -Command '$env:DEMO_API_KEY'` asks in the app's dialog, which lists
-   the variable names only, and prints the value once you allow it.
+   the variable names only, and prints the value once you allow it. With
+   `tir run --only DEMO_API_KEY -- ...` the dialog lists just that one; `--only NOPE` fails with
+   **Not sealed for this folder: NOPE**.
 5. Tick it under **Sealed** and **Put back in Windows**; a new terminal has it again. Then
    `setx DEMO_API_KEY ""` or delete it in Windows settings.
 
@@ -272,16 +274,38 @@ its device keys belong to that PC's Windows account.
 
 To keep it, add the hook line last in `$PROFILE`.
 
-## 11. NuGet credentials from a sealed variable
+## 11. A placeholder instead of a value
+
+Uses the `httpbin` service from section 5 (secret `Bearer example-token`).
+
+1. `tir env set HTTPBIN_TOKEN` (type anything: the placeholder replaces it), then
+   `tir env placeholder add HTTPBIN_TOKEN httpbin`. It says `HTTPBIN_BASE_URL` gets the forwarder's
+   address. `tir env list` shows **HTTPBIN_TOKEN (a placeholder for httpbin)**.
+2. In a terminal with the hook, `cd` once: the dialog lists it as a placeholder. Allow it.
+   `$env:HTTPBIN_TOKEN` starts with `tirph_httpbin_`; `$env:HTTPBIN_BASE_URL` is the address.
+3. `curl.exe -s "$env:HTTPBIN_BASE_URL/headers" -H "Authorization: Bearer $env:HTTPBIN_TOKEN"`:
+   httpbin echoes `Bearer example-token`, and **Activity...** shows the request.
+4. `cd` elsewhere and back: `$env:HTTPBIN_TOKEN` is the same placeholder.
+5. Copy the placeholder, close that terminal, and `cd` in another one with the hook. The copied
+   placeholder is now refused.
+6. `tir run -- pwsh -NoProfile -Command 'echo $env:HTTPBIN_TOKEN'` prints a different placeholder,
+   which no longer works once the command has exited.
+7. Quit the app and `tir run` again: HTTPBIN_TOKEN is left out, and `tir` says why.
+8. Clean up: `tir env placeholder remove HTTPBIN_TOKEN`, `tir env remove HTTPBIN_TOKEN`.
+
+## 12. NuGet credentials from a sealed variable
 
 Needs the .NET 9.0.200 SDK or later and a private feed (Azure Artifacts, GitHub Packages) with a
 personal access token.
 
-1. `tir env set FEED_PAT` (paste the token), then
-   `tir env nuget add https://pkgs.dev.azure.com/example/_packaging/feed/nuget/v3/index.json FEED_PAT`
-   (GitHub Packages: add `--username <your GitHub login>`). `tir env nuget list` shows it.
-2. Remove that source's `packageSourceCredentials` from `NuGet.Config`, and clear
-   `NUGET_PLUGIN_PATHS` and `NuGetPackageSourceCredentials_*` if set.
+1. With the feed's credentials in `%APPDATA%\NuGet\NuGet.Config` as `%FEED_PAT%` (or the token in
+   plain text): `tir env nuget list` shows it under **Still in NuGet.Config**. `tir env nuget import`
+   says what it will do, and after a yes seals the token, maps the source and takes the
+   credentials out of the file. The environment variables window's **NuGet feeds** does the same
+   with **Move to Tiresias**. By hand instead: `tir env set FEED_PAT`, then
+   `tir env nuget add <source-url> FEED_PAT` (GitHub Packages: `--username <your GitHub login>`),
+   and remove the source's `packageSourceCredentials`.
+2. Clear `NUGET_PLUGIN_PATHS` and `NuGetPackageSourceCredentials_*` if set.
 3. `where.exe nuget-plugin-tiresias` finds it next to `tir`. Run on its own, it explains itself.
 4. In a project using the feed: `dotnet nuget locals http-cache --clear`, then
    `dotnet restore --interactive`. The app asks to give **FEED_PAT** to `dotnet`; allow it, and the

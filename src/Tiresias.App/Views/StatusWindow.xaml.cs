@@ -36,6 +36,16 @@ public partial class StatusWindow : Window
 
     void OnServices(object sender, RoutedEventArgs e) => App.Current.ShowWindow<ServicesWindow>();
 
+    void OnEnvironment(object sender, RoutedEventArgs e) => ShowEnvironment();
+
+    /// <summary>The environment variables window; its changes can clear the exposed-variables check, so closing it re-runs the checks.</summary>
+    void ShowEnvironment()
+    {
+        var window = App.Current.ShowWindow<EnvironmentWindow>();
+        window.Closed -= OnRecoveryClosed;
+        window.Closed += OnRecoveryClosed;
+    }
+
     void OnAbout(object sender, RoutedEventArgs e) => App.Current.ShowWindow<AboutWindow>();
 
     void OnRestore(object sender, RoutedEventArgs e)
@@ -56,9 +66,7 @@ public partial class StatusWindow : Window
                 App.Current.ShowWindow<SecretsWindow>().Select(id);
                 break;
             case CheckRow { OpensEnvironment: true }:
-                var window = App.Current.ShowWindow<EnvironmentWindow>();
-                window.Closed -= OnRecoveryClosed;
-                window.Closed += OnRecoveryClosed;
+                ShowEnvironment();
                 break;
         }
     }

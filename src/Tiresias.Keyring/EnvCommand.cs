@@ -3,7 +3,9 @@ using System.Diagnostics;
 using System.Text;
 using Tiresias.Agent;
 using Tiresias.Audit;
+using Tiresias.Client;
 using Tiresias.EnvironmentVariables;
+using Tiresias.Vault;
 
 namespace Tiresias.Keyring;
 
@@ -27,25 +29,92 @@ static class EnvCommand
         "remove" => Remove(args.Require(2, "name"), Folder(args)),
         "hook" => Hook(args.At(2)),
         "nuget" => NuGet(args),
-        _ => throw new UsageException("tir env takes list, protect, put-back, set, remove, hook, shell or nuget."),
+        "placeholder" => Placeholder(args),
+        _ => throw new UsageException("tir env takes list, protect, put-back, set, remove, hook, shell, nuget or placeholder."),
     };
 
     /// <summary>
-    /// <c>tir env nuget add|list|remove</c>: which package sources the NuGet plugin answers for, and
-    /// with which sealed variable. Sealed with the variables, so a mapping can't be changed behind
-    /// your back to send a token elsewhere.
+    /// <c>tir env placeholder add|list|remove</c>: variables handed out as a broker placeholder,
+    /// with the forwarder's URL in the tool's base-URL variable, instead of their value. The real
+    /// key is the vault service's secret, so the process never holds it.
     /// </summary>
-    static int NuGet(CommandLine args)
+    static int Placeholder(CommandLine args)
     {
         using var hello = HelloKeyWrapper.Open(create: false);
         var (sealedNow, version) = EnvironmentStore.Open(hello);
         switch (args.At(2))
         {
             case "list":
-                if (sealedNow.NuGetSources.Count == 0)
-                    Console.WriteLine("No NuGet sources use a sealed variable. Add one: tir env nuget add <source-url> <NAME>.");
+                if (sealedNow.Placeholders.Count == 0)
+                    Console.WriteLine("Every sealed variable is handed out as its value. Use a placeholder instead: tir env placeholder add <NAME> <service>.");
+                foreach (var placeholder in sealedNow.Placeholders)
+                    Console.WriteLine($"  {placeholder.Variable}  a placeholder for {placeholder.Service}, with {placeholder.BaseUrlVariable}");
+                return 0;
+            case "add":
+                var name = args.Require(3, "NAME");
+                var slug = args.Require(4, "service");
+                if (!sealedNow.IsSealedAnywhere(name))
+                    throw new UsageException($"{name} is not a sealed variable. Seal it first: tir env set {name} (or tir env protect {name}).");
+                var baseUrl = args.Option("--base-url") ?? SealedEnvironment.BaseUrlVariableFor(name)
+                    ?? throw new UsageException("Name the variable the tool reads its API address from: --base-url (for example OPENAI_BASE_URL).");
+                if (sealedNow.IsSealedAnywhere(baseUrl))
+                    throw new UsageException($"{baseUrl} is itself a sealed variable, so it can't also carry the forwarder's address.");
+                CheckService(slug);
+                EnvironmentStore.Save(sealedNow.WithPlaceholder(new(name, slug, baseUrl)), version, hello);
+                Console.WriteLine($"{name} is now handed out as a placeholder for {slug}, with {baseUrl} set to {ExecPlan.ServiceUrl(slug, PlaceholderMinter.Endpoint)}.");
+                Console.WriteLine("Works with tools that send the key as an Authorization: Bearer header and honour that variable. Terminals pick it up at their next folder change.");
+                return 0;
+            case "remove":
+                var removing = args.Require(3, "NAME");
+                if (sealedNow.PlaceholderFor(removing) is null)
+                {
+                    Console.Error.WriteLine($"{removing} is handed out as its value already. See tir env placeholder list.");
+                    return 1;
+                }
+                EnvironmentStore.Save(sealedNow.WithoutPlaceholder(removing), version, hello);
+                Console.WriteLine($"{removing} is handed out as its value again. The vault service keeps its secret.");
+                return 0;
+            default:
+                throw new UsageException("tir env placeholder takes add, list or remove.");
+        }
+    }
+
+    /// <summary>A placeholder only works for a vault service the forwarder can relay as HTTP, with its key as the Authorization header.</summary>
+    static void CheckService(string slug)
+    {
+        var path = KeyringStore.Settings.VaultPath;
+        var service = (File.Exists(path) ? VaultFile.Load(path).FindService(slug) : null)
+            ?? throw new UsageException($"No service '{slug}' in the vault. Add it, with the key as its secret (\"Bearer <key>\"): tir service add {slug} --upstream https://api.example.com/v1.");
+        if (!PlaceholderMinter.CanStandIn(service))
+            throw new UsageException($"{slug} isn't an https API, so a placeholder can't stand in for its key. Use tir exec {slug} instead.");
+    }
+
+    /// <summary>
+    /// <c>tir env nuget add|list|remove|import</c>: which package sources the NuGet plugin answers for, and
+    /// with which sealed variable. Sealed with the variables, so a mapping can't be changed behind
+    /// your back to send a token elsewhere.
+    /// </summary>
+    static int NuGet(CommandLine args)
+    {
+        if (args.At(2) == "import")
+            return NuGetImportCommand(args.Flag("--yes"));
+        using var hello = HelloKeyWrapper.Open(create: false);
+        var (sealedNow, version) = EnvironmentStore.Open(hello);
+        switch (args.At(2))
+        {
+            case "list":
                 foreach (var source in sealedNow.NuGetSources)
                     Console.WriteLine($"  {source.Source}  {source.Variable} (user name {source.Username})");
+                var waiting = PlanNuGetImport(sealedNow).Where(s => s.Acts).ToArray();
+                if (waiting.Length > 0)
+                {
+                    Console.WriteLine($"Still in NuGet.Config, not yet through Tiresias ({waiting.Length}):");
+                    foreach (var step in waiting)
+                        Console.WriteLine($"  {step.Credential.Source}  {Holds(step)}  ({step.File})");
+                    Console.WriteLine("Move them over: tir env nuget import.");
+                }
+                else if (sealedNow.NuGetSources.Count == 0)
+                    Console.WriteLine("No NuGet sources use a sealed variable. Move those in NuGet.Config over with tir env nuget import, or add one: tir env nuget add <source-url> <NAME>.");
                 return 0;
             case "add":
                 var url = args.Require(3, "source-url");
@@ -70,9 +139,53 @@ static class EnvCommand
                 Console.WriteLine($"NuGet no longer gets a sealed variable for {removing}. The variable itself stays sealed.");
                 return 0;
             default:
-                throw new UsageException("tir env nuget takes add, list or remove.");
+                throw new UsageException("tir env nuget takes list, import, add or remove.");
         }
     }
+
+    /// <summary>
+    /// <c>tir env nuget import</c>: every source whose NuGet.Config credentials name an environment
+    /// variable, or hold the token in plain text, is mapped to a sealed variable (sealing it first if
+    /// needed), and its credentials are taken out of the file so NuGet asks Tiresias instead.
+    /// </summary>
+    static int NuGetImportCommand(bool yes)
+    {
+        using var hello = HelloKeyWrapper.Open(create: false);
+        var steps = PlanNuGetImport(EnvironmentStore.Open(hello).Environment);
+        if (steps.Count == 0)
+        {
+            Console.WriteLine("No NuGet.Config here or in your profile has credentials for a package source.");
+            return 0;
+        }
+        foreach (var step in steps)
+        {
+            Console.WriteLine($"  {step.Credential.Key}  {step.Credential.Source ?? "(no URL)"}  ({step.File})");
+            Console.WriteLine(step.Skip is { } why ? $"    left as is: {why}." : $"    {Holds(step)}: {Action(step)}, user name {step.Username}");
+        }
+        var acting = steps.Where(s => s.Acts).ToArray();
+        if (acting.Length == 0)
+            return 1;
+        if (!yes && !Terminal.Confirm($"Move {acting.Length} over and take their credentials out of NuGet.Config?"))
+            return 1;
+
+        var result = NuGetImporter.Apply(acting, hello);
+        foreach (var file in result.Files)
+            Console.WriteLine($"Took the credentials out of {file}.");
+        if (result.Sealed.Count > 0)
+            Console.WriteLine($"Sealed {string.Join(", ", result.Sealed)}. A variable moved from Windows is gone from it; programs already running keep their copy until they restart.");
+        Console.WriteLine("NuGet now asks Tiresias for these feeds, and you allow each program once. Needs the .NET 9.0.200 SDK or later.");
+        return steps.Count == acting.Length ? 0 : 1;
+    }
+
+    static IReadOnlyList<NuGetImportStep> PlanNuGetImport(SealedEnvironment sealedNow) =>
+        NuGetImporter.Plan(sealedNow, Directory.GetCurrentDirectory());
+
+    static string Holds(NuGetImportStep step) => step.Credential.Kind == NuGetPasswordKind.ClearText ? "token in plain text" : $"%{step.Credential.Password}%";
+
+    static string Action(NuGetImportStep step) =>
+        step.SealClearText ? $"seal it as {step.Variable}"
+        : step.ProtectFirst ? $"seal {step.Variable} (now in your Windows environment)"
+        : $"{step.Variable} is sealed already";
 
     /// <summary><c>--folder</c> alone means the current directory; absent means the global set.</summary>
     static string? Folder(CommandLine args) =>
@@ -85,12 +198,12 @@ static class EnvCommand
         var (sealedNow, _) = EnvironmentStore.Open(hello);
         Console.WriteLine($"Sealed ({sealedNow.Global.Count}):");
         foreach (var variable in sealedNow.Global)
-            Console.WriteLine($"  {variable.Name}");
+            Console.WriteLine($"  {EnvironmentDelivery.Describe(sealedNow, variable.Name)}");
         foreach (var set in sealedNow.Folders.OrderBy(f => f.Folder, StringComparer.OrdinalIgnoreCase))
         {
             Console.WriteLine($"For commands in {set.Folder} ({set.Variables.Count}):");
             foreach (var variable in set.Variables)
-                Console.WriteLine($"  {variable.Name}");
+                Console.WriteLine($"  {EnvironmentDelivery.Describe(sealedNow, variable.Name)}");
         }
         var exposed = user.Where(v => v.LooksSecret).ToArray();
         if (exposed.Length > 0)
@@ -241,15 +354,28 @@ static class EnvCommand
             throw new UsageException("Nothing to run. Put the command after --: tir run -- dotnet run.");
         var program = Path.GetFileName(args.Rest[0]);
         var directory = Directory.GetCurrentDirectory();
-        var variables = await FromAppAsync(program, args.Rest, directory) ?? FromTerminal(program, directory);
+        var only = args.Option("--only")?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var variables = await FromAppAsync(program, args.Rest, directory, only) ?? await FromTerminalAsync(program, directory, only);
         if (ReferenceEquals(variables, Denied))
         {
             Console.Error.WriteLine("Not approved.");
             return 1;
         }
+        try
+        {
+            return await StartAsync(program, args.Rest, variables);
+        }
+        finally
+        {
+            // Nothing the command leaked outlives it.
+            await PlaceholderMinter.RevokeAsync(EnvironmentDelivery.Placeholders(variables.Values));
+        }
+    }
 
-        var start = new ProcessStartInfo(args.Rest[0]) { UseShellExecute = false };
-        foreach (var arg in args.Rest.Skip(1))
+    static async Task<int> StartAsync(string program, IReadOnlyList<string> commandLine, IReadOnlyDictionary<string, string> variables)
+    {
+        var start = new ProcessStartInfo(commandLine[0]) { UseShellExecute = false };
+        foreach (var arg in commandLine.Skip(1))
             start.ArgumentList.Add(arg);
         foreach (var (name, value) in variables)
             start.Environment[name] = value;
@@ -261,12 +387,12 @@ static class EnvCommand
         }
         catch (Win32Exception)
         {
-            throw new InvalidOperationException($"Could not start {program}. For a .cmd script or a shell command, run it through the shell: tir run -- cmd /c {string.Join(' ', args.Rest)}");
+            throw new InvalidOperationException($"Could not start {program}. For a .cmd script or a shell command, run it through the shell: tir run -- cmd /c {string.Join(' ', commandLine)}");
         }
     }
 
     /// <returns>The variables, <see cref="Denied"/> for a denial, or <c>null</c> when the app isn't running.</returns>
-    static async Task<IReadOnlyDictionary<string, string>?> FromAppAsync(string program, IReadOnlyList<string> commandLine, string directory)
+    static async Task<IReadOnlyDictionary<string, string>?> FromAppAsync(string program, IReadOnlyList<string> commandLine, string directory, IReadOnlyList<string>? only)
     {
         ControlReply? reply;
         try
@@ -274,7 +400,7 @@ static class EnvCommand
             if (await AppLink.StateAsync() is null)
                 return null;
             Console.WriteLine("Waiting for your answer in the Tiresias app...");
-            reply = await ControlClient.TryAsync(new(ControlRequest.Environment, commandLine, program, Directory: directory), ConsentWait);
+            reply = await ControlClient.TryAsync(new(ControlRequest.Environment, commandLine, program, Directory: directory, Names: only), ConsentWait);
         }
         catch (Exception e) when (e is IOException or OperationCanceledException)
         {
@@ -291,16 +417,24 @@ static class EnvCommand
 
     static readonly IReadOnlyDictionary<string, string> Denied = new Dictionary<string, string>();
 
-    static IReadOnlyDictionary<string, string> FromTerminal(string program, string directory)
+    static async Task<IReadOnlyDictionary<string, string>> FromTerminalAsync(string program, string directory, IReadOnlyList<string>? only)
     {
         Console.WriteLine("Windows Hello will ask you to confirm it's you.");
-        using var hello = HelloKeyWrapper.Open(create: false);
-        var variables = EnvironmentStore.Open(hello).Environment.Resolve(directory);
+        SealedEnvironment sealedNow;
+        using (var hello = HelloKeyWrapper.Open(create: false))
+            sealedNow = EnvironmentStore.Open(hello).Environment;
+        var (variables, missing) = SealedVariables.Pick(sealedNow.Resolve(directory), only);
+        if (missing.Count > 0)
+            throw new UsageException($"Not sealed for this folder: {string.Join(", ", missing)}. See tir env list.");
         if (variables.Count > 0)
-            Console.WriteLine($"With {string.Join(", ", variables.Select(v => v.Name))}.");
+            Console.WriteLine($"With {string.Join(", ", variables.Select(v => EnvironmentDelivery.Describe(sealedNow, v.Name)))}.");
         // The app isn't running, so tir records the hand-over itself.
         using (var activity = new AuditLog(AgentHost.ActivityPath, TimeProvider.System))
-            activity.Append(AgentHost.EnvironmentRecord(true, program, variables.Select(v => v.Name), "tir run (Windows Hello)"));
-        return variables.ToDictionary(v => v.Name, v => v.Value, StringComparer.OrdinalIgnoreCase);
+            activity.Append(AgentHost.EnvironmentRecord(true, program, variables.Select(v => EnvironmentDelivery.Describe(sealedNow, v.Name)), "tir run (Windows Hello)"));
+        var delivery = await EnvironmentDelivery.DeliverAsync(sealedNow, variables, PlaceholderMinter.Endpoint,
+            (placeholder, _) => PlaceholderMinter.MintAsync(placeholder, $"run:{program}", null), CancellationToken.None);
+        foreach (var problem in delivery.Problems)
+            Console.Error.WriteLine(problem);
+        return delivery.Variables;
     }
 }

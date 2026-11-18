@@ -13,7 +13,7 @@ namespace Tiresias.Agent;
 /// <param name="Shell">For <see cref="ShellEnvironment"/>: the terminal's shell process id. Believed only when it is an ancestor of the caller.</param>
 /// <param name="AskAgain">For <see cref="ShellEnvironment"/>: ask even though the user said no in this terminal.</param>
 public sealed record ControlRequest(string Op, IReadOnlyList<string>? Lines = null, string? Title = null, int V = ControlRequest.Version,
-    string? Directory = null, int? Shell = null, bool AskAgain = false)
+    string? Directory = null, int? Shell = null, bool AskAgain = false, IReadOnlyList<string>? Names = null)
 {
     public const int Version = 1;
     public const string Ping = "ping";

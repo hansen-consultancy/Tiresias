@@ -13,9 +13,6 @@ namespace Tiresias.Keyring;
 /// </summary>
 static class Exec
 {
-    /// <summary>Where placeholders are sent: the forwarder, which relays to a remote broker. A solo broker is called directly.</summary>
-    static readonly Uri Forwarder = new("http://127.0.0.1:7781");
-
     public static async Task<int> RunAsync(CommandLine args)
     {
         var slugs = args.Require(1, "service").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -68,7 +65,7 @@ static class Exec
             var start = new ProcessStartInfo(args.Rest[0]) { UseShellExecute = false };
             foreach (var arg in args.Rest.Skip(1))
                 start.ArgumentList.Add(arg);
-            foreach (var (name, value) in ExecPlan.Environment(credentials, KeyringStore.Tenant is { Solo: true } ? SoloBroker.Url : Forwarder))
+            foreach (var (name, value) in ExecPlan.Environment(credentials, PlaceholderMinter.Endpoint))
                 start.Environment[name] = value;
             using var child = Process.Start(start) ?? throw new InvalidOperationException($"Could not start {args.Rest[0]}.");
             await child.WaitForExitAsync();

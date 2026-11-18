@@ -6,6 +6,19 @@
         Width="520" SizeToContent="Height" MaxHeight="720" ResizeMode="NoResize"
         WindowStartupLocation="CenterScreen" Topmost="True" ShowInTaskbar="True"
         Icon="pack://application:,,,/Assets/tiresias.ico">
+  <Window.Resources>
+    <!-- Reads as the mono text it replaces, but can be selected and copied. -->
+    <Style x:Key="SelectableText" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+      <Setter Property="IsReadOnly" Value="True" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="FontFamily" Value="Cascadia Mono, Consolas" />
+      <Setter Property="FontSize" Value="13" />
+    </Style>
+  </Window.Resources>
   <Grid Margin="{StaticResource PagePadding}">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
@@ -15,7 +28,12 @@
       <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
-    <TextBlock x:Name="Heading" Grid.Row="0" Style="{StaticResource TitleText}" AutomationProperties.HeadingLevel="Level1" />
+    <StackPanel Grid.Row="0">
+      <TextBlock x:Name="Heading" Style="{StaticResource TitleText}" AutomationProperties.HeadingLevel="Level1" />
+      <!-- tir run's whole command line, as tir reports it: what the program is about to be asked to do. -->
+      <TextBox x:Name="Command" Style="{StaticResource SelectableText}" Margin="0,4,0,0" Visibility="Collapsed"
+               AutomationProperties.Name="{l:S Consent_CommandLabel}" />
+    </StackPanel>
 
     <Border Grid.Row="1" Style="{StaticResource Card}">
       <StackPanel>
@@ -23,7 +41,10 @@
         <!-- The file name first, so it reads at a glance; the folder below says which copy it is. -->
         <TextBlock x:Name="ProgramName" Style="{StaticResource MonoText}" FontWeight="SemiBold" Margin="0,2,0,0"
                    AutomationProperties.LabeledBy="{Binding ElementName=ProgramLabel}" />
-        <TextBlock x:Name="ProgramFolder" Style="{StaticResource MonoText}" Margin="0,2,0,0" TextWrapping="Wrap" Opacity="0.75" />
+        <TextBox x:Name="ProgramFolder" Style="{StaticResource SelectableText}" Margin="0,2,0,0" Opacity="0.75" />
+        <TextBlock x:Name="OpenFolderLine" Margin="0,4,0,0">
+          <Hyperlink Click="OnOpenFolder"><Run Text="{l:S Consent_OpenFolder}" /></Hyperlink>
+        </TextBlock>
       </StackPanel>
     </Border>
 
