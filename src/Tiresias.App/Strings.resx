@@ -499,6 +499,44 @@
     <value>{0} is now sealed. From its next start, Tiresias asks you before it gets them.</value>
     <comment>{0}: UserSecretsId</comment>
   </data>
+  <data name="Status_Review" xml:space="preserve">
+    <value>Review...</value>
+  </data>
+  <data name="Status_ReviewName" xml:space="preserve">
+    <value>Review {0} in the secrets editor</value>
+    <comment>{0}: UserSecretsId</comment>
+  </data>
+  <data name="Secrets_SealNow" xml:space="preserve">
+    <value>Seal now</value>
+  </data>
+  <data name="Secrets_SealConfirmTitle" xml:space="preserve">
+    <value>Seal these user secrets?</value>
+  </data>
+  <data name="Secrets_SealConfirmBody" xml:space="preserve">
+    <value>The secrets of {0} will be encrypted on disk. From then on, only apps that use Tiresias.Extensions.Configuration can read them, and only after you allow it.
+
+An app that doesn't use it yet starts without these secrets. You can undo this here with Store in clear.
+
+Seal them now?</value>
+    <comment>{0}: UserSecretsId</comment>
+  </data>
+  <data name="Secrets_StoreInClear" xml:space="preserve">
+    <value>Store in clear</value>
+  </data>
+  <data name="Secrets_ClearConfirmTitle" xml:space="preserve">
+    <value>Store these user secrets in clear?</value>
+  </data>
+  <data name="Secrets_ClearConfirmBody" xml:space="preserve">
+    <value>The secrets of {0} will be written back as a plain secrets.json. Any program running as you can read them again, and Tiresias no longer asks before an app gets them.
+
+Use this for an app that can't use Tiresias.Extensions.Configuration.
+
+Store them in clear?</value>
+    <comment>{0}: UserSecretsId</comment>
+  </data>
+  <data name="Secrets_StoredInClear" xml:space="preserve">
+    <value>Stored in clear. Seal now encrypts them again.</value>
+  </data>
   <data name="Secrets_ProjectSealed" xml:space="preserve">
     <value>{0} (sealed)</value>
     <comment>{0}: UserSecretsId</comment>

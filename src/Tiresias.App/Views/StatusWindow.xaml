@@ -17,10 +17,18 @@
     <TextBlock Grid.Row="0" Text="{l:S Status_Heading}" Style="{StaticResource TitleText}" AutomationProperties.HeadingLevel="Level1" />
 
     <Border Grid.Row="1" Style="{StaticResource Card}">
-      <StackPanel>
-        <TextBlock Text="{Binding Headline}" Style="{StaticResource SubtitleText}" />
-        <TextBlock Text="{Binding Mode}" Style="{StaticResource CaptionText}" />
-      </StackPanel>
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <StackPanel>
+          <TextBlock Text="{Binding Headline}" Style="{StaticResource SubtitleText}" />
+          <TextBlock Text="{Binding Mode}" Style="{StaticResource CaptionText}" />
+        </StackPanel>
+        <Button Grid.Column="1" VerticalAlignment="Center" Padding="12,6" Margin="12,0,0,0" MinWidth="96"
+                Content="{Binding LockLabel}" Command="{Binding ToggleLockCommand}" />
+      </Grid>
     </Border>
 
     <Grid Grid.Row="2">
@@ -32,6 +40,7 @@
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="28" />
                 <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
               </Grid.ColumnDefinitions>
               <TextBlock Text="{Binding Glyph}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16"
                          Foreground="{Binding Brush}" VerticalAlignment="Top" Margin="0,2,0,0" />
@@ -41,6 +50,9 @@
                 </TextBlock>
                 <TextBlock Text="{Binding Detail}" Style="{StaticResource CaptionText}" />
               </StackPanel>
+              <Button Grid.Column="2" VerticalAlignment="Center" Margin="12,0,4,0" Padding="12,4"
+                      Content="{l:S Status_Review}" AutomationProperties.Name="{Binding ReviewName}"
+                      Visibility="{Binding ReviewVisibility}" Click="OnReview" />
             </Grid>
           </DataTemplate>
         </ListView.ItemTemplate>
@@ -63,6 +75,7 @@
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
         <Button Content="{l:S Status_CopyDetails}" Padding="12,6" Command="{Binding CopyCommand}" />
         <Button Content="{l:S Problem_Action_DataFolder}" Padding="12,6" Margin="8,0,0,0" Command="{Binding OpenFolderCommand}" />
+        <Button Content="{l:S Tray_Secrets}" Padding="12,6" Margin="8,0,0,0" Click="OnSecrets" />
       </StackPanel>
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
         <Button Style="{DynamicResource AccentButtonStyle}" MinWidth="96" Padding="12,6" Content="{l:S Status_RunAgain}"

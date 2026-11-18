@@ -13,7 +13,8 @@ public enum DoctorStatus
     Fail,
 }
 
-public sealed record DoctorCheck(string Name, DoctorStatus Status, string Detail);
+/// <param name="UserSecretsId">Set on a user-secrets line, so a UI can open that project to fix it.</param>
+public sealed record DoctorCheck(string Name, DoctorStatus Status, string Detail, string? UserSecretsId = null);
 
 /// <summary>What the vault file says about recoverability: which secrets lack a Hello or a recovery wrap.</summary>
 public sealed record DoctorVault(int Secrets, IReadOnlyList<string> WithoutHello, IReadOnlyList<string> WithoutRecovery);
@@ -110,17 +111,24 @@ public static partial class Doctor
         return new(name, DoctorStatus.Ok, $"{vault.Secrets} secrets, all with Hello and recovery wraps");
     }
 
-    /// <returns><c>null</c> for an empty file or one that is sealed and clean: nothing to report per file.</returns>
+    /// <returns><c>null</c> for an empty file, one without keys, or one that is sealed and clean: nothing to report.</returns>
+    /// <remarks>
+    /// A plaintext file is a warning, not a failure: it is what .NET does by default, the app works,
+    /// and sealing it breaks any app that doesn't use Tiresias.Extensions.Configuration yet.
+    /// </remarks>
     static DoctorCheck? UserSecretsFile(DoctorFile file)
     {
-        var name = $"user secrets {file.Path}";
+        var id = System.IO.Path.GetFileName(System.IO.Path.GetDirectoryName(file.Path)) is { Length: > 0 } folder ? folder : file.Path;
+        var name = $"user secrets {id}";
         switch (SecretsFile.Classify(file.Text))
         {
             case SecretsFileKind.Plain:
                 var keys = UserSecretsVault.FlattenKeys(Parse(file.Text!)).Count;
-                return new(name, DoctorStatus.Fail, $"plaintext, {keys} key(s) readable by anything running as you; run the app once with Tiresias.Extensions.Configuration to seal it");
+                return keys == 0
+                    ? null
+                    : new(name, DoctorStatus.Warn, $"in plain text: {Keys(keys)} any program running as you can read. Seal it once the project uses Tiresias.Extensions.Configuration: run the app once, or use Seal now in the secrets editor", id);
             case SecretsFileKind.Invalid:
-                return new(name, DoctorStatus.Fail, "not valid JSON; apps reading it will fail at startup");
+                return new(name, DoctorStatus.Fail, "not valid JSON; apps reading it will fail at startup", id);
             case SecretsFileKind.Sealed:
                 JsonObject? plain;
                 try
@@ -129,11 +137,11 @@ public static partial class Doctor
                 }
                 catch (Exception e) when (e is InvalidDataException or FormatException or JsonException or InvalidOperationException)
                 {
-                    return new(name, DoctorStatus.Fail, $"sealed envelope unreadable ({e.Message})");
+                    return new(name, DoctorStatus.Fail, $"sealed envelope unreadable ({e.Message})", id);
                 }
                 return plain is null
                     ? null
-                    : new(name, DoctorStatus.Warn, $"sealed, but {UserSecretsVault.FlattenKeys(plain).Count} plaintext key(s) were added beside it; they are sealed on the next run");
+                    : new(name, DoctorStatus.Warn, $"sealed, but {UserSecretsVault.FlattenKeys(plain).Count} plaintext key(s) were added beside it; they are sealed on the next run", id);
             default:
                 return null;
         }
@@ -147,6 +155,8 @@ public static partial class Doctor
             ? null
             : new($"project {file.Path}", DoctorStatus.Warn, "sets <UserSecretsId> but doesn't reference Tiresias.Extensions.Configuration, so its secrets.json stays plaintext");
     }
+
+    static string Keys(int count) => count == 1 ? "1 key" : $"{count} keys";
 
     static JsonNode? Parse(string text) =>
         JsonNode.Parse(text, documentOptions: new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });

@@ -73,6 +73,17 @@ public static partial class UserSecretsFiles
         File.Move(temp, folder.FilePath, overwrite: true);
     }
 
+    /// <summary>
+    /// Writes <paramref name="document"/> back as a plain <c>secrets.json</c>, for an app that can't use
+    /// Tiresias.Extensions.Configuration. The only way to undo a seal; the caller confirms first.
+    /// </summary>
+    public static void StoreInClear(UserSecretsFolder folder, JsonObject document)
+    {
+        var temp = folder.FilePath + ".tiresias.tmp";
+        File.WriteAllText(temp, document.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+        File.Move(temp, folder.FilePath, overwrite: true);
+    }
+
     [GeneratedRegex(@"<UserSecretsId>\s*([^<\s]+)\s*</UserSecretsId>")]
     private static partial Regex UserSecretsIdElement();
 }

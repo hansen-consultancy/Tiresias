@@ -58,8 +58,10 @@ Check that it worked:
   **Solo: the broker runs in this app**.
 - `tir status` prints `App: Unlocked until ...` and ` - Solo, hosted by the app` after the broker
   line.
-- **Status...** in the tray menu shows the checks. A solo PC has two warnings, egress and
-  isolation. They are the solo trade-offs, not faults.
+- **Status...** in the tray menu (or a double-click on the icon) shows the checks. A solo PC has
+  three warnings, egress, isolation and broker process. They are the solo trade-offs, not faults.
+  Every other project that keeps user secrets in plain text is a warning too, with **Review...**
+  to open it in the secrets editor.
 
 Things worth trying:
 
@@ -192,7 +194,10 @@ Things worth trying:
   decision (lease, placeholder, allowed or denied request). Filter it by period, outcome
   (**Denied** shows the refused `/get`), source or text.
 - **Status...** runs the same checks as `tir doctor`. **Copy details** puts them on the clipboard
-  for an issue.
+  for an issue. **Lock** there locks right away; **Unlock** asks for Windows Hello.
+- **Review...** on a plain-text project opens it in the secrets editor. **Seal now** asks first,
+  because an app that doesn't use Tiresias.Extensions.Configuration yet then starts without its
+  secrets. **Store in clear** undoes it.
 - If something fails, the app's problem screen has **Copy details** too. Stack traces never appear
   on screen. They are in `%LOCALAPPDATA%\Tiresias\app.log`.
 

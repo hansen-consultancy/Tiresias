@@ -149,14 +149,15 @@ public class DoctorTests
     }
 
     [Test]
-    public async Task A_plaintext_secrets_file_fails_with_its_key_count_and_never_its_keys_or_values()
+    public async Task A_plaintext_secrets_file_warns_with_its_id_and_key_count_and_never_its_keys_or_values()
     {
         var probe = new FakeProbe();
         probe.Secrets.Add(new(@"C:\u\abc\secrets.json", """{"ConnectionStrings":{"Db":"Password=hunter2"},"ApiKey":"sk-live-1"}"""));
         var check = await Check(probe, "user secrets");
 
-        Assert.That(check.Status, Is.EqualTo(DoctorStatus.Fail));
-        Assert.That(check.Detail, Does.Contain("2 key(s)"));
+        Assert.That(check.Status, Is.EqualTo(DoctorStatus.Warn));
+        Assert.That(check.UserSecretsId, Is.EqualTo("abc"));
+        Assert.That(check.Detail, Does.Contain("2 keys"));
         Assert.That(check.Detail, Does.Not.Contain("hunter2").And.Not.Contain("sk-live").And.Not.Contain("ApiKey").And.Not.Contain("ConnectionStrings"));
     }
 
@@ -171,11 +172,12 @@ public class DoctorTests
     }
 
     [Test]
-    public async Task A_clean_sealed_file_or_an_empty_one_is_not_reported()
+    public async Task A_clean_sealed_file_or_an_empty_one_or_one_without_keys_is_not_reported()
     {
         var probe = new FakeProbe();
         probe.Secrets.Add(new("a.json", $$$"""{"$tiresias":{"v":1,"sealed":"{{{Convert.ToBase64String([1])}}}"}}"""));
         probe.Secrets.Add(new("b.json", ""));
+        probe.Secrets.Add(new("c.json", "{ }"));
         Assert.That((await Doctor.RunAsync(probe)).Where(c => c.Name.StartsWith("user secrets", StringComparison.Ordinal)), Is.Empty);
     }
 

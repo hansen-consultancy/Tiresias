@@ -23,12 +23,25 @@ public partial class StatusWindow : Window
     }
 
     void OnClose(object sender, RoutedEventArgs e) => Close();
+
+    void OnSecrets(object sender, RoutedEventArgs e) => App.Current.ShowWindow<SecretsWindow>();
+
+    /// <summary>Opens the secrets editor on the row's project: the fix for a user-secrets line.</summary>
+    void OnReview(object sender, RoutedEventArgs e)
+    {
+        if (((FrameworkElement)sender).DataContext is CheckRow { UserSecretsId: { } id })
+            App.Current.ShowWindow<SecretsWindow>().Select(id);
+    }
 }
 
 /// <summary>One check as a row. Status is said in words and a glyph, never by colour alone.</summary>
-public sealed record CheckRow(string Name, string StatusText, string Glyph, Brush? Brush, string Detail)
+public sealed record CheckRow(string Name, string StatusText, string Glyph, Brush? Brush, string Detail, string? UserSecretsId = null)
 {
     public string Spoken => $"{Name}: {StatusText}. {Detail}";
+
+    public Visibility ReviewVisibility => UserSecretsId is null ? Visibility.Collapsed : Visibility.Visible;
+
+    public string ReviewName => UserSecretsId is null ? "" : Text.Format("Status_ReviewName", UserSecretsId);
 }
 
 public sealed partial class StatusViewModel : ObservableObject
@@ -42,6 +55,20 @@ public sealed partial class StatusViewModel : ObservableObject
     [ObservableProperty]
     public partial bool IsRunning { get; set; }
 
+    [ObservableProperty]
+    public partial string LockLabel { get; set; } = "";
+
+    /// <summary>Lock right here, or unlock with one Hello prompt; then the page reflects it.</summary>
+    [RelayCommand]
+    async Task ToggleLockAsync()
+    {
+        if (App.Current.Host.Keys.IsUnlocked)
+            await App.Current.LockAsync();
+        else
+            await App.Current.UnlockAsync(interactive: true);
+        await RunAsync();
+    }
+
     public ObservableCollection<CheckRow> Checks { get; } = [];
 
     [RelayCommand]
@@ -52,6 +79,7 @@ public sealed partial class StatusViewModel : ObservableObject
         var view = TrayStatus.Describe(App.Current.Snapshot());
         Headline = Text.Of(view.Headline);
         Mode = view.Mode is null ? Text.Get("Status_ModeNone") : Text.Get("Status_ModeSolo");
+        LockLabel = Text.Get(App.Current.Host.Keys.IsUnlocked ? "Tray_Lock" : "Tray_Unlock");
         try
         {
             foreach (var check in await Task.Run(() => Doctor.RunAsync(new MachineProbe())))
@@ -89,9 +117,9 @@ public sealed partial class StatusViewModel : ObservableObject
 
     static CheckRow Row(DoctorCheck check) => check.Status switch
     {
-        DoctorStatus.Ok => new(check.Name, Text.Get("Status_Ok"), "\uE73E", Brush("SystemFillColorSuccessBrush"), check.Detail),
-        DoctorStatus.Warn => new(check.Name, Text.Get("Status_Warn"), "\uE7BA", Brush("SystemFillColorCautionBrush"), check.Detail),
-        _ => new(check.Name, Text.Get("Status_Fail"), "\uEA39", Brush("SystemFillColorCriticalBrush"), check.Detail),
+        DoctorStatus.Ok => new(check.Name, Text.Get("Status_Ok"), "\uE73E", Brush("SystemFillColorSuccessBrush"), check.Detail, check.UserSecretsId),
+        DoctorStatus.Warn => new(check.Name, Text.Get("Status_Warn"), "\uE7BA", Brush("SystemFillColorCautionBrush"), check.Detail, check.UserSecretsId),
+        _ => new(check.Name, Text.Get("Status_Fail"), "\uEA39", Brush("SystemFillColorCriticalBrush"), check.Detail, check.UserSecretsId),
     };
 
     static Brush? Brush(string key) => Application.Current.TryFindResource(key) as Brush;
