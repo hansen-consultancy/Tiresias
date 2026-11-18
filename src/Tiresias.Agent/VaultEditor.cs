@@ -51,6 +51,16 @@ public static class VaultEditor
         VaultFile.Save(Path, vault with { Services = [.. vault.Services, service] });
     }
 
+    /// <summary>Adds the service, or replaces the one with its slug: setting a SQL Server up again.</summary>
+    /// <exception cref="InvalidOperationException">Its secret is missing.</exception>
+    public static void SetService(Service service)
+    {
+        var vault = Load();
+        if (service.Grants.FirstOrDefault(g => vault.FindSecret(g.SecretSlug) is null) is { } orphan)
+            throw new InvalidOperationException($"Secret {orphan.SecretSlug} isn't in the vault; add it first.");
+        VaultFile.Save(Path, vault with { Services = [.. vault.Services.Where(s => s.Slug != service.Slug), service] });
+    }
+
     /// <summary>Removes a service and keeps its secrets, which other services may share.</summary>
     /// <returns>Whether there was such a service.</returns>
     public static bool RemoveService(string slug)

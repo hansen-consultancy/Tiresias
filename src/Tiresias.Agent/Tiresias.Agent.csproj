@@ -29,6 +29,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Tiresias.Broker\Tiresias.Broker.csproj" />
+    <EmbeddedResource Include="..\Tiresias.Broker\sql\01-tiresias-setup.sql" LogicalName="sql/01-tiresias-setup.sql" />
+    <EmbeddedResource Include="..\Tiresias.Broker\sql\02-tiresias-cleanup-job.sql" LogicalName="sql/02-tiresias-cleanup-job.sql" />
     <ProjectReference Include="..\Tiresias.Core\Tiresias.Core.csproj" />
   </ItemGroup>
 

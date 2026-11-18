@@ -19,7 +19,11 @@ public enum AgentStatus
 }
 
 /// <param name="Json">The secrets document, as stored; only set when <see cref="Status"/> is <see cref="AgentStatus.Ok"/>.</param>
-public sealed record AgentReply(AgentStatus Status, string? Json = null, string? Message = null);
+/// <param name="RefreshAt">
+/// Unix seconds: the document holds values that expire (a temporary SQL login), so load it again by
+/// then. <c>null</c> when nothing in it expires.
+/// </param>
+public sealed record AgentReply(AgentStatus Status, string? Json = null, string? Message = null, long? RefreshAt = null);
 
 /// <summary>
 /// Wire format between the configuration provider and the tir agent: one request, one reply, each a

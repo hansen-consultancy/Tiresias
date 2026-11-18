@@ -520,10 +520,12 @@ public sealed class RemoveFolderName : IValueConverter
 /// <summary><c>v:Password.Value</c>: a two-way bindable value for a <see cref="PasswordBox"/>, which has none by design.</summary>
 public static class Password
 {
+    // The default is null, not "": the box starts listening in OnValueChanged, which a binding to an
+    // empty string would never raise, leaving the box deaf to typing.
     public static readonly DependencyProperty ValueProperty = DependencyProperty.RegisterAttached(
-        "Value", typeof(string), typeof(Password), new FrameworkPropertyMetadata("", FrameworkPropertyMetadataOptions.BindsTwoWayByDefault, OnValueChanged));
+        "Value", typeof(string), typeof(Password), new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault, OnValueChanged));
 
-    public static string GetValue(PasswordBox box) => (string)box.GetValue(ValueProperty);
+    public static string GetValue(PasswordBox box) => (string?)box.GetValue(ValueProperty) ?? "";
 
     public static void SetValue(PasswordBox box, string value) => box.SetValue(ValueProperty, value);
 
@@ -532,8 +534,9 @@ public static class Password
         if (d is not PasswordBox box)
             return;
         box.PasswordChanged -= OnPasswordChanged;
-        if (box.Password != (string)e.NewValue)
-            box.Password = (string)e.NewValue;
+        var value = (string?)e.NewValue ?? "";
+        if (box.Password != value)
+            box.Password = value;
         box.PasswordChanged += OnPasswordChanged;
     }
 

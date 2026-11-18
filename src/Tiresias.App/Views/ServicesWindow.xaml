@@ -89,7 +89,7 @@
 
         <StackPanel Style="{StaticResource Field}" Visibility="{Binding NeedsValue, Converter={StaticResource Visible}}">
           <Label x:Name="ValueLabel" Content="{l:S Services_Value}" Target="{Binding ElementName=ValueBox}" Padding="0,0,0,4" />
-          <PasswordBox x:Name="ValueBox" v:Password.Value="{Binding Value, Mode=TwoWay}" AutomationProperties.LabeledBy="{Binding ElementName=ValueLabel}" />
+          <PasswordBox x:Name="ValueBox" v:Password.Value="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.LabeledBy="{Binding ElementName=ValueLabel}" />
           <TextBlock Text="{l:S Services_ValueHint}" Style="{StaticResource CaptionText}" Margin="0,4,0,0" />
           <TextBlock Text="{Binding ValueError}" Style="{StaticResource FieldError}" />
         </StackPanel>
@@ -125,6 +125,7 @@
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Visibility="{Binding IsListing, Converter={StaticResource Visible}}">
         <Button Padding="12,6" Content="{l:S Services_Add}" Command="{Binding AddCommand}" />
         <Button Padding="12,6" Margin="8,0,0,0" Content="{l:S Services_Remove}" Command="{Binding RemoveCommand}" />
+        <Button Padding="12,6" Margin="8,0,0,0" Content="{l:S Services_SetUpSql}" Command="{Binding SetUpSqlCommand}" />
       </StackPanel>
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
         <TextBlock Text="{Binding Message}" Style="{StaticResource CaptionText}" VerticalAlignment="Center" Margin="0,0,12,0" MaxWidth="420" />

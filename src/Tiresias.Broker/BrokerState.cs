@@ -340,11 +340,22 @@ public sealed class BrokerState : IDisposable
     /// </summary>
     /// <param name="instance">The vault service slug of the SQL Server database.</param>
     /// <param name="grantName"><c>read</c> or <c>write</c>; the grant's secret is the provisioner connection string.</param>
-    public (AllowedRequest? Allowed, Refusal? Refusal) AuthorizeSql(string? authorization, string instance, string grantName, string sql, string? observedProcess = null)
+    public (AllowedRequest? Allowed, Refusal? Refusal) AuthorizeSql(string? authorization, string instance, string grantName, string sql, string? observedProcess = null) =>
+        AuthorizeSqlAccess(authorization, instance, grantName, sql, observedProcess);
+
+    /// <summary>
+    /// The decision for <c>/sql/{instance}/{grant}/login</c>: the checks of <see cref="AuthorizeSql"/>
+    /// without a statement to classify, and the grant must issue logins. Audited as <c>LOGIN</c>.
+    /// </summary>
+    public (AllowedRequest? Allowed, Refusal? Refusal) AuthorizeSqlLogin(string? authorization, string instance, string grantName, string? observedProcess = null) =>
+        AuthorizeSqlAccess(authorization, instance, grantName, sql: null, observedProcess);
+
+    /// <param name="sql">The statement, or <c>null</c> for a login hand-out.</param>
+    (AllowedRequest? Allowed, Refusal? Refusal) AuthorizeSqlAccess(string? authorization, string instance, string grantName, string? sql, string? observedProcess)
     {
         var token = ParseBearer(authorization);
-        var classification = SqlReadClassifier.Classify(sql);
-        var record = new AuditRecord(AuditKind.Deny, Service: instance, Grant: grantName, Method: "SQL",
+        var classification = sql is null ? null : SqlReadClassifier.Classify(sql);
+        var record = new AuditRecord(AuditKind.Deny, Service: instance, Grant: grantName, Method: sql is null ? "LOGIN" : "SQL",
             Token: token is null ? null : AuditLog.TokenRef(PlaceholderToken.Hash(token)), Process: observedProcess);
 
         lock (gate)
@@ -361,7 +372,9 @@ public sealed class BrokerState : IDisposable
                 return Deny(403, "not-covered");
             if (grant.RequiresElevation && !current.ActiveElevations(instance, now).Contains(grant.Name))
                 return Deny(403, "elevation-required", grant.Name);
-            if (grantName == SqlGrants.Read && !classification.IsRead)
+            if (classification is null && !grant.IssuesLogins)
+                return Deny(403, "no-logins");
+            if (classification is not null && grantName == SqlGrants.Read && !classification.IsRead)
                 return Deny(403, "not-read-only", detail: classification.Reason);
 
             var secret = vault.FindSecret(grant.SecretSlug);
@@ -370,7 +383,7 @@ public sealed class BrokerState : IDisposable
             if (SecretEnvelope.Open(secret, dek) is not { } value)
                 return Deny(500, "secret-unreadable");
 
-            var allow = record with { Kind = AuditKind.Allow, Reason = classification.IsRead ? "select" : "statement" };
+            var allow = record with { Kind = AuditKind.Allow, Reason = classification is null ? "login" : classification.IsRead ? "select" : "statement" };
             return (new AllowedRequest(audit, allow, service, grant, value, current.HardCapAt), null);
         }
 

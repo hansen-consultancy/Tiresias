@@ -157,6 +157,8 @@ public static class BrokerHost
 
         app.MapPost("/sql/{instance}/{grant}", (HttpContext context, string instance, string grant, SqlRequest body, SqlEndpoint endpoint) =>
             endpoint.HandleAsync(context, instance, grant, body));
+        app.MapPost("/sql/{instance}/{grant}/login", (HttpContext context, string instance, string grant, SqlEndpoint endpoint) =>
+            endpoint.HandleLoginAsync(context, instance, grant));
 
         return app;
     }

@@ -18,6 +18,9 @@ public sealed record SqlQuery(string Sql, IReadOnlyDictionary<string, object?> P
 /// <param name="RecordsAffected">As SQL Server reports it; -1 for a SELECT.</param>
 public sealed record SqlResult(IReadOnlyList<IReadOnlyDictionary<string, object?>> Rows, bool Truncated, int RecordsAffected);
 
+/// <summary>A temporary login as an application's connection string, valid until <paramref name="ExpiresAt"/>.</summary>
+public sealed record SqlLogin(string ConnectionString, DateTimeOffset ExpiresAt);
+
 /// <summary>An error SQL Server raised for the caller's own statement (syntax, permission, timeout), safe to hand back.</summary>
 public sealed class SqlStatementException(int number, string message) : Exception(message)
 {
@@ -33,6 +36,12 @@ public interface ISqlGateway
 {
     /// <exception cref="SqlStatementException">SQL Server refused the statement.</exception>
     Task<SqlResult> QueryAsync(SqlLeaseTarget target, SqlQuery query, CancellationToken ct);
+
+    /// <summary>
+    /// The lease's temporary login as a connection string an application can use (pooled, unlike the
+    /// broker's own), created on first use. The same login the broker runs statements as.
+    /// </summary>
+    Task<SqlLogin> LoginAsync(SqlLeaseTarget target, CancellationToken ct);
 
     /// <summary>Drops the lease's temporary logins and forgets their passwords. Never throws; the SQL Agent job is the backstop.</summary>
     Task EndLeaseAsync(string leaseId);
@@ -79,6 +88,32 @@ sealed partial class SqlEndpoint(BrokerState state, ISqlGateway gateway, IOption
         }
     }
 
+    /// <summary><c>POST /sql/{instance}/{grant}/login</c> → <c>{ connectionString, expiresAt }</c>, for a grant that issues logins.</summary>
+    public async Task<IResult> HandleLoginAsync(HttpContext context, string instance, string grant)
+    {
+        var observed = context.Request.Headers[ForwarderHeaders.ObservedProcess].FirstOrDefault();
+        var (allowed, refusal) = state.AuthorizeSqlLogin(context.Request.Headers.Authorization, instance, grant,
+            string.IsNullOrEmpty(observed) ? null : observed);
+        if (refusal is not null)
+            return Results.Json(new { refusal.Reason, refusal.ElevationNeeded, refusal.Problems }, statusCode: refusal.Status);
+
+        using (allowed)
+        {
+            try
+            {
+                var login = await gateway.LoginAsync(new SqlLeaseTarget(allowed!.LeaseId, instance, grant, allowed.TakeSecret(), allowed.LeaseExpiresAt),
+                    context.RequestAborted);
+                allowed.Complete(StatusCodes.Status200OK);
+                return Results.Ok(new { connectionString = login.ConnectionString, expiresAt = login.ExpiresAt.ToUnixTimeSeconds() });
+            }
+            catch (SqlStatementException e)
+            {
+                allowed!.Complete(StatusCodes.Status502BadGateway, $"sql-error {e.Number}");
+                return Results.Json(new { reason = "sql-error", number = e.Number, message = e.Message }, statusCode: StatusCodes.Status502BadGateway);
+            }
+        }
+    }
+
     /// <returns><c>false</c> for a value with no single SQL scalar meaning (an object or array).</returns>
     static bool TryScalar(JsonElement value, out object? scalar)
     {
@@ -107,13 +142,13 @@ sealed record SqlRequest(string Sql, Dictionary<string, JsonElement>? Parameters
 sealed class SqlServerGateway(ILogger<SqlServerGateway> logger) : ISqlGateway, IDisposable
 {
     readonly SemaphoreSlim gate = new(1, 1);
-    readonly Dictionary<(string LeaseId, string Instance, string Grant), (string Provisioner, string Temporary)> logins = [];
+    readonly Dictionary<(string LeaseId, string Instance, string Grant), (string Provisioner, string Temporary, DateTimeOffset ExpiresAt)> logins = [];
 
     public async Task<SqlResult> QueryAsync(SqlLeaseTarget target, SqlQuery query, CancellationToken ct)
     {
         try
         {
-            var connectionString = await TemporaryLoginAsync(target, ct);
+            var (connectionString, _) = await TemporaryLoginAsync(target, ct);
             await using var connection = new SqlConnection(connectionString);
             await connection.OpenAsync(ct);
             await using var transaction = query.ReadOnly ? connection.BeginTransaction(IsolationLevel.ReadCommitted) : null;
@@ -152,6 +187,23 @@ sealed class SqlServerGateway(ILogger<SqlServerGateway> logger) : ISqlGateway, I
         }
     }
 
+    public async Task<SqlLogin> LoginAsync(SqlLeaseTarget target, CancellationToken ct)
+    {
+        try
+        {
+            var (connectionString, expiresAt) = await TemporaryLoginAsync(target, ct);
+            // The broker's statements need a fresh session each; an application wants its pool.
+            var forApp = new SqlConnectionStringBuilder(connectionString);
+            forApp.Remove("Pooling");
+            forApp.Remove("Application Name");
+            return new(forApp.ConnectionString, expiresAt);
+        }
+        catch (SqlException e)
+        {
+            throw new SqlStatementException(e.Number, e.Message);
+        }
+    }
+
     public async Task EndLeaseAsync(string leaseId)
     {
         List<string> provisioners;
@@ -172,7 +224,7 @@ sealed class SqlServerGateway(ILogger<SqlServerGateway> logger) : ISqlGateway, I
         {
             try
             {
-                await using var connection = new SqlConnection(provisioner);
+                await using var connection = new SqlConnection(AsBroker(provisioner));
                 await connection.OpenAsync();
                 await using var command = new SqlCommand("tir.EndLease", connection) { CommandType = CommandType.StoredProcedure };
                 command.Parameters.Add("@LeaseId", SqlDbType.VarChar, 32).Value = leaseId;
@@ -187,16 +239,23 @@ sealed class SqlServerGateway(ILogger<SqlServerGateway> logger) : ISqlGateway, I
 
     public void Dispose() => gate.Dispose();
 
-    async Task<string> TemporaryLoginAsync(SqlLeaseTarget target, CancellationToken ct)
+    /// <summary>What the server's audit (APP_NAME(), DDL trigger logs, sessions) shows for the broker's own connections.</summary>
+    const string ApplicationName = "Tiresias broker";
+
+    // The sealed provisioner secret may name another application (or none); the broker's statements say who ran them.
+    static string AsBroker(string connectionString) =>
+        new SqlConnectionStringBuilder(connectionString) { ApplicationName = ApplicationName }.ConnectionString;
+
+    async Task<(string ConnectionString, DateTimeOffset ExpiresAt)> TemporaryLoginAsync(SqlLeaseTarget target, CancellationToken ct)
     {
         await gate.WaitAsync(ct);
         try
         {
             var key = (target.LeaseId, target.Instance, target.Grant);
             if (logins.TryGetValue(key, out var known))
-                return known.Temporary;
+                return (known.Temporary, known.ExpiresAt);
 
-            await using var connection = new SqlConnection(target.ProvisionerConnectionString);
+            await using var connection = new SqlConnection(AsBroker(target.ProvisionerConnectionString));
             await connection.OpenAsync(ct);
             await using var command = new SqlCommand("tir.BeginLease", connection) { CommandType = CommandType.StoredProcedure };
             command.Parameters.Add("@LeaseId", SqlDbType.VarChar, 32).Value = target.LeaseId;
@@ -216,10 +275,11 @@ sealed class SqlServerGateway(ILogger<SqlServerGateway> logger) : ISqlGateway, I
                 Password = (string)password.Value,
                 IntegratedSecurity = false,
                 Pooling = false,
-                ApplicationName = "Tiresias",
+                ApplicationName = ApplicationName,
             }.ConnectionString;
-            logins[key] = (target.ProvisionerConnectionString, temporary);
-            return temporary;
+            var expiresAt = new DateTimeOffset(expires, TimeSpan.Zero);
+            logins[key] = (target.ProvisionerConnectionString, temporary, expiresAt);
+            return (temporary, expiresAt);
         }
         finally
         {

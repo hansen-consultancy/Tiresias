@@ -28,6 +28,25 @@ public static class SecretsFile
 
     public const string EnvelopeProperty = "$tiresias";
 
+    /// <summary>Starts a value that names a credential for the agent to fetch: <c>tiresias:sql/{service}/{grant}</c>.</summary>
+    public const string ReferencePrefix = "tiresias:";
+
+    /// <summary>
+    /// Whether any string value in a plain file starts with <see cref="ReferencePrefix"/>. Served as
+    /// is, it would reach the app as a connection string that can't work, so callers fail instead.
+    /// </summary>
+    public static bool NamesReferences(string json)
+    {
+        if (!json.Contains(ReferencePrefix, StringComparison.Ordinal))
+            return false;
+        var reader = new Utf8JsonReader(System.Text.Encoding.UTF8.GetBytes(json),
+            new JsonReaderOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
+        while (reader.Read())
+            if (reader.TokenType == JsonTokenType.String && reader.GetString()!.StartsWith(ReferencePrefix, StringComparison.Ordinal))
+                return true;
+        return false;
+    }
+
     public static SecretsFileKind Classify(string? json)
     {
         if (string.IsNullOrWhiteSpace(json))

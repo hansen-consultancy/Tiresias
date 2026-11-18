@@ -74,7 +74,8 @@ public static class VaultFile
                 g.Allow.Select(Compile).ToArray(),
                 g.Deny.Select(Compile).ToArray(),
                 g.MaxBodyBytes),
-            g.RequiresElevation)).ToArray());
+            g.RequiresElevation,
+            g.IssuesLogins)).ToArray());
 
     static ServiceDto ToDto(Service s) => new(
         s.Slug,
@@ -86,7 +87,8 @@ public static class VaultFile
             g.Rule.Methods.Order().ToArray(),
             g.Rule.Allow.Select(r => r.ToString()).ToArray(),
             (g.Rule.Deny ?? []).Select(r => r.ToString()).ToArray(),
-            g.Rule.MaxBodyBytes)).ToArray());
+            g.Rule.MaxBodyBytes,
+            g.IssuesLogins)).ToArray());
 
     sealed record VaultDto(int Version, SecretDto[] Secrets, ServiceDto[] Services);
 
@@ -94,5 +96,6 @@ public static class VaultFile
 
     sealed record ServiceDto(string Slug, Uri Upstream, GrantDto[] Grants);
 
-    sealed record GrantDto(string Name, string SecretSlug, bool RequiresElevation, string[] Methods, string[] Allow, string[] Deny, long? MaxBodyBytes);
+    /// <param name="IssuesLogins">Absent in vaults written before it existed, which reads as <c>false</c>.</param>
+    sealed record GrantDto(string Name, string SecretSlug, bool RequiresElevation, string[] Methods, string[] Allow, string[] Deny, long? MaxBodyBytes, bool IssuesLogins = false);
 }

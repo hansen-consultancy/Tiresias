@@ -10,6 +10,14 @@ its section below.
 
 ### Added
 
+- **SQL Server logins in user secrets.** A `secrets.json` value `tiresias:sql/<service>/<grant>`
+  becomes a temporary login for the lease when the app loads its configuration, and the app gets a
+  new one before it expires (the reload token fires). No password stays in the file. A renewal
+  declined on the consent screen is not asked again until the app restarts.
+- **Set up a SQL Server** (Services window) prepares a database for those logins: an administrator
+  signs in once, for that window only, and the service is saved with a `read` and a `write` grant.
+- `tir exec` gives a SQL Server child its temporary login in `{SLUG}_CONNECTION_STRING`, for
+  grants that hand out logins.
 - **This wasn't me** on every consent dialog, for a prompt you didn't expect: it denies the
   request, locks Tiresias, ends the lease and refuses everything until you unlock from the app,
   and blocks the asking program until you unblock it on the status page. A follow-up window shows
@@ -17,7 +25,7 @@ its section below.
   records the process and what started it.
 - The app starts when you sign in to Windows. The installer turns it on; the status page turns it
   off.
-- An app with sealed user secrets waits up to a minute for the Tiresias app instead of failing at
+- An app with sealed user secrets (or `tiresias:` values) waits up to a minute for the Tiresias app instead of failing at
   once, so both can start at sign-in. A plaintext `secrets.json` without Tiresias loads as before,
   with no delay.
 - `tir env nuget import`, and **NuGet feeds** in the environment variables window, move a feed's

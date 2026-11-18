@@ -451,6 +451,70 @@ public class UserSecretsServiceTests
         Assert.That(reply.Status, Is.EqualTo(AgentStatus.Error));
     }
 
+    sealed class FakeReferences(Func<SecretReference, ResolvedSecret> resolve) : ISecretReferenceResolver
+    {
+        public List<(SecretReference Reference, string? Caller, string Id)> Asked { get; } = [];
+
+        public Task<ResolvedSecret> ResolveAsync(SecretReference reference, string? caller, string userSecretsId, CancellationToken ct)
+        {
+            Asked.Add((reference, caller, userSecretsId));
+            return Task.FromResult(resolve(reference));
+        }
+    }
+
+    const string WithReference = """{ "ConnectionStrings": { "Db": "tiresias:sql/appdb/read" }, "Other": "1" }""";
+
+    [Test]
+    public async Task A_reference_is_served_as_the_login_it_names_and_only_the_reference_is_sealed()
+    {
+        var references = new FakeReferences(_ => new("Server=db;User ID=tir_l_read;Password=temp", time.Now.AddHours(10)));
+        using var resolving = new UserSecretsService(root, keys, screen, time, references: references);
+        File.WriteAllText(FilePath, WithReference);
+
+        var reply = await resolving.HandleAsync(new(AgentRequest.LoadUserSecrets, Id, folder), Exe, CancellationToken.None);
+
+        Assert.That(reply.Status, Is.EqualTo(AgentStatus.Ok), reply.Message);
+        Assert.That((string?)JsonNode.Parse(reply.Json!)!["ConnectionStrings"]!["Db"], Is.EqualTo("Server=db;User ID=tir_l_read;Password=temp"));
+        Assert.That(reply.RefreshAt, Is.EqualTo(time.Now.AddHours(8).ToUnixTimeSeconds()));
+        Assert.That(references.Asked.Single(), Is.EqualTo((new SecretReference("sql", "appdb", "read"), (string?)Exe, Id)));
+        var reopened = UserSecretsVault.Open(Id, File.ReadAllText(FilePath), Keys.Hello);
+        Assert.That((string?)reopened.Document["ConnectionStrings"]!["Db"], Is.EqualTo("tiresias:sql/appdb/read"));
+    }
+
+    [Test]
+    public async Task A_reference_that_cannot_be_fetched_fails_the_load_naming_the_key()
+    {
+        var references = new FakeReferences(_ => throw new InvalidOperationException("the broker refused (403 not-covered)"));
+        using var resolving = new UserSecretsService(root, keys, screen, time, references: references);
+        File.WriteAllText(FilePath, WithReference);
+
+        var reply = await resolving.HandleAsync(new(AgentRequest.LoadUserSecrets, Id, folder), Exe, CancellationToken.None);
+
+        Assert.That(reply.Status, Is.EqualTo(AgentStatus.Error));
+        Assert.That(reply.Message, Is.EqualTo("ConnectionStrings:Db (tiresias:sql/appdb/read): the broker refused (403 not-covered)"));
+    }
+
+    [Test]
+    public async Task Without_a_resolver_a_reference_fails_the_load()
+    {
+        File.WriteAllText(FilePath, WithReference);
+        var reply = await Load();
+        Assert.That(reply.Status, Is.EqualTo(AgentStatus.Error));
+        Assert.That(reply.Message, Does.Contain("only the Tiresias app can fetch it"));
+    }
+
+    [Test]
+    public async Task A_plain_file_with_a_reference_is_not_served_as_is_while_locked()
+    {
+        File.WriteAllText(FilePath, WithReference);
+        keys.IsUnlocked = false;
+
+        var reply = await Load();
+
+        Assert.That(reply.Status, Is.EqualTo(AgentStatus.Error));
+        Assert.That(reply.Message, Does.Contain("unlock Tiresias"));
+    }
+
     [Test]
     public async Task Decisions_are_audited_with_keys_counted_and_no_values()
     {
