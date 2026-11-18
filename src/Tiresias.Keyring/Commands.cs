@@ -76,7 +76,9 @@ static class Commands
         }
 
         Console.WriteLine(summary.Restored == 0
-            ? "Nothing needed restoring: Windows Hello on this PC opens every sealed secret."
+            ? summary.NotOpened.Count == 0
+                ? "Nothing needed restoring: Windows Hello on this PC opens every sealed secret."
+                : "Nothing restored with this recovery key."
             : $"Restored {summary.Restored} sealed {(summary.Restored == 1 ? "item" : "items")}; Windows Hello on this PC opens {(summary.Restored == 1 ? "it" : "them")} now.");
         if (summary.AlreadyOpen > 0 && summary.Restored > 0)
             Console.WriteLine($"{summary.AlreadyOpen} already opened with this PC's Windows Hello.");
