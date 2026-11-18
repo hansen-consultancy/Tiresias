@@ -58,7 +58,9 @@ agent (the tray app, or `tir agent` in a terminal) answers on a per-user named p
 - **Editing:** `tir secrets list | set <key> | remove <key>` in the project folder, or the app's
   editor. No command prints a value or writes the file back in clear.
 - **Without the agent:** a colleague who doesn't use Tiresias keeps the stock plaintext
-  behaviour. A sealed file fails loudly instead of silently loading nothing.
+  behaviour, with no delay. A sealed file waits up to a minute for the agent (an app started at
+  sign-in races the tray app starting with it), then fails loudly instead of silently loading
+  nothing.
 
 ## Solo mode: no server needed
 
