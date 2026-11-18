@@ -71,6 +71,26 @@ public class ExecPlanTests
         }));
     }
 
+    [Test]
+    public void A_handed_out_sql_login_goes_in_the_connection_string_variable()
+    {
+        var env = ExecPlan.Environment([new(Svc("appdb", "mssql://db.example/AppDb"), "tirph_db", "Server=db.example;User ID=tir_x_read;Password=t")], Forwarder);
+        Assert.That(env["APPDB_CONNECTION_STRING"], Is.EqualTo("Server=db.example;User ID=tir_x_read;Password=t"));
+    }
+
+    static Grant SqlGrant(string name, bool logins, bool elevation = false) =>
+        new(name, name, new(new HashSet<string>(), []), RequiresElevation: elevation, IssuesLogins: logins);
+
+    [Test]
+    public void The_login_grant_is_the_most_privileged_one_that_issues_logins_without_elevation()
+    {
+        var db = new Service("appdb", new Uri("mssql://db.example/AppDb"), [SqlGrant("read", true), SqlGrant("write", true), SqlGrant("admin", true, elevation: true)]);
+        Assert.That(ExecPlan.LoginGrant(db, ceiling: null)?.Name, Is.EqualTo("write"));
+        Assert.That(ExecPlan.LoginGrant(db, ceiling: "read")?.Name, Is.EqualTo("read"));
+        Assert.That(ExecPlan.LoginGrant(db with { Grants = [SqlGrant("read", false)] }, null), Is.Null);
+        Assert.That(ExecPlan.LoginGrant(db with { Upstream = new Uri("https://db.example/") }, null), Is.Null);
+    }
+
     [TestCase("llm", "LLM")]
     [TestCase("llm-prod", "LLM_PROD")]
     [TestCase("a.b c", "A_B_C")]

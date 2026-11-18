@@ -38,6 +38,9 @@ static class Exec
             lines.AddRange(Consent.Describe(request, service).Select(line => "  " + line).Append(""));
         foreach (var service in services.Where(ExecPlan.IsGitHubApp))
             lines.Add($"  {service.Slug}: a GitHub App installation token in GH_TOKEN (valid up to 1 h)");
+        foreach (var service in services)
+            if (ExecPlan.LoginGrant(service, ceiling) is { } login)
+                lines.Add($"  {service.Slug}: a temporary SQL login ({login.Name}) in {ExecPlan.EnvName(service.Slug)}_CONNECTION_STRING, dropped when the lease ends");
         foreach (var line in lines)
             Console.WriteLine(line);
         if (!await AppLink.ApproveAsync($"tir exec {Path.GetFileName(args.Rest[0])}", lines))
@@ -59,7 +62,10 @@ static class Exec
                 var token = body.GetProperty("token").GetString()!;
                 if (!ExecPlan.IsGitHubApp(service))
                     minted.Add(token);
-                credentials.Add(new(service, token));
+                var connectionString = ExecPlan.LoginGrant(service, ceiling) is { } login
+                    ? await SqlLogin.RequestAsync(service.Slug, login.Name, token)
+                    : null;
+                credentials.Add(new(service, token, connectionString));
             }
 
             var start = new ProcessStartInfo(args.Rest[0]) { UseShellExecute = false };
