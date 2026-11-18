@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
 using Tiresias.Agent;
+using Tiresias.Audit;
 using Tiresias.Client;
 using Tiresias.EnvironmentVariables;
 using Tiresias.Vault;
@@ -207,9 +208,8 @@ static class EnvCommand
             if (bytes.Length == 0)
                 throw new UsageException("Empty value. To delete one, use tir env remove.");
             using var hello = HelloKeyWrapper.Open(create: false);
-            var (sealedNow, version) = EnvironmentStore.Open(hello);
-            SealedVariable[] added = [new(name, Encoding.UTF8.GetString(bytes))];
-            EnvironmentStore.Save(folder is null ? sealedNow.WithGlobal(added) : sealedNow.WithFolder(folder, added), version, hello);
+            if (EnvironmentStore.Set(new(name, Encoding.UTF8.GetString(bytes)), folder, hello))
+                Console.WriteLine($"Removed the old {name} from your Windows environment. Programs already running keep their copy until they restart.");
         }
         finally
         {
@@ -371,6 +371,9 @@ static class EnvCommand
         var variables = sealedNow.Resolve(directory);
         if (variables.Count > 0)
             Console.WriteLine($"With {string.Join(", ", variables.Select(v => EnvironmentDelivery.Describe(sealedNow, v.Name)))}.");
+        // The app isn't running, so tir records the hand-over itself.
+        using (var activity = new AuditLog(AgentHost.ActivityPath, TimeProvider.System))
+            activity.Append(AgentHost.EnvironmentRecord(true, program, variables.Select(v => EnvironmentDelivery.Describe(sealedNow, v.Name)), "tir run (Windows Hello)"));
         var delivery = await EnvironmentDelivery.DeliverAsync(sealedNow, variables, PlaceholderMinter.Endpoint,
             (placeholder, _) => PlaceholderMinter.MintAsync(placeholder, $"run:{program}", null), CancellationToken.None);
         foreach (var problem in delivery.Problems)
