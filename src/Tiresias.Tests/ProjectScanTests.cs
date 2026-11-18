@@ -14,9 +14,12 @@ public class ProjectScanTests
     [TearDown]
     public void RemoveTree() => Directory.Delete(root, recursive: true);
 
+    /// <summary>A path under the temporary tree; written with <c>\</c>, which this OS's separator replaces.</summary>
+    string Under(string relative) => Path.Combine(root, relative.Replace('\\', Path.DirectorySeparatorChar));
+
     string Project(string relative, string? id)
     {
-        var path = Path.Combine(root, relative);
+        var path = Under(relative);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, id is null
             ? "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>"
@@ -42,11 +45,11 @@ public class ProjectScanTests
     public void The_program_asking_is_traced_back_to_its_project()
     {
         var api = Project(@"Shop\Api\Api.csproj", "aaa-1");
-        var exe = Path.Combine(root, @"Shop\Api\bin\Debug\net10.0\Api.exe");
+        var exe = Under(@"Shop\Api\bin\Debug\net10.0\Api.exe");
 
         Assert.That(ProjectScanner.FromExecutable(exe, "AAA-1"), Is.EqualTo(new ProjectFile(api, "aaa-1")));
         Assert.That(ProjectScanner.FromExecutable(exe, "another-id"), Is.Null, "a project with another id is not this program's");
-        Assert.That(ProjectScanner.FromExecutable(Path.Combine(root, @"elsewhere\dotnet.exe"), "aaa-1"), Is.Null);
+        Assert.That(ProjectScanner.FromExecutable(Under(@"elsewhere\dotnet.exe"), "aaa-1"), Is.Null);
     }
 
     [Test]
@@ -64,6 +67,7 @@ public class ProjectScanTests
     }
 
     [Test]
+    [Platform("Win")]
     public void A_project_on_a_drive_that_is_not_there_is_kept_one_that_was_deleted_is_not()
     {
         var index = new ProjectIndex([], [new(@"P:\gone\Gone.csproj", "1"), new(@"E:\usb\Usb.csproj", "2"), new(@"P:\here\Here.csproj", "3")]);
@@ -83,6 +87,7 @@ public class ProjectScanTests
     }
 
     [Test]
+    [Platform("Win")]
     public void Named_projects_come_first_and_a_copied_id_lists_every_project()
     {
         var index = new ProjectIndex([@"P:\"], [

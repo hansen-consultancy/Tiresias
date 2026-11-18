@@ -95,6 +95,9 @@ public sealed partial class SecretsViewModel : ObservableObject
     IReadOnlyList<string> unused = [];
     bool scanning, rescanQueued;
 
+    /// <summary>The last rescan in this window finished: until it does, no id is called unused.</summary>
+    bool scanned;
+
     /// <summary>Ids opened here (Find a project, the status page) that have no folder yet.</summary>
     readonly HashSet<string> extraIds = new(StringComparer.OrdinalIgnoreCase);
 
@@ -184,6 +187,7 @@ public sealed partial class SecretsViewModel : ObservableObject
                 if (index.Folders.Count > 0)
                     ScanStatus = Text.Get("Secrets_Scanning");
                 index = await Task.Run(() => ProjectIndexStore.Rescan());
+                scanned = true;
                 Rebuild();
             }
             while (rescanQueued);
@@ -191,6 +195,7 @@ public sealed partial class SecretsViewModel : ObservableObject
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             AppLog.Error(e, "scanning for projects");
+            scanned = false;
             Rebuild();
         }
         finally
@@ -453,7 +458,7 @@ public sealed partial class SecretsViewModel : ObservableObject
         var folders = UserSecretsFiles.All();
         var kinds = folders.ToDictionary(f => f.Id, f => f.Kind, StringComparer.OrdinalIgnoreCase);
         var entries = ProjectList.Build(folders.Select(f => f.Id).Concat(extraIds), index);
-        unused = [.. ProjectList.Unused(entries, index).Where(kinds.ContainsKey)];
+        unused = scanned ? [.. ProjectList.Unused(entries, index).Where(kinds.ContainsKey)] : [];
         var selectedId = SelectedProject?.Id;
         relabelling = true;
         try
