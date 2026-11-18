@@ -1,11 +1,13 @@
 # Databases
 
-Status: **design, not built**. The broker already speaks to SQL Server and RavenDB for agents and
-scripts. This page designs the next step: an ordinary application (EF Core, ADO.NET, the RavenDB
-client) using a database without the long-lived credential ever being in the app, its
-configuration or its folder.
+Status: **phases 1 and 2 built, the app half of phase 4 built; the TCP relay (phase 3), `tir`
+support and schema discovery not yet** (see *Phases*). This page designs how an ordinary
+application (EF Core, ADO.NET, the RavenDB client) uses a database without the long-lived
+credential ever being in the app, its configuration or its folder.
 
-## What exists
+## Where this started
+
+Before phase 1, the broker spoke to both databases for agents and scripts only:
 
 - **SQL Server, statements over HTTP.** A vault service with upstream `mssql://host/database` and
   `read`/`write` grants. `POST /sql/{instance}/{grant}` runs one statement and returns rows as
@@ -19,7 +21,7 @@ configuration or its folder.
   API) got `501` before phase 2 (see *Changes API* below), and the TCP protocol (subscriptions) is
   not reachable at all.
 
-Neither serves an application that uses the normal drivers.
+Neither served an application that uses the normal drivers.
 
 ## Decisions
 
@@ -137,9 +139,11 @@ methods list `WEBSOCKET`, next to `GET`, `POST` and the rest:
 
 ## Phases
 
-1. **SQL login hand-out:** the `login` grant flag, `/login`, provider and `tir run` support,
-   renewal. Guide: *SQL Server with per-lease logins*.
-2. **RavenDB placeholder path and Changes:** path-carried placeholder, WebSocket relay.
-3. **RavenDB TCP relay**, after the spike. Guide: *RavenDB through the broker*.
-4. **Agent side:** SQL and RavenDB services in the desktop app's Services window and `tir`,
+1. **SQL login hand-out** (built): the `login` grant flag, `/login`, provider and `tir run`
+   support, renewal. Guide: *SQL Server with per-lease logins*.
+2. **RavenDB placeholder path and Changes** (built): path-carried placeholder, WebSocket relay
+   behind the `WEBSOCKET` method.
+3. **RavenDB TCP relay**, after the spike (not started). Guide: *RavenDB through the broker*.
+4. **Agent side** (app built): *Set up a SQL Server* and *Set up a RavenDB* in the desktop app's
+   Services window, with **Edit...** and **How to use...**. Still to do: the same in `tir`, and
    schema discovery on `/sql`.
