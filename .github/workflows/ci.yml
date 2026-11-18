@@ -38,6 +38,13 @@ jobs:
       - name: Pack
         if: runner.os == 'Windows'
         run: dotnet pack Tiresias.slnx -c Release -o artifacts
+      # The same self-contained publish app-release.yml runs, so a break shows on the PR, not on a tag.
+      - name: Publish the app as released
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          dotnet publish src/Tiresias.App -c Release -r win-x64 --self-contained -o publish
+          dotnet publish src/Tiresias.Keyring -c Release -r win-x64 --self-contained -o publish
 
   denylist:
     # Names that must never land here (hosts, people, customers). The list lives in a repository

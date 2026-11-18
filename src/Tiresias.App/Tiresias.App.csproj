@@ -18,6 +18,13 @@
     <RootNamespace>Tiresias.App</RootNamespace>
     <ApplicationIcon>..\..\assets\export\tiresias.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!--
+      Agent references the broker, an Exe, for solo mode. A self-contained publish then picks up the
+      broker's apphost, deps.json and runtimeconfig.json from both its RID and its RID-less build
+      (NETSDK1152). Only the broker's assembly is used: solo mode hosts it in-process and never runs
+      Tiresias.Broker.exe, so which copy wins doesn't matter.
+    -->
+    <ErrorOnDuplicatePublishOutputFiles>false</ErrorOnDuplicatePublishOutputFiles>
     <!-- Application.ThemeMode (the Windows 11 Fluent theme) is marked experimental. -->
     <NoWarn>$(NoWarn);WPF0001</NoWarn>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>

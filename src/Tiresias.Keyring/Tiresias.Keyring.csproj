@@ -9,6 +9,13 @@
     <IsPackable>false</IsPackable>
     <AssemblyName>tir</AssemblyName>
     <RootNamespace>Tiresias.Keyring</RootNamespace>
+    <!--
+      Agent references the broker, an Exe, for solo mode. A self-contained publish then picks up the
+      broker's apphost, deps.json and runtimeconfig.json from both its RID and its RID-less build
+      (NETSDK1152). Only the broker's assembly is used: solo mode hosts it in-process and never runs
+      Tiresias.Broker.exe, so which copy wins doesn't matter.
+    -->
+    <ErrorOnDuplicatePublishOutputFiles>false</ErrorOnDuplicatePublishOutputFiles>
   </PropertyGroup>
 
   <ItemGroup>
