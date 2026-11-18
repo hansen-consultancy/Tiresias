@@ -1,0 +1,58 @@
+<Window x:Class="Tiresias.App.Views.AboutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:Tiresias.App"
+        Title="{l:S About_WindowTitle}"
+        Width="620" Height="600" MinWidth="460" MinHeight="420"
+        WindowStartupLocation="CenterScreen"
+        Icon="pack://application:,,,/Assets/tiresias.ico">
+  <Grid Margin="{StaticResource PagePadding}">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <TextBlock Grid.Row="0" x:Name="Heading" Style="{StaticResource TitleText}" AutomationProperties.HeadingLevel="Level1" />
+    <TextBlock Grid.Row="1" x:Name="Summary" Style="{StaticResource BodyText}" />
+
+    <Border Grid.Row="2" Style="{StaticResource Card}">
+      <ItemsControl x:Name="Facts" Focusable="False">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <Grid Margin="0,2">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="140" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <TextBlock Text="{Binding Name}" Style="{StaticResource CaptionText}" Margin="0" />
+              <TextBox Grid.Column="1" Text="{Binding Value, Mode=OneWay}" IsReadOnly="True" BorderThickness="0"
+                       Background="Transparent" Padding="0" MinHeight="0" TextWrapping="Wrap"
+                       AutomationProperties.Name="{Binding Name}" />
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </Border>
+
+    <TextBlock Grid.Row="3" x:Name="NotesHeading" Style="{StaticResource SubtitleText}" />
+    <TextBox Grid.Row="4" x:Name="Notes" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+             AutomationProperties.Name="{Binding Text, ElementName=NotesHeading}" />
+
+    <Grid Grid.Row="5" Margin="0,16,0,0">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+        <Button Content="{l:S About_GitHub}" Padding="12,6" Click="OnGitHub" />
+        <Button x:Name="PageButton" Padding="12,6" Margin="8,0,0,0" Click="OnPage" />
+        <Button Content="{l:S Status_CopyDetails}" Padding="12,6" Margin="8,0,0,0" Click="OnCopy" />
+      </StackPanel>
+      <Button Grid.Column="1" Style="{StaticResource RowButton}" Margin="16,0,0,0" Content="{l:S Common_Close}" IsCancel="True" IsDefault="True" Click="OnClose" />
+    </Grid>
+  </Grid>
+</Window>

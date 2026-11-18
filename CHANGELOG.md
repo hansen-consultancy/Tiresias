@@ -8,6 +8,26 @@ its section below.
 
 ## [Unreleased]
 
+### Added
+
+- **About Tiresias** (tray menu and status page): the version, where it runs from, since when, and
+  this version's release notes, with links to GitHub.
+- A development build says so: its tray icon has an orange corner, and the tray menu, tooltip,
+  status page and About window name the version and commit. `tir status` shows which app it is
+  talking to and which `tir` answered.
+- Starting a different copy of the app (a development build while the installed app runs, or the
+  other way round) offers to switch instead of only saying Tiresias is already running.
+
+### Changed
+
+- A development build no longer adds its `tir` to PATH, so it can't shadow the installed one.
+
+### Fixed
+
+- **Show** in the secrets editor reveals the value; it did nothing before.
+- A selected row in the secrets, services and activity lists is a subtle highlight instead of dark
+  blue under black text.
+
 ## [0.1.0-preview.4] - 2026-11-18
 
 ### Added

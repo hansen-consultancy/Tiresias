@@ -36,6 +36,8 @@ public partial class StatusWindow : Window
 
     void OnServices(object sender, RoutedEventArgs e) => App.Current.ShowWindow<ServicesWindow>();
 
+    void OnAbout(object sender, RoutedEventArgs e) => App.Current.ShowWindow<AboutWindow>();
+
     /// <summary>Opens the secrets editor on the row's project: the fix for a user-secrets line.</summary>
     void OnReview(object sender, RoutedEventArgs e)
     {
@@ -64,6 +66,8 @@ public sealed partial class StatusViewModel : ObservableObject
 
     [ObservableProperty]
     public partial bool IsRunning { get; set; }
+
+    public string Build { get; } = Text.Format("Status_Build", Text.Of(AppBuild.Current.Label), AppBuild.Current.Folder);
 
     [ObservableProperty]
     public partial string LockLabel { get; set; } = "";
@@ -130,7 +134,7 @@ public sealed partial class StatusViewModel : ObservableObject
     [RelayCommand]
     void Copy()
     {
-        var sb = new StringBuilder().AppendLine(Headline).AppendLine(Mode);
+        var sb = new StringBuilder().AppendLine(Headline).AppendLine(Mode).AppendLine(Build);
         foreach (var row in Checks)
             sb.AppendLine(CultureInfo.CurrentCulture, $"{row.StatusText}  {row.Name}: {row.Detail}");
         try

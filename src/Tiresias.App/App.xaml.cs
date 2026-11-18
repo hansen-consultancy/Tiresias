@@ -12,8 +12,10 @@ namespace Tiresias.App;
 /// <summary>
 /// The tray app: one per user session. It is the agent (<see cref="AgentHost"/>: unlocked keys,
 /// user-secrets pipe, lease keeper, solo broker), shows every consent question, and answers
-/// <c>tir</c> on the control pipe. A second start hands over to the first and exits.
+/// <c>tir</c> on the control pipe. A second start of the same copy brings the first forward and
+/// exits; a different copy (a development build, the installed app) offers to take over.
 /// </summary>
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001", Justification = "WPF never disposes the Application; Quit disposes these in order (the lease ends before the pipes close).")]
 public partial class App : Application
 {
     readonly CancellationTokenSource stop = new();
@@ -45,11 +47,8 @@ public partial class App : Application
         };
 
         instance = new Mutex(initiallyOwned: true, $@"Local\Tiresias.App.{Environment.UserName}", out var first);
-        if (!first)
+        if (!first && !await TakeOverAsync())
         {
-            // Already running in this session: bring it forward instead of starting a second agent.
-            if (await ControlClient.TryAsync(new(ControlRequest.Show)) is null)
-                AskWindow.Tell(null, null, Text.Get("Startup_AlreadyRunning"));
             Shutdown();
             return;
         }
@@ -69,7 +68,10 @@ public partial class App : Application
             return;
         }
         StartControlPipe();
-        TirOnPath.Ensure();
+        // A development build leaves PATH alone: it would put its own tir ahead of the installed one's.
+        if (AppBuild.Current.Installed)
+            TirOnPath.Ensure();
+        AppLog.Info($"started {Text.Of(AppBuild.Current.Label)} from {AppBuild.Current.Folder}");
 
         tray = new TrayController(this);
         host.StateChanged += () => Dispatcher.BeginInvoke(Refresh);
@@ -86,6 +88,77 @@ public partial class App : Application
             ShowWindow<FirstRunWindow>();
         else if (host.SoloBrokerProblem is not null)
             ProblemWindow.Show(ProblemKind.SoloBrokerDown, host.SoloBrokerProblem, retry: () => _ = UnlockAsync(interactive: true));
+    }
+
+    /// <summary>
+    /// Another copy holds the session. The same copy is brought forward; a different one (say the
+    /// installed app while this is a development build) is asked to quit, after the user agrees.
+    /// </summary>
+    /// <returns>Whether this copy now owns the session.</returns>
+    async Task<bool> TakeOverAsync()
+    {
+        var running = await TryControlAsync(new(ControlRequest.Ping));
+        if (running is null)
+        {
+            AskWindow.Tell(null, null, Text.Get("Startup_AlreadyRunning"));
+            return false;
+        }
+        if (running.Folder is null)
+        {
+            AskWindow.Tell(null, Text.Get("Startup_SwitchHeading"), Text.Get("Startup_SwitchOld"));
+            return false;
+        }
+        if (AppBuild.Current.SameCopyAs(running.Folder))
+        {
+            await TryControlAsync(new(ControlRequest.Show));
+            return false;
+        }
+        var body = Text.Format("Startup_SwitchBody", running.Build, running.Folder, Text.Of(AppBuild.Current.Label), AppBuild.Current.Folder);
+        if (AskWindow.Show(null, Text.Get("Startup_SwitchHeading"), body, Text.Get("Startup_Switch"), cancel: Text.Get("Common_Cancel")) != true)
+            return false;
+        var reply = await TryControlAsync(new(ControlRequest.Quit));
+        if (reply is not { Ok: true })
+        {
+            AskWindow.Tell(null, Text.Get("Startup_SwitchHeading"), reply?.Message ?? Text.Get("Startup_SwitchFailed"));
+            return false;
+        }
+        // The other copy releases the mutex last, after its agent pipes are closed.
+        for (var waited = TimeSpan.Zero; waited < TimeSpan.FromSeconds(15); waited += TimeSpan.FromMilliseconds(200))
+        {
+            if (OwnsInstance())
+            {
+                AppLog.Info($"took over from {running.Build} in {running.Folder}");
+                return true;
+            }
+            await Task.Delay(200);
+        }
+        AskWindow.Tell(null, Text.Get("Startup_SwitchHeading"), Text.Get("Startup_SwitchFailed"));
+        return false;
+    }
+
+    bool OwnsInstance()
+    {
+        try
+        {
+            return instance!.WaitOne(0);
+        }
+        catch (AbandonedMutexException)
+        {
+            // The other copy ended without releasing it; it is ours now all the same.
+            return true;
+        }
+    }
+
+    static async Task<ControlReply?> TryControlAsync(ControlRequest request)
+    {
+        try
+        {
+            return await ControlClient.TryAsync(request, TimeSpan.FromSeconds(10));
+        }
+        catch (Exception e) when (e is IOException or OperationCanceledException)
+        {
+            return null;
+        }
     }
 
     internal static SetupFacts SetupFacts() =>
@@ -181,7 +254,15 @@ public partial class App : Application
         switch (request.Op)
         {
             case ControlRequest.Ping:
-                return new(true, State: await Dispatcher.InvokeAsync(() => Text.Of(TrayStatus.Describe(Snapshot()).Headline)));
+                return new(true, State: await Dispatcher.InvokeAsync(() => Text.Of(TrayStatus.Describe(Snapshot()).Headline)),
+                    Build: Text.Of(AppBuild.Current.Label), Folder: AppBuild.Current.Folder);
+            case ControlRequest.Quit:
+                if (await Dispatcher.InvokeAsync(() => Busy))
+                    return new(false, Text.Get("Startup_SwitchBusy"));
+                AppLog.Info("quitting: another copy is taking over");
+                // After the reply is on its way: quitting closes this pipe.
+                _ = Task.Delay(250, CancellationToken.None).ContinueWith(_ => Dispatcher.BeginInvoke(Quit), TaskScheduler.Default);
+                return new(true);
             case ControlRequest.Show:
                 await Dispatcher.InvokeAsync(ShowHome);
                 return new(true);

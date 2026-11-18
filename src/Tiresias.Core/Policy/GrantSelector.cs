@@ -100,10 +100,10 @@ public static class PathGuard
         if (pathAndQuery.Length == 0 || pathAndQuery[0] != '/')
             return false;
 
-        var queryStart = pathAndQuery.IndexOf('?');
+        var queryStart = pathAndQuery.IndexOf('?', StringComparison.Ordinal);
         var path = queryStart < 0 ? pathAndQuery : pathAndQuery[..queryStart];
 
-        if (path.Contains('\\') || path.Contains("//") || path.Any(char.IsControl))
+        if (path.Contains('\\', StringComparison.Ordinal) || path.Contains("//", StringComparison.Ordinal) || path.Any(char.IsControl))
             return false;
         if (EncodedTricks.Any(t => path.Contains(t, StringComparison.OrdinalIgnoreCase)))
             return false;

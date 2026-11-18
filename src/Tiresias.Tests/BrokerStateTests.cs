@@ -96,7 +96,7 @@ public class BrokerStateTests
 
         var lines = AuditLines();
         Assert.That(lines, Has.Exactly(1).Contains("\"kind\":\"Allow\""));
-        Assert.That(lines.Single(l => l.Contains("\"kind\":\"Allow\"")), Does.Contain("\"path\":\"/v1/models\"").And.Contain("\"status\":200"));
+        Assert.That(lines.Single(l => l.Contains("\"kind\":\"Allow\"", StringComparison.Ordinal)), Does.Contain("\"path\":\"/v1/models\"").And.Contain("\"status\":200"));
         Assert.That(string.Join("\n", lines), Does.Not.Contain("sk-read").And.Not.Contain(token));
         Assert.That(AuditLog.Verify(auditPath), Is.Null);
     }

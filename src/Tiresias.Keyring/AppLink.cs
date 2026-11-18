@@ -16,7 +16,10 @@ static class AppLink
     static readonly TimeSpan ConsentWait = TimeSpan.FromMinutes(10);
 
     /// <returns>The app's state line, or <c>null</c> when it isn't running.</returns>
-    public static async Task<string?> StateAsync() => (await TryAsync(new(ControlRequest.Ping)))?.State;
+    public static async Task<string?> StateAsync() => (await PingAsync())?.State;
+
+    /// <returns>The app's state and build, or <c>null</c> when it isn't running.</returns>
+    public static Task<ControlReply?> PingAsync() => TryAsync(new(ControlRequest.Ping));
 
     /// <summary>Asks for approval of what <paramref name="lines"/> describe: in the app's dialog when it runs, otherwise here.</summary>
     /// <param name="lines">Already printed by the caller; the app shows them in its dialog.</param>

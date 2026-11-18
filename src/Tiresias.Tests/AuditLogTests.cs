@@ -46,7 +46,7 @@ public class AuditLogTests
     {
         Write(4);
         var lines = File.ReadAllLines(path);
-        lines[1] = lines[1].Replace("\"status\":200", "\"status\":403");
+        lines[1] = lines[1].Replace("\"status\":200", "\"status\":403", StringComparison.Ordinal);
         File.WriteAllLines(path, lines);
         Assert.That(AuditLog.Verify(path), Is.EqualTo(3));
     }
