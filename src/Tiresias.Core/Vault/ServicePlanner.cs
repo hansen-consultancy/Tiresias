@@ -50,7 +50,8 @@ public sealed record ServicePlan(Service? Service, IReadOnlyList<ServiceProblem>
 /// <summary>
 /// The decision behind adding a service with one grant: defaults, validation and the entry itself.
 /// <c>tir service add</c> and the app's Services window both call it, so they refuse the same
-/// things for the same reasons. It never overwrites: a slug already in the vault is a problem.
+/// things for the same reasons. It never overwrites, except the one service being edited: any
+/// other slug already in the vault is a problem.
 /// </summary>
 public static class ServicePlanner
 {
@@ -63,14 +64,28 @@ public static class ServicePlanner
     /// <summary>Lower-case letters, digits and dashes, starting with a letter or digit: secret, service and grant names.</summary>
     public static bool IsSlug(string text) => SlugPattern.IsMatch(text);
 
-    public static ServicePlan Plan(ServiceInput input, VaultDocument vault)
+    /// <summary>
+    /// The input that plans back to <paramref name="service"/>, to edit it in the same form; <c>null</c>
+    /// for a service that form can't show faithfully: several grants, a body limit, or logins.
+    /// </summary>
+    public static ServiceInput? Describe(Service service) =>
+        service.Grants is [{ IssuesLogins: false, Rule.MaxBodyBytes: null } grant]
+            ? new(service.Slug, service.Upstream.ToString(), grant.SecretSlug,
+                [.. grant.Rule.Methods.Order(StringComparer.Ordinal)],
+                grant.Rule.Allow is [{ } only] && only.ToString() == EveryPath ? [] : [.. grant.Rule.Allow.Select(r => r.ToString())],
+                [.. (grant.Rule.Deny ?? []).Select(r => r.ToString())],
+                grant.Name, grant.RequiresElevation)
+            : null;
+
+    /// <param name="replacing">The slug of the service being edited: planning it again isn't "exists already".</param>
+    public static ServicePlan Plan(ServiceInput input, VaultDocument vault, string? replacing = null)
     {
         var problems = new List<ServiceProblem>();
         var slug = input.Slug.Trim();
         if (!IsSlug(slug))
             problems.Add(new(ServiceField.Slug, ServiceProblemKind.SlugInvalid,
                 $"'{slug}' can't be a service name: use lower-case letters, digits and dashes, e.g. httpbin or github-api.", slug));
-        else if (vault.FindService(slug) is not null)
+        else if (slug != replacing && vault.FindService(slug) is not null)
             problems.Add(new(ServiceField.Slug, ServiceProblemKind.SlugTaken,
                 $"A service named {slug} exists already. Pick another name, or remove it first: tir service remove {slug}", slug));
 

@@ -78,6 +78,16 @@ public sealed partial class ServicesViewModel : ObservableObject
 
     public bool IsListing => !IsAdding;
 
+    /// <summary>The service the form edits, as the planner described it; <c>null</c> while adding one.</summary>
+    ServiceInput? editing;
+
+    [ObservableProperty]
+    public partial string FormHeading { get; set; } = Text.Get("Services_AddHeading");
+
+    /// <summary>Editing keeps the name: renaming would break every reference to it.</summary>
+    [ObservableProperty]
+    public partial bool SlugLocked { get; set; }
+
     [ObservableProperty]
     public partial string Slug { get; set; } = "";
 
@@ -144,11 +154,21 @@ public sealed partial class ServicesViewModel : ObservableObject
     }
 
     [RelayCommand]
-    void Add()
+    void Add() => Open(null);
+
+    /// <summary>Opens the form empty to add a service, or filled in to edit <paramref name="existing"/>.</summary>
+    void Open(ServiceInput? existing)
     {
-        Slug = Upstream = Secret = Value = Allow = "";
-        Methods = "GET";
-        Elevation = false;
+        editing = existing;
+        FormHeading = existing is null ? Text.Get("Services_AddHeading") : Text.Format("Services_EditHeading", existing.Slug);
+        SlugLocked = existing is not null;
+        Slug = existing?.Slug ?? "";
+        Upstream = existing?.Upstream ?? "";
+        Secret = existing?.Secret ?? "";
+        Value = "";
+        Methods = existing?.Methods is { } methods ? string.Join(", ", methods) : "GET";
+        Allow = existing?.Allow is { } allow ? string.Join("\n", allow) : "";
+        Elevation = existing?.RequiresElevation ?? false;
         attempted = false;
         ClearErrors();
         Message = "";
@@ -159,6 +179,7 @@ public sealed partial class ServicesViewModel : ObservableObject
     [RelayCommand]
     void Cancel()
     {
+        editing = null;
         Value = "";
         IsAdding = false;
         Message = "";
@@ -199,9 +220,16 @@ public sealed partial class ServicesViewModel : ObservableObject
         window.ShowDialog();
     }
 
-    /// <summary>The setup form a selected service can be edited with: only RavenDB services, so far.</summary>
-    RavenSetupInput? Editable() =>
-        SelectedRow is { } row && Load()?.FindService(row.Slug) is { } service ? RavenSetupPlanner.Recognize(service) : null;
+    /// <summary>
+    /// How the selected service is edited: in Set up a RavenDB when that saved it, else in the add
+    /// form when that can show it faithfully (one grant, no body limit, no logins); otherwise not.
+    /// </summary>
+    (RavenSetupInput? Raven, ServiceInput? Http) Editable()
+    {
+        if (SelectedRow is not { } row || Load()?.FindService(row.Slug) is not { } service)
+            return default;
+        return RavenSetupPlanner.Recognize(service) is { } raven ? (raven, null) : (null, ServicePlanner.Describe(service));
+    }
 
     static VaultDocument? Load()
     {
@@ -215,10 +243,21 @@ public sealed partial class ServicesViewModel : ObservableObject
         }
     }
 
-    bool CanEdit() => Editable() is not null;
+    bool CanEdit() => Editable() is not (null, null);
 
     [RelayCommand(CanExecute = nameof(CanEdit))]
-    void Edit() => SetUpRaven(Editable());
+    void Edit()
+    {
+        switch (Editable())
+        {
+            case ({ } raven, _):
+                SetUpRaven(raven);
+                break;
+            case (_, { } http):
+                Open(http);
+                break;
+        }
+    }
 
     [RelayCommand]
     void SetUpRaven() => SetUpRaven(null);
@@ -281,22 +320,27 @@ public sealed partial class ServicesViewModel : ObservableObject
             }
             AppLog.Info($"secret {plan.SecretSlug} sealed for service {service.Slug}");
         }
+        var edited = editing is not null;
         try
         {
-            VaultEditor.AddService(service);
+            if (edited)
+                VaultEditor.SetService(service);
+            else
+                VaultEditor.AddService(service);
         }
         catch (Exception e) when (e is InvalidOperationException or IOException or UnauthorizedAccessException
             or InvalidDataException or System.Text.Json.JsonException)
         {
-            ProblemWindow.Show(e, "adding a service");
+            ProblemWindow.Show(e, edited ? "saving a service" : "adding a service");
             return;
         }
-        AppLog.Info($"service {service.Slug} added");
+        AppLog.Info($"service {service.Slug} {(edited ? "changed" : "added")}");
         Value = "";
+        editing = null;
         IsAdding = false;
         Reload();
         SelectedRow = Rows.FirstOrDefault(r => r.Slug == service.Slug);
-        Message = Text.Format(plan.AllowsEveryPath ? "Services_AddedEveryPath" : "Services_Added", service.Slug);
+        Message = Text.Format(edited ? "Services_Saved" : plan.AllowsEveryPath ? "Services_AddedEveryPath" : "Services_Added", service.Slug);
     }
 
     partial void OnSlugChanged(string value) => Changed();
@@ -347,11 +391,14 @@ public sealed partial class ServicesViewModel : ObservableObject
 
     ServicePlan Validate(VaultDocument vault)
     {
+        // Deny patterns and the grant's name aren't in the form; an edit keeps them as they were.
         var plan = ServicePlanner.Plan(new ServiceInput(
             Slug, Upstream, Secret,
             [Methods],
             Allow.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
-            RequiresElevation: Elevation), vault);
+            editing?.Deny,
+            editing?.Grant,
+            Elevation), vault, editing?.Slug);
         ClearErrors();
         foreach (var problem in plan.Problems)
         {

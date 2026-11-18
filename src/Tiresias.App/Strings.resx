@@ -1741,4 +1741,10 @@ Store them in clear?</value>
   <data name="Raven_DoneEditHeading" xml:space="preserve">
     <value>{0} is saved</value>
   </data>
+  <data name="Services_EditHeading" xml:space="preserve">
+    <value>Edit {0}</value>
+  </data>
+  <data name="Services_Saved" xml:space="preserve">
+    <value>Saved {0}. Programs using it get the change at once.</value>
+  </data>
 </root>
