@@ -61,6 +61,7 @@ public static class SqlServerSetup
                 + "or have an administrator drop the tiresias_signing certificates and tiresias_signer (see 01-tiresias-setup.sql), then run this again.")
             : NewPassword();
         var password = NewPassword();
+        IReadOnlyList<string> ddlTriggers = [];
 
         await using (var connection = await OpenAdminAsync(plan, admin, trustServerCertificate, ct))
         {
@@ -92,6 +93,8 @@ public static class SqlServerSetup
             }
             else
                 warnings.Add("SQL Server Agent isn't running, so there is no cleanup job. Leases still drop their logins when they end; see 02-tiresias-cleanup-job.sql to schedule tir.DropExpired another way.");
+
+            ddlTriggers = await NamesAsync(connection, $"SELECT name FROM {Bracket(plan.Database)}.sys.triggers WHERE parent_class = 0 AND is_disabled = 0 ORDER BY name;", ct);
         }
 
         var provisioner = ConnectionString(plan, new(Provisioner, password), trustServerCertificate);
@@ -106,8 +109,28 @@ public static class SqlServerSetup
             {
                 throw new InvalidOperationException($"{Provisioner} can't sign in to {plan.Server} ({e.Message}). Is SQL Server authentication on? (Server properties, Security, SQL Server and Windows Authentication mode, then restart the service.)", e);
             }
-            if (await ScalarAsync<int?>(check, "SELECT HAS_PERMS_BY_NAME(N'tir.BeginLease', N'OBJECT', N'EXECUTE');", ct) != 1)
-                throw new InvalidOperationException($"{Provisioner} signed in but can't run tir.BeginLease in {plan.Database}.");
+            // A real lease, created and ended at once: a permission check alone misses what the
+            // database runs around CREATE USER, such as an auditing DDL trigger.
+            var trial = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
+            try
+            {
+                await using (var begin = new SqlCommand("tir.BeginLease", check) { CommandType = System.Data.CommandType.StoredProcedure })
+                {
+                    begin.Parameters.AddWithValue("@LeaseId", trial);
+                    begin.Parameters.AddWithValue("@Grant", "read");
+                    begin.Parameters.AddWithValue("@ExpiresAt", DateTime.UtcNow.AddMinutes(5));
+                    begin.Parameters.Add("@Login", System.Data.SqlDbType.NVarChar, 128).Direction = System.Data.ParameterDirection.Output;
+                    begin.Parameters.Add("@Password", System.Data.SqlDbType.NVarChar, 128).Direction = System.Data.ParameterDirection.Output;
+                    await begin.ExecuteNonQueryAsync(ct);
+                }
+                await using var end = new SqlCommand("tir.EndLease", check) { CommandType = System.Data.CommandType.StoredProcedure };
+                end.Parameters.AddWithValue("@LeaseId", trial);
+                await end.ExecuteNonQueryAsync(ct);
+            }
+            catch (SqlException e)
+            {
+                throw new InvalidOperationException($"{Provisioner} can't start a lease in {plan.Database}: {e.Message}{TriggerHint(e, ddlTriggers)}", e);
+            }
         }
 
         progress.Report("Sealing the connection in the vault");
@@ -195,6 +218,30 @@ public static class SqlServerSetup
         // SQL Server picks the width (DB_ID is smallint, COUNT int), so convert rather than unbox.
         return value is null or DBNull ? default
             : (T)Convert.ChangeType(value, Nullable.GetUnderlyingType(typeof(T)) ?? typeof(T), System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    static async Task<IReadOnlyList<string>> NamesAsync(SqlConnection connection, string sql, CancellationToken ct)
+    {
+        await using var command = new SqlCommand(sql, connection);
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        var names = new List<string>();
+        while (await reader.ReadAsync(ct))
+            names.Add(reader.GetString(0));
+        return names;
+    }
+
+    /// <summary>
+    /// A database DDL trigger runs as whoever ran the DDL, and a procedure's signature doesn't reach
+    /// into it, so a trigger that writes an audit table refuses the provisioner (error 229 on that
+    /// table). Name the triggers and the grant that fixes it; granting it is the administrator's call.
+    /// </summary>
+    static string TriggerHint(SqlException e, IReadOnlyList<string> ddlTriggers)
+    {
+        if (e.Number != 229 || ddlTriggers.Count == 0)
+            return "";
+        var table = System.Text.RegularExpressions.Regex.Match(e.Message, @"object '([^']+)', database '[^']+', schema '([^']+)'");
+        var grant = table.Success ? $" To let it, run in the database: GRANT INSERT ON [{table.Groups[2].Value}].[{table.Groups[1].Value}] TO {Provisioner}; then set up again." : "";
+        return $" The database runs {string.Join(", ", ddlTriggers)} on every CREATE USER, as the user who runs it, so {Provisioner} must be allowed what the trigger does.{grant}";
     }
 
     static string Bracket(string name) => $"[{name.Replace("]", "]]")}]";

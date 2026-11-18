@@ -24,7 +24,9 @@ public static class SqlLogin
         if (!response.IsSuccessStatusCode)
         {
             var reason = body.ValueKind == JsonValueKind.Object && body.TryGetProperty("reason", out var r) ? r.GetString() : null;
-            throw new InvalidOperationException($"{service}: no SQL login ({(int)response.StatusCode} {reason ?? response.ReasonPhrase}).");
+            // A sql-error carries SQL Server's own message, which says what to fix on the server.
+            var detail = body.ValueKind == JsonValueKind.Object && body.TryGetProperty("message", out var m) ? $": {m.GetString()}" : "";
+            throw new InvalidOperationException($"{service}: no SQL login ({(int)response.StatusCode} {reason ?? response.ReasonPhrase}{detail}).");
         }
         return (body.GetProperty("connectionString").GetString()!, DateTimeOffset.FromUnixTimeSeconds(body.GetProperty("expiresAt").GetInt64()));
     }
