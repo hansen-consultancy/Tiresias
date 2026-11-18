@@ -32,6 +32,12 @@ its section below.
   approve. Use "Allow for this session" to stop being asked until you lock.
   When Tiresias provides an app's secrets, the app prints one line saying so on its error output,
   with the number of keys and never their names or values.
+- **Locked is no longer a dead end.** When an app asks for sealed user secrets while Tiresias is
+  locked, the app shows who is asking with **Unlock with Windows Hello**, then the usual consent
+  dialog, instead of the app stopping with "unlock first". An app now waits up to five minutes for
+  that answer rather than three.
+- The app puts `tir` on your user `PATH` when it starts, so `tir` works in any terminal you open
+  afterwards, and takes it off again when you uninstall.
 - `tir secrets list | set | remove` edits a project's protected user secrets without ever
   printing a value.
 - When the app is running, `tir grant` and `tir exec` ask for approval in the app, `tir unlock`

@@ -51,7 +51,8 @@ agent (the tray app, or `tir agent` in a terminal) answers on a per-user named p
 - **With the agent running:** the first load converts `secrets.json` into a sealed envelope that
   is still valid JSON. After that, a consent prompt shows the requesting executable and the
   secret *keys* (never values) before the app gets them.
-- **While locked:** a sealed file is refused with a message saying to unlock; a plaintext one is
+- **While locked:** for a sealed file the app offers to unlock with Windows Hello, then asks as
+  usual (`tir agent` refuses it with a message saying to unlock); a plaintext one is
   served unchanged and sealed on the first load after you unlock. "Allow for this session" lasts
   until you lock (or 12 hours).
 - **Editing:** `tir secrets list | set <key> | remove <key>` in the project folder, or the app's

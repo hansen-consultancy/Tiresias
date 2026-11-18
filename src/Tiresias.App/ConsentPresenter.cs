@@ -15,6 +15,9 @@ sealed class ConsentPresenter(Dispatcher dispatcher) : IUserSecretsConsentPrompt
     CancellationTokenSource session = new();
     int waiting;
 
+    /// <summary>Unlocks with Windows Hello, explaining any problem; completes with whether it worked. Set once the agent exists.</summary>
+    public Func<Task<bool>>? Unlock { get; set; }
+
     /// <summary>Whether a consent dialog is on screen; an update never restarts the app under one.</summary>
     public bool Busy => one.CurrentCount == 0;
 
@@ -27,6 +30,22 @@ sealed class ConsentPresenter(Dispatcher dispatcher) : IUserSecretsConsentPrompt
             request.Keys,
             Text.Get("Consent_UserSecrets_Note"),
             AllowSession: true), UserSecretsService.ConsentTimeout, ct);
+
+    /// <summary>Locked: the same dialog, naming the program, with "Unlock with Windows Hello" as the way to answer it.</summary>
+    public async Task<bool> AskUnlockAsync(string? executable, string userSecretsId, CancellationToken ct)
+    {
+        if (Unlock is not { } unlock)
+            return false;
+        var answer = await ShowAsync(new ConsentView(
+            Text.Format("Consent_UserSecrets_Heading", userSecretsId.Replace('-', '\u2011')),
+            executable,
+            Text.Get("Consent_Unlock_Label"),
+            [],
+            Text.Get("Consent_Unlock_Note"),
+            AllowSession: false,
+            Unlock: true), UserSecretsService.ConsentTimeout, ct);
+        return answer != ConsentAnswer.Deny && await dispatcher.InvokeAsync(unlock).Task.Unwrap();
+    }
 
     /// <summary>A placeholder or <c>tir exec</c> approval asked by <c>tir</c>; <c>tir</c> still asks for Windows Hello afterwards.</summary>
     public async Task<bool> AskPlaceholderAsync(string title, IReadOnlyList<string> lines, string? caller, CancellationToken ct) =>

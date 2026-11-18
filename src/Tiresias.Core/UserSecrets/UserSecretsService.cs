@@ -20,6 +20,14 @@ public interface IUserSecretsConsentPrompt
 {
     /// <summary>Cancelled when the screen times out or the agent locks; the service treats that as a refusal.</summary>
     Task<ConsentAnswer> AskAsync(UserSecretsConsentRequest request, CancellationToken ct);
+
+    /// <summary>
+    /// Tiresias is locked and a program asks for a sealed file: offer to unlock rather than refuse.
+    /// Completes with whether the user unlocked. The default declines, so a prompt that can't unlock
+    /// (the console of <c>tir agent</c>) keeps answering "unlock first".
+    /// </summary>
+    /// <param name="executable">The program asking, or <c>null</c> when unknown.</param>
+    Task<bool> AskUnlockAsync(string? executable, string userSecretsId, CancellationToken ct) => Task.FromResult(false);
 }
 
 /// <summary>
@@ -102,6 +110,8 @@ public sealed class UserSecretsService : IDisposable
         var kind = SecretsFile.Classify(text);
         var additions = kind == SecretsFileKind.Sealed && SecretsFile.Read(text!).PlainAdditions is not null;
         var wrapper = keys.Unlocked;
+        if (kind == SecretsFileKind.Sealed && wrapper is null && await AskUnlockAsync(caller, request.UserSecretsId, ct))
+            wrapper = keys.Unlocked;
         var plan = UserSecretsPolicy.Decide(kind, additions, wrapper is not null, keys.Recovery is not null,
             Memory.IsAllowed(caller, request.UserSecretsId, time.GetUtcNow()));
 
@@ -149,6 +159,33 @@ public sealed class UserSecretsService : IDisposable
         }
         Record(AuditKind.Allow, request, caller, $"{reason}; {load.Keys.Count} key(s)");
         return new(AgentStatus.Ok, load.Document.ToJsonString());
+    }
+
+    /// <summary>Takes its turn with the consent screens; another request may have unlocked meanwhile.</summary>
+    async Task<bool> AskUnlockAsync(string? caller, string userSecretsId, CancellationToken ct)
+    {
+        using var timeout = new CancellationTokenSource(ConsentTimeout, time);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token);
+        try
+        {
+            await screen.WaitAsync(linked.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
+        }
+        try
+        {
+            return keys.Unlocked is not null || (await prompt.AskUnlockAsync(caller, userSecretsId, linked.Token) && keys.Unlocked is not null);
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
+        }
+        finally
+        {
+            screen.Release();
+        }
     }
 
     async Task<(ConsentAnswer Answer, string Reason)> AskAsync(UserSecretsConsentRequest consent, CancellationToken ct)

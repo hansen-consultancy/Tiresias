@@ -21,8 +21,9 @@ dotnet build Tiresias.slnx
 dotnet test src/Tiresias.Tests/Tiresias.Tests.csproj
 ```
 
-Then publish the app and `tir` into folders of their own. The commands below put `tir` on the
-PATH for this terminal session:
+Then publish the app and `tir` into folders of their own. The app adds the `cli` folder to your
+user PATH when it starts (step 2), so terminals opened after that find `tir`. The last line but
+one does the same for this terminal, which was open before:
 
 ```powershell
 $root = "$env:LOCALAPPDATA\Programs\Tiresias"
@@ -70,6 +71,8 @@ Things worth trying:
   If you close it after the recovery key was shown, a resumed solo setup asks you to type the key
   back from paper.
 - **Run `tir agent` while the app runs.** It refuses and says the app is the agent.
+- **Open a new terminal and run `tir status`.** It works without setting PATH: the app added the
+  `cli` folder to your user PATH. A terminal that was already open keeps its old PATH.
 
 ## 3. Unlock and lock
 
@@ -131,7 +134,9 @@ Things worth trying:
 - **Choose Deny,** or let the countdown run out. The sample stops at startup with "Access to user
   secrets 'tiresias-sample-2f7c' was denied by Tiresias", rather than running without them and
   failing later in a less obvious way.
-- **Lock, then run the sample.** It refuses the sealed file with a message to unlock.
+- **Lock, then run the sample.** The dialog appears with the sample's name and **Unlock with
+  Windows Hello**. Unlock, and the usual consent dialog follows. Deny instead, and the sample stops
+  at startup with a message to unlock.
 - **Start the sample several times at once.** The dialogs come one after another, and each says how
   many are waiting.
 - **Edit the secrets.** Tray menu > **Edit user secrets...**, then pick the project. Values are
@@ -195,7 +200,8 @@ Things worth trying:
   decision (lease, placeholder, allowed or denied request). Filter it by period, outcome
   (**Denied** shows the refused `/get`), source or text.
 - **Status...** runs the same checks as `tir doctor`. **Copy details** puts them on the clipboard
-  for an issue. **Lock** there locks right away; **Unlock** asks for Windows Hello.
+  for an issue. **Lock** there locks right away; **Unlock** asks for Windows Hello. **Edit user
+  secrets...** and **Services...** under the state open those windows.
 - **Review...** on a plain-text project opens it in the secrets editor. **Seal now** asks first,
   because an app that doesn't use Tiresias.Extensions.Configuration yet then starts without its
   secrets. **Store in clear** undoes it.

@@ -3,11 +3,12 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:l="clr-namespace:Tiresias.App"
         Title="{l:S Status_WindowTitle}"
-        Width="720" Height="600" MinWidth="480" MinHeight="360"
+        Width="720" Height="600" MinWidth="560" MinHeight="400"
         WindowStartupLocation="CenterScreen"
         Icon="pack://application:,,,/Assets/tiresias.ico">
   <Grid Margin="{StaticResource PagePadding}">
     <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
@@ -31,7 +32,13 @@
       </Grid>
     </Border>
 
-    <Grid Grid.Row="2">
+    <!-- Where to go next sits with the state it acts on; the footer keeps only what acts on this page. -->
+    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,12">
+      <Button Content="{l:S Tray_Secrets}" Padding="12,6" Click="OnSecrets" />
+      <Button Content="{l:S Status_Services}" Padding="12,6" Margin="8,0,0,0" Click="OnServices" />
+    </StackPanel>
+
+    <Grid Grid.Row="3">
       <ListView x:Name="Checks" ItemsSource="{Binding Checks}" AutomationProperties.Name="{l:S Status_ChecksName}"
                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
         <ListView.ItemTemplate>
@@ -71,14 +78,16 @@
       </TextBlock>
     </Grid>
 
-    <Grid Grid.Row="3" Margin="0,16,0,0">
+    <Grid Grid.Row="4" Margin="0,16,0,0">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
         <Button Content="{l:S Status_CopyDetails}" Padding="12,6" Command="{Binding CopyCommand}" />
         <Button Content="{l:S Problem_Action_DataFolder}" Padding="12,6" Margin="8,0,0,0" Command="{Binding OpenFolderCommand}" />
-        <Button Content="{l:S Tray_Secrets}" Padding="12,6" Margin="8,0,0,0" Click="OnSecrets" />
-        <Button Content="{l:S Status_Services}" Padding="12,6" Margin="8,0,0,0" Click="OnServices" />
       </StackPanel>
-      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="16,0,0,0">
         <Button Style="{DynamicResource AccentButtonStyle}" MinWidth="96" Padding="12,6" Content="{l:S Status_RunAgain}"
                 Command="{Binding RunCommand}" />
         <Button Style="{StaticResource RowButton}" Content="{l:S Common_Close}" IsCancel="True" Click="OnClose" />

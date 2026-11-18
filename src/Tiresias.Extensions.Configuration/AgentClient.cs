@@ -17,7 +17,7 @@ sealed class NamedPipeUserSecretsAgent(string? pipeName = null) : IUserSecretsAg
     static readonly TimeSpan ConnectTimeout = TimeSpan.FromMilliseconds(300);
 
     /// <summary>Long: the reply waits for the user to read a consent screen and touch Hello.</summary>
-    static readonly TimeSpan ReplyTimeout = TimeSpan.FromMinutes(3);
+    static readonly TimeSpan ReplyTimeout = TimeSpan.FromMinutes(5);
 
     public AgentReply? TryLoad(AgentRequest request)
     {

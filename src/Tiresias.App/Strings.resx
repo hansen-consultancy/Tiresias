@@ -162,6 +162,15 @@
   <data name="Consent_AllowSession" xml:space="preserve">
     <value>Allow for this session</value>
   </data>
+  <data name="Consent_Unlock" xml:space="preserve">
+    <value>Unlock with Windows Hello</value>
+  </data>
+  <data name="Consent_Unlock_Label" xml:space="preserve">
+    <value>Tiresias is locked, so its secrets can't be opened yet.</value>
+  </data>
+  <data name="Consent_Unlock_Note" xml:space="preserve">
+    <value>Unlock to answer: you then see which keys it gets and choose whether to allow it. Deny, and the app stops at startup.</value>
+  </data>
   <data name="Consent_Deny" xml:space="preserve">
     <value>Deny</value>
   </data>

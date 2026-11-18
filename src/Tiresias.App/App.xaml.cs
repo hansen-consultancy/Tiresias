@@ -56,6 +56,7 @@ public partial class App : Application
 
         consent = new ConsentPresenter(Dispatcher);
         host = new AgentHost(consent);
+        consent.Unlock = async () => (await UnlockAsync(interactive: true)).Ok;
         host.Log += AppLog.Info;
         try
         {
@@ -68,6 +69,7 @@ public partial class App : Application
             return;
         }
         StartControlPipe();
+        TirOnPath.Ensure();
 
         tray = new TrayController(this);
         host.StateChanged += () => Dispatcher.BeginInvoke(Refresh);

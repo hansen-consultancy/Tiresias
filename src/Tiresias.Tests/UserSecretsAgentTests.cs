@@ -174,6 +174,19 @@ public class UserSecretsServiceTests
         public List<UserSecretsConsentRequest> Shown { get; } = [];
         public TaskCompletionSource? Hold { get; set; }
 
+        /// <summary>Set to unlock when asked; <c>null</c> keeps the interface's default (decline).</summary>
+        public Keys? UnlockWith { get; set; }
+        public int UnlockAsked { get; private set; }
+
+        public Task<bool> AskUnlockAsync(string? executable, string userSecretsId, CancellationToken ct)
+        {
+            UnlockAsked++;
+            if (UnlockWith is null)
+                return Task.FromResult(false);
+            UnlockWith.IsUnlocked = true;
+            return Task.FromResult(true);
+        }
+
         public async Task<ConsentAnswer> AskAsync(UserSecretsConsentRequest request, CancellationToken ct)
         {
             Shown.Add(request);
@@ -308,6 +321,35 @@ public class UserSecretsServiceTests
         Assert.That(reply.Status, Is.EqualTo(AgentStatus.Denied));
         Assert.That(reply.Message, Does.Contain("locked"));
         Assert.That(screen.Shown, Is.Empty);
+    }
+
+    [Test]
+    public async Task Locked_offers_to_unlock_then_asks_consent()
+    {
+        File.WriteAllText(FilePath, """{ "A": "1" }""");
+        await Load();
+        keys.IsUnlocked = false;
+        screen.UnlockWith = keys;
+        screen.Answers.Enqueue(ConsentAnswer.AllowOnce);
+
+        var reply = await Load();
+
+        Assert.That(screen.UnlockAsked, Is.EqualTo(1));
+        Assert.That(screen.Shown, Has.Count.EqualTo(1));
+        Assert.That(reply.Status, Is.EqualTo(AgentStatus.Ok));
+        Assert.That(reply.Json, Does.Contain("\"A\""));
+    }
+
+    [Test]
+    public async Task Locked_does_not_offer_to_unlock_for_a_plaintext_file()
+    {
+        File.WriteAllText(FilePath, """{ "A": "1" }""");
+        keys.IsUnlocked = false;
+        screen.UnlockWith = keys;
+
+        await Load();
+
+        Assert.That(screen.UnlockAsked, Is.Zero);
     }
 
     [Test]

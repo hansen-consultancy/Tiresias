@@ -9,7 +9,8 @@ namespace Tiresias.App.Views;
 /// <param name="Program">The executable asking, as the pipe or the connection identified it; <c>null</c> when it couldn't be.</param>
 /// <param name="Items">User secrets: the keys (never values). A placeholder: the consent lines tir prints.</param>
 /// <param name="AllowSession">Offer "Allow for this session": user secrets only, where the agent remembers the answer.</param>
-public sealed record ConsentView(string Heading, string? Program, string ListLabel, IReadOnlyList<string> Items, string Note, bool AllowSession);
+/// <param name="Unlock">Tiresias is locked: the one way forward is "Unlock with Windows Hello" (or Deny), and there is no list.</param>
+public sealed record ConsentView(string Heading, string? Program, string ListLabel, IReadOnlyList<string> Items, string Note, bool AllowSession, bool Unlock = false);
 
 /// <summary>
 /// The consent dialog: topmost, names the program and lists what it gets, and answers Deny when it
@@ -32,6 +33,9 @@ public partial class ConsentWindow : Window
         ProgramFolder.Visibility = ProgramFolder.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         ListLabel.Text = view.ListLabel;
         Items.ItemsSource = view.Items.Count > 0 ? view.Items : [Text.Get("Consent_NoKeys")];
+        Items.Visibility = view.Unlock ? Visibility.Collapsed : Visibility.Visible;
+        if (view.Unlock)
+            AllowOnce.Content = Text.Get("Consent_Unlock");
         Note.Text = waiting > 0 ? $"{view.Note} {Text.Format("Consent_Waiting", waiting)}" : view.Note;
         AllowSession.Visibility = view.AllowSession ? Visibility.Visible : Visibility.Collapsed;
         tick.Tick += (_, _) => UpdateCountdown();

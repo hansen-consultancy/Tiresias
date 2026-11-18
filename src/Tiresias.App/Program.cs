@@ -8,7 +8,7 @@ static class Program
     static void Main()
     {
         // Handles Velopack's install, update and uninstall hooks (and exits for them) before any UI.
-        VelopackApp.Build().Run();
+        VelopackApp.Build().OnBeforeUninstallFastCallback(_ => TirOnPath.Remove()).Run();
         var app = new App();
         app.InitializeComponent();
         app.Run();
