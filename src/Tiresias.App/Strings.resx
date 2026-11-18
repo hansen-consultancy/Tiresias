@@ -91,6 +91,99 @@
   <data name="Build_DevelopmentCommit" xml:space="preserve">
     <value>{0}, development build {1}</value>
   </data>
+  <data name="Consent_Environment_Heading" xml:space="preserve">
+    <value>Give environment variables to {0}?</value>
+  </data>
+  <data name="Consent_Environment_ListLabel" xml:space="preserve">
+    <value>Sealed variables ({0}):</value>
+  </data>
+  <data name="Consent_Environment_Note" xml:space="preserve">
+    <value>They go into this one program's environment, and whatever it starts. Allowing it hands over the values; they are never shown here.</value>
+  </data>
+  <data name="Env_AddHeading" xml:space="preserve">
+    <value>Add a sealed variable</value>
+  </data>
+  <data name="Env_AddInvalid" xml:space="preserve">
+    <value>Type a name (without =) and a value.</value>
+  </data>
+  <data name="Env_Added" xml:space="preserve">
+    <value>Sealed {0}.</value>
+  </data>
+  <data name="Env_Body" xml:space="preserve">
+    <value>Variables in your Windows environment are readable by every program you run. Sealed ones are given only to a program you allow: run it with tir run -- &lt;command&gt;.</value>
+  </data>
+  <data name="Env_Detail" xml:space="preserve">
+    <value>({0} characters)</value>
+  </data>
+  <data name="Env_DetailSecret" xml:space="preserve">
+    <value>({0} characters, looks like a secret)</value>
+  </data>
+  <data name="Env_Heading" xml:space="preserve">
+    <value>Environment variables</value>
+  </data>
+  <data name="Env_Locked" xml:space="preserve">
+    <value>Tiresias is locked. Unlock it with Windows Hello to see or change sealed variables.</value>
+  </data>
+  <data name="Env_NewName" xml:space="preserve">
+    <value>Name of the new variable</value>
+  </data>
+  <data name="Env_NewValue" xml:space="preserve">
+    <value>Value of the new variable</value>
+  </data>
+  <data name="Env_NoneSealed" xml:space="preserve">
+    <value>Nothing sealed yet.</value>
+  </data>
+  <data name="Env_NothingPicked" xml:space="preserve">
+    <value>Tick at least one variable first.</value>
+  </data>
+  <data name="Env_Protect" xml:space="preserve">
+    <value>Seal and remove from Windows</value>
+  </data>
+  <data name="Env_Protected" xml:space="preserve">
+    <value>Sealed {0}. Run programs that need them with tir run -- &lt;command&gt;.</value>
+  </data>
+  <data name="Env_PutBack" xml:space="preserve">
+    <value>Put back in Windows</value>
+  </data>
+  <data name="Env_PutBackDone" xml:space="preserve">
+    <value>Put {0} back in Windows. Programs started from now on can read them again.</value>
+  </data>
+  <data name="Env_Remove" xml:space="preserve">
+    <value>Remove</value>
+  </data>
+  <data name="Env_RemoveBody" xml:space="preserve">
+    <value>{0} will be deleted, not put back in Windows. Only do this if you no longer need the values.</value>
+  </data>
+  <data name="Env_RemoveTitle" xml:space="preserve">
+    <value>Remove these variables?</value>
+  </data>
+  <data name="Env_Removed" xml:space="preserve">
+    <value>Removed {0}.</value>
+  </data>
+  <data name="Env_Seal" xml:space="preserve">
+    <value>Seal</value>
+  </data>
+  <data name="Env_SealedHeading" xml:space="preserve">
+    <value>Sealed</value>
+  </data>
+  <data name="Env_SealedSummary" xml:space="preserve">
+    <value>{0} sealed. Tick some to put them back in Windows or remove them.</value>
+  </data>
+  <data name="Env_WindowTitle" xml:space="preserve">
+    <value>Environment variables - Tiresias</value>
+  </data>
+  <data name="Env_WindowsHeading" xml:space="preserve">
+    <value>In your Windows environment</value>
+  </data>
+  <data name="Env_WindowsSummary" xml:space="preserve">
+    <value>{0} look like secrets and are ticked. Sealing removes them from Windows once the sealed copy reads back; programs already running keep their copy until they restart.</value>
+  </data>
+  <data name="Environment_Locked" xml:space="preserve">
+    <value>Tiresias is locked. Unlock it, then run the command again.</value>
+  </data>
+  <data name="Environment_NoneSealed" xml:space="preserve">
+    <value>No environment variables are sealed yet.</value>
+  </data>
   <data name="FirstRun_RecoveryRestore_Body" xml:space="preserve">
     <value>This PC already has sealed secrets: copied from another PC, or left by an earlier setup. Windows Hello here can't open them, but the recovery key they were sealed with can. Type it from your paper copy and they open on this PC as before; this PC then uses the same recovery key, so the paper you have keeps covering everything. Spaces and case don't matter.</value>
   </data>
@@ -220,6 +313,9 @@
   <data name="Status_RestoreTitle" xml:space="preserve">
     <value>Some secrets need your recovery key</value>
   </data>
+  <data name="Status_ReviewEnvironment" xml:space="preserve">
+    <value>Seal environment variables that look like secrets</value>
+  </data>
   <data name="Tray_About" xml:space="preserve">
     <value>About Tiresias</value>
   </data>
@@ -248,6 +344,9 @@ Switch to this copy, {2}, from {3}? The other copy quits first, ending its lease
   </data>
   <data name="Startup_OtherAgent" xml:space="preserve">
     <value>Another Tiresias agent is running in this session, probably 'tir agent' in a terminal. Only one can serve your secrets at a time. Stop it (press q in that terminal), then start Tiresias again.</value>
+  </data>
+  <data name="Tray_Environment" xml:space="preserve">
+    <value>Environment variables</value>
   </data>
   <data name="Tray_NotSetUp" xml:space="preserve">
     <value>Not set up yet</value>

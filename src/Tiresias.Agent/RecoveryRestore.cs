@@ -16,7 +16,7 @@ public sealed record RestoreSummary(int Restored, int AlreadyOpen, IReadOnlyList
 
 /// <summary>
 /// Restoring from the paper recovery key: every sealed item on this device (each vault's secrets and
-/// every sealed <c>secrets.json</c>) that this Windows Hello key can't open is given back to it, as
+/// every sealed <c>secrets.json</c>, and the sealed environment) that this Windows Hello key can't open is given back to it, as
 /// <see cref="RecoveryRewrap"/> describes. For a new PC, a reset Windows Hello, or files copied from
 /// another machine. Everything is worked out before anything is written.
 /// </summary>
@@ -32,7 +32,7 @@ public static class RecoveryRestore
         var storedMatches = stored is not null && PaperKey.Matches(recoveryKey, stored);
 
         var vaults = new List<(string Path, VaultDocument Vault, bool Changed)>();
-        var files = new List<(UserSecretsFolder Folder, string Text)>();
+        var files = new List<(string Path, string Text)>();
         int restored = 0, alreadyOpen = 0, recoveryOpens = 0, items = 0;
         var notOpened = new List<string>();
 
@@ -68,7 +68,15 @@ public static class RecoveryRestore
             var (outcome, text, opens) = UserSecretsVault.Rewrap(folder.Id, File.ReadAllText(folder.FilePath), hello, recovery);
             Count(outcome, opens, $"user secrets: {folder.Id}");
             if (outcome == RewrapOutcome.Rewrapped)
-                files.Add((folder, text));
+                files.Add((folder.FilePath, text));
+        }
+
+        if (EnvironmentStore.IsSealed)
+        {
+            var (outcome, text, opens) = EnvironmentStore.Rewrap(hello, recovery);
+            Count(outcome, opens, "environment variables");
+            if (outcome == RewrapOutcome.Rewrapped)
+                files.Add((EnvironmentStore.FilePath, text));
         }
 
         if (!storedMatches && (items > 0 ? recoveryOpens == 0 : stored is not null))
@@ -78,11 +86,11 @@ public static class RecoveryRestore
 
         foreach (var (path, vault, changed) in vaults.Where(v => v.Changed))
             VaultFile.Save(path, vault);
-        foreach (var (folder, text) in files)
+        foreach (var (path, text) in files)
         {
-            var temp = folder.FilePath + ".tmp";
+            var temp = path + ".tmp";
             File.WriteAllText(temp, text);
-            File.Move(temp, folder.FilePath, overwrite: true);
+            File.Move(temp, path, overwrite: true);
         }
 
         var adopt = RecoveryRewrap.ShouldAdopt(stored is not null, storedMatches, items, recoveryOpens);
@@ -97,7 +105,8 @@ public static class RecoveryRestore
     /// </summary>
     public static bool AnythingSealed() =>
         VaultPaths().Any(path => VaultFile.Load(path).Secrets.Count > 0)
-        || UserSecretsFiles.All().Any(f => f.Kind == SecretsFileKind.Sealed);
+        || UserSecretsFiles.All().Any(f => f.Kind == SecretsFileKind.Sealed)
+        || EnvironmentStore.IsSealed;
 
     /// <summary>The sealed items this Windows Hello key can't open, by name; empty when nothing needs restoring. No prompt beyond the unlocked wrapper.</summary>
     public static IReadOnlyList<string> Unopened(IKeyWrapper hello)
@@ -110,6 +119,8 @@ public static class RecoveryRestore
         foreach (var folder in UserSecretsFiles.All().Where(f => f.Kind == SecretsFileKind.Sealed))
             if (!UserSecretsVault.Opens(folder.Id, File.ReadAllText(folder.FilePath), hello))
                 names.Add($"user secrets: {folder.Id}");
+        if (EnvironmentStore.IsSealed && !EnvironmentStore.Opens(hello))
+            names.Add("environment variables");
         return names;
     }
 

@@ -48,6 +48,25 @@ sealed class ConsentPresenter(Dispatcher dispatcher) : IUserSecretsConsentPrompt
         return answer != ConsentAnswer.Deny && await dispatcher.InvokeAsync(unlock).Task.Unwrap();
     }
 
+    /// <summary><c>tir run</c> asking for the sealed environment variables for one program.</summary>
+    public async Task<bool> AskEnvironmentAsync(string program, IReadOnlyList<string> names, string? caller, CancellationToken ct)
+    {
+        try
+        {
+            return await ShowAsync(new ConsentView(
+                Text.Format("Consent_Environment_Heading", program),
+                caller,
+                Text.Format("Consent_Environment_ListLabel", names.Count),
+                names,
+                Text.Get("Consent_Environment_Note"),
+                AllowSession: false), UserSecretsService.ConsentTimeout, ct) != ConsentAnswer.Deny;
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
+        }
+    }
+
     /// <summary>A placeholder or <c>tir exec</c> approval asked by <c>tir</c>; <c>tir</c> still asks for Windows Hello afterwards.</summary>
     public async Task<bool> AskPlaceholderAsync(string title, IReadOnlyList<string> lines, string? caller, CancellationToken ct)
     {

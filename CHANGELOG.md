@@ -22,6 +22,9 @@ its section below.
   and they open again. Nothing is decrypted or re-encrypted. `tir recovery restore` does the same.
 - The first run on a PC with sealed secrets copied from another one asks for their recovery key
   instead of making a new one.
+- Environment variables that look like secrets can be sealed out of your Windows environment
+  (**Environment variables** in the tray menu, or `tir env protect`), put back, and given to one
+  program at a time with `tir run -- <command>`. The status page warns about the ones left exposed.
 - The secrets editor names projects instead of listing ids: add the folder you keep your code in
   under **Project folders**, use **Find a project**, or just run the project. Ids no project uses
   are grouped apart and can be moved to the Recycle Bin.

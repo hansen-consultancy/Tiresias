@@ -39,6 +39,17 @@ const string Usage = """
     tir secrets remove <key> [--project <path> | --id <UserSecretsId>]
         A project's protected user secrets (the project in the current folder by default).
         Values are typed without echo or piped in; no command prints one.
+
+    tir env list
+    tir env protect [<NAME>...] [--yes]
+    tir env put-back <NAME>...
+    tir env set <NAME> [--from-stdin]
+    tir env remove <NAME>
+        Environment variables sealed out of your Windows user environment. protect with no names
+        offers the ones that look like secrets; put-back returns them to Windows as they were.
+    tir run -- <command> [args...]
+        Runs the command with the sealed environment variables, after you allow it (in the app's
+        dialog, or with Windows Hello when the app isn't running).
     """;
 
 var line = new CommandLine(args);
@@ -62,6 +73,8 @@ try
         ("exec", _) => await Exec.RunAsync(line),
         ("doctor", _) => await Commands.DoctorAsync(line),
         ("secrets", _) => SecretsCommand.Run(line),
+        ("env", _) => EnvCommand.Run(line),
+        ("run", _) => await EnvCommand.RunCommandAsync(line),
         _ => throw new UsageException("Unknown command."),
     };
 }
