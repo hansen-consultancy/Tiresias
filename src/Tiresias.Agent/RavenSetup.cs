@@ -61,8 +61,7 @@ public static class RavenSetup
         X509Certificate2 certificate;
         try
         {
-            certificate = X509CertificateLoader.LoadPkcs12(pfx, string.IsNullOrEmpty(password) ? null : password,
-                X509KeyStorageFlags.Exportable | X509KeyStorageFlags.EphemeralKeySet);
+            certificate = RavenClients.Load(pfx, string.IsNullOrEmpty(password) ? null : password, exportable: true);
         }
         catch (CryptographicException) when (!string.IsNullOrEmpty(password))
         {
@@ -98,10 +97,9 @@ public static class RavenSetup
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             response = await client.SendAsync(request, ct);
         }
-        catch (HttpRequestException e) when (e.InnerException is AuthenticationException)
+        catch (HttpRequestException e) when (e.InnerException is AuthenticationException tls)
         {
-            throw new InvalidOperationException($"{server.Authority} and this PC couldn't agree on TLS: {e.InnerException.Message} "
-                + "If the server's own certificate is self-signed, this PC (and the broker) won't trust it; RavenDB's setup wizard can give it a Let's Encrypt one.", e);
+            throw new InvalidOperationException($"The TLS connection to {server.Authority} failed: {Innermost(tls).Message}", e);
         }
         catch (HttpRequestException e)
         {
@@ -131,6 +129,14 @@ public static class RavenSetup
                     throw new InvalidOperationException($"{server.Authority} answered {(int)response.StatusCode} {response.ReasonPhrase} for {database}'s stats.");
             }
         }
+    }
+
+    /// <summary>TLS failures nest: "see inner exception" twice before the reason Windows gave.</summary>
+    static Exception Innermost(Exception e)
+    {
+        while (e.InnerException is { } inner)
+            e = inner;
+        return e;
     }
 
     static async Task<bool> MentionsDatabaseAsync(HttpResponseMessage response, CancellationToken ct) =>
