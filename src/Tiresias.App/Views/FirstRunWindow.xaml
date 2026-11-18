@@ -72,7 +72,7 @@
                    TextWrapping="Wrap" FontFamily="Cascadia Mono, Consolas" CharacterCasing="Upper"
                    AutomationProperties.Name="{l:S FirstRun_RecoveryRestore_KeyName}" />
           <TextBlock Text="{Binding RestoreResult}" Style="{StaticResource BodyText}" Margin="0,12,0,0" AutomationProperties.LiveSetting="Polite" />
-          <Expander Header="{l:S FirstRun_RecoveryRestore_Lost}" Margin="0,16,0,0">
+          <Expander Header="{l:S FirstRun_RecoveryRestore_Lost}" Margin="0,16,0,0" Visibility="{Binding LostVisibility}">
             <StackPanel Margin="0,8,0,0">
               <TextBlock Text="{l:S FirstRun_RecoveryRestore_LostBody}" Style="{StaticResource BodyText}" />
               <Button Content="{l:S FirstRun_RecoveryRestore_New}" HorizontalAlignment="Left" Padding="12,6"

@@ -63,7 +63,13 @@ public sealed partial class FirstRunViewModel : ObservableObject
     byte[]? recoveryKey;
     IReadOnlyList<string> words = [];
     (int First, int Second) challenge;
-    bool restoreDone;
+
+    /// <summary>The typed key was adopted, so this PC has a recovery key: a new one can no longer be made.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(LostVisibility))]
+    public partial bool RestoreDone { get; set; }
+
+    public Visibility LostVisibility => RestoreDone ? Visibility.Collapsed : Visibility.Visible;
 
     public FirstRunViewModel()
     {
@@ -271,7 +277,7 @@ public sealed partial class FirstRunViewModel : ObservableObject
     /// </summary>
     async Task RestoreAsync()
     {
-        if (restoreDone)
+        if (RestoreDone)
         {
             MoveOn(FirstRunPlan.Next(Step, App.SetupFacts()));
             return;
@@ -305,7 +311,7 @@ public sealed partial class FirstRunViewModel : ObservableObject
             return;
         }
         RestoreResult = RecoveryViewModel.Describe(summary) + Environment.NewLine + Text.Get("FirstRun_RecoveryRestore_Later");
-        restoreDone = true;
+        RestoreDone = true;
     }
 
     async Task ChooseModeAsync()
