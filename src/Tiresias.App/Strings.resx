@@ -489,6 +489,13 @@
   <data name="Secrets_ProjectFilter" xml:space="preserve">
     <value>Project files (*.csproj)|*.csproj</value>
   </data>
+  <data name="Notify_FirstSealed_Title" xml:space="preserve">
+    <value>User secrets protected</value>
+  </data>
+  <data name="Notify_FirstSealed_Body" xml:space="preserve">
+    <value>{0} is now sealed. From its next start, Tiresias asks you before it gets them.</value>
+    <comment>{0}: UserSecretsId</comment>
+  </data>
   <data name="Secrets_ProjectSealed" xml:space="preserve">
     <value>{0} (sealed)</value>
     <comment>{0}: UserSecretsId</comment>

@@ -60,6 +60,12 @@ public sealed class UserSecretsService : IDisposable
     /// <summary>One line per decision, for a log window. Never a value.</summary>
     public event Action<string>? Log;
 
+    /// <summary>
+    /// A plaintext file was sealed on its first load, without a prompt. Raised with the UserSecretsId
+    /// so the app can tell the user something changed: from now on that project asks first.
+    /// </summary>
+    public event Action<string>? FirstSealed;
+
     /// <summary>Forgets every "allow for this session" and refuses the consent screen that is open, if any.</summary>
     public void Lock()
     {
@@ -138,6 +144,8 @@ public sealed class UserSecretsService : IDisposable
                 File.Move(temp, path, overwrite: true);
             }
             Say($"{request.UserSecretsId}: sealed {load.PlaintextKeys.Count} plaintext key(s).");
+            if (plan.Action == UserSecretsAction.SealAndServe)
+                FirstSealed?.Invoke(request.UserSecretsId);
         }
         Record(AuditKind.Allow, request, caller, $"{reason}; {load.Keys.Count} key(s)");
         return new(AgentStatus.Ok, load.Document.ToJsonString());

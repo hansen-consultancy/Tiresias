@@ -110,11 +110,13 @@ With the app unlocked, run the sample:
 dotnet run --project samples/ProtectedSecretsSample
 ```
 
-1. The **consent dialog** appears on top of everything else. It shows the program asking (the
-   sample's path) and the key `Demo:ApiKey`, but not its value. It also shows a countdown.
-2. Choose **Allow for this session**.
-3. In a second terminal, run `curl.exe http://localhost:5080/`. It answers
+1. There is no dialog this first time: the file was plaintext, so the sample could read it anyway.
+   Tiresias seals it in place and the tray shows **User secrets protected**.
+2. In a second terminal, run `curl.exe http://localhost:5080/`. It answers
    `Demo:ApiKey is set (13 characters).`
+3. Stop the sample (Ctrl+C) and run it again. Now the **consent dialog** appears on top of
+   everything else. It shows the program asking (the sample's path) and the key `Demo:ApiKey`,
+   but not its value. It also shows a countdown. Choose **Allow for this session**.
 
 Check that the file is sealed: open
 `%APPDATA%\Microsoft\UserSecrets\tiresias-sample-2f7c\secrets.json`. It still holds valid JSON,
@@ -122,7 +124,7 @@ but now it is a sealed envelope and `example-value` is nowhere in it.
 
 Things worth trying:
 
-- **Run the sample again.** There is no dialog this time, because the session allowance holds until
+- **Run the sample a third time.** There is no dialog, because the session allowance holds until
   you lock or for 12 hours.
 - **Choose Deny,** or let the countdown run out. The sample starts without the secret.
 - **Lock, then run the sample.** It refuses the sealed file with a message to unlock.

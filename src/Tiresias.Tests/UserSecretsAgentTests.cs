@@ -222,6 +222,20 @@ public class UserSecretsServiceTests
     }
 
     [Test]
+    public async Task Only_the_first_seal_is_announced()
+    {
+        File.WriteAllText(FilePath, """{ "A": "1" }""");
+        var announced = new List<string>();
+        service.FirstSealed += announced.Add;
+        screen.Answers.Enqueue(ConsentAnswer.AllowOnce);
+
+        await Load();
+        await Load();
+
+        Assert.That(announced, Is.EqualTo(new[] { Id }));
+    }
+
+    [Test]
     public async Task Afterwards_the_consent_screen_shows_keys_and_the_program_and_allow_once_asks_again()
     {
         File.WriteAllText(FilePath, """{ "Db": { "Password": "hunter2" } }""");

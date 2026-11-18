@@ -70,6 +70,8 @@ public partial class App : Application
 
         tray = new TrayController(this);
         host.StateChanged += () => Dispatcher.BeginInvoke(Refresh);
+        host.UserSecrets.FirstSealed += id => Dispatcher.BeginInvoke(() =>
+            tray?.Notify(Text.Get("Notify_FirstSealed_Title"), Text.Format("Notify_FirstSealed_Body", id)));
         SystemEvents.SessionSwitch += OnSessionSwitch;
         SystemEvents.PowerModeChanged += OnPowerModeChanged;
         Refresh();
