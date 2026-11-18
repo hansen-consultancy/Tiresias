@@ -16,6 +16,16 @@ its section below.
   declined on the consent screen is not asked again until the app restarts.
 - **Set up a SQL Server** (Services window) prepares a database for those logins: an administrator
   signs in once, for that window only, and the service is saved with a `read` and a `write` grant.
+- **RavenDB in user secrets.** A `secrets.json` value `tiresias:raven/<service>` becomes a URL on
+  this PC that carries a placeholder in its path, so an unchanged RavenDB client works through the
+  broker with no certificate on the PC.
+- **Set up a RavenDB** (Services window) checks a client certificate against the database, then
+  seals it in the vault and adds the server as a service. Its password is used only to open the
+  file. **Edit...** changes such a service later (e.g. the Changes API) and keeps the certificate,
+  so the file can be deleted once it is set up.
+- RavenDB's Changes API works through the broker and the forwarder, for grants that list the
+  `WEBSOCKET` method. Each tunnel is audited when it opens and when it closes, and closes with the
+  lease.
 - `tir exec` gives a SQL Server child its temporary login in `{SLUG}_CONNECTION_STRING`, for
   grants that hand out logins.
 - **This wasn't me** on every consent dialog, for a prompt you didn't expect: it denies the

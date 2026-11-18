@@ -78,6 +78,9 @@ public static class BrokerHost
                 _ = anchoring.AnchorAsync();
         };
 
+        // The Changes API on /raven; nothing else accepts an upgrade.
+        app.UseWebSockets();
+
         if (app.Services.GetRequiredService<IOptions<BrokerOptions>>().Value.IdentifyLoopbackCaller)
             app.UseWhen(c => PlaceholderRoutes.Any(r => c.Request.Path.StartsWithSegments(r, StringComparison.Ordinal)),
                 b => b.Use((context, next) =>

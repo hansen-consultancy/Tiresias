@@ -127,6 +127,25 @@ public class ForwarderHostTests
 
     sealed record SeenRequest(string Method, string Uri, Dictionary<string, string> Headers, string Body);
 
+    [Test]
+    public async Task A_websocket_is_relayed_to_the_broker_with_the_observed_process_and_messages_come_back()
+    {
+        var sockets = factory.Server.CreateWebSocketClient();
+        sockets.ConfigureRequest = r => r.Headers["X-Tiresias-Observed-Process"] = "forged.exe";
+        using var socket = await sockets.ConnectAsync(new Uri("ws://localhost/raven/orders/tirph_orders_abc/databases/Orders/changes"), CancellationToken.None);
+
+        await socket.SendAsync("ping"u8.ToArray(), System.Net.WebSockets.WebSocketMessageType.Text, true, CancellationToken.None);
+        var buffer = new byte[16];
+        var received = await socket.ReceiveAsync(buffer, CancellationToken.None);
+        Assert.That(System.Text.Encoding.UTF8.GetString(buffer, 0, received.Count), Is.EqualTo("ping"));
+
+        var seen = broker.Requests.Single();
+        Assert.That(seen.Uri, Is.EqualTo("ws://broker.test:7780/raven/orders/tirph_orders_abc/databases/Orders/changes"));
+        Assert.That(seen.Headers["X-Tiresias-Observed-Process"], Does.Not.Contain("forged.exe"));
+        await socket.CloseAsync(System.Net.WebSockets.WebSocketCloseStatus.NormalClosure, null, CancellationToken.None);
+        Assert.That(socket.CloseStatus, Is.EqualTo(System.Net.WebSockets.WebSocketCloseStatus.NormalClosure));
+    }
+
     sealed class FakeBroker : HttpMessageHandler
     {
         public List<SeenRequest> Requests { get; } = [];
@@ -137,6 +156,8 @@ public class ForwarderHostTests
                 .ToDictionary(h => h.Key, h => string.Join(",", h.Value), StringComparer.OrdinalIgnoreCase);
             var body = request.Content is null ? "" : await request.Content.ReadAsStringAsync(cancellationToken);
             Requests.Add(new(request.Method.Method, request.RequestUri!.OriginalString, headers, body));
+            if (request.Headers.TryGetValues("Sec-WebSocket-Key", out var keys))
+                return await FakeWebSocketNode.UpgradeAsync(keys.Single());
 
             var response = new HttpResponseMessage(HttpStatusCode.Accepted) { Content = new StringContent("broker-body") };
             response.Headers.Add("X-Broker", "yes");

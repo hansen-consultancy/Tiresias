@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.WebSockets;
 using System.Text;
 using Tiresias.Policy;
 using Tiresias.Raven;
@@ -12,6 +13,11 @@ namespace Tiresias.Broker;
 /// swapped for the real credential: an <c>Authorization</c> header for <c>/svc</c>, a client
 /// certificate for <c>/raven</c>. The path the policy checked and the path sent upstream are the
 /// same raw string; nothing is decoded or normalised in between.
+/// <para>
+/// A <c>/raven</c> request may carry its placeholder as the first path segment instead
+/// (<see cref="RavenPath"/>), and a WebSocket request (the Changes API) is a tunnel to the node,
+/// checked by policy as method <c>WEBSOCKET</c>, so only a grant that lists it opens one.
+/// </para>
 /// </summary>
 sealed class SvcProxy(BrokerState state, IHttpClientFactory clients, RavenClients ravenClients)
 {
@@ -23,25 +29,36 @@ sealed class SvcProxy(BrokerState state, IHttpClientFactory clients, RavenClient
         "TE", "Trailer", "Transfer-Encoding", "Upgrade", "Host", "Authorization",
     };
 
-    public Task HandleAsync(HttpContext context, string service) => ForwardAsync(context, "svc", service);
+    /// <summary>The policy method of a WebSocket request: opaque after the handshake, so a grant opts in by name.</summary>
+    public const string WebSocketMethod = "WEBSOCKET";
+
+    public Task HandleAsync(HttpContext context, string service) =>
+        ForwardAsync(context, "svc", service, SvcPath.Remainder(DeviceSignatureMiddleware.RawTarget(context), service),
+            context.Request.Headers.Authorization, publicBase: null);
 
     public Task HandleRavenAsync(HttpContext context, string instance)
     {
-        if (context.WebSockets.IsWebSocketRequest)
+        var remainder = SvcPath.Remainder(DeviceSignatureMiddleware.RawTarget(context), instance, "raven");
+        var pathAndQuery = remainder;
+        string? authorization = context.Request.Headers.Authorization;
+        var publicBase = PublicBase(context, instance);
+        if (remainder is not null && RavenPath.Split(remainder) is ({ } placeholder, var rest))
         {
-            // Changes API and subscriptions: unsupported in v1, and said so rather than half-proxied.
-            context.Response.StatusCode = StatusCodes.Status501NotImplemented;
-            return Task.CompletedTask;
+            // The node URL the client learns keeps the placeholder, so its next request carries it too.
+            pathAndQuery = rest;
+            authorization = $"Bearer {placeholder}";
+            publicBase = $"{publicBase}/{placeholder}";
         }
-        return ForwardAsync(context, "raven", instance);
+        return context.WebSockets.IsWebSocketRequest
+            ? TunnelAsync(context, instance, pathAndQuery, authorization)
+            : ForwardAsync(context, "raven", instance, pathAndQuery, authorization, publicBase);
     }
 
-    async Task ForwardAsync(HttpContext context, string route, string service)
+    async Task ForwardAsync(HttpContext context, string route, string service, string? pathAndQuery, string? authorization, string? publicBase)
     {
         var request = context.Request;
         var ct = context.RequestAborted;
         var raven = route == "raven";
-        var pathAndQuery = SvcPath.Remainder(DeviceSignatureMiddleware.RawTarget(context), service, route);
 
         // The rule's body limit needs a length; a chunked body is buffered to learn it (Kestrel's
         // request size limit still caps it).
@@ -61,9 +78,7 @@ sealed class SvcProxy(BrokerState state, IHttpClientFactory clients, RavenClient
             body = buffered;
         }
 
-        var (allowed, refusal) = state.Authorize(request.Headers.Authorization, service,
-            new BrokeredRequest(request.Method, pathAndQuery ?? "", length),
-            request.Headers[ForwarderHeaders.ObservedProcess].FirstOrDefault() is { Length: > 0 } observed ? observed : null);
+        var (allowed, refusal) = state.Authorize(authorization, service, new BrokeredRequest(request.Method, pathAndQuery ?? "", length), Observed(context));
         if (refusal is not null)
         {
             await Results.Json(new RefusalBody(refusal.Reason, refusal.ElevationNeeded), statusCode: refusal.Status).ExecuteAsync(context);
@@ -134,7 +149,7 @@ sealed class SvcProxy(BrokerState state, IHttpClientFactory clients, RavenClient
                         context.Response.Headers[name] = values.ToArray();
                 if (rewrite)
                 {
-                    var rewritten = RavenTopology.Rewrite(await response.Content.ReadAsStringAsync(ct), PublicBase(context, service));
+                    var rewritten = RavenTopology.Rewrite(await response.Content.ReadAsStringAsync(ct), publicBase!);
                     await context.Response.Body.WriteAsync(Encoding.UTF8.GetBytes(rewritten), ct);
                 }
                 else
@@ -142,6 +157,70 @@ sealed class SvcProxy(BrokerState state, IHttpClientFactory clients, RavenClient
             }
         }
     }
+
+    /// <summary>
+    /// The Changes API: a WebSocket to the node, opened with the lease's client certificate and
+    /// relayed until either side closes or the lease ends. Audited when it opens and when it closes,
+    /// with the bytes moved; what crosses it is not inspected.
+    /// </summary>
+    async Task TunnelAsync(HttpContext context, string instance, string? pathAndQuery, string? authorization)
+    {
+        var (allowed, refusal) = state.Authorize(authorization, instance, new BrokeredRequest(WebSocketMethod, pathAndQuery ?? "", 0), Observed(context));
+        if (refusal is not null)
+        {
+            await Results.Json(new RefusalBody(refusal.Reason, refusal.ElevationNeeded), statusCode: refusal.Status).ExecuteAsync(context);
+            return;
+        }
+
+        using (allowed)
+        {
+            var upstream = allowed!.Service.Upstream;
+            var target = new Uri((upstream.Scheme == Uri.UriSchemeHttps ? "wss" : "ws") + upstream.AbsoluteUri[upstream.Scheme.Length..].TrimEnd('/') + pathAndQuery,
+                new UriCreationOptions { DangerousDisablePathAndQueryCanonicalization = true });
+            HttpMessageInvoker client;
+            try
+            {
+                client = ravenClients.For(allowed.LeaseId, allowed.Grant.SecretSlug, allowed.TakeSecret);
+            }
+            catch (Exception e) when (e is FormatException or System.Security.Cryptography.CryptographicException)
+            {
+                allowed.Complete(StatusCodes.Status500InternalServerError, "certificate-unreadable");
+                context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+                return;
+            }
+
+            using var node = new ClientWebSocket();
+            node.Options.CollectHttpResponseDetails = true;
+            foreach (var protocol in context.WebSockets.WebSocketRequestedProtocols)
+                node.Options.AddSubProtocol(protocol);
+            try
+            {
+                await node.ConnectAsync(target, client, context.RequestAborted);
+            }
+            catch (WebSocketException)
+            {
+                // The node answered something other than 101 (its status is passed on), or didn't answer.
+                var status = node.HttpStatusCode is var code and not 0 ? (int)code : StatusCodes.Status502BadGateway;
+                allowed.Complete(status, status == StatusCodes.Status502BadGateway ? "upstream-unreachable" : "upstream-refused-websocket");
+                context.Response.StatusCode = status;
+                return;
+            }
+
+            using var local = await context.WebSockets.AcceptWebSocketAsync(node.SubProtocol);
+            allowed.Complete(StatusCodes.Status101SwitchingProtocols);
+            var leaseEnding = ravenClients.Ending(allowed.LeaseId);
+            using var ending = CancellationTokenSource.CreateLinkedTokenSource(leaseEnding, context.RequestAborted);
+            // The hard cap as well: a lease that ended just before the line above never cancels its token.
+            ending.CancelAfter(Clamp(allowed.LeaseExpiresAt - DateTimeOffset.UtcNow));
+            var moved = await WebSocketRelay.RunAsync(local, node, ending.Token);
+            allowed.Closed(leaseEnding.IsCancellationRequested || allowed.LeaseExpiresAt <= DateTimeOffset.UtcNow ? "lease-ended" : "closed", moved.Up, moved.Down);
+        }
+
+        static TimeSpan Clamp(TimeSpan left) => left < TimeSpan.Zero ? TimeSpan.Zero : left;
+    }
+
+    static string? Observed(HttpContext context) =>
+        context.Request.Headers[ForwarderHeaders.ObservedProcess].FirstOrDefault() is { Length: > 0 } observed ? observed : null;
 
     static string PublicBase(HttpContext context, string instance)
     {

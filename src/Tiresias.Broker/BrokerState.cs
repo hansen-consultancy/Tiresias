@@ -556,6 +556,11 @@ public sealed class AllowedRequest : IDisposable
         audit.Append(record with { Status = status, Reason = reason ?? record.Reason });
     }
 
+    /// <summary>A tunnel this request opened has closed: a second record, so the first shows it while it lasts.</summary>
+    /// <param name="how"><c>closed</c> by either side, or <c>lease-ended</c>.</param>
+    public void Closed(string how, long bytesUp, long bytesDown) =>
+        audit.Append(record with { Status = StatusCodes.Status101SwitchingProtocols, Reason = $"{how}: {bytesUp} bytes up, {bytesDown} bytes down" });
+
     public void Dispose()
     {
         Array.Clear(secret);
