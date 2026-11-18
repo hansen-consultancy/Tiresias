@@ -132,6 +132,9 @@ sealed class ProtectedUserSecretsProvider(string userSecretsId, string directory
     internal static readonly TimeSpan AgentStartWait = TimeSpan.FromSeconds(60);
 
     bool fromAgent;
+
+    /// <summary>The last load was refused (consent screen or policy), not merely failed.</summary>
+    bool denied;
     DateTimeOffset? refreshAt;
     Timer? renewal;
 
@@ -158,6 +161,11 @@ sealed class ProtectedUserSecretsProvider(string userSecretsId, string directory
         renewal.Change(due, Timeout.InfiniteTimeSpan);
     }
 
+    /// <summary>
+    /// A timer callback: an exception escaping it would end the app, so every failure is caught.
+    /// A refusal on the consent screen stops renewing (asking again every minute would only train
+    /// people to dismiss it); anything else keeps the old values and tries again shortly.
+    /// </summary>
     void Renew()
     {
         try
@@ -165,7 +173,13 @@ sealed class ProtectedUserSecretsProvider(string userSecretsId, string directory
             Load();
             OnReload();
         }
-        catch (Exception e) when (e is InvalidOperationException or InvalidDataException or IOException)
+        catch (InvalidOperationException e) when (denied)
+        {
+            Notices.WriteLine($"Tiresias: not renewing user secrets '{userSecretsId}' ({e.Message}). The current values work until they expire; restart the app to ask again.");
+        }
+#pragma warning disable CA1031 // The process boundary: see above.
+        catch (Exception e)
+#pragma warning restore CA1031
         {
             Notices.WriteLine($"Tiresias: could not renew user secrets '{userSecretsId}' ({e.Message}); trying again in {RenewalRetry.TotalSeconds:0} seconds.");
             Schedule(RenewalRetry);
@@ -182,6 +196,7 @@ sealed class ProtectedUserSecretsProvider(string userSecretsId, string directory
         if (kind == SecretsFileKind.None)
             return null; // Nothing to protect and nothing to ask anyone for.
 
+        denied = false;
         var request = new AgentRequest(AgentRequest.LoadUserSecrets, userSecretsId, directory);
         var reply = agent.TryLoad(request, Glance);
         // A file naming tiresias: values needs the app as much as a sealed one does.
@@ -198,6 +213,7 @@ sealed class ProtectedUserSecretsProvider(string userSecretsId, string directory
                 refreshAt = reply.RefreshAt is { } at ? DateTimeOffset.FromUnixTimeSeconds(at) : null;
                 return reply.Json;
             case AgentStatus.Denied:
+                denied = true;
                 throw new InvalidOperationException($"Access to user secrets '{userSecretsId}' was denied by Tiresias: "
                     + (reply.Message ?? "declined on the consent screen."));
             case AgentStatus.Error:

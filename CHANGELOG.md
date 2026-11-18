@@ -12,7 +12,8 @@ its section below.
 
 - **SQL Server logins in user secrets.** A `secrets.json` value `tiresias:sql/<service>/<grant>`
   becomes a temporary login for the lease when the app loads its configuration, and the app gets a
-  new one before it expires (the reload token fires). No password stays in the file.
+  new one before it expires (the reload token fires). No password stays in the file. A renewal
+  declined on the consent screen is not asked again until the app restarts.
 - **Set up a SQL Server** (Services window) prepares a database for those logins: an administrator
   signs in once, for that window only, and the service is saved with a `read` and a `write` grant.
 - `tir exec` gives a SQL Server child its temporary login in `{SLUG}_CONNECTION_STRING`, for

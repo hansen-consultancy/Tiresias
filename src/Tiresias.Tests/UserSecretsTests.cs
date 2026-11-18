@@ -239,6 +239,72 @@ public class ProtectedUserSecretsProviderTests
         }
     }
 
+    /// <summary>Renews through <paramref name="renewals"/>: a reply, or an exception the agent client throws.</summary>
+    sealed class RenewingAgent(params Func<AgentReply>[] renewals) : IUserSecretsAgent
+    {
+        int next = -1;
+        public int Calls => next + 1;
+
+        public AgentReply? TryLoad(AgentRequest request, TimeSpan wait)
+        {
+            next++;
+            return next == 0
+                ? new(AgentStatus.Ok, """{ "Db": "login-1" }""", RefreshAt: DateTimeOffset.UtcNow.ToUnixTimeSeconds())
+                : renewals[Math.Min(next - 1, renewals.Length - 1)]();
+        }
+    }
+
+    [Test, NonParallelizable]
+    public void A_renewal_whose_reply_timed_out_is_tried_again_rather_than_ending_the_app()
+    {
+        var notices = new StringWriter();
+        var before = (ProtectedUserSecretsProvider.Notices, ProtectedUserSecretsProvider.RenewalRetry);
+        (ProtectedUserSecretsProvider.Notices, ProtectedUserSecretsProvider.RenewalRetry) = (TextWriter.Synchronized(notices), TimeSpan.FromMilliseconds(50));
+        try
+        {
+            WriteFile("""{ "$tiresias": { "v": 1, "sealed": "AA==" } }""");
+            var agent = new RenewingAgent(
+                () => throw new TaskCanceledException("The reply took too long."),
+                () => new(AgentStatus.Ok, """{ "Db": "login-2" }"""));
+            var config = Build(agent);
+            using var _ = config as IDisposable;
+            var reloaded = new ManualResetEventSlim();
+            config.GetReloadToken().RegisterChangeCallback(_ => reloaded.Set(), null);
+
+            Assert.That(reloaded.Wait(TimeSpan.FromSeconds(10)), Is.True, "no renewal after the retry");
+            Assert.That(config["Db"], Is.EqualTo("login-2"));
+            Assert.That(notices.ToString(), Does.Contain("took too long"));
+        }
+        finally
+        {
+            (ProtectedUserSecretsProvider.Notices, ProtectedUserSecretsProvider.RenewalRetry) = before;
+        }
+    }
+
+    [Test, NonParallelizable]
+    public void A_renewal_declined_on_the_consent_screen_stops_renewing_and_keeps_the_values()
+    {
+        var notices = new StringWriter();
+        var before = (ProtectedUserSecretsProvider.Notices, ProtectedUserSecretsProvider.RenewalRetry);
+        (ProtectedUserSecretsProvider.Notices, ProtectedUserSecretsProvider.RenewalRetry) = (TextWriter.Synchronized(notices), TimeSpan.FromMilliseconds(50));
+        try
+        {
+            WriteFile("""{ "$tiresias": { "v": 1, "sealed": "AA==" } }""");
+            var agent = new RenewingAgent(() => new(AgentStatus.Denied));
+            var config = Build(agent);
+            using var _ = config as IDisposable;
+
+            Assert.That(SpinWait.SpinUntil(() => notices.ToString().Contains("not renewing", StringComparison.Ordinal), TimeSpan.FromSeconds(10)), Is.True, notices.ToString());
+            Thread.Sleep(300);
+            Assert.That(agent.Calls, Is.EqualTo(2), "asked once at startup and once to renew, never again");
+            Assert.That(config["Db"], Is.EqualTo("login-1"));
+        }
+        finally
+        {
+            (ProtectedUserSecretsProvider.Notices, ProtectedUserSecretsProvider.RenewalRetry) = before;
+        }
+    }
+
     [Test]
     public void Without_an_agent_a_plain_file_loads_like_stock_user_secrets()
     {
