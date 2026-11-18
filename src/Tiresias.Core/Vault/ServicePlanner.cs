@@ -66,10 +66,11 @@ public static class ServicePlanner
 
     /// <summary>
     /// The input that plans back to <paramref name="service"/>, to edit it in the same form; <c>null</c>
-    /// for a service that form can't show faithfully: several grants, a body limit, or logins.
+    /// for a service that form can't show faithfully: several grants, a body limit, logins, or a grant
+    /// that covers nothing (no methods or no paths), which the form would save as GET on every path.
     /// </summary>
     public static ServiceInput? Describe(Service service) =>
-        service.Grants is [{ IssuesLogins: false, Rule.MaxBodyBytes: null } grant]
+        service.Grants is [{ IssuesLogins: false, Rule.MaxBodyBytes: null, Rule.Allow.Count: > 0, Rule.Methods.Count: > 0 } grant]
             ? new(service.Slug, service.Upstream.ToString(), grant.SecretSlug,
                 [.. grant.Rule.Methods.Order(StringComparer.Ordinal)],
                 grant.Rule.Allow is [{ } only] && only.ToString() == EveryPath ? [] : [.. grant.Rule.Allow.Select(r => r.ToString())],

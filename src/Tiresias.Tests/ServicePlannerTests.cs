@@ -46,7 +46,10 @@ public class ServicePlannerTests
         var two = new Service("two", new Uri("https://api.example.com/"), [new Grant("read", "s", rule), new Grant("write", "s", rule)]);
         var capped = new Service("capped", new Uri("https://api.example.com/"), [new Grant("read", "s", rule with { MaxBodyBytes = 10 })]);
         var logins = SqlServerSetupPlanner.Plan(new("appdb", "sql.example.com", "AppDb"), Empty).Service!;
-        Assert.That(new[] { two, capped, logins }.Select(ServicePlanner.Describe), Is.All.Null);
+        var noPaths = new Service("no-paths", new Uri("https://api.example.com/"), [new Grant("read", "s", rule with { Allow = [] })]);
+        var noMethods = new Service("no-methods", new Uri("https://api.example.com/"), [new Grant("read", "s", rule with { Methods = new HashSet<string>() })]);
+        Assert.That(new[] { two, capped, logins, noPaths, noMethods }.Select(ServicePlanner.Describe), Is.All.Null,
+            "a grant that covers nothing would be saved as GET on every path");
     }
 
     [Test]
