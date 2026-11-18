@@ -73,6 +73,7 @@ jobs:
           for rid in win-x64 win-arm64; do
             dotnet publish src/Tiresias.App -c Release -r $rid --self-contained -p:Version="$v" -o publish/$rid
             dotnet publish src/Tiresias.Keyring -c Release -r $rid --self-contained -p:Version="$v" -o publish/$rid
+            dotnet publish src/Tiresias.NuGetPlugin -c Release -r $rid --self-contained -p:Version="$v" -o publish/$rid
           done
 
       - name: Azure sign-in (OIDC)

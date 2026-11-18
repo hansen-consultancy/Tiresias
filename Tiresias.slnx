@@ -8,6 +8,7 @@
     <Project Path="src/Tiresias.Extensions.Configuration/Tiresias.Extensions.Configuration.csproj" />
     <Project Path="src/Tiresias.Forwarder/Tiresias.Forwarder.csproj" />
     <Project Path="src/Tiresias.Keyring/Tiresias.Keyring.csproj" />
+    <Project Path="src/Tiresias.NuGetPlugin/Tiresias.NuGetPlugin.csproj" />
     <Project Path="src/Tiresias.Protocol/Tiresias.Protocol.csproj" />
   </Folder>
   <Folder Name="/tests/">

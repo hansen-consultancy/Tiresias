@@ -244,6 +244,79 @@ secrets were sealed with instead of showing a new one. A typo, or the paper from
 says so in place and changes nothing. A solo broker set up on the old PC has to be set up again:
 its device keys belong to that PC's Windows account.
 
+## 9. Environment variables
+
+1. Make a throwaway one: `setx DEMO_API_KEY test-value`.
+2. **Status** shows **environment variables** as a warning naming it. **Review...** opens the
+   **Environment variables** window with it ticked under **In your Windows environment**.
+3. **Seal and remove from Windows**. A new terminal no longer has it: `echo $env:DEMO_API_KEY`
+   prints nothing.
+4. `tir run -- pwsh -NoProfile -Command '$env:DEMO_API_KEY'` asks in the app's dialog, which lists
+   the variable names only, and prints the value once you allow it. With
+   `tir run --only DEMO_API_KEY -- ...` the dialog lists just that one; `--only NOPE` fails with
+   **Not sealed for this folder: NOPE**.
+5. Tick it under **Sealed** and **Put back in Windows**; a new terminal has it again. Then
+   `setx DEMO_API_KEY ""` or delete it in Windows settings.
+
+## 10. Environment variables in a terminal
+
+1. Seal a throwaway global one: `tir env set DEMO_API_KEY` (type any value), and one for a
+   folder: `cd C:\temp; tir env set DEMO_DB --folder` (any value).
+2. In a PowerShell window: `tir env hook | Out-String | Invoke-Expression`. The app asks once,
+   naming the shell, the folder and the variables; allow it. `$env:DEMO_API_KEY` has the value.
+3. `cd C:\temp`: the dialog asks about **DEMO_DB** only. `cd ..`: `$env:DEMO_DB` is gone, and
+   `cd C:\temp` again gives it back without asking.
+4. A second PowerShell window asks on its own. Deny it: nothing is set, and `cd` doesn't ask
+   again. `Update-TiresiasEnvironment -Ask` does.
+5. Lock Tiresias from the tray, then `cd` somewhere: Windows Hello asks before the dialog does.
+6. Quit the app: a new window says once that the app isn't running, and carries on.
+7. Clean up: `tir env remove DEMO_API_KEY` and `tir env remove DEMO_DB --folder C:\temp`.
+
+To keep it, add the hook line last in `$PROFILE`.
+
+## 11. A placeholder instead of a value
+
+Uses the `httpbin` service from section 5 (secret `Bearer example-token`).
+
+1. `tir env set HTTPBIN_TOKEN` (type anything: the placeholder replaces it), then
+   `tir env placeholder add HTTPBIN_TOKEN httpbin`. It says `HTTPBIN_BASE_URL` gets the forwarder's
+   address. `tir env list` shows **HTTPBIN_TOKEN (a placeholder for httpbin)**.
+2. In a terminal with the hook, `cd` once: the dialog lists it as a placeholder. Allow it.
+   `$env:HTTPBIN_TOKEN` starts with `tirph_httpbin_`; `$env:HTTPBIN_BASE_URL` is the address.
+3. `curl.exe -s "$env:HTTPBIN_BASE_URL/headers" -H "Authorization: Bearer $env:HTTPBIN_TOKEN"`:
+   httpbin echoes `Bearer example-token`, and **Activity...** shows the request.
+4. `cd` elsewhere and back: `$env:HTTPBIN_TOKEN` is the same placeholder.
+5. Copy the placeholder, close that terminal, and `cd` in another one with the hook. The copied
+   placeholder is now refused.
+6. `tir run -- pwsh -NoProfile -Command 'echo $env:HTTPBIN_TOKEN'` prints a different placeholder,
+   which no longer works once the command has exited.
+7. Quit the app and `tir run` again: HTTPBIN_TOKEN is left out, and `tir` says why.
+8. Clean up: `tir env placeholder remove HTTPBIN_TOKEN`, `tir env remove HTTPBIN_TOKEN`.
+
+## 12. NuGet credentials from a sealed variable
+
+Needs the .NET 9.0.200 SDK or later and a private feed (Azure Artifacts, GitHub Packages) with a
+personal access token.
+
+1. With the feed's credentials in `%APPDATA%\NuGet\NuGet.Config` as `%FEED_PAT%` (or the token in
+   plain text): `tir env nuget list` shows it under **Still in NuGet.Config**. `tir env nuget import`
+   says what it will do, and after a yes seals the token, maps the source and takes the
+   credentials out of the file. The environment variables window's **NuGet feeds** does the same
+   with **Move to Tiresias**. By hand instead: `tir env set FEED_PAT`, then
+   `tir env nuget add <source-url> FEED_PAT` (GitHub Packages: `--username <your GitHub login>`),
+   and remove the source's `packageSourceCredentials`.
+2. Clear `NUGET_PLUGIN_PATHS` and `NuGetPackageSourceCredentials_*` if set.
+3. `where.exe nuget-plugin-tiresias` finds it next to `tir`. Run on its own, it explains itself.
+4. In a project using the feed: `dotnet nuget locals http-cache --clear`, then
+   `dotnet restore --interactive`. The app asks to give **FEED_PAT** to `dotnet`; allow it, and the
+   restore succeeds.
+5. Deny it instead: the restore fails with a 401 (with `-v n`, NuGet may show the plugin's
+   message; whether it does is part of what to check).
+6. Reseal a wrong value (`tir env set FEED_PAT`, type anything): the restore fails, and the
+   message names the variable to reseal rather than asking again.
+7. Quit the app: the restore says the app isn't running.
+8. Clean up: `tir env nuget remove <source-url>`, `tir env remove FEED_PAT`.
+
 ## What you can't test yet
 
 These are not built yet (see [desktop-app.md](desktop-app.md#what-is-built)):

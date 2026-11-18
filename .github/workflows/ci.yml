@@ -46,6 +46,7 @@ jobs:
           for rid in win-x64 win-arm64; do
             dotnet publish src/Tiresias.App -c Release -r $rid --self-contained -o publish/$rid
             dotnet publish src/Tiresias.Keyring -c Release -r $rid --self-contained -o publish/$rid
+            dotnet publish src/Tiresias.NuGetPlugin -c Release -r $rid --self-contained -o publish/$rid
           done
 
   denylist:

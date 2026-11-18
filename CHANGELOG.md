@@ -10,6 +10,11 @@ its section below.
 
 ### Added
 
+- `tir env nuget import`, and **NuGet feeds** in the environment variables window, move a feed's
+  token out of NuGet.Config (`%NAME%` or plain text) into the sealed environment.
+- The environment variables window can switch a sealed key to placeholder delivery and back.
+- The `tir run` consent dialog shows the command line; the program's folder can be copied or
+  opened in Explorer. The status window has an **Environment variables** button.
 - A native Windows on Arm build: `TiresiasApp-win-arm64-Setup.exe` on each app release.
 - **About Tiresias** (tray menu and status page): the version, where it runs from, since when, and
   this version's release notes, with links to GitHub.
@@ -23,6 +28,20 @@ its section below.
   and they open again. Nothing is decrypted or re-encrypted. `tir recovery restore` does the same.
 - The first run on a PC with sealed secrets copied from another one asks for their recovery key
   instead of making a new one.
+- Environment variables that look like secrets can be sealed out of your Windows environment
+  (**Environment variables** in the tray menu, or `tir env protect`), put back, and given to one
+  program at a time with `tir run -- <command>`. The status page warns about the ones left exposed.
+- A PowerShell profile hook (`tir env hook`) gives each terminal the sealed variables after you
+  allow it once, and a variable can be kept for one folder (`tir env set NAME --folder`, or the
+  folder field in the window): changing folder adds and removes its variables.
+- `tir run --only NAME[,NAME...]` hands over just the variables named, instead of every one
+  sealed for the folder.
+- A sealed API key can be handed out as a placeholder instead of its value
+  (`tir env placeholder add OPENAI_API_KEY openai`): terminals and `tir run` get a `tirph_`
+  placeholder and the forwarder's address in `OPENAI_BASE_URL`, so the program never holds the key.
+- `dotnet restore`, Visual Studio and Rider can take a private feed's token from a sealed variable
+  (`tir env nuget add <source-url> <NAME>`), after you allow the program asking. Needs the .NET
+  9.0.200 SDK or later.
 - The secrets editor names projects instead of listing ids: add the folder you keep your code in
   under **Project folders**, use **Find a project**, or just run the project. Ids no project uses
   are grouped apart and can be moved to the Recycle Bin.

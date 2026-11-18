@@ -48,6 +48,68 @@ sealed class ConsentPresenter(Dispatcher dispatcher) : IUserSecretsConsentPrompt
         return answer != ConsentAnswer.Deny && await dispatcher.InvokeAsync(unlock).Task.Unwrap();
     }
 
+    /// <summary><c>tir run</c> asking for the sealed environment variables for one program; <paramref name="commandLine"/> is the whole command, shown under the heading.</summary>
+    public async Task<bool> AskEnvironmentAsync(string program, IReadOnlyList<string>? commandLine, IReadOnlyList<string> names, string? caller, CancellationToken ct)
+    {
+        try
+        {
+            return await ShowAsync(new ConsentView(
+                Text.Format("Consent_Environment_Heading", program),
+                caller,
+                Text.Format("Consent_Environment_ListLabel", names.Count),
+                names,
+                Text.Get("Consent_Environment_Note"),
+                AllowSession: false,
+                Command: commandLine is { Count: > 0 } ? Joined(commandLine) : null), UserSecretsService.ConsentTimeout, ct) != ConsentAnswer.Deny;
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>The arguments as one line, quoting any that are empty or hold a space, so the boundaries still show.</summary>
+    static string Joined(IReadOnlyList<string> arguments) =>
+        string.Join(' ', arguments.Select(a => a.Length == 0 || a.Any(char.IsWhiteSpace) ? $"\"{a}\"" : a));
+
+    /// <summary>The terminal hook asking for the sealed variables for a shell session; <paramref name="shell"/> is its image path.</summary>
+    public async Task<bool> AskShellAsync(string shell, string directory, IReadOnlyList<string> names, CancellationToken ct)
+    {
+        try
+        {
+            return await ShowAsync(new ConsentView(
+                Text.Format("Consent_Shell_Heading", System.IO.Path.GetFileNameWithoutExtension(shell)),
+                shell,
+                Text.Format("Consent_Shell_ListLabel", names.Count, directory),
+                names,
+                Text.Get("Consent_Shell_Note"),
+                AllowSession: false), UserSecretsService.ConsentTimeout, ct) != ConsentAnswer.Deny;
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>A NuGet feed's token for one program (<paramref name="program"/> is its image path), allowed once or until the agent locks.</summary>
+    public async Task<ConsentAnswer> AskNuGetAsync(string program, string source, string variable, CancellationToken ct)
+    {
+        try
+        {
+            return await ShowAsync(new ConsentView(
+                Text.Format("Consent_NuGet_Heading", System.IO.Path.GetFileNameWithoutExtension(program)),
+                program,
+                Text.Format("Consent_NuGet_ListLabel", source),
+                [variable],
+                Text.Get("Consent_NuGet_Note"),
+                AllowSession: true), UserSecretsService.ConsentTimeout, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            return ConsentAnswer.Deny;
+        }
+    }
+
     /// <summary>A placeholder or <c>tir exec</c> approval asked by <c>tir</c>; <c>tir</c> still asks for Windows Hello afterwards.</summary>
     public async Task<bool> AskPlaceholderAsync(string title, IReadOnlyList<string> lines, string? caller, CancellationToken ct)
     {

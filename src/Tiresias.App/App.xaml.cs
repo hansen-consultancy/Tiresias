@@ -5,6 +5,7 @@ using Microsoft.Win32;
 using Tiresias.Agent;
 using Tiresias.App.Logic;
 using Tiresias.App.Views;
+using Tiresias.EnvironmentVariables;
 using Tiresias.UserSecrets;
 
 namespace Tiresias.App;
@@ -21,6 +22,8 @@ public partial class App : Application
     readonly CancellationTokenSource stop = new();
     Mutex? instance;
     ConsentPresenter? consent;
+    readonly ShellConsent shells = new();
+    readonly ShellPlaceholders shellPlaceholders = new(TimeProvider.System);
     AgentHost? host;
     TrayController? tray;
     AppUpdates? updates;
@@ -74,7 +77,18 @@ public partial class App : Application
         AppLog.Info($"started {Text.Of(AppBuild.Current.Label)} from {AppBuild.Current.Folder}");
 
         tray = new TrayController(this);
-        host.StateChanged += () => Dispatcher.BeginInvoke(Refresh);
+        host.StateChanged += () =>
+        {
+            // Locked: every terminal asks again, as it would after a restart.
+            if (!host.Keys.IsUnlocked)
+            {
+                shells.Clear();
+                _ = PlaceholderMinter.RevokeAsync(shellPlaceholders.Release((_, _) => false));
+                lock (nugetAllowed)
+                    nugetAllowed.Clear();
+            }
+            Dispatcher.BeginInvoke(Refresh);
+        };
         host.UserSecrets.FirstSealed += id => Dispatcher.BeginInvoke(() =>
             tray?.Notify(Text.Get("Notify_FirstSealed_Title"), Text.Format("Notify_FirstSealed_Body", id)));
         SystemEvents.SessionSwitch += OnSessionSwitch;
@@ -258,14 +272,14 @@ public partial class App : Application
 
     void StartControlPipe()
     {
-        var server = new AgentPipeServer<ControlRequest, ControlReply>(ControlClient.PipeName, HandleControlAsync, PipeCaller.Identify);
+        var server = new AgentPipeServer<ControlRequest, ControlReply, PipeClient>(ControlClient.PipeName, HandleControlAsync, PipeCaller.Client);
         server.ConnectionFailed += e => AppLog.Error(e, "control pipe");
         var serving = server.RunAsync(stop.Token);
         serving.ContinueWith(t => AppLog.Error(t.Exception!, "control pipe stopped"), TaskContinuationOptions.OnlyOnFaulted);
     }
 
     /// <summary><c>tir</c>'s requests. Runs off the UI thread; anything visual is marshalled.</summary>
-    async Task<ControlReply> HandleControlAsync(ControlRequest request, string? caller, CancellationToken ct)
+    async Task<ControlReply> HandleControlAsync(ControlRequest request, PipeClient caller, CancellationToken ct)
     {
         if (request.V > ControlRequest.Version)
             return new(false, Text.Get("Control_NewerTir"));
@@ -285,8 +299,14 @@ public partial class App : Application
                 await Dispatcher.InvokeAsync(ShowHome);
                 return new(true);
             case ControlRequest.Consent:
-                var approved = await consent!.AskPlaceholderAsync(request.Title ?? "tir", request.Lines ?? [], caller, ct);
+                var approved = await consent!.AskPlaceholderAsync(request.Title ?? "tir", request.Lines ?? [], caller.Image, ct);
                 return new(true, Approved: approved);
+            case ControlRequest.Environment:
+                return await EnvironmentForAsync(request, caller.Image, ct);
+            case ControlRequest.ShellEnvironment:
+                return await ShellEnvironmentAsync(request, caller, ct);
+            case ControlRequest.NuGetCredential:
+                return await NuGetCredentialAsync(request, caller, ct);
             case ControlRequest.Unlock:
                 var (ok, message) = await Dispatcher.InvokeAsync(() => UnlockAsync(interactive: false)).Task.Unwrap();
                 return new(ok, message);
@@ -296,6 +316,142 @@ public partial class App : Application
             default:
                 return new(false, Text.Format("Control_Unknown", request.Op));
         }
+    }
+
+    /// <summary><c>tir run</c>: unlocks if needed, then hands the sealed variables over only if the user allows this program.</summary>
+    async Task<ControlReply> EnvironmentForAsync(ControlRequest request, string? caller, CancellationToken ct)
+    {
+        if (!host!.Keys.IsUnlocked)
+        {
+            var (unlocked, message) = await Dispatcher.InvokeAsync(() => UnlockAsync(interactive: false)).Task.Unwrap();
+            if (!unlocked)
+                return new(false, message);
+        }
+        if (host.Keys.Hello is not { } hello)
+            return new(false, Text.Get("Environment_Locked"));
+        var sealedNow = await Task.Run(() => EnvironmentStore.Open(hello).Environment, ct);
+        var (variables, missing) = SealedVariables.Pick(request.Directory is { } directory ? sealedNow.Resolve(directory) : sealedNow.Global, request.Names);
+        if (missing.Count > 0)
+            return new(false, Text.Format("Environment_NotSealed", string.Join(", ", missing)));
+        if (variables.Count == 0)
+            return new(true, Text.Get("Environment_NoneSealed"), Approved: true, Variables: new Dictionary<string, string>());
+        var program = request.Title ?? "tir run";
+        var approved = await consent!.AskEnvironmentAsync(program, request.Lines, [.. variables.Select(v => EnvironmentDelivery.Describe(sealedNow, v.Name))], caller, ct);
+        AppLog.Info($"tir run {program}: {(approved ? "allowed" : "denied")} {variables.Count} environment variable(s)");
+        host.RecordEnvironment(approved, program, variables.Select(v => EnvironmentDelivery.Describe(sealedNow, v.Name)), caller);
+        if (!approved)
+            return new(true, Approved: false);
+        // tir revokes these placeholders when the command exits.
+        var delivery = await EnvironmentDelivery.DeliverAsync(sealedNow, variables, PlaceholderMinter.Endpoint,
+            (placeholder, _) => PlaceholderMinter.MintAsync(placeholder, $"run:{program}", caller), ct);
+        return new(true, Note(delivery), Approved: true, Variables: delivery.Variables);
+    }
+
+    static string? Note(Delivery delivery) => delivery.Problems.Count > 0 ? string.Join(Environment.NewLine, delivery.Problems) : null;
+
+    /// <summary>
+    /// The terminal hook, on opening a terminal and on each change of folder. Asks once per shell
+    /// session (again only for names a folder adds), and after a no stays quiet in that terminal
+    /// until the user asks again. Nothing sealed means no prompt at all, not even to unlock.
+    /// </summary>
+    async Task<ControlReply> ShellEnvironmentAsync(ControlRequest request, PipeClient caller, CancellationToken ct)
+    {
+        if (caller.ProcessId is not { } pid || request.Shell is not { } shellId || request.Directory is not { } directory
+            || ProcessTree.ShellOf(pid, shellId) is not { } shell)
+            return new(false, Text.Get("Shell_Unrecognised"));
+        if (!EnvironmentStore.IsSealed)
+            return new(true, Approved: true, Variables: new Dictionary<string, string>());
+        shells.Prune(ProcessTree.IsRunning);
+        if (!host!.Keys.IsUnlocked && shells.HasRefused(shell) && !request.AskAgain)
+            return new(true, Approved: false);
+        if (!host.Keys.IsUnlocked)
+        {
+            var (unlocked, message) = await Dispatcher.InvokeAsync(() => UnlockAsync(interactive: false)).Task.Unwrap();
+            if (!unlocked)
+            {
+                shells.Refuse(shell);
+                return new(true, Text.Format("Shell_NotUnlocked", message), Approved: false);
+            }
+        }
+        if (host.Keys.Hello is not { } hello)
+            return new(false, Text.Get("Environment_Locked"));
+        _ = PlaceholderMinter.RevokeAsync(shellPlaceholders.Release(ProcessTree.IsRunning));
+        var sealedNow = await Task.Run(() => EnvironmentStore.Open(hello).Environment, ct);
+        var variables = sealedNow.Resolve(directory);
+        var (answer, fresh) = shells.Check(shell, variables.Select(v => v.Name), request.AskAgain);
+        string? note = null;
+        if (answer == ShellAnswer.Ask)
+        {
+            var approved = await consent!.AskShellAsync(shell.Program, directory, [.. fresh.Select(name => EnvironmentDelivery.Describe(sealedNow, name))], ct);
+            AppLog.Info($"terminal {System.IO.Path.GetFileName(shell.Program)} ({shell.ProcessId}): {(approved ? "allowed" : "denied")} {fresh.Count} environment variable(s)");
+            if (approved)
+            {
+                shells.Allow(shell, fresh);
+                fresh = [];
+            }
+            else
+            {
+                shells.Refuse(shell);
+                note = Text.Get("Shell_Refused");
+            }
+        }
+        // Whatever the shell was allowed before still reaches it; only the names it was refused stay out.
+        var given = variables.Where(v => !fresh.Contains(v.Name, StringComparer.OrdinalIgnoreCase));
+        var observed = $"{shell.Program} ({shell.ProcessId})";
+        var delivery = await EnvironmentDelivery.DeliverAsync(sealedNow, given, PlaceholderMinter.Endpoint,
+            (placeholder, _) => shellPlaceholders.GetAsync(shell, placeholder,
+                () => PlaceholderMinter.MintAsync(placeholder, $"terminal:{System.IO.Path.GetFileNameWithoutExtension(shell.Program)}", observed)), ct);
+        return new(true, string.Join(Environment.NewLine, new[] { note, Note(delivery) }.OfType<string>()) is { Length: > 0 } text ? text : null,
+            Approved: true, Variables: delivery.Variables);
+    }
+
+    /// <summary>Programs allowed a NuGet source's token until the agent locks: image path and variable.</summary>
+    readonly HashSet<(string Program, string Variable)> nugetAllowed = [];
+
+    /// <summary>
+    /// The NuGet credential plugin, asked by <c>dotnet restore</c>, Visual Studio or Rider. The
+    /// program asking is the plugin's parent, never anything the plugin says. Only a source mapped
+    /// to a sealed variable gets an answer; any other is left to NuGet's other providers.
+    /// </summary>
+    async Task<ControlReply> NuGetCredentialAsync(ControlRequest request, PipeClient caller, CancellationToken ct)
+    {
+        if (!Uri.TryCreate(request.Title, UriKind.Absolute, out var uri))
+            return new(false, Text.Get("NuGet_BadSource"));
+        if (!EnvironmentStore.IsSealed)
+            return new(true, Approved: false);
+        if (caller.ProcessId is not { } pid || ProcessTree.ParentOf(pid) is not { } program)
+            return new(false, Text.Get("Shell_Unrecognised"));
+        if (!host!.Keys.IsUnlocked)
+        {
+            var (unlocked, message) = await Dispatcher.InvokeAsync(() => UnlockAsync(interactive: false)).Task.Unwrap();
+            if (!unlocked)
+                return new(false, message);
+        }
+        if (host.Keys.Hello is not { } hello)
+            return new(false, Text.Get("Environment_Locked"));
+        var environment = await Task.Run(() => EnvironmentStore.Open(hello).Environment, ct);
+        if (environment.NuGetSourceFor(uri) is not { } source)
+            return new(true, Approved: false);
+        if (environment.Global.FirstOrDefault(v => string.Equals(v.Name, source.Variable, StringComparison.OrdinalIgnoreCase)) is not { } variable)
+            return new(true, Text.Format("NuGet_VariableMissing", source.Variable, source.Source), Approved: false);
+        if (request.AskAgain)
+            return new(true, Text.Format("NuGet_Refused", source.Variable, source.Source), Approved: false);
+
+        var key = (program.Program, variable.Name);
+        bool known;
+        lock (nugetAllowed)
+            known = nugetAllowed.Contains(key);
+        if (!known)
+        {
+            var answer = await consent!.AskNuGetAsync(program.Program, source.Source, variable.Name, ct);
+            AppLog.Info($"nuget {System.IO.Path.GetFileName(program.Program)} {source.Source}: {answer} {variable.Name}");
+            if (answer == ConsentAnswer.Deny)
+                return new(true, Approved: false);
+            if (answer == ConsentAnswer.AllowForSession)
+                lock (nugetAllowed)
+                    nugetAllowed.Add(key);
+        }
+        return new(true, Approved: true, Username: source.Username, Password: variable.Value);
     }
 
     void OnSessionSwitch(object? sender, SessionSwitchEventArgs e)

@@ -31,6 +31,8 @@ sealed class CommandLine
     /// <summary>The arguments after <c>--</c>, e.g. the command <c>tir exec</c> runs.</summary>
     public IReadOnlyList<string> Rest { get; } = [];
 
+    public IReadOnlyList<string> Positional => positional;
+
     public string? At(int index) => index < positional.Count ? positional[index] : null;
 
     public string Require(int index, string name) => At(index) ?? throw new UsageException($"Missing <{name}>.");

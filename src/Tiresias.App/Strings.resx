@@ -91,6 +91,240 @@
   <data name="Build_DevelopmentCommit" xml:space="preserve">
     <value>{0}, development build {1}</value>
   </data>
+  <data name="Consent_CommandLabel" xml:space="preserve">
+    <value>Command</value>
+  </data>
+  <data name="Consent_Environment_Heading" xml:space="preserve">
+    <value>Give environment variables to {0}?</value>
+  </data>
+  <data name="Consent_Environment_ListLabel" xml:space="preserve">
+    <value>Sealed variables ({0}):</value>
+  </data>
+  <data name="Consent_Environment_Note" xml:space="preserve">
+    <value>They go into this one program's environment, and whatever it starts. Allowing it hands over the values; they are never shown here.</value>
+  </data>
+  <data name="Consent_NuGet_Heading" xml:space="preserve">
+    <value>Give a NuGet feed's token to {0}?</value>
+  </data>
+  <data name="Consent_NuGet_ListLabel" xml:space="preserve">
+    <value>For {0}:</value>
+  </data>
+  <data name="Consent_NuGet_Note" xml:space="preserve">
+    <value>The program uses it to download packages from this feed. Allowing it hands over the value; it is never shown here.</value>
+  </data>
+  <data name="Consent_OpenFolder" xml:space="preserve">
+    <value>Open folder</value>
+  </data>
+  <data name="Consent_Shell_Heading" xml:space="preserve">
+    <value>Give sealed variables to this {0} terminal?</value>
+  </data>
+  <data name="Consent_Shell_ListLabel" xml:space="preserve">
+    <value>For commands in {1} ({0}):</value>
+  </data>
+  <data name="Consent_Shell_Note" xml:space="preserve">
+    <value>This terminal, and everything run from it, keeps them until it closes or Tiresias locks. You're asked again only for names a folder adds.</value>
+  </data>
+  <data name="Env_AddHeading" xml:space="preserve">
+    <value>Add a sealed variable</value>
+  </data>
+  <data name="Env_AddInvalid" xml:space="preserve">
+    <value>Type a name (without =) and a value.</value>
+  </data>
+  <data name="Env_Added" xml:space="preserve">
+    <value>Sealed {0}.</value>
+  </data>
+  <data name="Env_Body" xml:space="preserve">
+    <value>Variables in your Windows environment are readable by every program you run. Sealed ones are given only to a program you allow: run it with tir run -- &lt;command&gt;.</value>
+  </data>
+  <data name="Env_Detail" xml:space="preserve">
+    <value>({0} characters)</value>
+  </data>
+  <data name="Env_DetailFolder" xml:space="preserve">
+    <value>for commands in {0}</value>
+  </data>
+  <data name="Env_DetailPlaceholder" xml:space="preserve">
+    <value>(a placeholder for {0})</value>
+  </data>
+  <data name="Env_DetailSecret" xml:space="preserve">
+    <value>({0} characters, looks like a secret)</value>
+  </data>
+  <data name="Env_FolderBrowse" xml:space="preserve">
+    <value>Browse...</value>
+  </data>
+  <data name="Env_FolderInvalid" xml:space="preserve">
+    <value>The folder must be a full path, such as C:\src\shop.</value>
+  </data>
+  <data name="Env_FolderPick" xml:space="preserve">
+    <value>Folder whose commands get this variable</value>
+  </data>
+  <data name="Env_Heading" xml:space="preserve">
+    <value>Environment variables</value>
+  </data>
+  <data name="Env_Locked" xml:space="preserve">
+    <value>Tiresias is locked. Unlock it with Windows Hello to see or change sealed variables.</value>
+  </data>
+  <data name="Env_NewFolder" xml:space="preserve">
+    <value>Folder (optional)</value>
+  </data>
+  <data name="Env_NewFolderHint" xml:space="preserve">
+    <value>Leave the folder empty for every terminal and tir run. With a folder, the variable is only for commands run in it and below, and overrides one of the same name.</value>
+  </data>
+  <data name="Env_NewName" xml:space="preserve">
+    <value>Name of the new variable</value>
+  </data>
+  <data name="Env_NewValue" xml:space="preserve">
+    <value>Value of the new variable</value>
+  </data>
+  <data name="Env_NoneSealed" xml:space="preserve">
+    <value>Nothing sealed yet.</value>
+  </data>
+  <data name="Env_NothingPicked" xml:space="preserve">
+    <value>Tick at least one variable first.</value>
+  </data>
+  <data name="Env_NuGetFoundHeading" xml:space="preserve">
+    <value>Still in NuGet.Config:</value>
+  </data>
+  <data name="Env_NuGetFoundSummary" xml:space="preserve">
+    <value>NuGet.Config still gives these feeds their token itself. Move them over: the token is sealed, and NuGet asks Tiresias for it instead.</value>
+  </data>
+  <data name="Env_NuGetHeading" xml:space="preserve">
+    <value>NuGet feeds</value>
+  </data>
+  <data name="Env_NuGetImport" xml:space="preserve">
+    <value>Move to Tiresias</value>
+  </data>
+  <data name="Env_NuGetImportBody" xml:space="preserve">
+    <value>Seals the tokens for {0} and takes their credentials out of {1}. NuGet then asks Tiresias, and you allow each program once.</value>
+  </data>
+  <data name="Env_NuGetImported" xml:space="preserve">
+    <value>Moved {0} to Tiresias. NuGet asks for the token from now on.</value>
+  </data>
+  <data name="Env_NuGetImportTitle" xml:space="preserve">
+    <value>Move these feeds to Tiresias?</value>
+  </data>
+  <data name="Env_NuGetMappedDetail" xml:space="preserve">
+    <value>uses {0}, user name {1}</value>
+  </data>
+  <data name="Env_NuGetNone" xml:space="preserve">
+    <value>No NuGet.Config in your profile has credentials for a feed, and no feed uses a sealed variable.</value>
+  </data>
+  <data name="Env_NuGetProtect" xml:space="preserve">
+    <value>%{0}% in {1}: seals {0}, now in your Windows environment</value>
+  </data>
+  <data name="Env_NuGetRemove" xml:space="preserve">
+    <value>Stop using for NuGet</value>
+  </data>
+  <data name="Env_NuGetRemoved" xml:space="preserve">
+    <value>NuGet no longer gets a sealed variable for {0}. The variables stay sealed.</value>
+  </data>
+  <data name="Env_NuGetSealClearText" xml:space="preserve">
+    <value>token in plain text in {1}: seals it as {0}</value>
+  </data>
+  <data name="Env_NuGetSealed" xml:space="preserve">
+    <value>%{0}% in {1}: {0} is sealed already</value>
+  </data>
+  <data name="Env_NuGetSkip" xml:space="preserve">
+    <value>left as is: {0}</value>
+  </data>
+  <data name="Env_NuGetSummary" xml:space="preserve">
+    <value>NuGet asks Tiresias for {0} feed(s), and you allow each program once. Needs the .NET 9.0.200 SDK or later.</value>
+  </data>
+  <data name="Env_PlaceholderAdd" xml:space="preserve">
+    <value>Use a placeholder</value>
+  </data>
+  <data name="Env_PlaceholderAdded" xml:space="preserve">
+    <value>Handed out as a placeholder from now on: {0}. Terminals pick it up at their next folder change.</value>
+  </data>
+  <data name="Env_PlaceholderAddedItem" xml:space="preserve">
+    <value>{0} (for {1}, with {2})</value>
+  </data>
+  <data name="Env_PlaceholderBaseUrl" xml:space="preserve">
+    <value>Base URL variable</value>
+  </data>
+  <data name="Env_PlaceholderBaseUrlHint" xml:space="preserve">
+    <value>The variable the tool reads its API address from. Left empty, it follows the key's name: OPENAI_API_KEY gives OPENAI_BASE_URL.</value>
+  </data>
+  <data name="Env_PlaceholderBaseUrlSealed" xml:space="preserve">
+    <value>{0} is itself a sealed variable, so it can't also carry the forwarder's address.</value>
+  </data>
+  <data name="Env_PlaceholderHeading" xml:space="preserve">
+    <value>Hand out a placeholder instead</value>
+  </data>
+  <data name="Env_PlaceholderNeedsBaseUrl" xml:space="preserve">
+    <value>Name the variable the tool reads its API address from (for example OPENAI_BASE_URL).</value>
+  </data>
+  <data name="Env_PlaceholderNoServices" xml:space="preserve">
+    <value>No https service in the vault for a placeholder to stand in for. Add one under Services, with the key as its secret ("Bearer &lt;key&gt;").</value>
+  </data>
+  <data name="Env_PlaceholderPickOne" xml:space="preserve">
+    <value>Check one variable in the global set to hand out as a placeholder.</value>
+  </data>
+  <data name="Env_PlaceholderRemove" xml:space="preserve">
+    <value>Hand out the value</value>
+  </data>
+  <data name="Env_PlaceholderRemoved" xml:space="preserve">
+    <value>Handed out as the value again: {0}.</value>
+  </data>
+  <data name="Env_PlaceholderService" xml:space="preserve">
+    <value>Service</value>
+  </data>
+  <data name="Env_PlaceholderSummary" xml:space="preserve">
+    <value>Check one sealed API key above, pick the vault service whose secret is that key ("Bearer &lt;key&gt;"), and Tiresias hands out a tirph_ placeholder with the forwarder's address instead of the key.</value>
+  </data>
+  <data name="Env_Protect" xml:space="preserve">
+    <value>Seal and remove from Windows</value>
+  </data>
+  <data name="Env_Protected" xml:space="preserve">
+    <value>Sealed {0}. Run programs that need them with tir run -- &lt;command&gt;.</value>
+  </data>
+  <data name="Env_PutBack" xml:space="preserve">
+    <value>Put back in Windows</value>
+  </data>
+  <data name="Env_PutBackDone" xml:space="preserve">
+    <value>Put {0} back in Windows. Programs started from now on can read them again.</value>
+  </data>
+  <data name="Env_PutBackFolder" xml:space="preserve">
+    <value>A folder's variables never came from Windows, so there is nothing to put back. Remove them instead.</value>
+  </data>
+  <data name="Env_Remove" xml:space="preserve">
+    <value>Remove</value>
+  </data>
+  <data name="Env_RemoveBody" xml:space="preserve">
+    <value>{0} will be deleted, not put back in Windows. Only do this if you no longer need the values.</value>
+  </data>
+  <data name="Env_RemoveTitle" xml:space="preserve">
+    <value>Remove these variables?</value>
+  </data>
+  <data name="Env_Removed" xml:space="preserve">
+    <value>Removed {0}.</value>
+  </data>
+  <data name="Env_Seal" xml:space="preserve">
+    <value>Seal</value>
+  </data>
+  <data name="Env_SealedHeading" xml:space="preserve">
+    <value>Sealed</value>
+  </data>
+  <data name="Env_SealedSummary" xml:space="preserve">
+    <value>{0} sealed. Tick some to put them back in Windows or remove them.</value>
+  </data>
+  <data name="Env_WindowTitle" xml:space="preserve">
+    <value>Environment variables - Tiresias</value>
+  </data>
+  <data name="Env_WindowsHeading" xml:space="preserve">
+    <value>In your Windows environment</value>
+  </data>
+  <data name="Env_WindowsSummary" xml:space="preserve">
+    <value>{0} look like secrets and are ticked. Sealing removes them from Windows once the sealed copy reads back; programs already running keep their copy until they restart.</value>
+  </data>
+  <data name="Environment_Locked" xml:space="preserve">
+    <value>Tiresias is locked. Unlock it, then run the command again.</value>
+  </data>
+  <data name="Environment_NoneSealed" xml:space="preserve">
+    <value>No environment variables are sealed yet.</value>
+  </data>
+  <data name="Environment_NotSealed" xml:space="preserve">
+    <value>Not sealed for this folder: {0}. See tir env list.</value>
+  </data>
   <data name="FirstRun_RecoveryRestore_Body" xml:space="preserve">
     <value>This PC already has sealed secrets: copied from another PC, or left by an earlier setup. Windows Hello here can't open them, but the recovery key they were sealed with can. Type it from your paper copy and they open on this PC as before; this PC then uses the same recovery key, so the paper you have keeps covering everything. Spaces and case don't matter.</value>
   </data>
@@ -111,6 +345,15 @@
   </data>
   <data name="FirstRun_RecoveryRestore_Title" xml:space="preserve">
     <value>Secrets sealed elsewhere</value>
+  </data>
+  <data name="NuGet_BadSource" xml:space="preserve">
+    <value>NuGet asked for a source that isn't a URL.</value>
+  </data>
+  <data name="NuGet_Refused" xml:space="preserve">
+    <value>the feed refused {0} for {1}. Check the token, then seal the new one with tir env set {0}.</value>
+  </data>
+  <data name="NuGet_VariableMissing" xml:space="preserve">
+    <value>{1} is mapped to {0}, which is no longer sealed. Seal it again with tir env set {0}.</value>
   </data>
   <data name="Recovery_Body" xml:space="preserve">
     <value>Some sealed secrets on this PC don't open with its Windows Hello: they were copied from another PC, or Windows Hello was reset since they were sealed. Type the recovery key they were sealed with. Nothing is decrypted or re-encrypted: each secret gets a copy of its key for this PC's Windows Hello, and keeps its recovery copy. Spaces and case don't matter.</value>
@@ -205,6 +448,15 @@
   <data name="Secrets_Scanning" xml:space="preserve">
     <value>Looking for projects...</value>
   </data>
+  <data name="Shell_NotUnlocked" xml:space="preserve">
+    <value>not unlocked ({0}), so this terminal has no sealed variables. Run Update-TiresiasEnvironment -Ask to try again.</value>
+  </data>
+  <data name="Shell_Refused" xml:space="preserve">
+    <value>not given to this terminal. Run Update-TiresiasEnvironment -Ask to be asked again.</value>
+  </data>
+  <data name="Shell_Unrecognised" xml:space="preserve">
+    <value>couldn't tell which terminal asked, so nothing was given. Check that the hook passes $PID (tir env hook).</value>
+  </data>
   <data name="Status_About" xml:space="preserve">
     <value>About</value>
   </data>
@@ -219,6 +471,9 @@
   </data>
   <data name="Status_RestoreTitle" xml:space="preserve">
     <value>Some secrets need your recovery key</value>
+  </data>
+  <data name="Status_ReviewEnvironment" xml:space="preserve">
+    <value>Seal environment variables that look like secrets</value>
   </data>
   <data name="Tray_About" xml:space="preserve">
     <value>About Tiresias</value>
@@ -248,6 +503,9 @@ Switch to this copy, {2}, from {3}? The other copy quits first, ending its lease
   </data>
   <data name="Startup_OtherAgent" xml:space="preserve">
     <value>Another Tiresias agent is running in this session, probably 'tir agent' in a terminal. Only one can serve your secrets at a time. Stop it (press q in that terminal), then start Tiresias again.</value>
+  </data>
+  <data name="Tray_Environment" xml:space="preserve">
+    <value>Environment variables</value>
   </data>
   <data name="Tray_NotSetUp" xml:space="preserve">
     <value>Not set up yet</value>

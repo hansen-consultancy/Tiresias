@@ -36,6 +36,16 @@ public partial class StatusWindow : Window
 
     void OnServices(object sender, RoutedEventArgs e) => App.Current.ShowWindow<ServicesWindow>();
 
+    void OnEnvironment(object sender, RoutedEventArgs e) => ShowEnvironment();
+
+    /// <summary>The environment variables window; its changes can clear the exposed-variables check, so closing it re-runs the checks.</summary>
+    void ShowEnvironment()
+    {
+        var window = App.Current.ShowWindow<EnvironmentWindow>();
+        window.Closed -= OnRecoveryClosed;
+        window.Closed += OnRecoveryClosed;
+    }
+
     void OnAbout(object sender, RoutedEventArgs e) => App.Current.ShowWindow<AboutWindow>();
 
     void OnRestore(object sender, RoutedEventArgs e)
@@ -50,19 +60,28 @@ public partial class StatusWindow : Window
     /// <summary>Opens the secrets editor on the row's project: the fix for a user-secrets line.</summary>
     void OnReview(object sender, RoutedEventArgs e)
     {
-        if (((FrameworkElement)sender).DataContext is CheckRow { UserSecretsId: { } id })
-            App.Current.ShowWindow<SecretsWindow>().Select(id);
+        switch (((FrameworkElement)sender).DataContext)
+        {
+            case CheckRow { UserSecretsId: { } id }:
+                App.Current.ShowWindow<SecretsWindow>().Select(id);
+                break;
+            case CheckRow { OpensEnvironment: true }:
+                ShowEnvironment();
+                break;
+        }
     }
 }
 
 /// <summary>One check as a row. Status is said in words and a glyph, never by colour alone.</summary>
-public sealed record CheckRow(string Name, string StatusText, string Glyph, Brush? Brush, string Detail, string? UserSecretsId = null)
+/// <param name="OpensEnvironment">Review opens the environment variables window: the fix for exposed variables.</param>
+public sealed record CheckRow(string Name, string StatusText, string Glyph, Brush? Brush, string Detail, string? UserSecretsId = null, bool OpensEnvironment = false)
 {
     public string Spoken => $"{Name}: {StatusText}. {Detail}";
 
-    public Visibility ReviewVisibility => UserSecretsId is null ? Visibility.Collapsed : Visibility.Visible;
+    public Visibility ReviewVisibility => UserSecretsId is null && !OpensEnvironment ? Visibility.Collapsed : Visibility.Visible;
 
-    public string ReviewName => UserSecretsId is null ? "" : Text.Format("Status_ReviewName", UserSecretsId);
+    public string ReviewName => UserSecretsId is not null ? Text.Format("Status_ReviewName", UserSecretsId)
+        : OpensEnvironment ? Text.Get("Status_ReviewEnvironment") : "";
 }
 
 public sealed partial class StatusViewModel : ObservableObject
@@ -187,7 +206,8 @@ public sealed partial class StatusViewModel : ObservableObject
     static CheckRow Row(DoctorCheck check) => check.Status switch
     {
         DoctorStatus.Ok => new(check.Name, Text.Get("Status_Ok"), "\uE73E", Brush("SystemFillColorSuccessBrush"), check.Detail, check.UserSecretsId),
-        DoctorStatus.Warn => new(check.Name, Text.Get("Status_Warn"), "\uE7BA", Brush("SystemFillColorCautionBrush"), check.Detail, check.UserSecretsId),
+        DoctorStatus.Warn => new(check.Name, Text.Get("Status_Warn"), "\uE7BA", Brush("SystemFillColorCautionBrush"), check.Detail, check.UserSecretsId,
+            check.Name == Doctor.VariablesCheck),
         _ => new(check.Name, Text.Get("Status_Fail"), "\uEA39", Brush("SystemFillColorCriticalBrush"), check.Detail, check.UserSecretsId),
     };
 

@@ -1,6 +1,8 @@
 # Environment variables
 
-**Status:** design, nothing built yet.
+**Status:** built: the store with folder sets, **Protect** / **Put back**, `tir env`, `tir run`,
+the PowerShell hook with consent once per terminal, the **Environment variables** window, the
+status check, placeholder delivery and the NuGet credential plugin.
 
 Many developers keep API keys and tokens in their Windows user environment (`setx OPENAI_API_KEY
 ...`). That makes them readable by every process the user starts, forever, with no record of who
@@ -30,12 +32,13 @@ never shown, only their length. Paths and well-known Windows variables are never
    processes stop inheriting it.
 
 Programs already running keep their copy until they restart; the dialog says so. **Put back** on
-a sealed variable writes it to the registry again, so the move is never a trap. Machine-level
+a sealed variable writes it to the registry again, so the move is never a trap. `tir env set` for a name
+still in the registry seals the new value, then deletes the old copy there. Machine-level
 variables need elevation and are reported, not moved, in the first version.
 
 ## The store
 
-`%APPDATA%\Tiresias\environment.json`, sealed the way a user-secrets file is: each value encrypted
+`%LOCALAPPDATA%\Tiresias\environment.json`, sealed the way a user-secrets file is: each value encrypted
 under a data key wrapped for Windows Hello and for the recovery key, so the recovery restore
 covers it with no extra step. It holds:
 
@@ -50,42 +53,100 @@ drive root down to that directory; the nearest folder wins.
 
 ### In a terminal
 
-One line in the PowerShell profile (the app offers to add it, and `tir env hook` prints it):
+One line, last in the PowerShell profile (`$PROFILE`), after anything else that replaces the
+prompt; it works in PowerShell 7 and Windows PowerShell 5.1:
 
 ```powershell
-tir env hook pwsh | Invoke-Expression
+tir env hook | Out-String | Invoke-Expression
 ```
 
-The hook asks the agent over its pipe for the set for the current directory. The first request
-from a shell process asks for consent (a dialog naming the shell, its folder and the variable
-names). Once allowed, that shell process is remembered, keyed by its process id and start time,
-until it exits or the agent locks. Changing directory re-resolves the set: variables from the old
-folder are removed, the new folder's are added, with no new prompt unless a folder set adds
-variables the session has not been allowed.
+The hook wraps the prompt: when the terminal opens, and whenever the folder changes (never for
+each command), it runs `tir env shell`, which asks the app for the set for that folder. The first
+request from a shell asks for consent: a dialog naming the shell, its folder and the variable
+names. Once allowed, that shell is remembered, keyed by its process id and start time, until it
+exits or the agent locks. Changing folder re-resolves the set: variables from the old folder are
+removed, the new folder's are added, with no new prompt unless a folder set adds names the
+terminal has not been allowed.
 
-A locked agent leaves the terminal working, without the variables, and the prompt shows a short
-`tiresias: locked` hint once.
+- **A no** sticks to that terminal: it keeps what it was allowed before and is not asked again on
+  each `cd`. `Update-TiresiasEnvironment -Ask` asks again.
+- **Locked:** the first request unlocks (Windows Hello) as part of asking. Cancelling it counts as
+  a no for that terminal.
+- **Nothing sealed:** no prompt at all, not even to unlock.
+- **The app not running:** the terminal works without the variables, and says so once. `tir run`
+  still works, with Windows Hello as the consent.
+
+The app believes the shell process id the hook sends only when that process is an ancestor of
+the `tir` on the pipe, started before it, so another program can't borrow a terminal's consent by
+naming it. Values reach the hook as base64, which PowerShell decodes, so neither the console's
+code page nor PowerShell's parser touches them.
 
 ### For one command
 
-`tir run [--] <command> [args...]` resolves the set for the current directory, asks once, and
-starts the command with the variables in its environment only. For scripts, CI-like runs, and
+`tir run -- <command> [args...]` resolves the set for the current directory, asks once, and
+starts the command with the variables in its environment only. `--only NAME[,NAME...]` narrows
+that to the names given, in the dialog too; a name not sealed for that folder is an error rather
+than silently missing. The dialog's **Asked by** is `tir`, the program the app can verify on its
+pipe; the heading names the command it is about to start. For scripts, CI-like runs, and
 shells without a hook (cmd, Git Bash).
 
 ### Placeholders instead of values
 
-A variable can be switched to **placeholder** delivery when it is an API key for a service the
-vault knows. The real key moves into the vault as that service; the process gets a placeholder in
-the variable and the forwarder's URL in the tool's base-URL variable (for example
-`OPENAI_BASE_URL`), so it never holds the key at all. It works only for tools that honour such a
-variable, and the editor says so rather than offering it everywhere.
+A variable can be switched to **placeholder** delivery when it is an API key for an https
+service in the vault, whose secret is the key as an `Authorization` header (`Bearer <key>`):
+
+```powershell
+tir service add openai --upstream https://api.openai.com/v1   # secret: Bearer sk-...
+tir env placeholder add OPENAI_API_KEY openai                  # base URL: OPENAI_BASE_URL
+```
+
+From then on a terminal or `tir run` gets a `tirph_` placeholder in `OPENAI_API_KEY` and the
+forwarder's `/svc/openai` (the solo broker's, without a forwarder) in `OPENAI_BASE_URL`, so the
+process never holds the key. The broker swaps the real header in on the way out, under the
+service's grants, and the activity log records each request.
+
+- **The base-URL variable** follows the key's name (`*_API_KEY`, `*_KEY`, `*_TOKEN` become
+  `*_BASE_URL`); `--base-url` names another. It can't be a sealed variable itself.
+- **Consent** lists the variable as a placeholder for its service. The placeholder is minted after
+  the answer, for at most 10 hours and never past the broker's lease (a workday lease ends at its
+  daily cutoff).
+- **A terminal** keeps one placeholder per variable, so changing folder doesn't mint another; one
+  with less than 30 minutes left before the expiry the broker gave it is replaced at the next
+  folder change, and the old one revoked.
+  A terminal's placeholders are revoked once it has exited (noticed at the next request from any
+  terminal), and all of them when Tiresias locks.
+- **`tir run`** revokes its placeholders when the command exits, as `tir exec` does.
+- **No placeholder** (broker unreachable, service missing, no lease): the variable is left out
+  and the reason shown. It never falls back to the real value.
+- `tir env placeholder list` shows the deliveries, `remove` switches a variable back to its value.
+  The environment variables window does both: check a sealed key, pick the service under **Hand
+  out a placeholder instead**, then **Use a placeholder**; **Hand out the value** undoes it.
+  The sealed value stays, so **Put back** and `remove` lose nothing.
+- Only tools that send the key as `Authorization: Bearer` and read a base-URL variable work this
+  way: the OpenAI SDKs and most OpenAI-compatible clients do. A tool sending the key in another
+  header (Anthropic's `x-api-key`) gets refused by the broker: keep that one as a value.
 
 ### Programs started outside a shell
 
-- **NuGet:** a credential provider (`Tiresias.NuGet.CredentialProvider`, NuGet's plugin protocol)
-  answers for package sources the user maps to sealed variables. `dotnet restore`, Visual Studio
-  and Rider then authenticate without a token in `NuGet.Config` or the environment. Consent is per
-  program, as for user secrets.
+- **NuGet:** `nuget-plugin-tiresias.exe`, installed next to `tir`, speaks NuGet's
+  cross-platform credential plugin protocol (version 2). `tir env nuget import` (or **Move to
+  Tiresias** under **NuGet feeds** in the environment variables window) finds the sources whose
+  `NuGet.Config` credentials are `%NAME%` or a plain-text token, seals the token (from Windows, or
+  from the file), maps the source, and takes its credentials out of the file: NuGet only asks a
+  plugin when the config has none. An encrypted `Password` can't be read, so it is left with a
+  note. `tir env nuget list` shows what is mapped and what is still in `NuGet.Config`. By hand:
+  `tir env nuget add <source-url> <NAME> [--username <name>]`, then remove the credentials. When the feed answers 401, NuGet asks the plugin; the plugin asks the app, and
+  the app asks you once per program (the parent of the plugin: `dotnet`, `devenv`, `MSBuild`...)
+  and variable, with **Allow for this session** remembered until Tiresias locks.
+  - The plugin answers only for https sources on the mapped host and port: the source itself, or
+    anything under the folder its service index is in. Everything else is **NotFound**, so NuGet
+    carries on with its other providers.
+  - A retry (the feed refused the last answer) gets no value, only a message saying which
+    variable to reseal.
+  - The mapping is sealed with the variables, so nothing can quietly point a token at another host.
+  - NuGet finds `nuget-plugin-*` on PATH from NuGet 6.13 (.NET SDK 9.0.200, Visual Studio 17.13);
+    older ones also wanted plugins Authenticode-signed. Don't set `NUGET_PLUGIN_PATHS`: it
+    replaces NuGet's own discovery.
 - Anything else that only reads its environment at start-up stays in the registry, and the status
   page lists it as **unprotected** with the program that needs it, so the gap is visible rather
   than hidden.
@@ -96,11 +157,23 @@ variable, and the editor says so rather than offering it everywhere.
   anywhere. Placeholder delivery is the answer where a tool allows it.
 - A whole terminal session sharing the values means anything run from that terminal gets them.
   That is the trade-off chosen over a prompt per command.
+- A program running as you could start `tir` with a forged parent and so pass for an allowed
+  terminal. It gains nothing it couldn't take anyway: a program running as you can read that
+  terminal's memory, environment included. Sealing protects against reading the registry, files
+  and new processes, not against malware already running as you.
 - The activity log records variable names, the program and the decision; never a value.
+- The NuGet plugin has been tested against the protocol as documented, not yet against a real
+  `dotnet restore`. In particular, which NuGet hosts (the .NET SDK, MSBuild under Visual Studio,
+  `nuget.exe`) look on PATH is not spelled out by NuGet's documentation.
+- The program asking for a NuGet token is the plugin's parent process. A program running as you
+  can start the plugin itself and pass for `dotnet`; as above, it could read `dotnet`'s memory
+  anyway.
 
 ## Phases
 
-1. Store, **Protect...** / **Put back**, `tir run`, and an Environment tab in the secrets editor.
-2. The shell hook with session consent and folder sets.
-3. Placeholder delivery through the vault and forwarder.
-4. The NuGet credential provider.
+1. Store, **Protect** / **Put back**, `tir env`, `tir run`, and an **Environment variables** window
+   (tray menu, and **Review...** on the status check). Built.
+2. The shell hook with session consent and folder sets (`tir env hook`, `--folder`, a folder field
+   in the window). Built.
+3. Placeholder delivery through the vault and forwarder (`tir env placeholder`). Built.
+4. The NuGet credential plugin (`tir env nuget`, `nuget-plugin-tiresias.exe`). Built.

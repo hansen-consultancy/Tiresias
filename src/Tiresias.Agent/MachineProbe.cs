@@ -67,6 +67,9 @@ public sealed class MachineProbe(string? projectsRoot = null) : IDoctorProbe
         return Directory.EnumerateFiles(root, SecretsFile.FileName, SearchOption.AllDirectories).Select(Read);
     }
 
+    public IReadOnlyList<string> ExposedVariables =>
+        [.. EnvironmentStore.UserVariables().Where(v => v.LooksSecret).Select(v => v.Name)];
+
     public IEnumerable<DoctorFile> Projects()
     {
         if (projectsRoot is null)

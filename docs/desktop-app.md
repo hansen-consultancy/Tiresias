@@ -16,8 +16,9 @@ CI and people who prefer it, and it talks to the same agent.
   to start while the app runs.
 - **The agent runs in the app:** the user-secrets pipe server, the lease heartbeat, locking on
   workstation lock, and in solo mode the broker on `127.0.0.1:7780`.
-- **Consent dialog**, topmost. It shows the program asking (its path) and the keys or what the
-  placeholder gets, never values. Answers are Allow once / Allow for this session / Deny. Deny has
+- **Consent dialog**, topmost. It shows the program asking (its path, selectable, with **Open
+  folder** to look at it in Explorer) and the keys or what the placeholder gets, never values.
+  For `tir run` it shows the whole command line under the heading. Answers are Allow once / Allow for this session / Deny. Deny has
   focus and is the Esc answer. A countdown runs, and no answer means Deny. Requests that arrive
   while one is open wait their turn, and the dialog shows how many are waiting. Workstation lock,
   logoff or sleep answers every open dialog with Deny.

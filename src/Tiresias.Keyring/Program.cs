@@ -39,6 +39,35 @@ const string Usage = """
     tir secrets remove <key> [--project <path> | --id <UserSecretsId>]
         A project's protected user secrets (the project in the current folder by default).
         Values are typed without echo or piped in; no command prints one.
+
+    tir env list
+    tir env protect [<NAME>...] [--yes]
+    tir env put-back <NAME>...
+    tir env set <NAME> [--from-stdin] [--folder [<path>]]
+    tir env remove <NAME> [--folder [<path>]]
+        Environment variables sealed out of your Windows user environment. protect with no names
+        offers the ones that look like secrets; put-back returns them to Windows as they were.
+        --folder keeps a variable for commands run in that folder (the current one by default)
+        and below, adding to or overriding the global set.
+    tir env nuget import [--yes]
+    tir env nuget add <source-url> <NAME> [--username <name>]
+    tir env nuget list
+    tir env nuget remove <source-url>
+        NuGet package sources that authenticate with a sealed variable: dotnet restore, Visual
+        Studio and Rider ask the app for the token, and you allow each program once. import
+        finds the sources NuGet.Config gives a token (as %NAME% or in plain text), seals it and
+        takes it out of the file.
+    tir env placeholder add <NAME> <service> [--base-url <VARIABLE>]
+    tir env placeholder list
+    tir env placeholder remove <NAME>
+        Hand a sealed API key out as a placeholder for a vault service instead of its value, with
+        the forwarder's address in the tool's base-URL variable (OPENAI_API_KEY: OPENAI_BASE_URL).
+    tir env hook [pwsh]
+        Prints the PowerShell profile hook: tir env hook | Out-String | Invoke-Expression. Each
+        terminal asks once for the sealed variables, and changing folder applies its set.
+    tir run [--only NAME[,NAME...]] -- <command> [args...]
+        Runs the command with the sealed environment variables, after you allow it (in the app's
+        dialog, or with Windows Hello when the app isn't running). --only gives it just those.
     """;
 
 var line = new CommandLine(args);
@@ -62,6 +91,9 @@ try
         ("exec", _) => await Exec.RunAsync(line),
         ("doctor", _) => await Commands.DoctorAsync(line),
         ("secrets", _) => SecretsCommand.Run(line),
+        ("env", "shell") => await EnvCommand.ShellAsync(line),
+        ("env", _) => EnvCommand.Run(line),
+        ("run", _) => await EnvCommand.RunCommandAsync(line),
         _ => throw new UsageException("Unknown command."),
     };
 }
