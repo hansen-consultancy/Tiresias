@@ -63,11 +63,11 @@
 
     <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Visibility="{Binding IsAdding, Converter={StaticResource Visible}}">
       <StackPanel MaxWidth="640" HorizontalAlignment="Left">
-        <TextBlock Text="{l:S Services_AddHeading}" Style="{StaticResource SubtitleText}" Margin="0,0,0,12" AutomationProperties.HeadingLevel="Level2" />
+        <TextBlock Text="{Binding FormHeading}" Style="{StaticResource SubtitleText}" Margin="0,0,0,12" AutomationProperties.HeadingLevel="Level2" />
 
         <StackPanel Style="{StaticResource Field}">
           <Label x:Name="SlugLabel" Content="{l:S Services_Slug}" Target="{Binding ElementName=SlugBox}" Padding="0,0,0,4" />
-          <TextBox x:Name="SlugBox" Text="{Binding Slug, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.LabeledBy="{Binding ElementName=SlugLabel}" />
+          <TextBox x:Name="SlugBox" Text="{Binding Slug, UpdateSourceTrigger=PropertyChanged}" IsReadOnly="{Binding SlugLocked}" AutomationProperties.LabeledBy="{Binding ElementName=SlugLabel}" />
           <TextBlock Text="{l:S Services_SlugHint}" Style="{StaticResource CaptionText}" Margin="0,4,0,0" />
           <TextBlock Text="{Binding SlugError}" Style="{StaticResource FieldError}" />
         </StackPanel>
@@ -125,6 +125,7 @@
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Visibility="{Binding IsListing, Converter={StaticResource Visible}}">
         <Button Padding="12,6" Content="{l:S Services_Add}" Command="{Binding AddCommand}" />
         <Button Padding="12,6" Margin="8,0,0,0" Content="{l:S Services_Edit}" Command="{Binding EditCommand}" />
+        <Button Padding="12,6" Margin="8,0,0,0" Content="{l:S Services_Usage}" Command="{Binding UsageCommand}" />
         <Button Padding="12,6" Margin="8,0,0,0" Content="{l:S Services_Remove}" Command="{Binding RemoveCommand}" />
         <Button Padding="12,6" Margin="8,0,0,0" Content="{l:S Services_SetUpSql}" Command="{Binding SetUpSqlCommand}" />
         <Button Padding="12,6" Margin="8,0,0,0" Content="{l:S Services_SetUpRaven}" Command="{Binding SetUpRavenCommand}" />

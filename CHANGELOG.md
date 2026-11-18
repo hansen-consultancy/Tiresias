@@ -23,6 +23,11 @@ its section below.
   seals it in the vault and adds the server as a service. Its password is used only to open the
   file. **Edit...** changes such a service later (e.g. the Changes API) and keeps the certificate,
   so the file can be deleted once it is set up.
+- **Edit...** in the Services window also changes an HTTP service added there: its upstream,
+  secret, methods, paths and Windows Hello requirement. The name stays, and programs using the
+  service get the change at once.
+- **How to use...** in the Services window shows again what to paste for a saved service: the
+  user secrets line for a SQL Server or RavenDB, or a placeholder for an API key.
 - RavenDB's Changes API works through the broker and the forwarder, for grants that list the
   `WEBSOCKET` method. Each tunnel is audited when it opens and when it closes, and closes with the
   lease.

@@ -11,6 +11,47 @@ public class ServicePlannerTests
 
     static ServiceProblemKind[] Kinds(ServicePlan plan) => plan.Problems.Select(p => p.Kind).ToArray();
 
+    static string Shape(Service service) => string.Join(" | ", service.Grants.Select(g =>
+        $"{service.Slug} {service.Upstream} {g.Name} {g.SecretSlug} {string.Join(",", g.Rule.Methods.Order(StringComparer.Ordinal))} "
+        + $"allow={string.Join(",", g.Rule.Allow)} deny={string.Join(",", g.Rule.Deny ?? [])} elevated={g.RequiresElevation}"));
+
+    [TestCase(null, null)]
+    [TestCase("^/v1/.*", null)]
+    [TestCase("^/v1/.*", "^/v1/admin")]
+    public void A_described_service_plans_back_to_itself_when_edited(string? allow, string? deny)
+    {
+        var original = Plan(new("api", "https://api.example.com/base", "api-token", ["get", "POST"],
+            allow is null ? null : [allow], deny is null ? null : [deny], "read", RequiresElevation: true)).Service!;
+        var vault = Empty with { Services = [original] };
+
+        var input = ServicePlanner.Describe(original)!;
+        var again = ServicePlanner.Plan(input, vault, replacing: "api");
+
+        Assert.That(again.Problems, Is.Empty);
+        Assert.That(Shape(again.Service!), Is.EqualTo(Shape(original)));
+        Assert.That(again.AllowsEveryPath, Is.EqualTo(allow is null));
+    }
+
+    [Test]
+    public void Editing_one_service_still_refuses_another_services_slug()
+    {
+        var vault = Empty with { Services = [Plan(new("api", "https://api.example.com")).Service!, Plan(new("other", "https://other.example.com")).Service!] };
+        Assert.That(Kinds(ServicePlanner.Plan(new("other", "https://api.example.com"), vault, replacing: "api")), Is.EqualTo(new[] { ServiceProblemKind.SlugTaken }));
+    }
+
+    [Test]
+    public void A_service_the_form_cant_show_faithfully_is_not_described()
+    {
+        var rule = new RequestRule(new HashSet<string> { "GET" }, [VaultFile.Compile("^/")]);
+        var two = new Service("two", new Uri("https://api.example.com/"), [new Grant("read", "s", rule), new Grant("write", "s", rule)]);
+        var capped = new Service("capped", new Uri("https://api.example.com/"), [new Grant("read", "s", rule with { MaxBodyBytes = 10 })]);
+        var logins = SqlServerSetupPlanner.Plan(new("appdb", "sql.example.com", "AppDb"), Empty).Service!;
+        var noPaths = new Service("no-paths", new Uri("https://api.example.com/"), [new Grant("read", "s", rule with { Allow = [] })]);
+        var noMethods = new Service("no-methods", new Uri("https://api.example.com/"), [new Grant("read", "s", rule with { Methods = new HashSet<string>() })]);
+        Assert.That(new[] { two, capped, logins, noPaths, noMethods }.Select(ServicePlanner.Describe), Is.All.Null,
+            "a grant that covers nothing would be saved as GET on every path");
+    }
+
     [Test]
     public void Defaults_are_one_get_grant_named_default_using_the_service_slug_as_secret()
     {
