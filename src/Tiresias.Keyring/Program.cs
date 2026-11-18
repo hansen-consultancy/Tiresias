@@ -49,6 +49,11 @@ const string Usage = """
         offers the ones that look like secrets; put-back returns them to Windows as they were.
         --folder keeps a variable for commands run in that folder (the current one by default)
         and below, adding to or overriding the global set.
+    tir env nuget add <source-url> <NAME> [--username <name>]
+    tir env nuget list
+    tir env nuget remove <source-url>
+        NuGet package sources that authenticate with a sealed variable: dotnet restore, Visual
+        Studio and Rider ask the app for the token, and you allow each program once.
     tir env hook [pwsh]
         Prints the PowerShell profile hook: tir env hook | Out-String | Invoke-Expression. Each
         terminal asks once for the sealed variables, and changing folder applies its set.

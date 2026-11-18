@@ -28,6 +28,8 @@ public sealed record ControlRequest(string Op, IReadOnlyList<string>? Lines = nu
     public const string Environment = "environment";
     /// <summary>The terminal hook: the sealed variables for a shell and its directory, asked once per shell session.</summary>
     public const string ShellEnvironment = "shell-environment";
+    /// <summary>The NuGet credential plugin: <see cref="Title"/> is the source URI, <see cref="AskAgain"/> means the feed refused the last answer.</summary>
+    public const string NuGetCredential = "nuget-credential";
 }
 
 /// <param name="Approved">For a consent: the user allowed it.</param>
@@ -35,8 +37,10 @@ public sealed record ControlRequest(string Op, IReadOnlyList<string>? Lines = nu
 /// <param name="Build">For a ping: the app's version, marked when it is a development build. Absent from apps before 0.1.0-preview.5.</param>
 /// <param name="Folder">For a ping: where the running app's files are, which tells two copies apart.</param>
 /// <param name="Variables">For an environment request the user allowed: the sealed variables, by name.</param>
+/// <param name="Username">For a NuGet credential the user allowed: the user name the feed is given.</param>
+/// <param name="Password">For a NuGet credential the user allowed: the sealed variable's value.</param>
 public sealed record ControlReply(bool Ok, string? Message = null, bool Approved = false, string? State = null, string? Build = null, string? Folder = null,
-    IReadOnlyDictionary<string, string>? Variables = null);
+    IReadOnlyDictionary<string, string>? Variables = null, string? Username = null, string? Password = null);
 
 /// <summary><c>tir</c>'s side of the control pipe.</summary>
 public static class ControlClient

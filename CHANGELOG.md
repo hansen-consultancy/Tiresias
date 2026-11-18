@@ -28,6 +28,9 @@ its section below.
 - A PowerShell profile hook (`tir env hook`) gives each terminal the sealed variables after you
   allow it once, and a variable can be kept for one folder (`tir env set NAME --folder`, or the
   folder field in the window): changing folder adds and removes its variables.
+- `dotnet restore`, Visual Studio and Rider can take a private feed's token from a sealed variable
+  (`tir env nuget add <source-url> <NAME>`), after you allow the program asking. Needs the .NET
+  9.0.200 SDK or later.
 - The secrets editor names projects instead of listing ids: add the folder you keep your code in
   under **Project folders**, use **Find a project**, or just run the project. Ids no project uses
   are grouped apart and can be moved to the Recycle Bin.
