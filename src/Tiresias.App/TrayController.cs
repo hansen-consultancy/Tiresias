@@ -112,13 +112,20 @@ sealed class TrayController : IDisposable
     {
         var file = Desktop.TaskbarIsLight() ? "tray-light-theme.ico" : "tray-dark-theme.ico";
         var uri = new Uri($"pack://application:,,,/Assets/{file}");
-        icon.IconSource = AppBuild.Current.Development ? WithDevelopmentCorner(uri) : BitmapFrame.Create(uri);
+        if (AppBuild.Current.Development)
+            icon.Icon = WithDevelopmentCorner(uri);
+        else
+            icon.IconSource = BitmapFrame.Create(uri);
     }
 
     static readonly SolidColorBrush DevelopmentOrange = Frozen(Color.FromRgb(0xF7, 0x63, 0x0C));
 
     /// <summary>The icon with its bottom-right corner filled orange: visible at 16 pixels, where text isn't.</summary>
-    static ImageSource WithDevelopmentCorner(Uri uri)
+    /// <remarks>
+    /// Handed over as a System.Drawing icon: H.NotifyIcon's ImageSource conversion only takes decoded
+    /// images, not a rendered bitmap. The icon file wraps one PNG image, which Windows reads since Vista.
+    /// </remarks>
+    static System.Drawing.Icon WithDevelopmentCorner(Uri uri)
     {
         const int size = 32;
         using var stream = Application.GetResourceStream(uri)!.Stream;
@@ -140,8 +147,21 @@ sealed class TrayController : IDisposable
         }
         var bitmap = new RenderTargetBitmap(size, size, 96, 96, PixelFormats.Pbgra32);
         bitmap.Render(visual);
-        bitmap.Freeze();
-        return bitmap;
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using var png = new MemoryStream();
+        encoder.Save(png);
+        using var ico = new MemoryStream();
+        using (var w = new BinaryWriter(ico, System.Text.Encoding.UTF8, leaveOpen: true))
+        {
+            w.Write((short)0); w.Write((short)1); w.Write((short)1);       // ICONDIR: reserved, type icon, one image
+            w.Write((byte)size); w.Write((byte)size); w.Write((byte)0); w.Write((byte)0);
+            w.Write((short)1); w.Write((short)32);                          // planes, bits per pixel
+            w.Write((int)png.Length); w.Write(6 + 16);                      // image size, offset after the directory
+            w.Write(png.ToArray());
+        }
+        ico.Position = 0;
+        return new System.Drawing.Icon(ico);
     }
 
     static SolidColorBrush Frozen(Color color)
