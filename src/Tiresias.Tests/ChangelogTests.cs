@@ -1,11 +1,11 @@
-using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
 namespace Tiresias.Tests;
 
 /// <summary>
-/// CHANGELOG.md is where the release notes come from (.github/scripts/release-notes.sh), so the
-/// version the build packs must have its section before it can be tagged.
+/// CHANGELOG.md is where the release notes come from (.github/scripts/release-notes.sh, which fails
+/// a tag whose version has no section). The version in Directory.Build.props is for local builds
+/// only: both release workflows set Version from the tag.
 /// </summary>
 public class ChangelogTests
 {
@@ -24,14 +24,12 @@ public class ChangelogTests
         Assert.That(Changelog, Does.Contain("\n## [Unreleased]"));
 
     [Test]
-    public void The_version_the_build_packs_has_notes()
+    public void A_local_build_never_claims_a_released_version()
     {
         var props = XDocument.Load(Path.Combine(RepoRoot(), "Directory.Build.props")).Descendants();
-        var version = $"{props.Single(e => e.Name.LocalName == "VersionPrefix").Value}-{props.Single(e => e.Name.LocalName == "VersionSuffix").Value}";
+        var suffix = props.Single(e => e.Name.LocalName == "VersionSuffix").Value;
 
-        var section = Regex.Match(Changelog, $@"^## \[{Regex.Escape(version)}\][^\n]*\n(?<body>.*?)(?=^## \[|\z)", RegexOptions.Multiline | RegexOptions.Singleline);
-
-        Assert.That(section.Success, Is.True, $"CHANGELOG.md has no '## [{version}]' section.");
-        Assert.That(Regex.IsMatch(section.Groups["body"].Value, "^- ", RegexOptions.Multiline), Is.True, $"'## [{version}]' lists no change.");
+        Assert.That(suffix, Is.EqualTo("dev"), "Directory.Build.props versions local builds; a release takes its version from the tag.");
+        Assert.That(Changelog, Does.Not.Contain($"## [{props.Single(e => e.Name.LocalName == "VersionPrefix").Value}-dev]"));
     }
 }

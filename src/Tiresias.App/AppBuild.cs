@@ -42,6 +42,7 @@ static class AppBuild
         if (stream is null)
             return null;
         using var reader = new StreamReader(stream);
-        return ReleaseNotes.Section(reader.ReadToEnd(), Current.Installed ? Current.Version : "Unreleased");
+        var section = ReleaseNotes.Section(reader.ReadToEnd(), Current.Installed ? Current.Version : "Unreleased");
+        return section is null ? null : ReleaseNotes.Plain(section);
     }
 }

@@ -19,4 +19,25 @@ public static class ReleaseNotes
         var section = string.Join('\n', lines[(start + 1)..(end < 0 ? lines.Length : end)]).Trim('\n', ' ');
         return section.Length == 0 ? null : section;
     }
+
+    /// <summary>
+    /// The changelog's markdown as plain text for a text box: headings without their hashes, bullets
+    /// as "•", no bold or code marks, and each paragraph or bullet on one line (the file wraps them).
+    /// </summary>
+    public static string Plain(string markdown)
+    {
+        var lines = new List<string>();
+        foreach (var raw in markdown.ReplaceLineEndings("\n").Split('\n'))
+        {
+            var line = raw.Trim().Replace("**", "", StringComparison.Ordinal).Replace("`", "", StringComparison.Ordinal);
+            var bullet = line.StartsWith("- ", StringComparison.Ordinal);
+            if (line.Length > 0 && !bullet && !line.StartsWith('#', StringComparison.Ordinal) && lines.Count > 0 && lines[^1].Length > 0)
+                lines[^1] += " " + line;
+            else if (line.StartsWith('#', StringComparison.Ordinal))
+                lines.Add(line.TrimStart('#').TrimStart());
+            else
+                lines.Add(bullet ? "• " + line[2..] : line);
+        }
+        return string.Join('\n', lines);
+    }
 }

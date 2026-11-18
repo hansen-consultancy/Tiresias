@@ -82,4 +82,18 @@ public class ReleaseNotesTests
     [Test]
     public void A_version_is_not_mistaken_for_a_longer_one() =>
         Assert.That(ReleaseNotes.Section(Changelog, "0.1.0-preview"), Is.Null);
+
+    [Test]
+    public void Plain_text_drops_the_markdown_and_unwraps_lines() =>
+        Assert.That(ReleaseNotes.Plain("""
+            ### Added
+
+            - **About Tiresias**: the version and
+              where it runs from.
+            - `tir status` names the app.
+
+            A paragraph wrapped
+            over two lines.
+            """), Is.EqualTo(
+            "Added\n\n• About Tiresias: the version and where it runs from.\n• tir status names the app.\n\nA paragraph wrapped over two lines."));
 }
