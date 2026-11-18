@@ -27,17 +27,15 @@ public sealed class LeaseKeeper : IDisposable
     /// <summary>Runs until <paramref name="stop"/> is cancelled.</summary>
     public async Task RunAsync(CancellationToken stop)
     {
-        // SystemEvents raises these on its own message-loop thread; block it until the broker has
-        // heard, so a suspend doesn't outrun the revoke.
         SessionSwitchEventHandler onSwitch = (_, e) =>
         {
             if (e.Reason is SessionSwitchReason.SessionLock or SessionSwitchReason.SessionLogoff)
-                EndAsync(e.Reason.ToString()).GetAwaiter().GetResult();
+                EndBeforeReturning(e.Reason.ToString());
         };
         PowerModeChangedEventHandler onPower = (_, e) =>
         {
             if (e.Mode == PowerModes.Suspend)
-                EndAsync("Suspend").GetAwaiter().GetResult();
+                EndBeforeReturning("Suspend");
         };
         SystemEvents.SessionSwitch += onSwitch;
         SystemEvents.PowerModeChanged += onPower;
@@ -86,6 +84,29 @@ public sealed class LeaseKeeper : IDisposable
         finally
         {
             gate.Release();
+        }
+    }
+
+    static readonly TimeSpan RevokeWait = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// Holds the event up until the broker has heard, so a suspend doesn't outrun the revoke, for at
+    /// most <see cref="RevokeWait"/>: past that the heartbeat timeout ends the lease anyway.
+    /// </summary>
+    /// <remarks>
+    /// SystemEvents raises the event on the thread that subscribed when it has a synchronization
+    /// context: the UI thread in the app. Blocking there on work whose continuations want that same
+    /// thread deadlocked the app on Win+L, so the work runs on the thread pool.
+    /// </remarks>
+    void EndBeforeReturning(string reason)
+    {
+        try
+        {
+            Task.Run(() => EndAsync(reason)).Wait(RevokeWait);
+        }
+        catch (AggregateException e)
+        {
+            Say($"{reason}: ending the lease failed ({e.InnerException?.Message}); it ends when its heartbeat times out.");
         }
     }
 
