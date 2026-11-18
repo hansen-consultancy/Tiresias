@@ -41,6 +41,7 @@ its section below.
 - **Show** in the secrets editor reveals the value; it did nothing before.
 - A selected row in the secrets, services and activity lists is a subtle highlight instead of dark
   blue under black text.
+- The **Show** button in the secrets editor is wide enough for its text when the window opens.
 
 ## [0.1.0-preview.4] - 2026-11-18
 
