@@ -11,16 +11,24 @@ using Tiresias.Client;
 
 namespace Tiresias.App.Views;
 
-/// <summary>The status page: the lock state and every <c>tir doctor</c> check, run on this machine.</summary>
+/// <summary>
+/// The status page: the lock state and every <c>tir doctor</c> check, run on this machine. It follows
+/// the agent: a lock or unlock from anywhere (tray, <c>tir</c>, a consent dialog, Win+L) re-runs it.
+/// </summary>
 public partial class StatusWindow : Window
 {
+    readonly StatusViewModel model = new();
+
     public StatusWindow()
     {
         InitializeComponent();
-        var model = new StatusViewModel();
         DataContext = model;
-        Loaded += async (_, _) => await model.RunCommand.ExecuteAsync(null);
+        Loaded += (_, _) => model.Refresh();
+        App.Current.Host.StateChanged += OnAgentStateChanged;
+        Closed += (_, _) => App.Current.Host.StateChanged -= OnAgentStateChanged;
     }
+
+    void OnAgentStateChanged() => Dispatcher.BeginInvoke(model.Refresh);
 
     void OnClose(object sender, RoutedEventArgs e) => Close();
 
@@ -60,7 +68,7 @@ public sealed partial class StatusViewModel : ObservableObject
     [ObservableProperty]
     public partial string LockLabel { get; set; } = "";
 
-    /// <summary>Lock right here, or unlock with one Hello prompt; then the page reflects it.</summary>
+    /// <summary>Lock right here, or unlock with one Hello prompt; the agent's state change refreshes the page.</summary>
     [RelayCommand]
     async Task ToggleLockAsync()
     {
@@ -68,20 +76,36 @@ public sealed partial class StatusViewModel : ObservableObject
             await App.Current.LockAsync();
         else
             await App.Current.UnlockAsync(interactive: true);
-        await RunAsync();
     }
 
     public ObservableCollection<CheckRow> Checks { get; } = [];
+
+    bool rerun;
+
+    /// <summary>The state line now, then the checks; a change during a run queues one more run rather than overlapping it.</summary>
+    public void Refresh()
+    {
+        ShowState();
+        if (IsRunning)
+            rerun = true;
+        else
+            _ = RunAsync();
+    }
+
+    void ShowState()
+    {
+        var view = TrayStatus.Describe(App.Current.Snapshot());
+        Headline = Text.Of(view.Headline);
+        Mode = view.Mode is null ? Text.Get("Status_ModeNone") : Text.Get("Status_ModeSolo");
+        LockLabel = Text.Get(App.Current.Host.Keys.IsUnlocked ? "Tray_Lock" : "Tray_Unlock");
+    }
 
     [RelayCommand]
     async Task RunAsync()
     {
         IsRunning = true;
         Checks.Clear();
-        var view = TrayStatus.Describe(App.Current.Snapshot());
-        Headline = Text.Of(view.Headline);
-        Mode = view.Mode is null ? Text.Get("Status_ModeNone") : Text.Get("Status_ModeSolo");
-        LockLabel = Text.Get(App.Current.Host.Keys.IsUnlocked ? "Tray_Lock" : "Tray_Unlock");
+        ShowState();
         try
         {
             foreach (var check in await Task.Run(() => Doctor.RunAsync(new MachineProbe())))
@@ -95,6 +119,11 @@ public sealed partial class StatusViewModel : ObservableObject
         finally
         {
             IsRunning = false;
+        }
+        if (rerun)
+        {
+            rerun = false;
+            await RunAsync();
         }
     }
 
