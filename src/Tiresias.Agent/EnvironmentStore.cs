@@ -27,22 +27,22 @@ public static partial class EnvironmentStore
     /// <summary>Whether a sealed environment exists here, for the recovery restore. No prompt.</summary>
     public static bool IsSealed => File.Exists(FilePath) && Protocol.SecretsFile.Classify(File.ReadAllText(FilePath)) == Protocol.SecretsFileKind.Sealed;
 
-    /// <summary>The sealed variables and the version they were read from; empty and 0 when nothing is sealed yet.</summary>
-    public static (IReadOnlyList<SealedVariable> Variables, int Version) Open(IKeyWrapper hello)
+    /// <summary>The sealed environment and the version it was read from; empty and 0 when nothing is sealed yet.</summary>
+    public static (SealedEnvironment Environment, int Version) Open(IKeyWrapper hello)
     {
         var load = UserSecretsVault.Open(Id, File.Exists(FilePath) ? File.ReadAllText(FilePath) : null, hello);
-        return (SealedVariables.FromDocument(load.Document), load.Version);
+        return (SealedEnvironment.FromDocument(load.Document), load.Version);
     }
 
-    /// <summary>Seals <paramref name="variables"/> as the version after <paramref name="loadedVersion"/>.</summary>
+    /// <summary>Seals <paramref name="environment"/> as the version after <paramref name="loadedVersion"/>.</summary>
     /// <exception cref="InvalidOperationException">No recovery key: nothing sealed may depend on the TPM alone.</exception>
-    public static void Save(IReadOnlyList<SealedVariable> variables, int loadedVersion, IKeyWrapper hello)
+    public static void Save(SealedEnvironment environment, int loadedVersion, IKeyWrapper hello)
     {
         var recovery = RecoveryKey.Wrapper()
             ?? throw new InvalidOperationException("No recovery key yet, so nothing can be sealed. Create it first (first-run wizard, or tir recovery init).");
         Directory.CreateDirectory(KeyringStore.Directory);
         var temp = FilePath + ".tmp";
-        File.WriteAllText(temp, UserSecretsVault.Seal(Id, loadedVersion + 1, SealedVariables.ToDocument(variables), [hello, recovery]));
+        File.WriteAllText(temp, UserSecretsVault.Seal(Id, loadedVersion + 1, environment.ToDocument(), [hello, recovery]));
         File.Move(temp, FilePath, overwrite: true);
     }
 
@@ -86,8 +86,8 @@ public static partial class EnvironmentStore
             return [];
 
         var (sealedNow, version) = Open(hello);
-        Save(SealedVariables.With(sealedNow, moving), version, hello);
-        var check = Open(hello).Variables.ToDictionary(v => v.Name, StringComparer.OrdinalIgnoreCase);
+        Save(sealedNow.WithGlobal(moving), version, hello);
+        var check = Open(hello).Environment.Global.ToDictionary(v => v.Name, StringComparer.OrdinalIgnoreCase);
         if (moving.Any(v => !check.TryGetValue(v.Name, out var back) || back != v))
             throw new InvalidOperationException("The sealed copy didn't read back the same, so nothing was removed from Windows.");
 
@@ -98,16 +98,20 @@ public static partial class EnvironmentStore
     }
 
     /// <summary>
-    /// Seals <paramref name="variable"/>, replacing any of the same name, and once the sealed copy
-    /// reads back the same, deletes a copy left in the user's Windows environment: otherwise the old
-    /// value would stay readable, and a later Protect would seal it over the new one.
+    /// Seals <paramref name="variable"/> globally or for <paramref name="folder"/>, replacing any of
+    /// the same name there. A global one, once the sealed copy reads back the same, also deletes a
+    /// copy left in the user's Windows environment: otherwise the old value would stay readable, and
+    /// a later Protect would seal it over the new one. A folder one leaves Windows alone, since it
+    /// replaces nothing outside that folder.
     /// </summary>
     /// <returns>Whether a copy was removed from Windows.</returns>
-    public static bool Set(SealedVariable variable, IKeyWrapper hello)
+    public static bool Set(SealedVariable variable, string? folder, IKeyWrapper hello)
     {
         var (sealedNow, version) = Open(hello);
-        Save(SealedVariables.With(sealedNow, [variable]), version, hello);
-        if (Open(hello).Variables.FirstOrDefault(v => string.Equals(v.Name, variable.Name, StringComparison.OrdinalIgnoreCase)) != variable)
+        Save(folder is null ? sealedNow.WithGlobal([variable]) : sealedNow.WithFolder(folder, [variable]), version, hello);
+        if (folder is not null)
+            return false;
+        if (Open(hello).Environment.Global.FirstOrDefault(v => string.Equals(v.Name, variable.Name, StringComparison.OrdinalIgnoreCase)) != variable)
             throw new InvalidOperationException("The sealed copy didn't read back the same.");
         using var key = Registry.CurrentUser.OpenSubKey(RegistryKey, writable: true);
         if (key is null || Raw(key, variable.Name) is null)
@@ -118,19 +122,19 @@ public static partial class EnvironmentStore
     }
 
     /// <summary>Writes <paramref name="names"/> back to the user's environment as they were, then drops them from the sealed one.</summary>
-    /// <returns>The names put back.</returns>
+    /// <returns>The names put back. Only the global set came from Windows; a folder set's variable is never put back.</returns>
     public static IReadOnlyList<string> PutBack(IEnumerable<string> names, IKeyWrapper hello)
     {
         var (sealedNow, version) = Open(hello);
         var wanted = names.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var returning = sealedNow.Where(v => wanted.Contains(v.Name)).ToArray();
+        var returning = sealedNow.Global.Where(v => wanted.Contains(v.Name)).ToArray();
         if (returning.Length == 0)
             return [];
         using (var key = Registry.CurrentUser.CreateSubKey(RegistryKey, writable: true))
             foreach (var variable in returning)
                 key.SetValue(variable.Name, variable.Value, variable.Expandable ? RegistryValueKind.ExpandString : RegistryValueKind.String);
         AnnounceChange();
-        Save(SealedVariables.Without(sealedNow, returning.Select(v => v.Name)), version, hello);
+        Save(sealedNow.WithoutGlobal(returning.Select(v => v.Name)), version, hello);
         return [.. returning.Select(v => v.Name)];
     }
 

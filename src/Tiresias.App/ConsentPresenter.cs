@@ -67,6 +67,25 @@ sealed class ConsentPresenter(Dispatcher dispatcher) : IUserSecretsConsentPrompt
         }
     }
 
+    /// <summary>The terminal hook asking for the sealed variables for a shell session; <paramref name="shell"/> is its image path.</summary>
+    public async Task<bool> AskShellAsync(string shell, string directory, IReadOnlyList<string> names, CancellationToken ct)
+    {
+        try
+        {
+            return await ShowAsync(new ConsentView(
+                Text.Format("Consent_Shell_Heading", System.IO.Path.GetFileNameWithoutExtension(shell)),
+                shell,
+                Text.Format("Consent_Shell_ListLabel", names.Count, directory),
+                names,
+                Text.Get("Consent_Shell_Note"),
+                AllowSession: false), UserSecretsService.ConsentTimeout, ct) != ConsentAnswer.Deny;
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
+        }
+    }
+
     /// <summary>A placeholder or <c>tir exec</c> approval asked by <c>tir</c>; <c>tir</c> still asks for Windows Hello afterwards.</summary>
     public async Task<bool> AskPlaceholderAsync(string title, IReadOnlyList<string> lines, string? caller, CancellationToken ct)
     {

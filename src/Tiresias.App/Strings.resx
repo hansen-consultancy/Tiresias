@@ -100,6 +100,15 @@
   <data name="Consent_Environment_Note" xml:space="preserve">
     <value>They go into this one program's environment, and whatever it starts. Allowing it hands over the values; they are never shown here.</value>
   </data>
+  <data name="Consent_Shell_Heading" xml:space="preserve">
+    <value>Give sealed variables to this {0} terminal?</value>
+  </data>
+  <data name="Consent_Shell_ListLabel" xml:space="preserve">
+    <value>For commands in {1} ({0}):</value>
+  </data>
+  <data name="Consent_Shell_Note" xml:space="preserve">
+    <value>This terminal, and everything run from it, keeps them until it closes or Tiresias locks. You're asked again only for names a folder adds.</value>
+  </data>
   <data name="Env_AddHeading" xml:space="preserve">
     <value>Add a sealed variable</value>
   </data>
@@ -115,14 +124,32 @@
   <data name="Env_Detail" xml:space="preserve">
     <value>({0} characters)</value>
   </data>
+  <data name="Env_DetailFolder" xml:space="preserve">
+    <value>for commands in {0}</value>
+  </data>
   <data name="Env_DetailSecret" xml:space="preserve">
     <value>({0} characters, looks like a secret)</value>
+  </data>
+  <data name="Env_FolderBrowse" xml:space="preserve">
+    <value>Browse...</value>
+  </data>
+  <data name="Env_FolderInvalid" xml:space="preserve">
+    <value>The folder must be a full path, such as C:\src\shop.</value>
+  </data>
+  <data name="Env_FolderPick" xml:space="preserve">
+    <value>Folder whose commands get this variable</value>
   </data>
   <data name="Env_Heading" xml:space="preserve">
     <value>Environment variables</value>
   </data>
   <data name="Env_Locked" xml:space="preserve">
     <value>Tiresias is locked. Unlock it with Windows Hello to see or change sealed variables.</value>
+  </data>
+  <data name="Env_NewFolder" xml:space="preserve">
+    <value>Folder (optional)</value>
+  </data>
+  <data name="Env_NewFolderHint" xml:space="preserve">
+    <value>Leave the folder empty for every terminal and tir run. With a folder, the variable is only for commands run in it and below, and overrides one of the same name.</value>
   </data>
   <data name="Env_NewName" xml:space="preserve">
     <value>Name of the new variable</value>
@@ -147,6 +174,9 @@
   </data>
   <data name="Env_PutBackDone" xml:space="preserve">
     <value>Put {0} back in Windows. Programs started from now on can read them again.</value>
+  </data>
+  <data name="Env_PutBackFolder" xml:space="preserve">
+    <value>A folder's variables never came from Windows, so there is nothing to put back. Remove them instead.</value>
   </data>
   <data name="Env_Remove" xml:space="preserve">
     <value>Remove</value>
@@ -297,6 +327,15 @@
   </data>
   <data name="Secrets_Scanning" xml:space="preserve">
     <value>Looking for projects...</value>
+  </data>
+  <data name="Shell_NotUnlocked" xml:space="preserve">
+    <value>not unlocked ({0}), so this terminal has no sealed variables. Run Update-TiresiasEnvironment -Ask to try again.</value>
+  </data>
+  <data name="Shell_Refused" xml:space="preserve">
+    <value>not given to this terminal. Run Update-TiresiasEnvironment -Ask to be asked again.</value>
+  </data>
+  <data name="Shell_Unrecognised" xml:space="preserve">
+    <value>couldn't tell which terminal asked, so nothing was given. Check that the hook passes $PID (tir env hook).</value>
   </data>
   <data name="Status_About" xml:space="preserve">
     <value>About</value>

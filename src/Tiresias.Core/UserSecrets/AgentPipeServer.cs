@@ -9,11 +9,12 @@ namespace Tiresias.UserSecrets;
 /// user (<see cref="PipeOptions.CurrentUserOnly"/>), and the caller is identified from the pipe
 /// itself, never from anything the client says.
 /// </summary>
+/// <typeparam name="TCaller">What the handler is told about the client, read by <c>identifyCaller</c> from the pipe.</typeparam>
 /// <remarks>The user-secrets pipe speaks <see cref="AgentRequest"/>/<see cref="AgentReply"/>; the agent's control pipe its own pair.</remarks>
-public sealed class AgentPipeServer<TRequest, TReply>(
+public sealed class AgentPipeServer<TRequest, TReply, TCaller>(
     string pipeName,
-    Func<TRequest, string?, CancellationToken, Task<TReply>> handle,
-    Func<NamedPipeServerStream, string?> identifyCaller)
+    Func<TRequest, TCaller, CancellationToken, Task<TReply>> handle,
+    Func<NamedPipeServerStream, TCaller> identifyCaller)
 {
     /// <summary>A client that connects and then says nothing is dropped after this.</summary>
     static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(10);

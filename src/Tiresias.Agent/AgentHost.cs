@@ -61,7 +61,7 @@ public sealed class AgentHost : IAsyncDisposable
     /// <exception cref="IOException">Another agent (the app, or <c>tir agent</c>) already runs in this session.</exception>
     public async Task StartAsync()
     {
-        var server = new AgentPipeServer<AgentRequest, AgentReply>(AgentWire.PipeName, HandleUserSecretsAsync, PipeCaller.Identify);
+        var server = new AgentPipeServer<AgentRequest, AgentReply, string?>(AgentWire.PipeName, HandleUserSecretsAsync, PipeCaller.Identify);
         server.ConnectionFailed += e => Say($"A user-secrets request failed: {e.Message}");
         var serving = server.RunAsync(stop.Token);
         if (serving.IsFaulted)

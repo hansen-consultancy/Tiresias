@@ -24,6 +24,13 @@ public partial class EnvironmentWindow : Window
         Loaded += async (_, _) => await model.LoadAsync();
     }
 
+    void OnBrowse(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFolderDialog { Title = Text.Get("Env_FolderPick") };
+        if (dialog.ShowDialog(this) == true)
+            model.NewFolder = dialog.FolderName;
+    }
+
     void OnAdd(object sender, RoutedEventArgs e)
     {
         model.Add(NewValue.Password);
@@ -33,9 +40,12 @@ public partial class EnvironmentWindow : Window
     void OnClose(object sender, RoutedEventArgs e) => Close();
 }
 
-public sealed partial class VariableRow(string name, string detail, bool isChecked) : ObservableObject
+/// <param name="folder">For a sealed variable kept for one folder: that folder; <c>null</c> for the global set and for Windows' own.</param>
+public sealed partial class VariableRow(string name, string detail, bool isChecked, string? folder = null) : ObservableObject
 {
     public string Name { get; } = name;
+
+    public string? Folder { get; } = folder;
 
     public string Detail { get; } = detail;
 
@@ -64,6 +74,10 @@ public sealed partial class EnvironmentViewModel : ObservableObject
     [ObservableProperty]
     public partial string NewName { get; set; } = "";
 
+    /// <summary>Empty for the global set; a folder keeps the variable for commands run in it and below.</summary>
+    [ObservableProperty]
+    public partial string NewFolder { get; set; } = "";
+
     /// <summary>Unlocks if needed (one Windows Hello prompt), then lists both sides.</summary>
     public async Task LoadAsync()
     {
@@ -83,63 +97,90 @@ public sealed partial class EnvironmentViewModel : ObservableObject
             Message = Text.Get("Env_Locked");
             return;
         }
-        var sealedNow = EnvironmentStore.Open(hello).Variables;
+        var sealedNow = EnvironmentStore.Open(hello).Environment;
         var user = EnvironmentStore.UserVariables();
         Sealed.Clear();
-        foreach (var variable in sealedNow)
+        foreach (var variable in sealedNow.Global)
             Sealed.Add(new(variable.Name, "", false));
+        foreach (var set in sealedNow.Folders.OrderBy(f => f.Folder, StringComparer.OrdinalIgnoreCase))
+            foreach (var variable in set.Variables)
+                Sealed.Add(new(variable.Name, Text.Format("Env_DetailFolder", set.Folder), false, set.Folder));
         InWindows.Clear();
         foreach (var variable in user.OrderByDescending(v => v.LooksSecret))
             InWindows.Add(new(variable.Name,
                 Text.Format(variable.LooksSecret ? "Env_DetailSecret" : "Env_Detail", variable.Length), variable.LooksSecret));
-        SealedSummary = sealedNow.Count == 0 ? Text.Get("Env_NoneSealed") : Text.Format("Env_SealedSummary", sealedNow.Count);
+        SealedSummary = Sealed.Count == 0 ? Text.Get("Env_NoneSealed") : Text.Format("Env_SealedSummary", Sealed.Count);
         WindowsSummary = Text.Format("Env_WindowsSummary", user.Count(v => v.LooksSecret));
         CanEdit = true;
     }
 
     [RelayCommand]
-    void Protect() => Act(InWindows, (names, hello) => EnvironmentStore.Protect(names, hello), "Env_Protected");
+    void Protect()
+    {
+        var picked = Checked(InWindows);
+        Act(picked, hello => EnvironmentStore.Protect(picked.Select(r => r.Name), hello), "Env_Protected");
+    }
 
+    /// <summary>Only the global set came from Windows; a folder's variable stays sealed, and the message says so.</summary>
     [RelayCommand]
-    void PutBack() => Act(Sealed, (names, hello) => EnvironmentStore.PutBack(names, hello), "Env_PutBackDone");
+    void PutBack()
+    {
+        var picked = Checked(Sealed);
+        var global = picked.Where(r => r.Folder is null).ToArray();
+        if (picked.Length > 0 && global.Length == 0)
+        {
+            Message = Text.Get("Env_PutBackFolder");
+            return;
+        }
+        Act(global, hello => EnvironmentStore.PutBack(global.Select(r => r.Name), hello), "Env_PutBackDone");
+    }
 
     [RelayCommand]
     void Remove()
     {
-        var names = Checked(Sealed);
-        if (names.Length == 0 || !AskWindow.Confirm(null, Text.Get("Env_RemoveTitle"), Text.Format("Env_RemoveBody", string.Join(", ", names)), Text.Get("Env_Remove")))
+        var picked = Checked(Sealed);
+        if (picked.Length == 0 || !AskWindow.Confirm(null, Text.Get("Env_RemoveTitle"), Text.Format("Env_RemoveBody", string.Join(", ", picked.Select(r => r.Name))), Text.Get("Env_Remove")))
             return;
-        Act(Sealed, (picked, hello) =>
+        Act(picked, hello =>
         {
-            var (variables, version) = EnvironmentStore.Open(hello);
-            EnvironmentStore.Save(SealedVariables.Without(variables, picked), version, hello);
-            return picked;
+            var (environment, version) = EnvironmentStore.Open(hello);
+            environment = environment.WithoutGlobal(picked.Where(r => r.Folder is null).Select(r => r.Name));
+            foreach (var folder in picked.Where(r => r.Folder is not null).GroupBy(r => r.Folder!, StringComparer.OrdinalIgnoreCase))
+                environment = environment.WithoutFolder(folder.Key, folder.Select(r => r.Name));
+            EnvironmentStore.Save(environment, version, hello);
+            return [.. picked.Select(r => r.Name)];
         }, "Env_Removed");
     }
 
     public void Add(string value)
     {
         var name = NewName.Trim();
+        var folder = NewFolder.Trim();
         if (name.Length == 0 || value.Length == 0 || name.Contains('=', StringComparison.Ordinal))
         {
             Message = Text.Get("Env_AddInvalid");
             return;
         }
-        Act([new(name, "", true)], (_, hello) =>
+        if (folder.Length > 0 && !Path.IsPathFullyQualified(folder))
         {
-            var (variables, version) = EnvironmentStore.Open(hello);
-            EnvironmentStore.Save(SealedVariables.With(variables, [new(name, value)]), version, hello);
+            Message = Text.Get("Env_FolderInvalid");
+            return;
+        }
+        Act([new(name, "", true)], hello =>
+        {
+            var (environment, version) = EnvironmentStore.Open(hello);
+            SealedVariable[] added = [new(name, value)];
+            EnvironmentStore.Save(folder.Length == 0 ? environment.WithGlobal(added) : environment.WithFolder(Path.GetFullPath(folder), added), version, hello);
             return [name];
         }, "Env_Added");
         NewName = "";
     }
 
-    static string[] Checked(IEnumerable<VariableRow> rows) => [.. rows.Where(r => r.IsChecked).Select(r => r.Name)];
+    static VariableRow[] Checked(IEnumerable<VariableRow> rows) => [.. rows.Where(r => r.IsChecked)];
 
-    void Act(IEnumerable<VariableRow> rows, Func<IReadOnlyList<string>, Agent.HelloKeyWrapper, IReadOnlyList<string>> action, string done)
+    void Act(IReadOnlyList<VariableRow> picked, Func<Agent.HelloKeyWrapper, IReadOnlyList<string>> action, string done)
     {
-        var names = Checked(rows);
-        if (names.Length == 0)
+        if (picked.Count == 0)
         {
             Message = Text.Get("Env_NothingPicked");
             return;
@@ -151,7 +192,7 @@ public sealed partial class EnvironmentViewModel : ObservableObject
         }
         try
         {
-            var result = action(names, hello);
+            var result = action(hello);
             Message = Text.Format(done, string.Join(", ", result));
             AppLog.Info($"environment: {done} {result.Count} variable(s)");
         }

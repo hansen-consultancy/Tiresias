@@ -9,7 +9,9 @@ namespace Tiresias.Keyring;
 
 /// <summary>
 /// <c>tir env</c> and <c>tir run</c>: user environment variables moved into the sealed environment,
-/// and handed to one command at a time. Like <c>tir secrets</c>, nothing here prints a value.
+/// handed to one command at a time, or to a terminal through the profile hook. Like
+/// <c>tir secrets</c>, nothing here prints a value, except the script <c>tir env shell</c> hands the
+/// hook, which PowerShell runs rather than shows.
 /// </summary>
 static class EnvCommand
 {
@@ -21,19 +23,30 @@ static class EnvCommand
         "list" => List(),
         "protect" => Protect(args),
         "put-back" => PutBack(args),
-        "set" => Set(args.Require(2, "name"), args.Flag("--from-stdin")),
-        "remove" => Remove(args.Require(2, "name")),
-        _ => throw new UsageException("tir env takes list, protect, put-back, set or remove."),
+        "set" => Set(args.Require(2, "name"), Folder(args), args.Flag("--from-stdin")),
+        "remove" => Remove(args.Require(2, "name"), Folder(args)),
+        "hook" => Hook(args.At(2)),
+        _ => throw new UsageException("tir env takes list, protect, put-back, set, remove, hook or shell."),
     };
+
+    /// <summary><c>--folder</c> alone means the current directory; absent means the global set.</summary>
+    static string? Folder(CommandLine args) =>
+        !args.Flag("--folder") ? null : Path.GetFullPath(args.Option("--folder") ?? Directory.GetCurrentDirectory());
 
     static int List()
     {
         var user = EnvironmentStore.UserVariables();
         using var hello = HelloKeyWrapper.Open(create: false);
         var (sealedNow, _) = EnvironmentStore.Open(hello);
-        Console.WriteLine($"Sealed ({sealedNow.Count}):");
-        foreach (var variable in sealedNow)
+        Console.WriteLine($"Sealed ({sealedNow.Global.Count}):");
+        foreach (var variable in sealedNow.Global)
             Console.WriteLine($"  {variable.Name}");
+        foreach (var set in sealedNow.Folders.OrderBy(f => f.Folder, StringComparer.OrdinalIgnoreCase))
+        {
+            Console.WriteLine($"For commands in {set.Folder} ({set.Variables.Count}):");
+            foreach (var variable in set.Variables)
+                Console.WriteLine($"  {variable.Name}");
+        }
         var exposed = user.Where(v => v.LooksSecret).ToArray();
         if (exposed.Length > 0)
         {
@@ -79,11 +92,11 @@ static class EnvCommand
             throw new UsageException("Name the variables to put back: tir env put-back NAME [NAME...].");
         using var hello = HelloKeyWrapper.Open(create: false);
         var back = EnvironmentStore.PutBack(names, hello);
-        Console.WriteLine(back.Count == 0 ? "None of those are sealed." : $"Put {string.Join(", ", back)} back in your Windows environment, readable by every program again.");
+        Console.WriteLine(back.Count == 0 ? "None of those are sealed in the global set (a folder's variables never came from Windows)." : $"Put {string.Join(", ", back)} back in your Windows environment, readable by every program again.");
         return back.Count == names.Length ? 0 : 1;
     }
 
-    static int Set(string name, bool fromStdin)
+    static int Set(string name, string? folder, bool fromStdin)
     {
         var bytes = fromStdin ? Terminal.ReadStdin() : Terminal.ReadHidden($"Value for {name}: ");
         try
@@ -91,42 +104,99 @@ static class EnvCommand
             if (bytes.Length == 0)
                 throw new UsageException("Empty value. To delete one, use tir env remove.");
             using var hello = HelloKeyWrapper.Open(create: false);
-            if (EnvironmentStore.Set(new(name, Encoding.UTF8.GetString(bytes)), hello))
+            if (EnvironmentStore.Set(new(name, Encoding.UTF8.GetString(bytes)), folder, hello))
                 Console.WriteLine($"Removed the old {name} from your Windows environment. Programs already running keep their copy until they restart.");
         }
         finally
         {
             Array.Clear(bytes);
         }
-        Console.WriteLine($"Sealed {name}.");
+        Console.WriteLine(folder is null ? $"Sealed {name}." : $"Sealed {name} for commands in {folder}.");
         return 0;
     }
 
-    static int Remove(string name)
+    static int Remove(string name, string? folder)
     {
         using var hello = HelloKeyWrapper.Open(create: false);
         var (sealedNow, version) = EnvironmentStore.Open(hello);
-        var left = SealedVariables.Without(sealedNow, [name]);
-        if (left.Count == sealedNow.Count)
+        var present = folder is null
+            ? sealedNow.Global.Any(v => string.Equals(v.Name, name, StringComparison.OrdinalIgnoreCase))
+            : sealedNow.Find(folder)?.Variables.Any(v => string.Equals(v.Name, name, StringComparison.OrdinalIgnoreCase)) == true;
+        if (!present)
         {
-            Console.Error.WriteLine($"{name} is not sealed.");
+            Console.Error.WriteLine(folder is null
+                ? $"{name} is not sealed. For a folder's variable, add --folder <path>."
+                : $"{name} is not sealed for {folder}.");
             return 1;
         }
-        EnvironmentStore.Save(left, version, hello);
-        Console.WriteLine($"Removed {name}. Its value is gone; tir env put-back keeps it instead.");
+        EnvironmentStore.Save(folder is null ? sealedNow.WithoutGlobal([name]) : sealedNow.WithoutFolder(folder, [name]), version, hello);
+        Console.WriteLine(folder is null
+            ? $"Removed {name}. Its value is gone; tir env put-back keeps it instead."
+            : $"Removed {name} from {folder}. Its value is gone.");
+        return 0;
+    }
+
+    /// <summary>The profile line's script. Only PowerShell has a hook; other shells use <c>tir run</c>.</summary>
+    static int Hook(string? shell)
+    {
+        if (shell is not (null or "pwsh" or "powershell"))
+            throw new UsageException($"No hook for {shell}: only PowerShell (pwsh, powershell) has one. In other shells, run a command with tir run -- <command>.");
+        Console.WriteLine(ShellScript.PowerShellHook);
+        return 0;
+    }
+
+    /// <summary>Set once the "app isn't running" hint was shown in a terminal, so it isn't repeated on every <c>cd</c>.</summary>
+    const string HintedVariable = "TIRESIAS_ENV_HINTED";
+
+    /// <summary>
+    /// <c>tir env shell</c>, run by the hook: a script that brings the terminal's environment up to
+    /// date for its directory. Asks the app, which asks the user once per terminal; hints go to the
+    /// error stream so the hook doesn't run them. Without the app nothing changes, so a <c>cd</c>
+    /// never raises a Windows Hello prompt of its own.
+    /// </summary>
+    public static async Task<int> ShellAsync(CommandLine args)
+    {
+        var shell = int.TryParse(args.Require("--shell"), out var id) ? id : throw new UsageException("--shell takes the shell's process id ($PID).");
+        var directory = Path.GetFullPath(args.Require("--directory"));
+        ControlReply? reply;
+        try
+        {
+            reply = await ControlClient.TryAsync(new(ControlRequest.ShellEnvironment, Directory: directory, Shell: shell, AskAgain: args.Flag("--ask")), ConsentWait);
+        }
+        catch (Exception e) when (e is IOException or OperationCanceledException)
+        {
+            reply = null;
+        }
+        if (reply is null)
+        {
+            if (Environment.GetEnvironmentVariable(HintedVariable) is null)
+            {
+                Console.Error.WriteLine("Tiresias: the app isn't running, so this terminal has no sealed variables. Start it, then run Update-TiresiasEnvironment.");
+                Console.WriteLine($"[Environment]::SetEnvironmentVariable('{HintedVariable}', '1', 'Process')");
+            }
+            return 0;
+        }
+        if (reply.Message is { } note)
+            Console.Error.WriteLine($"Tiresias: {note}");
+        if (!reply.Ok || !reply.Approved || reply.Variables is null)
+            return reply.Ok ? 0 : 1;
+        var variables = reply.Variables.Select(pair => new SealedVariable(pair.Key, pair.Value)).ToArray();
+        Console.Write(ShellScript.PowerShell(ShellScript.Names(Environment.GetEnvironmentVariable(ShellScript.NamesVariable)), variables));
         return 0;
     }
 
     /// <summary>
-    /// <c>tir run -- &lt;command&gt;</c>: the sealed variables in that one process's environment. With the
-    /// app running it asks there (and unlocks if needed); without it, the Windows Hello prompt is the consent.
+    /// <c>tir run -- &lt;command&gt;</c>: the sealed variables for the current directory in that one
+    /// process's environment. With the app running it asks there (and unlocks if needed); without
+    /// it, the Windows Hello prompt is the consent.
     /// </summary>
     public static async Task<int> RunCommandAsync(CommandLine args)
     {
         if (args.Rest.Count == 0)
             throw new UsageException("Nothing to run. Put the command after --: tir run -- dotnet run.");
         var program = Path.GetFileName(args.Rest[0]);
-        var variables = await FromAppAsync(program, args.Rest) ?? FromTerminal(program);
+        var directory = Directory.GetCurrentDirectory();
+        var variables = await FromAppAsync(program, args.Rest, directory) ?? FromTerminal(program, directory);
         if (ReferenceEquals(variables, Denied))
         {
             Console.Error.WriteLine("Not approved.");
@@ -150,8 +220,8 @@ static class EnvCommand
         }
     }
 
-    /// <returns>The variables, an empty set for a denial, or <c>null</c> when the app isn't running.</returns>
-    static async Task<IReadOnlyDictionary<string, string>?> FromAppAsync(string program, IReadOnlyList<string> commandLine)
+    /// <returns>The variables, <see cref="Denied"/> for a denial, or <c>null</c> when the app isn't running.</returns>
+    static async Task<IReadOnlyDictionary<string, string>?> FromAppAsync(string program, IReadOnlyList<string> commandLine, string directory)
     {
         ControlReply? reply;
         try
@@ -159,7 +229,7 @@ static class EnvCommand
             if (await AppLink.StateAsync() is null)
                 return null;
             Console.WriteLine("Waiting for your answer in the Tiresias app...");
-            reply = await ControlClient.TryAsync(new(ControlRequest.Environment, commandLine, program), ConsentWait);
+            reply = await ControlClient.TryAsync(new(ControlRequest.Environment, commandLine, program, Directory: directory), ConsentWait);
         }
         catch (Exception e) when (e is IOException or OperationCanceledException)
         {
@@ -176,11 +246,11 @@ static class EnvCommand
 
     static readonly IReadOnlyDictionary<string, string> Denied = new Dictionary<string, string>();
 
-    static IReadOnlyDictionary<string, string> FromTerminal(string program)
+    static IReadOnlyDictionary<string, string> FromTerminal(string program, string directory)
     {
         Console.WriteLine("Windows Hello will ask you to confirm it's you.");
         using var hello = HelloKeyWrapper.Open(create: false);
-        var (variables, _) = EnvironmentStore.Open(hello);
+        var variables = EnvironmentStore.Open(hello).Environment.Resolve(directory);
         if (variables.Count > 0)
             Console.WriteLine($"With {string.Join(", ", variables.Select(v => v.Name))}.");
         // The app isn't running, so tir records the hand-over itself.

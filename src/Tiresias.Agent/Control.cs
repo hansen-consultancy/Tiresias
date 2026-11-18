@@ -9,7 +9,11 @@ namespace Tiresias.Agent;
 /// </summary>
 /// <param name="Lines">For <see cref="Consent"/>: the consent lines to show, as <c>tir</c> would print them. For <see cref="Environment"/>: the command line to run.</param>
 /// <param name="Title">For <see cref="Consent"/>: what is being approved, e.g. <c>tir exec gh</c>. For <see cref="Environment"/>: the program that will run.</param>
-public sealed record ControlRequest(string Op, IReadOnlyList<string>? Lines = null, string? Title = null, int V = ControlRequest.Version)
+/// <param name="Directory">For <see cref="Environment"/> and <see cref="ShellEnvironment"/>: the working directory, which picks the folder sets.</param>
+/// <param name="Shell">For <see cref="ShellEnvironment"/>: the terminal's shell process id. Believed only when it is an ancestor of the caller.</param>
+/// <param name="AskAgain">For <see cref="ShellEnvironment"/>: ask even though the user said no in this terminal.</param>
+public sealed record ControlRequest(string Op, IReadOnlyList<string>? Lines = null, string? Title = null, int V = ControlRequest.Version,
+    string? Directory = null, int? Shell = null, bool AskAgain = false)
 {
     public const int Version = 1;
     public const string Ping = "ping";
@@ -22,6 +26,8 @@ public sealed record ControlRequest(string Op, IReadOnlyList<string>? Lines = nu
     public const string Quit = "quit";
     /// <summary><c>tir run</c>: the sealed environment variables for one process, after the user allows it.</summary>
     public const string Environment = "environment";
+    /// <summary>The terminal hook: the sealed variables for a shell and its directory, asked once per shell session.</summary>
+    public const string ShellEnvironment = "shell-environment";
 }
 
 /// <param name="Approved">For a consent: the user allowed it.</param>
