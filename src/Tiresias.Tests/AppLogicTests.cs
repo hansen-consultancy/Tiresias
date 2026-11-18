@@ -84,6 +84,16 @@ public class FirstRunPlanTests
             Is.EqualTo(FirstRunStep.Done));
     }
 
+    [Test]
+    public void Sealed_secrets_without_a_recovery_key_ask_for_theirs_before_making_a_new_one()
+    {
+        var copied = new SetupFacts(HelloReady: true, RecoverySet: false, Enrolled: false, Skipped: false, SealedWithoutKey: true);
+        Assert.That(FirstRunPlan.Next(FirstRunStep.Hello, copied), Is.EqualTo(FirstRunStep.RecoveryRestore));
+        Assert.That(FirstRunPlan.Start(copied), Is.EqualTo(FirstRunStep.RecoveryRestore));
+        Assert.That(FirstRunPlan.Next(FirstRunStep.RecoveryRestore, copied with { RecoverySet = true }), Is.EqualTo(FirstRunStep.Mode));
+        Assert.That(FirstRunPlan.Next(FirstRunStep.RecoveryRestore, copied with { RecoverySet = true, Enrolled = true }), Is.EqualTo(FirstRunStep.Done));
+    }
+
     [TestCase(true, false, false, false, FirstRunStep.RecoveryShow)]
     [TestCase(false, true, false, false, FirstRunStep.Hello)]
     [TestCase(true, true, false, false, FirstRunStep.Mode)]

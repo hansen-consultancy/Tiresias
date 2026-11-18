@@ -13,8 +13,9 @@ using Tiresias.Vault;
 namespace Tiresias.App.Views;
 
 /// <summary>
-/// First run: Windows Hello, the recovery key (shown once, two groups asked back), the mode (solo
-/// by default), done. Closing it halfway is fine: the next start resumes at the first missing step.
+/// First run: Windows Hello, the recovery key (shown once, two groups asked back; or, where sealed
+/// secrets are already here, the key they were sealed with typed back), the mode (solo by default),
+/// done. Closing it halfway is fine: the next start resumes at the first missing step.
 /// Excluded from screen capture, since it shows the recovery key.
 /// </summary>
 public partial class FirstRunWindow : Window
@@ -37,12 +38,14 @@ public partial class FirstRunWindow : Window
 
     void ShowStep()
     {
-        foreach (var panel in new Panel[] { Welcome, Hello, RecoveryShow, RecoveryConfirm, Mode, RecoveryType, Done })
+        foreach (var panel in new Panel[] { Welcome, Hello, RecoveryShow, RecoveryConfirm, Restore, Mode, RecoveryType, Done })
             panel.Visibility = (FirstRunStep)panel.Tag == model.Step ? Visibility.Visible : Visibility.Collapsed;
         if (model.Step == FirstRunStep.RecoveryConfirm)
             Dispatcher.BeginInvoke(() => FirstGroup.Focus());
         else if (model.Step == FirstRunStep.RecoveryType)
             Dispatcher.BeginInvoke(() => TypedKey.Focus());
+        else if (model.Step == FirstRunStep.RecoveryRestore)
+            Dispatcher.BeginInvoke(() => RestoreKey.Focus());
     }
 
     protected override void OnClosed(EventArgs e)
@@ -60,6 +63,7 @@ public sealed partial class FirstRunViewModel : ObservableObject
     byte[]? recoveryKey;
     IReadOnlyList<string> words = [];
     (int First, int Second) challenge;
+    bool restoreDone;
 
     public FirstRunViewModel()
     {
@@ -113,6 +117,12 @@ public sealed partial class FirstRunViewModel : ObservableObject
 
     [ObservableProperty]
     public partial string TypedKey { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string RestoreKey { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string RestoreResult { get; set; } = "";
 
     [ObservableProperty]
     public partial bool CanReplaceKey { get; set; }
@@ -171,6 +181,9 @@ public sealed partial class FirstRunViewModel : ObservableObject
                     KeyText = "";
                     MoveOn(FirstRunPlan.Next(Step, App.SetupFacts()));
                     break;
+                case FirstRunStep.RecoveryRestore:
+                    await RestoreAsync();
+                    break;
                 case FirstRunStep.Mode:
                     await ChooseModeAsync();
                     break;
@@ -189,7 +202,7 @@ public sealed partial class FirstRunViewModel : ObservableObject
                     break;
             }
         }
-        catch (InvalidOperationException e) when (Step is FirstRunStep.RecoveryType && e is not HelloException)
+        catch (InvalidOperationException e) when (Step is FirstRunStep.RecoveryType or FirstRunStep.RecoveryRestore && e is not HelloException)
         {
             // The key typed is a key, but not this device's: say so in place.
             Message = e.Message;
@@ -226,6 +239,14 @@ public sealed partial class FirstRunViewModel : ObservableObject
         MoveOn(FirstRunStep.RecoveryShow);
     }
 
+    /// <summary>The paper for the sealed secrets here is gone: carry on with a new key, leaving them locked until it turns up.</summary>
+    [RelayCommand]
+    void NewRecoveryKey()
+    {
+        AppLog.Info("first run: new recovery key chosen over restoring the sealed secrets here");
+        MoveOn(FirstRunStep.RecoveryShow);
+    }
+
     [RelayCommand]
     void SkipSolo()
     {
@@ -241,6 +262,50 @@ public sealed partial class FirstRunViewModel : ObservableObject
             Array.Clear(recoveryKey);
         recoveryKey = null;
         KeyText = "";
+    }
+
+    /// <summary>
+    /// Gives the sealed secrets here to this PC's Windows Hello, and this PC takes the typed key as
+    /// its recovery key, held for the run so solo setup needn't ask for it again. Anything the key
+    /// didn't open is listed once before moving on.
+    /// </summary>
+    async Task RestoreAsync()
+    {
+        if (restoreDone)
+        {
+            MoveOn(FirstRunPlan.Next(Step, App.SetupFacts()));
+            return;
+        }
+        var paper = PaperKey.Parse(RestoreKey);
+        if (paper is null)
+        {
+            Message = Text.Get("FirstRun_RecoveryType_Invalid");
+            return;
+        }
+        RestoreSummary summary;
+        try
+        {
+            await Task.Run(() => App.Current.Host.Keys.Unlock(create: true));
+            var hello = App.Current.Host.Keys.Hello!;
+            summary = await Task.Run(() => RecoveryRestore.Run(paper, hello));
+        }
+        catch
+        {
+            Array.Clear(paper);
+            throw;
+        }
+        AppLog.Info($"first run: recovery restore, {summary.Restored} restored, {summary.AlreadyOpen} already open, {summary.NotOpened.Count} not opened");
+        Forget();
+        recoveryKey = paper;
+        RestoreKey = "";
+        App.Current.Refresh();
+        if (summary.NotOpened.Count == 0)
+        {
+            MoveOn(FirstRunPlan.Next(Step, App.SetupFacts()));
+            return;
+        }
+        RestoreResult = RecoveryViewModel.Describe(summary) + Environment.NewLine + Text.Get("FirstRun_RecoveryRestore_Later");
+        restoreDone = true;
     }
 
     async Task ChooseModeAsync()

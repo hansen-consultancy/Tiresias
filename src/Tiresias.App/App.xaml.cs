@@ -30,9 +30,9 @@ public partial class App : Application
 
     internal ConsentPresenter Consent => consent!;
 
-    /// <summary>A window that must not be interrupted (consent, secrets editor, services, first run) is open.</summary>
+    /// <summary>A window that must not be interrupted (consent, secrets editor, services, first run, recovery) is open.</summary>
     internal bool Busy => consent?.Busy == true || windows.ContainsKey(typeof(SecretsWindow)) || windows.ContainsKey(typeof(ServicesWindow))
-        || windows.ContainsKey(typeof(FirstRunWindow));
+        || windows.ContainsKey(typeof(FirstRunWindow)) || windows.ContainsKey(typeof(RecoveryWindow));
 
     internal static new App Current => (App)Application.Current;
 
@@ -161,8 +161,26 @@ public partial class App : Application
         }
     }
 
-    internal static SetupFacts SetupFacts() =>
-        new(HelloKeyWrapper.Exists(), KeyringStore.Settings.RecoveryPublicKey is not null, KeyringStore.Broker is not null, AppSettings.Load().SetupSkipped);
+    internal static SetupFacts SetupFacts()
+    {
+        var recoverySet = KeyringStore.Settings.RecoveryPublicKey is not null;
+        return new(HelloKeyWrapper.Exists(), recoverySet, KeyringStore.Broker is not null, AppSettings.Load().SetupSkipped,
+            SealedWithoutKey: !recoverySet && AnythingSealed());
+    }
+
+    /// <summary>A damaged vault or secrets file must not stop the app starting: the status page reports it.</summary>
+    static bool AnythingSealed()
+    {
+        try
+        {
+            return RecoveryRestore.AnythingSealed();
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidDataException)
+        {
+            AppLog.Error(e, "looking for sealed secrets");
+            return false;
+        }
+    }
 
     internal AgentSnapshot Snapshot() =>
         new(!FirstRunPlan.Needed(SetupFacts()), host!.Keys.IsUnlocked, KeyringStore.Broker is not null, KeyringStore.Tenant is { Solo: true },

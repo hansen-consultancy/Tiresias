@@ -91,11 +91,71 @@
   <data name="Build_DevelopmentCommit" xml:space="preserve">
     <value>{0}, development build {1}</value>
   </data>
+  <data name="FirstRun_RecoveryRestore_Body" xml:space="preserve">
+    <value>This PC already has sealed secrets: copied from another PC, or left by an earlier setup. Windows Hello here can't open them, but the recovery key they were sealed with can. Type it from your paper copy and they open on this PC as before; this PC then uses the same recovery key, so the paper you have keeps covering everything. Spaces and case don't matter.</value>
+  </data>
+  <data name="FirstRun_RecoveryRestore_KeyName" xml:space="preserve">
+    <value>Recovery key the secrets were sealed with</value>
+  </data>
+  <data name="FirstRun_RecoveryRestore_Later" xml:space="preserve">
+    <value>Continue to finish setup. When you find the key those were sealed with, use Restore on the status page.</value>
+  </data>
+  <data name="FirstRun_RecoveryRestore_Lost" xml:space="preserve">
+    <value>I don't have that key</value>
+  </data>
+  <data name="FirstRun_RecoveryRestore_LostBody" xml:space="preserve">
+    <value>You can create a new recovery key and carry on. Secrets you seal from now on are covered by it, but the ones already here stay locked until their own key turns up; the status page offers to restore them whenever it does.</value>
+  </data>
+  <data name="FirstRun_RecoveryRestore_New" xml:space="preserve">
+    <value>Create a new recovery key</value>
+  </data>
+  <data name="FirstRun_RecoveryRestore_Title" xml:space="preserve">
+    <value>Secrets sealed elsewhere</value>
+  </data>
+  <data name="Recovery_Body" xml:space="preserve">
+    <value>Some sealed secrets on this PC don't open with its Windows Hello: they were copied from another PC, or Windows Hello was reset since they were sealed. Type the recovery key they were sealed with. Nothing is decrypted or re-encrypted: each secret gets a copy of its key for this PC's Windows Hello, and keeps its recovery copy. Spaces and case don't matter.</value>
+  </data>
+  <data name="Recovery_Heading" xml:space="preserve">
+    <value>Restore sealed secrets</value>
+  </data>
+  <data name="Recovery_KeyAdopted" xml:space="preserve">
+    <value>This PC now uses this recovery key for new secrets too.</value>
+  </data>
+  <data name="Recovery_KeyName" xml:space="preserve">
+    <value>Recovery key</value>
+  </data>
+  <data name="Recovery_NotOpened" xml:space="preserve">
+    <value>Still locked, sealed with another recovery key: {0}. Restore again with that key.</value>
+  </data>
+  <data name="Recovery_OtherKeyKept" xml:space="preserve">
+    <value>This PC keeps its own recovery key as well, because secrets sealed here since setup need it. Keep both papers.</value>
+  </data>
+  <data name="Recovery_Restore" xml:space="preserve">
+    <value>Restore</value>
+  </data>
+  <data name="Recovery_Result" xml:space="preserve">
+    <value>Restored: {0}. Already opened here: {1}.</value>
+  </data>
+  <data name="Recovery_Services" xml:space="preserve">
+    <value>Services already running pick up restored vault secrets the next time you unlock.</value>
+  </data>
+  <data name="Recovery_WindowTitle" xml:space="preserve">
+    <value>Tiresias - restore with recovery key</value>
+  </data>
   <data name="Status_About" xml:space="preserve">
     <value>About</value>
   </data>
   <data name="Status_Build" xml:space="preserve">
     <value>{0}, from {1}</value>
+  </data>
+  <data name="Status_RestoreBody" xml:space="preserve">
+    <value>Sealed items that don't open with this PC's Windows Hello: {0}. They came from another PC, or Windows Hello was reset. The recovery key they were sealed with gives them back.</value>
+  </data>
+  <data name="Status_RestoreButton" xml:space="preserve">
+    <value>Restore...</value>
+  </data>
+  <data name="Status_RestoreTitle" xml:space="preserve">
+    <value>Some secrets need your recovery key</value>
   </data>
   <data name="Tray_About" xml:space="preserve">
     <value>About Tiresias</value>
@@ -333,7 +393,7 @@ Switch to this copy, {2}, from {3}? The other copy quits first, ending its lease
     <value>Secrets sealed to the old key can't be opened with Hello any more. Your paper recovery key still opens them.</value>
   </data>
   <data name="Problem_HelloCredentialMissing_Next" xml:space="preserve">
-    <value>Keep your recovery key at hand. Re-sealing from it isn't in the app yet; docs/testing-on-windows.md has the current steps.</value>
+    <value>Finish setup again to create a new Windows Hello key. The status page then offers Restore: type your paper recovery key and your sealed secrets open with the new key.</value>
   </data>
   <data name="Problem_HelloUnavailable_Title" xml:space="preserve">
     <value>Windows Hello couldn't be used</value>

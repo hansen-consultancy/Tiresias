@@ -33,7 +33,16 @@ CI and people who prefer it, and it talks to the same agent.
   groups back, then asks for a mode: solo by default, a broker, or user secrets only. It is
   resumable: a closed wizard restarts at the first missing step. A solo setup resumed after the key
   was shown asks for the key to be typed back. If that key is lost and nothing is sealed to it yet,
-  the wizard offers a new one.
+  the wizard offers a new one. Where sealed secrets are already here and no recovery key is stored
+  (files copied from another PC), it asks for the key they were sealed with instead of making a
+  new one, so one paper keeps covering everything.
+- **Restore with the recovery key.** The Windows Hello key can't be copied or backed up: a new PC,
+  a reset TPM or a removed Hello credential gives a new one. Every sealed item also carries a copy
+  of its key for the paper recovery key, so the status page notices items this Hello can't open and
+  offers **Restore**: type the paper key and each item gets a copy for this Hello. Nothing is
+  decrypted or re-encrypted, and the recovery copy stays. `tir recovery restore` does the same. A
+  solo broker's device and identity keys are bound to the old PC's Windows account and are not
+  restored: set solo mode up again there.
 - **Errors** say what happened, why it matters and what to do next, with a button for that next
   step and "Copy details" (no stack trace; that goes to `%LOCALAPPDATA%\Tiresias\app.log`).
 - **Wording:** every string is in `src/Tiresias.App/Strings.resx`, and a test keeps the file and
@@ -42,8 +51,7 @@ CI and people who prefer it, and it talks to the same agent.
 
 **Not built yet:** the Windows service for the solo broker, and the "Move to a broker" wizard. The
 wizard doesn't enrol you with a broker either: use `tir enroll`, which the wizard points to. Other
-gaps: re-sealing secrets with the recovery key after Windows Hello is lost (the problem screen says
-so), the full-JSON editor view, scanning the machine for plaintext secrets, and toasts. winget is
+gaps: the full-JSON editor view, scanning the machine for plaintext secrets, and toasts. winget is
 also not built: install from source.
 
 ## Why the GUI is not optional
@@ -74,6 +82,7 @@ hosts:
 | Activity | not built | window with filters (tenant, service, process, decision) |
 | Health | `tir doctor` | status page, same checks, a "fix" button where it's safe |
 | Enrolment | `tir enroll` + flags | first-run wizard |
+| Restore after Hello is lost | `tir recovery restore` | status page notice, or the first run on a PC with copied secrets |
 
 The CLI becomes a thin client of the agent over the same named pipe, so the two never disagree
 about state. Without the app running, the CLI keeps working standalone, exactly as today.

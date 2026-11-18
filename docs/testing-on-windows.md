@@ -219,10 +219,29 @@ next start, the tray menu offers **Update to ... available - restart to apply**.
 the release notes, then restarts into the new version. Choose it while a consent dialog or the
 secrets editor is open: it asks you to finish that first.
 
+## 8. Restore with the recovery key
+
+Your Windows Hello key can't be copied or backed up, by design. What keeps sealed secrets
+recoverable is the paper key: every sealed item has a copy of its key for it. To try it without
+another PC:
+
+1. Seal something: a vault secret, or a project's user secrets.
+2. In **Settings > Accounts > Sign-in options**, remove your PIN and set it up again (or use a
+   second Windows account and copy `%APPDATA%\Microsoft\UserSecrets` and `%LOCALAPPDATA%\Tiresias`
+   over). The old Hello key is gone; the secrets no longer open.
+3. Start the app. If the Hello credential is gone, setup asks for Windows Hello again.
+4. Unlock, open the status page: a card says some secrets need your recovery key. Choose
+   **Restore...**, type the paper key, and the summary says how many were restored.
+5. The secrets open again. `tir recovery restore` does the same from a terminal.
+
+On a fresh PC with copied files and no recovery key stored yet, the first run asks for the key the
+secrets were sealed with instead of showing a new one. A typo, or the paper from another setup,
+says so in place and changes nothing. A solo broker set up on the old PC has to be set up again:
+its device keys belong to that PC's Windows account.
+
 ## What you can't test yet
 
 These are not built yet (see [desktop-app.md](desktop-app.md#what-is-built)):
 
 - the solo broker as a Windows service;
-- enrolling with a remote broker from the app (use `tir enroll`);
-- re-sealing your secrets from the recovery key after the Windows Hello key is lost.
+- enrolling with a remote broker from the app (use `tir enroll`).
