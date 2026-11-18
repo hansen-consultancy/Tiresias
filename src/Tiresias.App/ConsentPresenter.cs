@@ -44,18 +44,28 @@ sealed class ConsentPresenter(Dispatcher dispatcher) : IUserSecretsConsentPrompt
             Text.Get("Consent_Unlock_Note"),
             AllowSession: false,
             Unlock: true), UserSecretsService.ConsentTimeout, ct);
+        // Cancelled (lock, time out) propagates: the service then says why rather than "unlock first".
         return answer != ConsentAnswer.Deny && await dispatcher.InvokeAsync(unlock).Task.Unwrap();
     }
 
     /// <summary>A placeholder or <c>tir exec</c> approval asked by <c>tir</c>; <c>tir</c> still asks for Windows Hello afterwards.</summary>
-    public async Task<bool> AskPlaceholderAsync(string title, IReadOnlyList<string> lines, string? caller, CancellationToken ct) =>
-        await ShowAsync(new ConsentView(
-            Text.Format("Consent_Placeholder_Heading", title),
-            caller,
-            Text.Get("Consent_Placeholder_ListLabel"),
-            lines,
-            Text.Get("Consent_Placeholder_Note"),
-            AllowSession: false), UserSecretsService.ConsentTimeout, ct) != ConsentAnswer.Deny;
+    public async Task<bool> AskPlaceholderAsync(string title, IReadOnlyList<string> lines, string? caller, CancellationToken ct)
+    {
+        try
+        {
+            return await ShowAsync(new ConsentView(
+                Text.Format("Consent_Placeholder_Heading", title),
+                caller,
+                Text.Get("Consent_Placeholder_ListLabel"),
+                lines,
+                Text.Get("Consent_Placeholder_Note"),
+                AllowSession: false), UserSecretsService.ConsentTimeout, ct) != ConsentAnswer.Deny;
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>The session locked: deny what is open and what waits.</summary>
     public void DenyAll()
@@ -65,6 +75,10 @@ sealed class ConsentPresenter(Dispatcher dispatcher) : IUserSecretsConsentPrompt
         old.Cancel();
     }
 
+    /// <exception cref="OperationCanceledException">
+    /// Nobody answered: the session locked, the time ran out or the caller gave up. Only the Deny button
+    /// returns <see cref="ConsentAnswer.Deny"/>, so the program is told the real reason, not "you declined".
+    /// </exception>
     async Task<ConsentAnswer> ShowAsync(ConsentView view, TimeSpan timeout, CancellationToken ct)
     {
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, session.Token);
@@ -78,13 +92,16 @@ sealed class ConsentPresenter(Dispatcher dispatcher) : IUserSecretsConsentPrompt
         catch (OperationCanceledException)
         {
             Interlocked.Decrement(ref waiting);
-            return ConsentAnswer.Deny;
+            throw;
         }
         try
         {
             var others = Interlocked.Decrement(ref waiting);
             var shown = await dispatcher.InvokeAsync(() => ConsentWindow.AskAsync(view, deadline - DateTimeOffset.Now, others, linked.Token));
-            return await shown;
+            var answer = await shown;
+            if (answer == ConsentAnswer.Deny && (linked.IsCancellationRequested || DateTimeOffset.Now >= deadline))
+                throw new OperationCanceledException(linked.Token);
+            return answer;
         }
         finally
         {

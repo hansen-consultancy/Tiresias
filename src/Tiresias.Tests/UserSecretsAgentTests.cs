@@ -174,6 +174,9 @@ public class UserSecretsServiceTests
         public List<UserSecretsConsentRequest> Shown { get; } = [];
         public TaskCompletionSource? Hold { get; set; }
 
+        /// <summary>The screen went away unanswered (the session locked), as the app reports it.</summary>
+        public bool Vanish { get; set; }
+
         /// <summary>Set to unlock when asked; <c>null</c> keeps the interface's default (decline).</summary>
         public Keys? UnlockWith { get; set; }
         public int UnlockAsked { get; private set; }
@@ -190,6 +193,8 @@ public class UserSecretsServiceTests
         public async Task<ConsentAnswer> AskAsync(UserSecretsConsentRequest request, CancellationToken ct)
         {
             Shown.Add(request);
+            if (Vanish)
+                throw new OperationCanceledException();
             if (Hold is { } hold)
                 await hold.Task.WaitAsync(ct);
             return Answers.Dequeue();
@@ -321,6 +326,20 @@ public class UserSecretsServiceTests
         Assert.That(reply.Status, Is.EqualTo(AgentStatus.Denied));
         Assert.That(reply.Message, Does.Contain("locked"));
         Assert.That(screen.Shown, Is.Empty);
+    }
+
+    [Test]
+    public async Task A_screen_closed_by_a_lock_is_not_reported_as_declined()
+    {
+        File.WriteAllText(FilePath, """{ "A": "1" }""");
+        await Load();
+        screen.Vanish = true;
+
+        var reply = await Load();
+
+        Assert.That(reply.Status, Is.EqualTo(AgentStatus.Denied));
+        Assert.That(reply.Message, Does.Not.Contain("declined"));
+        Assert.That(reply.Message, Does.Contain("locked"));
     }
 
     [Test]
