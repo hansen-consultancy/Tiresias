@@ -76,6 +76,7 @@
         <Button Content="{l:S Status_CopyDetails}" Padding="12,6" Command="{Binding CopyCommand}" />
         <Button Content="{l:S Problem_Action_DataFolder}" Padding="12,6" Margin="8,0,0,0" Command="{Binding OpenFolderCommand}" />
         <Button Content="{l:S Tray_Secrets}" Padding="12,6" Margin="8,0,0,0" Click="OnSecrets" />
+        <Button Content="{l:S Status_Services}" Padding="12,6" Margin="8,0,0,0" Click="OnServices" />
       </StackPanel>
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
         <Button Style="{DynamicResource AccentButtonStyle}" MinWidth="96" Padding="12,6" Content="{l:S Status_RunAgain}"

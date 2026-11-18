@@ -26,6 +26,8 @@ public partial class StatusWindow : Window
 
     void OnSecrets(object sender, RoutedEventArgs e) => App.Current.ShowWindow<SecretsWindow>();
 
+    void OnServices(object sender, RoutedEventArgs e) => App.Current.ShowWindow<ServicesWindow>();
+
     /// <summary>Opens the secrets editor on the row's project: the fix for a user-secrets line.</summary>
     void OnReview(object sender, RoutedEventArgs e)
     {

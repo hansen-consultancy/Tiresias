@@ -28,8 +28,9 @@ public partial class App : Application
 
     internal ConsentPresenter Consent => consent!;
 
-    /// <summary>A window that must not be interrupted (consent, secrets editor, first run) is open.</summary>
-    internal bool Busy => consent?.Busy == true || windows.ContainsKey(typeof(SecretsWindow)) || windows.ContainsKey(typeof(FirstRunWindow));
+    /// <summary>A window that must not be interrupted (consent, secrets editor, services, first run) is open.</summary>
+    internal bool Busy => consent?.Busy == true || windows.ContainsKey(typeof(SecretsWindow)) || windows.ContainsKey(typeof(ServicesWindow))
+        || windows.ContainsKey(typeof(FirstRunWindow));
 
     internal static new App Current => (App)Application.Current;
 

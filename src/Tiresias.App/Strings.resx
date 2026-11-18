@@ -783,6 +783,162 @@ Store them in clear?</value>
     <value>Later</value>
   </data>
   <data name="Update_Busy" xml:space="preserve">
-    <value>Finish what's open first (an approval, the secrets editor or setup), then choose the update in the tray menu again.</value>
+    <value>Finish what's open first (an approval, the secrets editor, the services window or setup), then choose the update in the tray menu again.</value>
+  </data>
+  <data name="Tray_Services" xml:space="preserve">
+    <value>Services for tir exec...</value>
+  </data>
+  <data name="Services_WindowTitle" xml:space="preserve">
+    <value>Services - Tiresias</value>
+  </data>
+  <data name="Services_Heading" xml:space="preserve">
+    <value>Services</value>
+  </data>
+  <data name="Services_StateUnlocked" xml:space="preserve">
+    <value>These are the services tir exec can reach through the broker. Adding one takes effect at its next request; you don't need to lock and unlock.</value>
+  </data>
+  <data name="Services_StateLocked" xml:space="preserve">
+    <value>Tiresias is locked. You can see and remove services; unlock to add one with a new secret.</value>
+  </data>
+  <data name="Services_ListName" xml:space="preserve">
+    <value>Services</value>
+  </data>
+  <data name="Services_ColSlug" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="Services_ColUpstream" xml:space="preserve">
+    <value>Address</value>
+  </data>
+  <data name="Services_ColGrants" xml:space="preserve">
+    <value>Grants</value>
+  </data>
+  <data name="Services_Grant" xml:space="preserve">
+    <value>{0}: {1} on {2} (secret {3})</value>
+  </data>
+  <data name="Services_GrantElevated" xml:space="preserve">
+    <value>, needs elevation</value>
+  </data>
+  <data name="Services_GrantSecretMissing" xml:space="preserve">
+    <value>, secret missing from the vault: add the service again to type it</value>
+  </data>
+  <data name="Services_None" xml:space="preserve">
+    <value>No services yet. Choose Add to set one up.</value>
+  </data>
+  <data name="Services_Unreadable" xml:space="preserve">
+    <value>The vault file can't be read. Open the data folder from the status page and check vault.json.</value>
+  </data>
+  <data name="Services_Add" xml:space="preserve">
+    <value>Add...</value>
+  </data>
+  <data name="Services_Remove" xml:space="preserve">
+    <value>Remove</value>
+  </data>
+  <data name="Services_RemoveConfirmTitle" xml:space="preserve">
+    <value>Remove the service?</value>
+  </data>
+  <data name="Services_RemoveConfirmBody" xml:space="preserve">
+    <value>Remove {0}? Programs can no longer reach it through Tiresias. Its secret stays in the vault, so you can add the service again without typing it.</value>
+  </data>
+  <data name="Services_Removed" xml:space="preserve">
+    <value>Removed {0}. Its secret is still in the vault.</value>
+  </data>
+  <data name="Services_AddHeading" xml:space="preserve">
+    <value>Add a service</value>
+  </data>
+  <data name="Services_Slug" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="Services_SlugHint" xml:space="preserve">
+    <value>Used in tir exec &lt;name&gt;. Lower-case letters, digits and dashes, like httpbin.</value>
+  </data>
+  <data name="Services_Upstream" xml:space="preserve">
+    <value>Address</value>
+  </data>
+  <data name="Services_UpstreamHint" xml:space="preserve">
+    <value>Where requests go, starting with https://, like https://api.example.com.</value>
+  </data>
+  <data name="Services_Secret" xml:space="preserve">
+    <value>Secret</value>
+  </data>
+  <data name="Services_SecretHint" xml:space="preserve">
+    <value>Pick a secret already in the vault, or leave empty to create one named after the service.</value>
+  </data>
+  <data name="Services_SecretExists" xml:space="preserve">
+    <value>Uses {0}, already in the vault. Nothing to type.</value>
+  </data>
+  <data name="Services_SecretNew" xml:space="preserve">
+    <value>{0} isn't in the vault yet: type its value below.</value>
+  </data>
+  <data name="Services_Value" xml:space="preserve">
+    <value>Secret value</value>
+  </data>
+  <data name="Services_ValueHint" xml:space="preserve">
+    <value>The whole Authorization header, like Bearer sk-.... It is sealed with Windows Hello and never shown again.</value>
+  </data>
+  <data name="Services_ValueEmpty" xml:space="preserve">
+    <value>Type the secret's value, the whole Authorization header.</value>
+  </data>
+  <data name="Services_ValueLocked" xml:space="preserve">
+    <value>Unlock first: a new secret is sealed with Windows Hello.</value>
+  </data>
+  <data name="Services_Methods" xml:space="preserve">
+    <value>HTTP methods</value>
+  </data>
+  <data name="Services_MethodsHint" xml:space="preserve">
+    <value>Separated by commas, like GET, POST. GET when empty.</value>
+  </data>
+  <data name="Services_Allow" xml:space="preserve">
+    <value>Allowed paths</value>
+  </data>
+  <data name="Services_AllowHint" xml:space="preserve">
+    <value>One regular expression per line, matched against path and query.</value>
+  </data>
+  <data name="Services_AllowEveryPath" xml:space="preserve">
+    <value>Empty: every path is allowed. To narrow it, type one regular expression per line, like ^/v1/models$.</value>
+  </data>
+  <data name="Services_Elevation" xml:space="preserve">
+    <value>Needs elevation</value>
+  </data>
+  <data name="Services_ElevationHint" xml:space="preserve">
+    <value>Each use must first be confirmed with Windows Hello (tir elevate), for a time.</value>
+  </data>
+  <data name="Services_Save" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="Services_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="Services_Added" xml:space="preserve">
+    <value>Added {0}. Programs started with tir exec {0} can use it now.</value>
+  </data>
+  <data name="Services_AddedEveryPath" xml:space="preserve">
+    <value>Added {0}, with every path allowed. To narrow it, remove it and add it again with allowed paths.</value>
+  </data>
+  <data name="Services_ProblemSlugInvalid" xml:space="preserve">
+    <value>Use lower-case letters, digits and dashes, like httpbin or github-api.</value>
+  </data>
+  <data name="Services_ProblemSlugTaken" xml:space="preserve">
+    <value>A service named {0} exists already. Pick another name, or remove that one first.</value>
+  </data>
+  <data name="Services_ProblemUpstreamInvalid" xml:space="preserve">
+    <value>That isn't a web address. Type the full address, like {0}.</value>
+  </data>
+  <data name="Services_ProblemUpstreamNotHttps" xml:space="preserve">
+    <value>Plain http would send the secret unencrypted. Use {0} instead (http is only for localhost).</value>
+  </data>
+  <data name="Services_ProblemSecretInvalid" xml:space="preserve">
+    <value>Use lower-case letters, digits and dashes, or leave it empty to use the service's name.</value>
+  </data>
+  <data name="Services_ProblemGrantInvalid" xml:space="preserve">
+    <value>The grant name must be lower-case letters, digits and dashes.</value>
+  </data>
+  <data name="Services_ProblemMethodInvalid" xml:space="preserve">
+    <value>{0} isn't an HTTP method. Type methods like GET, POST.</value>
+  </data>
+  <data name="Services_ProblemPatternInvalid" xml:space="preserve">
+    <value>{0} isn't a valid regular expression ({1}). Fix it, like ^/v1/models$.</value>
+  </data>
+  <data name="Status_Services" xml:space="preserve">
+    <value>Services...</value>
   </data>
 </root>

@@ -32,6 +32,7 @@ sealed class TrayController : IDisposable
         lockItem.Click += async (_, _) => await app.LockAsync();
         setup.Click += (_, _) => app.ShowWindow<FirstRunWindow>();
         var secrets = Item("Tray_Secrets", () => app.ShowWindow<SecretsWindow>());
+        var services = Item("Tray_Services", () => app.ShowWindow<ServicesWindow>());
         var activity = Item("Tray_Activity", () => app.ShowWindow<ActivityWindow>());
         var status = Item("Tray_Status", () => app.ShowWindow<StatusWindow>());
         var quit = Item("Tray_Quit", app.Quit);
@@ -47,6 +48,7 @@ sealed class TrayController : IDisposable
             icon.ContextMenu.Items.Add(item);
         icon.ContextMenu.Items.Add(new Separator());
         icon.ContextMenu.Items.Add(secrets);
+        icon.ContextMenu.Items.Add(services);
         icon.ContextMenu.Items.Add(activity);
         icon.ContextMenu.Items.Add(status);
         icon.ContextMenu.Items.Add(updateSeparator);

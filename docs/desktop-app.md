@@ -70,6 +70,7 @@ hosts:
 | Placeholder consent (`tir grant`, `tir exec`) | terminal y/N | dialog; the CLI asks the agent |
 | Unlock / lock | `tir unlock`, `tir lock` | tray menu, plus the Hello prompt |
 | Secrets editing | `tir vault add` | capture-excluded editor: the full JSON view, like App Service |
+| Services for `tir exec` | `tir service add`, `list`, `remove` | Services window: list, add (same checks as the CLI), remove |
 | Activity | not built | window with filters (tenant, service, process, decision) |
 | Health | `tir doctor` | status page, same checks, a "fix" button where it's safe |
 | Enrolment | `tir enroll` + flags | first-run wizard |

@@ -157,6 +157,14 @@ Leave out `--allow` and every path is allowed; `tir` says so. `tir service list`
 configured, never a value, and `tir service remove httpbin` takes the service out but keeps its
 secret.
 
+Or do the same in the app: **Services for tir exec...** in the tray menu (or **Services...** at
+the bottom of the status page), then **Add...**. Type `httpbin` as the name,
+`https://httpbin.org` as the address and `^/headers$` under allowed paths. The secret field
+says `httpbin` isn't in the vault yet, so type `Bearer example-token` as its value, then
+**Save**. A mistake (a plain `http://` address, a broken pattern, a name already used) is
+explained under its field, in the same terms `tir` uses. **Remove** asks first and keeps the
+secret.
+
 With the app running and unlocked, there is nothing else to do: the solo broker notices the vault
 changed at its next request and seals the new secret into the open lease, without a lock and unlock.
 Run a command with a placeholder in its environment:

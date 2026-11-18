@@ -16,6 +16,10 @@ its section below.
   broken pattern with what to type instead. `tir service list` and `tir service remove` go with
   it. In solo mode the change works from the next request, with no lock and unlock, and a vault
   file that can't be read leaves the broker on its previous settings.
+- The desktop app has a **Services** window (tray menu, and the status page) that lists the
+  services `tir exec` can reach, adds one with the same checks as `tir service add` (explained
+  beside the field that needs fixing), and removes one while keeping its secret. A new secret's
+  value is typed into a hidden field in a window that stays out of screen shares.
 - **Tiresias desktop app** for Windows 11, in the notification area. It unlocks with Windows Hello
   and shows whether you are locked or unlocked, and until when. It asks before anything gets a
   secret, in a dialog that shows which program is asking and which keys it gets, never their
