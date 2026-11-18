@@ -10,17 +10,18 @@ public interface IUserSecretsAgent
     AgentReply? TryLoad(AgentRequest request);
 }
 
-sealed class NamedPipeUserSecretsAgent : IUserSecretsAgent
+/// <param name="pipeName">The agent's pipe; tests pass their own so they never meet a real agent.</param>
+sealed class NamedPipeUserSecretsAgent(string? pipeName = null) : IUserSecretsAgent
 {
     /// <summary>Short: an absent agent is the normal case on a colleague's machine and must not slow startup.</summary>
     static readonly TimeSpan ConnectTimeout = TimeSpan.FromMilliseconds(300);
 
     /// <summary>Long: the reply waits for the user to read a consent screen and touch Hello.</summary>
-    static readonly TimeSpan ReplyTimeout = TimeSpan.FromMinutes(3);
+    static readonly TimeSpan ReplyTimeout = TimeSpan.FromMinutes(5);
 
     public AgentReply? TryLoad(AgentRequest request)
     {
-        using var pipe = new NamedPipeClientStream(".", AgentWire.PipeName, PipeDirection.InOut,
+        using var pipe = new NamedPipeClientStream(".", pipeName ?? AgentWire.PipeName, PipeDirection.InOut,
             PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
         try
         {

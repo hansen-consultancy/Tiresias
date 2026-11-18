@@ -111,6 +111,14 @@ sealed class ProtectedUserSecretsSource(string userSecretsId, string directory, 
 sealed class ProtectedUserSecretsProvider(string userSecretsId, string directory, bool optional, IUserSecretsAgent agent)
     : JsonStreamConfigurationProvider(new JsonStreamConfigurationSource())
 {
+    /// <summary>
+    /// Where the one-line notice goes when Tiresias provided the secrets: stderr, so it never mixes
+    /// into an app's own output. Configuration loads before logging exists, so there is no ILogger.
+    /// </summary>
+    internal static TextWriter Notices { get; set; } = Console.Error;
+
+    bool fromAgent;
+
     public override void Load()
     {
         var json = Fetch();
@@ -121,6 +129,8 @@ sealed class ProtectedUserSecretsProvider(string userSecretsId, string directory
         }
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
         Load(stream);
+        if (fromAgent)
+            Notices.WriteLine($"Tiresias: user secrets '{userSecretsId}' provided ({(Data.Count == 1 ? "1 key" : $"{Data.Count} keys")}).");
     }
 
     string? Fetch()
@@ -135,9 +145,11 @@ sealed class ProtectedUserSecretsProvider(string userSecretsId, string directory
         switch (reply?.Status)
         {
             case AgentStatus.Ok:
+                fromAgent = true;
                 return reply.Json;
             case AgentStatus.Denied:
-                throw new InvalidOperationException($"Access to user secrets '{userSecretsId}' was denied on the tir consent screen.");
+                throw new InvalidOperationException($"Access to user secrets '{userSecretsId}' was denied by Tiresias: "
+                    + (reply.Message ?? "declined on the consent screen."));
             case AgentStatus.Error:
                 throw new InvalidOperationException($"The tir agent could not load user secrets '{userSecretsId}': {reply.Message}");
         }
@@ -148,7 +160,7 @@ sealed class ProtectedUserSecretsProvider(string userSecretsId, string directory
         {
             SecretsFileKind.Plain => text,
             SecretsFileKind.Sealed => throw new InvalidOperationException(
-                $"User secrets '{userSecretsId}' are protected by tir and no tir agent is running. Start it with 'tir agent'."),
+                $"User secrets '{userSecretsId}' are protected by tir and the Tiresias agent is not running. Start the Tiresias app (or run 'tir agent'), then start this app again."),
             _ when optional => null,
             _ => throw new InvalidDataException($"'{path}' is not valid JSON."),
         };

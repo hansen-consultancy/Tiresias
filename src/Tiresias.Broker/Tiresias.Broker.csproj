@@ -7,6 +7,7 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <RootNamespace>Tiresias.Broker</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,7 +21,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Solo mode identifies the loopback caller the way the forwarder does: the same code, linked. -->
+    <Compile Include="..\Tiresias.Forwarder\ClientProcess.cs" Link="ClientProcess.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="Tiresias.Tests" />
+    <!-- Solo mode reads the broker identity before the in-process broker starts, to pin it. -->
+    <InternalsVisibleTo Include="Tiresias.Agent" />
   </ItemGroup>
 
 </Project>

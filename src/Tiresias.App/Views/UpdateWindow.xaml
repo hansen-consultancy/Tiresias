@@ -1,0 +1,26 @@
+<Window x:Class="Tiresias.App.Views.UpdateWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:Tiresias.App"
+        Title="{l:S Update_WindowTitle}"
+        Width="560" Height="480" MinWidth="420" MinHeight="320"
+        WindowStartupLocation="CenterScreen"
+        Icon="pack://application:,,,/Assets/tiresias.ico">
+  <Grid Margin="{StaticResource PagePadding}">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <TextBlock x:Name="Heading" Grid.Row="0" Style="{StaticResource TitleText}" AutomationProperties.HeadingLevel="Level1" />
+    <TextBlock Grid.Row="1" Text="{l:S Update_Body}" Style="{StaticResource BodyText}" />
+    <TextBox x:Name="Notes" Grid.Row="2" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+             AutomationProperties.Name="{l:S Update_NotesName}" />
+    <StackPanel Grid.Row="3" Style="{StaticResource ButtonRow}">
+      <Button Style="{DynamicResource AccentButtonStyle}" MinWidth="120" Padding="12,6" Content="{l:S Update_Restart}"
+              IsDefault="True" Click="OnRestart" />
+      <Button Style="{StaticResource RowButton}" Content="{l:S Update_Later}" IsCancel="True" />
+    </StackPanel>
+  </Grid>
+</Window>

@@ -31,6 +31,7 @@ tools run as you. Tiresias moves those secrets behind three things:
 
 | Piece | What it is |
 |---|---|
+| Tiresias app | The Windows tray app: unlock with Windows Hello, approve requests in a dialog, edit user secrets, see activity and status. In solo mode it also hosts the broker |
 | `tir` (Keyring) | The CLI and agent on your workstation: vault, unlock, consent, `tir exec`, `tir doctor` |
 | Broker | Holds the ciphertext. During a lease it injects credentials into HTTP, SQL Server and RavenDB traffic |
 | Forwarder | A loopback relay on your workstation that tells the broker which local process is calling |
@@ -45,14 +46,37 @@ tools run as you. Tiresias moves those secrets behind three things:
 
 Your existing `builder.Configuration.AddUserSecrets<Program>()` and
 `WebApplication.CreateBuilder(args)` calls are rerouted at compile time by a C# interceptor. The
-library side is done. The agent's side (consent prompt, sealing on first load, `tir secrets`) is
-still being built.
+agent (the tray app, or `tir agent` in a terminal) answers on a per-user named pipe.
 
 - **With the agent running:** the first load converts `secrets.json` into a sealed envelope that
   is still valid JSON. After that, a consent prompt shows the requesting executable and the
   secret *keys* (never values) before the app gets them.
+- **While locked:** for a sealed file the app offers to unlock with Windows Hello, then asks as
+  usual (`tir agent` refuses it with a message saying to unlock); a plaintext one is
+  served unchanged and sealed on the first load after you unlock. "Allow for this session" lasts
+  until you lock (or 12 hours).
+- **Editing:** `tir secrets list | set <key> | remove <key>` in the project folder, or the app's
+  editor. No command prints a value or writes the file back in clear.
 - **Without the agent:** a colleague who doesn't use Tiresias keeps the stock plaintext
   behaviour. A sealed file fails loudly instead of silently loading nothing.
+
+## Solo mode: no server needed
+
+`tir solo init` sets Tiresias up on one PC with no VPS. The broker runs inside the agent (the tray
+app, or `tir agent`) on `127.0.0.1:7780` and identifies the calling process from the loopback
+connection, so no forwarder is needed. The trust chain has this one device, its genesis
+co-signed by a key derived from the paper recovery key. Encryption at rest, Hello unlock,
+leases, placeholders, consent and audit all work, offline too. What you give up: requests leave
+from your own connection (no fixed IP to allow-list), and the secrets stay on the same machine
+as your agents, with no protection from code running as admin. `tir doctor` lists these every
+time. The broker shares the agent's process for now; running it as a Windows service under its
+own account is planned (see [docs/desktop-app.md](docs/desktop-app.md#solo-mode)).
+
+Services are added with one command, for example
+`tir service add httpbin --upstream https://httpbin.org --allow '^/headers$'`, which asks for the
+secret's value when the vault doesn't have it yet. `tir service list` and `tir service remove`
+do the rest. The solo broker picks vault changes up at its next request, without a lock and
+unlock.
 
 ## Trust model in one paragraph
 
@@ -63,6 +87,24 @@ and so does the Keyring before it hands the broker any key. A control plane (an 
 service) only relays chains, approves known locations and collects audit summaries. It is never
 a root of trust.
 
+## Install from source
+
+There is no installer yet. On Windows 11, with Windows Hello set up and the .NET 11 SDK plus the
+.NET 10 runtime installed:
+
+```powershell
+git clone https://github.com/hansen-consultancy/Tiresias.git
+cd Tiresias
+dotnet publish src/Tiresias.App -c Release -o "$env:LOCALAPPDATA\Programs\Tiresias\app"
+dotnet publish src/Tiresias.Keyring -c Release -o "$env:LOCALAPPDATA\Programs\Tiresias\cli"
+& "$env:LOCALAPPDATA\Programs\Tiresias\app\Tiresias.exe"
+```
+
+The first run sets up Windows Hello, your paper recovery key and solo mode. Add the `cli` folder
+to your PATH for `tir`. [docs/testing-on-windows.md](docs/testing-on-windows.md) walks through
+everything from there: a sample app's protected user secrets, the consent dialog, `tir exec`, and
+activity.
+
 ## Building
 
 ```bash
@@ -70,8 +112,11 @@ dotnet build Tiresias.slnx
 dotnet test src/Tiresias.Tests/Tiresias.Tests.csproj
 ```
 
-You need the .NET 11 SDK, plus the .NET 10 runtime for the `net10.0` libraries. The Keyring
-builds on Windows only.
+You need the .NET 11 SDK, plus the .NET 10 runtime for the `net10.0` libraries. The app and the
+Keyring build on Windows only; the tests run anywhere.
+
+What changed in each release: [CHANGELOG.md](CHANGELOG.md). How releases are made and signed:
+[docs/releasing.md](docs/releasing.md).
 
 ## License
 

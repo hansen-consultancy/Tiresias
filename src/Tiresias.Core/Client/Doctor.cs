@@ -13,7 +13,8 @@ public enum DoctorStatus
     Fail,
 }
 
-public sealed record DoctorCheck(string Name, DoctorStatus Status, string Detail);
+/// <param name="UserSecretsId">Set on a user-secrets line, so a UI can open that project to fix it.</param>
+public sealed record DoctorCheck(string Name, DoctorStatus Status, string Detail, string? UserSecretsId = null);
 
 /// <summary>What the vault file says about recoverability: which secrets lack a Hello or a recovery wrap.</summary>
 public sealed record DoctorVault(int Secrets, IReadOnlyList<string> WithoutHello, IReadOnlyList<string> WithoutRecovery);
@@ -30,6 +31,9 @@ public interface IDoctorProbe
     bool Enrolled { get; }
     bool HasDeviceKey { get; }
     bool RecoveryKeySet { get; }
+
+    /// <summary>Enrolled with the broker this device hosts itself (solo mode) rather than a remote one.</summary>
+    bool Solo => false;
 
     /// <summary><c>null</c> when the vault file is missing.</summary>
     DoctorVault? Vault { get; }
@@ -64,21 +68,36 @@ public static partial class Doctor
             Vault(probe.Vault),
         };
 
+        if (probe.Solo)
+            checks.AddRange(SoloTradeOffs);
         if (probe.Enrolled)
             checks.Add(await probe.BrokerStatusAsync() switch
             {
+                null when probe.Solo => new("broker reachable", DoctorStatus.Fail, "no answer: the broker runs inside the Tiresias app; start the app (or tir agent)"),
                 null => new("broker reachable", DoctorStatus.Fail, "no answer (NetBird down, or the broker stopped)"),
                 401 => new("broker reachable", DoctorStatus.Ok, "answers and refuses unsigned calls"),
                 var status => new("broker reachable", DoctorStatus.Warn, $"answered {status} to an unsigned call; expected 401"),
             });
-        checks.Add(await probe.ForwarderListeningAsync()
-            ? new("forwarder", DoctorStatus.Ok, "listening on loopback")
-            : new("forwarder", DoctorStatus.Warn, "not running: placeholders work only against the broker directly"));
+        if (probe.Solo)
+            checks.Add(new("forwarder", DoctorStatus.Ok, "not needed: the solo broker identifies callers itself"));
+        else
+            checks.Add(await probe.ForwarderListeningAsync()
+                ? new("forwarder", DoctorStatus.Ok, "listening on loopback")
+                : new("forwarder", DoctorStatus.Warn, "not running: placeholders work only against the broker directly"));
 
         checks.AddRange(probe.UserSecretsFiles().Select(UserSecretsFile).OfType<DoctorCheck>());
         checks.AddRange(probe.Projects().Select(Project).OfType<DoctorCheck>());
         return checks;
     }
+
+    /// <summary>What solo mode gives up next to a remote broker (docs/desktop-app.md), stated on every run.</summary>
+    static readonly DoctorCheck[] SoloTradeOffs =
+    [
+        new("mode", DoctorStatus.Ok, "Solo: the broker runs on this device; encryption, leases, placeholders, consent and audit all apply"),
+        new("egress", DoctorStatus.Warn, "Solo: requests leave from your own connection, so there is no fixed IP for upstreams to allow-list"),
+        new("isolation", DoctorStatus.Warn, "Solo: secrets live on the same machine as your agents and are not protected from code running as admin"),
+        new("broker process", DoctorStatus.Warn, "Broker runs inside the app: install the service for process isolation (not built yet)"),
+    ];
 
     static DoctorCheck Vault(DoctorVault? vault)
     {
@@ -92,17 +111,26 @@ public static partial class Doctor
         return new(name, DoctorStatus.Ok, $"{vault.Secrets} secrets, all with Hello and recovery wraps");
     }
 
-    /// <returns><c>null</c> for an empty file or one that is sealed and clean: nothing to report per file.</returns>
+    /// <returns><c>null</c> for an empty file, one without keys, or one that is sealed and clean: nothing to report.</returns>
+    /// <remarks>
+    /// A plaintext file is a warning, not a failure: it is what .NET does by default, the app works,
+    /// and sealing it breaks any app that doesn't use Tiresias.Extensions.Configuration yet.
+    /// </remarks>
     static DoctorCheck? UserSecretsFile(DoctorFile file)
     {
-        var name = $"user secrets {file.Path}";
+        // The folder name is the UserSecretsId. Split on both separators: the probe may hand over either.
+        var parts = file.Path.Split(['/', '\\'],StringSplitOptions.RemoveEmptyEntries);
+        var id = parts.Length >= 2 ? parts[^2] : file.Path;
+        var name = $"user secrets {id}";
         switch (SecretsFile.Classify(file.Text))
         {
             case SecretsFileKind.Plain:
                 var keys = UserSecretsVault.FlattenKeys(Parse(file.Text!)).Count;
-                return new(name, DoctorStatus.Fail, $"plaintext, {keys} key(s) readable by anything running as you; run the app once with Tiresias.Extensions.Configuration to seal it");
+                return keys == 0
+                    ? null
+                    : new(name, DoctorStatus.Warn, $"in plain text: {Keys(keys)} any program running as you can read. Seal it once the project uses Tiresias.Extensions.Configuration: run the app once, or use Seal now in the secrets editor", id);
             case SecretsFileKind.Invalid:
-                return new(name, DoctorStatus.Fail, "not valid JSON; apps reading it will fail at startup");
+                return new(name, DoctorStatus.Fail, "not valid JSON; apps reading it will fail at startup", id);
             case SecretsFileKind.Sealed:
                 JsonObject? plain;
                 try
@@ -111,11 +139,11 @@ public static partial class Doctor
                 }
                 catch (Exception e) when (e is InvalidDataException or FormatException or JsonException or InvalidOperationException)
                 {
-                    return new(name, DoctorStatus.Fail, $"sealed envelope unreadable ({e.Message})");
+                    return new(name, DoctorStatus.Fail, $"sealed envelope unreadable ({e.Message})", id);
                 }
                 return plain is null
                     ? null
-                    : new(name, DoctorStatus.Warn, $"sealed, but {UserSecretsVault.FlattenKeys(plain).Count} plaintext key(s) were added beside it; they are sealed on the next run");
+                    : new(name, DoctorStatus.Warn, $"sealed, but {UserSecretsVault.FlattenKeys(plain).Count} plaintext key(s) were added beside it; they are sealed on the next run", id);
             default:
                 return null;
         }
@@ -129,6 +157,8 @@ public static partial class Doctor
             ? null
             : new($"project {file.Path}", DoctorStatus.Warn, "sets <UserSecretsId> but doesn't reference Tiresias.Extensions.Configuration, so its secrets.json stays plaintext");
     }
+
+    static string Keys(int count) => count == 1 ? "1 key" : $"{count} keys";
 
     static JsonNode? Parse(string text) =>
         JsonNode.Parse(text, documentOptions: new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });

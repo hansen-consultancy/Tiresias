@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Tiresias.Access;
 using Tiresias.Client;
+using Tiresias.Agent;
 using Tiresias.Vault;
 
 namespace Tiresias.Keyring;
@@ -12,6 +13,7 @@ namespace Tiresias.Keyring;
 /// </summary>
 static class Exec
 {
+    /// <summary>Where placeholders are sent: the forwarder, which relays to a remote broker. A solo broker is called directly.</summary>
     static readonly Uri Forwarder = new("http://127.0.0.1:7781");
 
     public static async Task<int> RunAsync(CommandLine args)
@@ -34,20 +36,18 @@ static class Exec
         if (problems.Length > 0)
             return Fail(string.Join(Environment.NewLine, problems));
 
-        Console.WriteLine($"Run: {string.Join(' ', args.Rest)}");
+        var lines = new List<string> { $"Run: {string.Join(' ', args.Rest)}" };
         foreach (var (service, request) in requests)
-        {
-            foreach (var line in Consent.Describe(request, service))
-                Console.WriteLine("  " + line);
-            Console.WriteLine();
-        }
+            lines.AddRange(Consent.Describe(request, service).Select(line => "  " + line).Append(""));
         foreach (var service in services.Where(ExecPlan.IsGitHubApp))
-            Console.WriteLine($"  {service.Slug}: a GitHub App installation token in GH_TOKEN (valid up to 1 h)");
-        if (!Terminal.Confirm("Approve?"))
+            lines.Add($"  {service.Slug}: a GitHub App installation token in GH_TOKEN (valid up to 1 h)");
+        foreach (var line in lines)
+            Console.WriteLine(line);
+        if (!await AppLink.ApproveAsync($"tir exec {Path.GetFileName(args.Rest[0])}", lines))
             return Fail("Not approved.");
         HelloKeyWrapper.ConfirmPresence($"exec\n{string.Join(',', slugs)}\n{consumer}");
 
-        using var client = Commands.Client(KeyringStore.RequireBroker(), settings);
+        using var client = BrokerClient.For(await Commands.ReachableBrokerAsync());
         var credentials = new List<ExecCredential>();
         var minted = new List<string>();
         try
@@ -68,7 +68,7 @@ static class Exec
             var start = new ProcessStartInfo(args.Rest[0]) { UseShellExecute = false };
             foreach (var arg in args.Rest.Skip(1))
                 start.ArgumentList.Add(arg);
-            foreach (var (name, value) in ExecPlan.Environment(credentials, Forwarder))
+            foreach (var (name, value) in ExecPlan.Environment(credentials, KeyringStore.Tenant is { Solo: true } ? SoloBroker.Url : Forwarder))
                 start.Environment[name] = value;
             using var child = Process.Start(start) ?? throw new InvalidOperationException($"Could not start {args.Rest[0]}.");
             await child.WaitForExitAsync();

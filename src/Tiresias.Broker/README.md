@@ -25,6 +25,13 @@ Design: see the repository's design document.
 10. **Point the tool at it:** `LLM_API_BASE=http://127.0.0.1:7781/svc/llm` and `LLM_API_TOKEN=tirph_…`.
 11. **Writes behind elevation:** `tir elevate llm admin --for 15m`. `tir lock` ends the lease, and so do locking, sleeping or logging off while `tir agent` runs.
 
+## Solo mode (in-process)
+
+`tir solo init` and the agent host this broker inside the agent on `127.0.0.1:7780` instead (see
+the main README). The one setting only solo mode uses is `Broker:IdentifyLoopbackCaller`: on the
+placeholder routes the broker then drops every client-sent `X-Tiresias-*` header and records the
+local calling process itself, from the loopback connection's TCP table, as the forwarder would.
+
 ## Forwarder service account
 
 Run the forwarder as its own Windows service account, not as the admin. Then malware running as the admin can't

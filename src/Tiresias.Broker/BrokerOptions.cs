@@ -32,6 +32,13 @@ public sealed class BrokerOptions
 
     public int SqlTimeoutSeconds { get; set; } = 30;
 
+    /// <summary>
+    /// Solo mode: the broker runs on the workstation and listens on loopback, so it identifies the
+    /// calling process from the connection itself, as the forwarder otherwise does. Any
+    /// <c>X-Tiresias-*</c> header a client sends is dropped first, so a client can't speak for it.
+    /// </summary>
+    public bool IdentifyLoopbackCaller { get; set; }
+
     /// <summary>RFC 3161 TSA that anchors the audit log's head (e.g. <c>http://timestamp.digicert.com</c>). Unset, nothing is anchored.</summary>
     public string? TimestampAuthorityUrl { get; set; }
 }

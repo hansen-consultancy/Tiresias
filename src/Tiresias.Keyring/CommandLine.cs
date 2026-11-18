@@ -8,7 +8,7 @@ namespace Tiresias.Keyring;
 sealed class CommandLine
 {
     readonly List<string> positional = [];
-    readonly Dictionary<string, string?> options = new(StringComparer.Ordinal);
+    readonly Dictionary<string, List<string?>> options = new(StringComparer.Ordinal);
 
     public CommandLine(string[] args)
     {
@@ -22,9 +22,9 @@ sealed class CommandLine
             if (!args[i].StartsWith("--", StringComparison.Ordinal))
                 positional.Add(args[i]);
             else if (i + 1 < args.Length && !args[i + 1].StartsWith("--", StringComparison.Ordinal))
-                options[args[i]] = args[++i];
+                Add(args[i], args[++i]);
             else
-                options[args[i]] = null;
+                Add(args[i], null);
         }
     }
 
@@ -35,12 +35,23 @@ sealed class CommandLine
 
     public string Require(int index, string name) => At(index) ?? throw new UsageException($"Missing <{name}>.");
 
-    public string? Option(string name) => options.GetValueOrDefault(name);
+    /// <summary>The option's value; the last one when it was given more than once.</summary>
+    public string? Option(string name) => options.GetValueOrDefault(name)?[^1];
+
+    /// <summary>Every value of an option that may repeat, e.g. <c>--method GET --method POST</c>.</summary>
+    public IReadOnlyList<string> Options(string name) => options.GetValueOrDefault(name)?.OfType<string>().ToArray() ?? [];
 
     public string Require(string name) =>
         Option(name) is { Length: > 0 } value ? value : throw new UsageException($"Missing {name} <value>.");
 
     public bool Flag(string name) => options.ContainsKey(name);
+
+    void Add(string name, string? value)
+    {
+        if (!options.TryGetValue(name, out var values))
+            options[name] = values = [];
+        values.Add(value);
+    }
 }
 
 sealed class UsageException(string message) : Exception(message);
@@ -115,34 +126,5 @@ static class Terminal
     {
         Console.Write($"{question} [y/N] ");
         return Console.ReadLine()?.Trim().Equals("y", StringComparison.OrdinalIgnoreCase) == true;
-    }
-
-    /// <summary>RFC 4648 base32 in groups of four, for writing a key on paper.</summary>
-    public static string PaperBase32(ReadOnlySpan<byte> bytes)
-    {
-        const string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-        var sb = new StringBuilder();
-        int buffer = 0, bits = 0, written = 0;
-        foreach (var b in bytes)
-        {
-            buffer = (buffer << 8) | b;
-            bits += 8;
-            while (bits >= 5)
-            {
-                Append(alphabet[(buffer >> (bits - 5)) & 31]);
-                bits -= 5;
-            }
-        }
-        if (bits > 0)
-            Append(alphabet[(buffer << (5 - bits)) & 31]);
-        return sb.ToString();
-
-        void Append(char c)
-        {
-            if (written > 0 && written % 4 == 0)
-                sb.Append(written % 32 == 0 ? '\n' : ' ');
-            sb.Append(c);
-            written++;
-        }
     }
 }

@@ -1,27 +1,19 @@
-using System.Text.Json;
 using System.Text.RegularExpressions;
 using Tiresias.Access;
+using Tiresias.Agent;
 using Tiresias.Client;
-using Tiresias.Crypto;
-using Tiresias.Transport;
-using Tiresias.Trust;
 using Tiresias.Vault;
-using NSec.Cryptography;
 
 namespace Tiresias.Keyring;
 
 /// <summary>The <c>tir</c> commands. Each returns the process exit code.</summary>
 static class Commands
 {
-    const string RecoveryWrapperId = "recovery";
-
-    static readonly Regex Slug = new("^[a-z0-9][a-z0-9-]{0,62}$", RegexOptions.CultureInvariant);
-
     public static int Enroll(CommandLine args)
     {
         var url = new Uri(args.Require("--broker"));
         var brokerKey = args.Require("--broker-key");
-        PublicKey.Import(SignatureAlgorithm.Ed25519, Convert.FromBase64String(brokerKey), KeyBlobFormat.RawPublicKey);
+        KeyringStore.ValidateBrokerKey(brokerKey);
 
         var tenant = args.Option("--tenant") ?? KeyringStore.DefaultTenant;
         var genesis = args.Option("--genesis");
@@ -36,161 +28,160 @@ static class Commands
             ?? (tenant == KeyringStore.DefaultTenant ? settings.VaultPath : Path.Combine(KeyringStore.Directory, $"vault-{tenant}.json"));
         KeyringStore.Enroll(new(tenant, url, brokerKey, vaultPath, genesis));
 
-        using var device = KeyringStore.LoadOrCreateDeviceKey();
+        var devicePublicKey = KeyringStore.DevicePublicKey();
         Console.WriteLine($"Pinned broker {url} for tenant {tenant} (identity {brokerKey}, vault {vaultPath}).");
         Console.WriteLine("Add this device to the broker's configuration:");
-        Console.WriteLine($"  \"Broker\": {{ \"Devices\": {{ \"{settings.DeviceId}\": \"{Convert.ToBase64String(device.PublicKey.Export(KeyBlobFormat.RawPublicKey))}\" }} }}");
+        Console.WriteLine($"  \"Broker\": {{ \"Devices\": {{ \"{settings.DeviceId}\": \"{devicePublicKey}\" }} }}");
         return 0;
     }
 
     public static int RecoveryInit()
     {
-        var settings = KeyringStore.Settings;
-        if (settings.RecoveryPublicKey is not null)
-        {
-            Console.Error.WriteLine("A recovery key is already configured. Secrets sealed so far open only with that one; refusing to replace it.");
-            return 1;
-        }
-
-        using var key = Key.Create(KeyAgreementAlgorithm.X25519, new KeyCreationParameters { ExportPolicy = KeyExportPolicies.AllowPlaintextExport });
-        var raw = key.Export(KeyBlobFormat.RawPrivateKey);
+        var raw = RecoveryKey.Create();
         try
         {
             Console.WriteLine("Recovery key. Write it on paper now; it is shown once and stored nowhere:");
             Console.WriteLine();
-            Console.WriteLine(Terminal.PaperBase32(raw));
+            Console.WriteLine(PaperKey.Format(raw));
             Console.WriteLine();
         }
         finally
         {
             Array.Clear(raw);
         }
-        KeyringStore.Settings = settings with { RecoveryPublicKey = Convert.ToBase64String(key.PublicKey.Export(KeyBlobFormat.RawPublicKey)) };
         Console.WriteLine("Stored the public half only. Clear this terminal's scrollback.");
         return 0;
+    }
+
+    /// <summary>
+    /// Sets up solo mode: the broker runs inside the app (or <c>tir agent</c>) on this device. The
+    /// recovery key co-signs the one-device trust chain, so it is created here when there is none,
+    /// and asked back when there is.
+    /// </summary>
+    public static int SoloInit()
+    {
+        byte[]? raw = null;
+        try
+        {
+            if (KeyringStore.Settings.RecoveryPublicKey is null)
+            {
+                raw = RecoveryKey.Create();
+                Console.WriteLine("Recovery key. Write it on paper now; it is shown once and stored nowhere.");
+                Console.WriteLine("It opens your secrets if Windows Hello or this PC is lost, and it signs this device's trust chain.");
+                Console.WriteLine();
+                Console.WriteLine(PaperKey.Format(raw));
+                Console.WriteLine();
+                ConfirmWrittenDown(PaperKey.Words(raw));
+            }
+            else
+            {
+                Console.WriteLine("This device already has a recovery key. Type it to sign the trust chain (spaces and case don't matter).");
+                raw = PaperKey.Parse(Console.ReadLine() ?? "")
+                    ?? throw new InvalidOperationException("That is not a recovery key: it should be 13 groups of four letters and digits 2-7.");
+            }
+            SoloBroker.Setup(raw);
+        }
+        finally
+        {
+            if (raw is not null)
+                Array.Clear(raw);
+        }
+        Console.WriteLine("Solo mode is set up. The broker runs inside the Tiresias app; start the app (or tir agent) and unlock.");
+        Console.WriteLine("Trade-off: no fixed egress IP, and secrets stay on this machine. tir doctor lists what that means.");
+        return 0;
+    }
+
+    static void ConfirmWrittenDown(IReadOnlyList<string> words)
+    {
+        while (true)
+        {
+            var (first, second) = PaperKey.Challenge(words.Count);
+            Console.Write($"To check it is written down, type group {first + 1}: ");
+            var a = Console.ReadLine() ?? "";
+            Console.Write($"and group {second + 1}: ");
+            var b = Console.ReadLine() ?? "";
+            if (PaperKey.Confirm(words, (first, second), a, b))
+            {
+                Console.Clear();
+                return;
+            }
+            Console.WriteLine("Those don't match. Check what you wrote and try again.");
+        }
+    }
+
+    /// <summary>The pinned broker; in solo mode, first checks something hosts it, so the failure says what to do.</summary>
+    public static async Task<BrokerPin> ReachableBrokerAsync()
+    {
+        var broker = KeyringStore.RequireBroker();
+        if (KeyringStore.Tenant is { Solo: true } && !await SoloBroker.ReachableAsync())
+            throw new InvalidOperationException("The solo broker runs inside the Tiresias app, which isn't running. Start the app (or tir agent), then try again.");
+        return broker;
     }
 
     public static int VaultAdd(CommandLine args)
     {
         var slug = args.Require(2, "slug");
-        if (!Slug.IsMatch(slug))
+        if (!ServicePlanner.IsSlug(slug))
             throw new UsageException("A slug is lower-case letters, digits and dashes.");
-        var settings = KeyringStore.Settings;
-        if (settings.RecoveryPublicKey is null)
+        var version = SealSecret(slug, args.Flag("--from-stdin"));
+        Console.WriteLine($"Sealed {slug} v{version} into {VaultEditor.Path}. {PickedUp()}");
+        return 0;
+    }
+
+    /// <summary>Reads a secret's value (typed without echo, or piped in with <paramref name="fromStdin"/>) and seals it into the vault.</summary>
+    /// <returns>The version written.</returns>
+    public static int SealSecret(string slug, bool fromStdin)
+    {
+        if (RecoveryKey.Wrapper() is null)
             throw new UsageException("No recovery key yet. Run tir recovery init first, so no secret depends on the TPM alone.");
-
-        var vault = File.Exists(settings.VaultPath) ? VaultFile.Load(settings.VaultPath) : new VaultDocument([], []);
-        var version = (vault.FindSecret(slug)?.Version ?? 0) + 1;
-
-        var value = args.Flag("--from-stdin")
+        var value = fromStdin
             ? Terminal.ReadStdin()
             : Terminal.ReadHidden($"Value for {slug} (the whole Authorization header, e.g. 'Bearer sk-...'): ");
-        SealedSecret secret;
         try
         {
             if (value.Length == 0)
                 throw new UsageException("Empty value.");
-            using var hello = HelloKeyWrapper.Open(create: true);
-            var recovery = X25519KeyWrapper.ForPublicKey(RecoveryWrapperId, Convert.FromBase64String(settings.RecoveryPublicKey));
-            secret = SecretEnvelope.Seal(slug, version, value, [hello, recovery]);
+            return VaultEditor.SealSecret(slug, value);
         }
         finally
         {
             Array.Clear(value);
         }
-
-        VaultFile.Save(settings.VaultPath, vault with { Secrets = [.. vault.Secrets.Where(s => s.Slug != slug), secret] });
-        Console.WriteLine($"Sealed {slug} v{version} into {settings.VaultPath}. Copy that file to the broker's VaultPath and restart the broker.");
-        return 0;
     }
 
-    /// <summary>
-    /// When the tenant was enrolled with a genesis hash, refuses a broker whose trust chain doesn't
-    /// verify per <see cref="BrokerTrust"/>, and remembers the head it accepts so the next unlock
-    /// catches a rollback. Returns the reason to refuse, or null.
-    /// </summary>
-    static async Task<string?> CheckTrustChainAsync(BrokerClient client, BrokerPin broker, KeyringSettings settings)
-    {
-        if (KeyringStore.Tenant?.GenesisHash is not { } genesis)
-            return null;
-        var (status, body) = await client.GetAsync("/trust/chain");
-        if (status != System.Net.HttpStatusCode.OK)
-            return $"This tenant pins a trust chain but the broker served none ({(int)status}).";
-        var result = BrokerTrust.Evaluate(TrustLinkJson.ParseChain(body), genesis, KeyringStore.ChainHead,
-            Convert.FromBase64String(broker.IdentityKey), settings.DeviceId);
-        if (!result.Trusted)
-            return result.Error;
-        KeyringStore.ChainHead = result.Head;
-        return null;
-    }
+    /// <summary>How a vault change reaches the broker.</summary>
+    public static string PickedUp() => KeyringStore.Tenant is { Solo: true }
+        ? "The solo broker uses the change from its next request; no need to lock and unlock."
+        : "Copy that file to the broker's VaultPath and restart the broker.";
 
     public static async Task<int> UnlockAsync(CommandLine args)
     {
-        var broker = KeyringStore.RequireBroker();
-        var settings = KeyringStore.Settings;
-        var vault = VaultFile.Load(settings.VaultPath);
-        var slugs = args.Option("--secrets") is { } list
-            ? list.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            : vault.Secrets.Where(s => s.WrappedDeks.ContainsKey("hello")).Select(s => s.Slug).ToArray();
-        var secrets = slugs.Select(s => vault.FindSecret(s) ?? throw new UsageException($"No secret '{s}' in {settings.VaultPath}.")).ToArray();
-
-        using var client = Client(broker, settings);
-        if (await CheckTrustChainAsync(client, broker, settings) is { } untrusted)
-            return Fail($"{untrusted} Nothing was sealed.");
-        var begin = await client.PostAsync("/lease/begin");
-        if (!begin.Ok || begin.Body is not { } body)
-            return Fail($"Lease not opened: {begin.Describe()}");
-
-        var offer = new LeaseOffer(
-            body.GetProperty("leaseId").GetString()!,
-            Convert.FromBase64String(body.GetProperty("leaseKey").GetString()!),
-            DateTimeOffset.FromUnixTimeSeconds(body.GetProperty("hardCapAt").GetInt64()));
-        var identity = PublicKey.Import(SignatureAlgorithm.Ed25519, Convert.FromBase64String(broker.IdentityKey), KeyBlobFormat.RawPublicKey);
-        if (!offer.Verify(identity, Convert.FromBase64String(body.GetProperty("signature").GetString()!)))
-            return Fail("The lease offer is not signed by the pinned broker identity. Nothing was sealed.");
-
-        var sealedDeks = new Dictionary<string, byte[]>();
+        if (args.Option("--secrets") is null && await AppLink.SendAsync(ControlRequest.Unlock) is { } reply)
+            return reply.Ok ? Done(reply.Message) : Fail($"The Tiresias app couldn't unlock: {reply.Message}");
+        await ReachableBrokerAsync();
+        var slugs = args.Option("--secrets")?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        UnlockResult result;
         using (var hello = HelloKeyWrapper.Open(create: false))
-        {
-            foreach (var secret in secrets)
-            {
-                var dek = SecretEnvelope.UnwrapDek(secret, hello);
-                if (dek is null)
-                {
-                    Console.Error.WriteLine($"  {secret.Slug}: this Hello credential can't open it, skipped.");
-                    continue;
-                }
-                try
-                {
-                    sealedDeks[secret.Slug] = SealedBox.Seal(offer.LeaseKey, dek, LeaseOffer.DekContext(offer.LeaseId, secret.Slug));
-                }
-                finally
-                {
-                    Array.Clear(dek);
-                }
-            }
-        }
-
-        var seal = await client.PostAsync("/lease/seal", new { offer.LeaseId, deks = sealedDeks });
-        if (!seal.Ok || seal.Body is not { } result)
-            return Fail($"DEKs not accepted: {seal.Describe()}");
-
-        KeyringStore.Lease = new(offer.LeaseId, offer.HardCapAt);
-        Console.WriteLine($"Lease {offer.LeaseId} open until {offer.HardCapAt.ToLocalTime():HH:mm}.");
-        Console.WriteLine($"  leased:   {Join(result.GetProperty("accepted"))}");
-        if (result.GetProperty("rejected").GetArrayLength() > 0)
-            Console.WriteLine($"  rejected: {Join(result.GetProperty("rejected"))}");
-        Console.WriteLine("Run 'tir agent' to keep it alive and end it when you lock the workstation.");
+            result = await LeaseControl.UnlockAsync(hello, slugs);
+        foreach (var note in result.Notes)
+            Console.Error.WriteLine($"  {note}");
+        if (!result.Ok)
+            return Fail(result.Message);
+        Console.WriteLine(result.Message);
+        Console.WriteLine($"  leased:   {string.Join(", ", result.Accepted)}");
+        if (result.Rejected.Count > 0)
+            Console.WriteLine($"  rejected: {string.Join(", ", result.Rejected)}");
+        if (KeyringStore.Tenant is not { Solo: true })
+            Console.WriteLine("Run 'tir agent' to keep it alive and end it when you lock the workstation.");
         return 0;
     }
 
     public static async Task<int> LockAsync()
     {
-        using var client = Client(KeyringStore.RequireBroker(), KeyringStore.Settings);
-        var end = await client.PostAsync("/lease/end");
-        KeyringStore.Lease = null;
-        if (!end.Ok)
-            return Fail($"Broker refused: {end.Describe()}");
+        if (await AppLink.SendAsync(ControlRequest.Lock) is { } reply)
+            return reply.Ok ? Done(reply.Message) : Fail(reply.Message ?? "The Tiresias app couldn't lock.");
+        if (await LeaseControl.LockAsync() is { } refused)
+            return Fail($"Broker refused: {refused}");
         Console.WriteLine("Lease ended.");
         return 0;
     }
@@ -199,26 +190,26 @@ static class Commands
     {
         var broker = KeyringStore.Broker;
         var settings = KeyringStore.Settings;
-        Console.WriteLine($"Broker:   {(broker is null ? "not enrolled" : $"{broker.Url} (identity {broker.IdentityKey})")}");
+        Console.WriteLine($"Broker:   {(broker is null ? "not enrolled" : $"{broker.Url} (identity {broker.IdentityKey})")}{(KeyringStore.Tenant is { Solo: true } ? " - Solo, hosted by the app" : "")}");
         Console.WriteLine($"Device:   {settings.DeviceId}");
         Console.WriteLine($"Vault:    {settings.VaultPath}" + (File.Exists(settings.VaultPath) ? $" ({VaultFile.Load(settings.VaultPath).Secrets.Count} secrets)" : " (missing)"));
         Console.WriteLine($"Recovery: {(settings.RecoveryPublicKey is null ? "NOT SET (run tir recovery init)" : "set")}");
+        Console.WriteLine($"App:      {await AppLink.StateAsync() ?? "not running (start Tiresias, or run tir agent)"}");
 
-        if (KeyringStore.Lease is not { } lease || broker is null)
-        {
-            Console.WriteLine("Lease:    none");
-            return 0;
-        }
-        using var client = Client(broker, settings);
-        var heartbeat = await client.PostAsync("/lease/heartbeat", new { lease.LeaseId });
-        if (heartbeat.Ok)
-            Console.WriteLine($"Lease:    {lease.LeaseId}, open until {lease.HardCapAt.ToLocalTime():HH:mm}");
-        else
-        {
-            Console.WriteLine($"Lease:    {lease.LeaseId} ended ({heartbeat.Describe()})");
-            KeyringStore.Lease = null;
-        }
+        var remembered = KeyringStore.Lease;
+        var (lease, ended) = await LeaseControl.CheckAsync();
+        Console.WriteLine(lease is not null ? $"Lease:    {lease.LeaseId}, open until {lease.HardCapAt.ToLocalTime():HH:mm}"
+            : remembered is not null ? $"Lease:    {remembered.LeaseId} ended ({ended})"
+            : "Lease:    none");
         return 0;
+    }
+
+    public static async Task<int> DoctorAsync(CommandLine args)
+    {
+        var checks = await Tiresias.Client.Doctor.RunAsync(new MachineProbe(args.Option("--projects")));
+        foreach (var check in checks)
+            Console.WriteLine($"{check.Status switch { Tiresias.Client.DoctorStatus.Ok => "ok  ", Tiresias.Client.DoctorStatus.Warn => "WARN", _ => "FAIL" }}  {check.Name}: {check.Detail}");
+        return checks.Any(c => c.Status == Tiresias.Client.DoctorStatus.Fail) ? 1 : 0;
     }
 
     public static async Task<int> GrantAsync(CommandLine args)
@@ -239,13 +230,14 @@ static class Commands
         if (problems.Count > 0)
             return Fail(string.Join(Environment.NewLine, problems));
 
-        foreach (var line in Consent.Describe(request, service))
+        var lines = Consent.Describe(request, service).ToArray();
+        foreach (var line in lines)
             Console.WriteLine(line);
-        if (!Terminal.Confirm("Approve?"))
+        if (!await AppLink.ApproveAsync($"tir grant {serviceSlug}", lines))
             return Fail("Not approved.");
         HelloKeyWrapper.ConfirmPresence($"grant\n{serviceSlug}\n{request.Consumer}");
 
-        using var client = Client(KeyringStore.RequireBroker(), settings);
+        using var client = BrokerClient.For(await ReachableBrokerAsync());
         var minted = await client.PostAsync("/placeholder", request);
         if (!minted.Ok || minted.Body is not { } body)
             return Fail($"Not minted: {minted.Describe()}");
@@ -263,7 +255,7 @@ static class Commands
         Console.WriteLine($"Elevating {service}/{grant} for {duration.TotalMinutes:0} min; confirm with Windows Hello.");
         HelloKeyWrapper.ConfirmPresence($"elevate\n{service}\n{grant}");
 
-        using var client = Client(KeyringStore.RequireBroker(), KeyringStore.Settings);
+        using var client = BrokerClient.For(await ReachableBrokerAsync());
         var elevated = await client.PostAsync("/elevate", new { service, grant, minutes = (int)Math.Ceiling(duration.TotalMinutes) });
         if (!elevated.Ok || elevated.Body is not { } body)
             return Fail($"Not elevated: {elevated.Describe()}");
@@ -271,10 +263,12 @@ static class Commands
         return 0;
     }
 
-    public static BrokerClient Client(BrokerPin broker, KeyringSettings settings) =>
-        new(broker, settings.DeviceId, KeyringStore.LoadOrCreateDeviceKey());
-
-    static string Join(JsonElement array) => string.Join(", ", array.EnumerateArray().Select(e => e.GetString()));
+    static int Done(string? message)
+    {
+        if (message is not null)
+            Console.WriteLine(message);
+        return 0;
+    }
 
     static int Fail(string message)
     {

@@ -45,7 +45,7 @@ public static class SqlGrants
 /// </summary>
 public sealed class BrokerState : IDisposable
 {
-    readonly VaultDocument vault;
+    VaultDocument vault;
     readonly LeaseTerms terms;
     readonly AuditLog audit;
     readonly Key identity;
@@ -137,6 +137,28 @@ public sealed class BrokerState : IDisposable
     {
         lock (gate)
             return Check(leaseId) ?? (lease!.Heartbeat(time.GetUtcNow()) ? null : new Refusal(503, "no-lease"));
+    }
+
+    /// <summary>
+    /// Swaps in a vault that changed on disk, keeping the lease. A leased DEK stays only while it
+    /// still opens its secret: a removed or re-sealed secret loses it (zeroed) until the Keyring
+    /// seals the new one. Placeholders keep working for services that are still there.
+    /// </summary>
+    /// <returns>The secrets of the open lease that have no DEK now, for the Keyring to seal; empty without a lease.</returns>
+    public IReadOnlyList<string> ReplaceVault(VaultDocument next)
+    {
+        lock (gate)
+        {
+            foreach (var (slug, dek) in deks.ToArray())
+            {
+                if (next.FindSecret(slug) is { } secret && Opens(secret, dek))
+                    continue;
+                Array.Clear(dek);
+                deks.Remove(slug);
+            }
+            vault = next;
+            return CurrentLease(time.GetUtcNow()) is null ? [] : next.Secrets.Where(s => !deks.ContainsKey(s.Slug)).Select(s => s.Slug).ToArray();
+        }
     }
 
     /// <summary>Revokes the current lease, if any. Idempotent.</summary>

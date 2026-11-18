@@ -4,6 +4,8 @@ using Tiresias.Broker;
 using Tiresias.Leases;
 using Tiresias.Policy;
 using Tiresias.Transport;
+using Tiresias.Crypto;
+using Tiresias.Vault;
 using NSec.Cryptography;
 
 namespace Tiresias.Tests;
@@ -241,4 +243,60 @@ public class BrokerStateTests
         OpenLease();
         Assert.That(state.Authorize($"Bearer {token}", "llm", Get("/v1/models")).Refusal?.Reason, Is.EqualTo("unknown-placeholder"));
     }
+
+    [Test]
+    public void A_reloaded_vault_keeps_the_lease_its_placeholders_and_the_deks_that_still_open()
+    {
+        OpenLease();
+        var token = Mint();
+        var dropped = state.LeasedDeks().ToArray();
+        var added = SecretEnvelope.Seal("httpbin", 1, "Bearer hb"u8, [vault.Tpm]);
+        var reloaded = vault.Document with
+        {
+            Secrets = [.. vault.Document.Secrets.Where(s => s.Slug != "llm-admin"), added],
+            Services = [.. vault.Document.Services, new Service("httpbin", new Uri("https://httpbin.example/"), [])],
+        };
+
+        var unleased = state.ReplaceVault(reloaded);
+
+        Assert.That(unleased, Is.EqualTo(new[] { "httpbin" }));
+        Assert.That(state.LeasedDeks(), Has.Count.EqualTo(2), "the removed secret's DEK is gone");
+        Assert.That(dropped.Count(d => d.All(b => b == 0)), Is.EqualTo(1), "and zeroed");
+        using var allowed = state.Authorize($"Bearer {token}", "llm", Get("/v1/models")).Allowed;
+        Assert.That(allowed!.TakeSecret(), Is.EqualTo("Bearer sk-read"));
+    }
+
+    [Test]
+    public void A_re_sealed_secret_loses_its_old_dek_until_the_new_one_is_sealed()
+    {
+        var offer = OpenLease();
+        var token = Mint();
+        var resealed = SecretEnvelope.Seal("llm-read", 2, "Bearer sk-read-2"u8, [vault.Tpm]);
+        var reloaded = vault.Document with { Secrets = [.. vault.Document.Secrets.Where(s => s.Slug != "llm-read"), resealed] };
+
+        Assert.That(state.ReplaceVault(reloaded), Is.EqualTo(new[] { "llm-read" }));
+        Assert.That(state.Authorize($"Bearer {token}", "llm", Get("/v1/models")).Refusal?.Reason, Is.EqualTo("secret-not-leased"));
+
+        var dek = SecretEnvelope.UnwrapDek(resealed, vault.Tpm)!;
+        var (result, _) = state.Seal(offer.LeaseId, new Dictionary<string, byte[]>
+            { ["llm-read"] = SealedBox.Seal(offer.LeaseKey, dek, LeaseOffer.DekContext(offer.LeaseId, "llm-read")) });
+        Assert.That(result!.Accepted, Is.EqualTo(new[] { "llm-read" }));
+        using var allowed = state.Authorize($"Bearer {token}", "llm", Get("/v1/models")).Allowed;
+        Assert.That(allowed!.TakeSecret(), Is.EqualTo("Bearer sk-read-2"));
+    }
+
+    [Test]
+    public void A_removed_service_refuses_its_placeholders()
+    {
+        OpenLease();
+        var token = Mint();
+
+        state.ReplaceVault(vault.Document with { Services = [] });
+
+        Assert.That(state.Authorize($"Bearer {token}", "llm", Get("/v1/models")).Refusal?.Reason, Is.EqualTo("unknown-service"));
+    }
+
+    [Test]
+    public void Without_a_lease_a_reload_has_nothing_to_seal() =>
+        Assert.That(state.ReplaceVault(vault.Document), Is.Empty);
 }

@@ -24,10 +24,14 @@ jobs:
             10.0.x
             11.0.x
           dotnet-quality: preview
-      # The Keyring targets Windows (Hello, TPM), so only the Windows leg builds the whole solution.
-      - name: Build (solution)
+      # The Keyring and the tray app target Windows (Hello, TPM, WPF), so only the Windows leg builds
+      # the whole solution; the Linux leg tests the cross-platform libraries and the app's Logic/.
+      - name: Build (solution, including the app)
         if: runner.os == 'Windows'
         run: dotnet build Tiresias.slnx -c Release
+      - name: Build the sample
+        if: runner.os == 'Windows'
+        run: dotnet build samples/ProtectedSecretsSample/ProtectedSecretsSample.csproj -c Release
       - name: Test
         # A hung test fails after 5 minutes and is named in the log, instead of holding the runner.
         run: dotnet test src/Tiresias.Tests/Tiresias.Tests.csproj -c Release --blame-hang-timeout 5m --blame-hang-dump-type none

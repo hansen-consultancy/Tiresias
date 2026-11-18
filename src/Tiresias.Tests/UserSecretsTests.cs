@@ -144,6 +144,27 @@ public class ProtectedUserSecretsProviderTests
         Assert.That(agent.Calls, Is.Zero);
     }
 
+    [Test, NonParallelizable]
+    public void Secrets_from_the_agent_say_so_in_one_line_without_values_and_a_plain_load_says_nothing()
+    {
+        var notices = new StringWriter();
+        var before = ProtectedUserSecretsProvider.Notices;
+        ProtectedUserSecretsProvider.Notices = notices;
+        try
+        {
+            WriteFile("""{ "A": "1" }""");
+            Build(new FakeAgent(null));
+            Assert.That(notices.ToString(), Is.Empty);
+
+            Build(new FakeAgent(new AgentReply(AgentStatus.Ok, """{ "A": "secret-a", "B": { "C": "secret-c" } }""")));
+            Assert.That(notices.ToString().Trim(), Is.EqualTo("Tiresias: user secrets 'test-id' provided (2 keys)."));
+        }
+        finally
+        {
+            ProtectedUserSecretsProvider.Notices = before;
+        }
+    }
+
     [Test]
     public void Without_an_agent_a_plain_file_loads_like_stock_user_secrets()
     {

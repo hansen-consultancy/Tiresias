@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The tray app: the agent for the user's session (Tiresias.Agent) with a face. It hosts the
+    user-secrets pipe, the solo broker and the control pipe tir talks to, and shows the consent
+    dialog, the secrets editor, activity and status. Windows only, built on the Windows CI leg.
+    Every user-facing string is in Strings.resx; Logic/ holds the pure decisions, which the test
+    project compiles and tests on any OS.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net11.0-windows10.0.22621.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <IsPackable>false</IsPackable>
+    <AssemblyName>Tiresias</AssemblyName>
+    <RootNamespace>Tiresias.App</RootNamespace>
+    <ApplicationIcon>..\..\assets\export\tiresias.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Application.ThemeMode (the Windows 11 Fluent theme) is marked experimental. -->
+    <NoWarn>$(NoWarn);WPF0001</NoWarn>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <!-- App.xaml is a plain page so Program.Main runs first: Velopack's install/update hooks must run before WPF starts. -->
+  <ItemGroup>
+    <ApplicationDefinition Remove="App.xaml" />
+    <Page Include="App.xaml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="System.IO" />
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="H.NotifyIcon.Wpf" />
+    <PackageReference Include="Velopack" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Tiresias.Agent\Tiresias.Agent.csproj" />
+    <ProjectReference Include="..\Tiresias.Core\Tiresias.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="..\..\assets\export\tiresias.ico" Link="Assets\tiresias.ico" />
+    <Resource Include="..\..\assets\export\tray-light-theme.ico" Link="Assets\tray-light-theme.ico" />
+    <Resource Include="..\..\assets\export\tray-dark-theme.ico" Link="Assets\tray-dark-theme.ico" />
+  </ItemGroup>
+
+</Project>

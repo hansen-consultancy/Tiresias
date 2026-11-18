@@ -17,13 +17,13 @@ dotnet test src/Tiresias.Tests/Tiresias.Tests.csproj --filter "FullyQualifiedNam
 dotnet pack Tiresias.slnx -c Release -o artifacts
 ```
 
-Needs the .NET 11 SDK plus the .NET 10 runtime. `Tiresias.Keyring` (`tir`) targets
+Needs the .NET 11 SDK plus the .NET 10 runtime. `Tiresias.Keyring` (`tir`) and `Tiresias.App` target
 `net11.0-windows` (Windows Hello, TPM, DPAPI) and builds on Windows only; CI's Linux leg tests
 without it. OS-specific tests use `[Platform]`, never a runtime `Assert.Ignore`.
 
 ## Layout
 
-All projects live in `src/`; `Tiresias.slnx` is hand-written (add new projects to it by hand).
+All projects live in `src/`; `Tiresias.slnx` is hand-written (add new projects to it by hand). `samples/` holds apps for trying Tiresias by hand (docs/testing-on-windows.md): not in the solution, never packed, built by the Windows CI leg.
 
 | Project | Target | Role |
 |---|---|---|
@@ -32,7 +32,9 @@ All projects live in `src/`; `Tiresias.slnx` is hand-written (add new projects t
 | `Tiresias.Extensions.Configuration` | net11.0, packed | `AddUserSecrets` replacement; ships the generator and `buildTransitive` props |
 | `…Configuration.Generator` | netstandard2.0 | C# interceptor rerouting `AddUserSecrets` / `CreateBuilder` |
 | `Tiresias.Broker`, `Tiresias.Forwarder` | net11.0 | Broker service; loopback relay identifying the calling process |
-| `Tiresias.Keyring` | net11.0-windows | The `tir` CLI and agent |
+| `Tiresias.Agent` | net11.0-windows | The workstation agent's logic, shared by `tir` and the app |
+| `Tiresias.Keyring` | net11.0-windows | The `tir` CLI, a thin console front over `Tiresias.Agent` |
+| `Tiresias.App` | net11.0-windows, WPF | The tray app (`Tiresias.exe`): agent host, consent dialog, editor, activity, status, first run. Its pure decisions live in `Logic/`, compiled into the tests by link; every string is in `Strings.resx` |
 | `Tiresias.Tests` | net11.0 | NUnit, covers all of the above |
 
 ## Invariants
@@ -57,5 +59,8 @@ All projects live in `src/`; `Tiresias.slnx` is hand-written (add new projects t
 - [Conventional Commits](https://www.conventionalcommits.org/), scopes `core`, `protocol`,
   `config`, `broker`, `forwarder`, `keyring`, `app`, plus `ci`/`build`/`docs` as types.
 - Behaviour changes update `README.md` or `docs/` in the same commit.
+- User-facing changes add a line under `## [Unreleased]` in `CHANGELOG.md`, written for users, in the
+  same PR. Release notes (GitHub and the app's update dialog) are that file's version sections
+  (`docs/releasing.md`).
 - Version is `VersionPrefix`/`VersionSuffix` in `Directory.Build.props`; releases are `v*` tags,
   published by `release.yml` via nuget.org trusted publishing.
