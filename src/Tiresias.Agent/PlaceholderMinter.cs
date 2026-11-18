@@ -29,9 +29,9 @@ public static class PlaceholderMinter
             using var client = BrokerClient.For(broker);
             var response = await client.PostAsync("/placeholder",
                 new AccessRequest(consumer, observed, placeholder.Service, null, $"{placeholder.Variable} in the environment", Consent.MaxDuration));
-            return response is { Ok: true, Body: { } body } && body.TryGetProperty("token", out var token) && token.GetString() is { } value
-                ? new(value)
-                : new(null, response.Describe());
+            if (response is not { Ok: true, Body: { } body } || !body.TryGetProperty("token", out var token) || token.GetString() is not { } value)
+                return new(null, response.Describe());
+            return new(value, ExpiresAt: body.TryGetProperty("expiresAt", out var expires) && expires.TryGetDateTimeOffset(out var at) ? at : null);
         }
         catch (Exception e) when (e is HttpRequestException or IOException or InvalidOperationException or TaskCanceledException)
         {

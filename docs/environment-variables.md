@@ -104,9 +104,11 @@ service's grants, and the activity log records each request.
 - **The base-URL variable** follows the key's name (`*_API_KEY`, `*_KEY`, `*_TOKEN` become
   `*_BASE_URL`); `--base-url` names another. It can't be a sealed variable itself.
 - **Consent** lists the variable as a placeholder for its service. The placeholder is minted after
-  the answer, for at most 10 hours.
+  the answer, for at most 10 hours and never past the broker's lease (a workday lease ends at its
+  daily cutoff).
 - **A terminal** keeps one placeholder per variable, so changing folder doesn't mint another; one
-  with less than 30 minutes left is replaced at the next folder change, and the old one revoked.
+  with less than 30 minutes left before the expiry the broker gave it is replaced at the next
+  folder change, and the old one revoked.
   A terminal's placeholders are revoked once it has exited (noticed at the next request from any
   terminal), and all of them when Tiresias locks.
 - **`tir run`** revokes its placeholders when the command exits, as `tir exec` does.

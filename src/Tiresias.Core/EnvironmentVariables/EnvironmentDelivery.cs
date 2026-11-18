@@ -6,8 +6,8 @@ namespace Tiresias.EnvironmentVariables;
 /// <summary>What a process got: the variables to set, and why any were left out (never a value).</summary>
 public sealed record Delivery(IReadOnlyDictionary<string, string> Variables, IReadOnlyList<string> Problems);
 
-/// <summary>A minted placeholder, or why there is none.</summary>
-public sealed record MintedPlaceholder(string? Token, string? Problem = null);
+/// <summary>A minted placeholder and when the broker lets it expire (it caps that at the lease's end), or why there is none.</summary>
+public sealed record MintedPlaceholder(string? Token, string? Problem = null, DateTimeOffset? ExpiresAt = null);
 
 /// <summary>
 /// Turns resolved sealed variables into what a process gets. A variable delivered as a placeholder

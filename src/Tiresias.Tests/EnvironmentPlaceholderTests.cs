@@ -89,4 +89,19 @@ public class EnvironmentPlaceholderTests
         Assert.That(cache.Release((id, _) => id != 42), Is.EqualTo(new[] { "tirph_openai_2" }));
         Assert.That(cache.Release((_, _) => false), Is.Empty);
     }
+
+    [Test]
+    public async Task A_placeholder_capped_at_the_lease_s_end_is_minted_again_before_then()
+    {
+        var time = new ManualTime(new DateTimeOffset(2026, 11, 18, 15, 0, 0, TimeSpan.Zero));
+        var cache = new ShellPlaceholders(time);
+        var shell = new ShellIdentity(7, new DateTime(2026, 11, 18, 14, 0, 0, DateTimeKind.Utc), @"C:\pwsh.exe");
+        var minted = 0;
+        Task<MintedPlaceholder> Mint() => Task.FromResult(new MintedPlaceholder($"tirph_openai_{++minted}", ExpiresAt: time.Now.AddHours(5)));
+
+        await cache.GetAsync(shell, Sealed.Placeholders[0], Mint);
+        time.Now += TimeSpan.FromMinutes(4 * 60 + 40);
+
+        Assert.That((await cache.GetAsync(shell, Sealed.Placeholders[0], Mint)).Token, Is.EqualTo("tirph_openai_2"), "the broker's 20:00, not 01:00");
+    }
 }

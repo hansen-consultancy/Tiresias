@@ -4,7 +4,8 @@ namespace Tiresias.EnvironmentVariables;
 
 /// <summary>
 /// The placeholders each terminal holds, one per variable, so changing folder doesn't mint a new
-/// one each time. A placeholder close to expiry is minted again. <see cref="Release"/> hands back,
+/// one each time. A placeholder close to the expiry the broker gave it (the lease's end, often well
+/// before the 10 h asked for) is minted again. <see cref="Release"/> hands back,
 /// for revoking, the ones replaced since and those of terminals that exited (or all of them when
 /// the agent locks).
 /// </summary>
@@ -29,7 +30,7 @@ public sealed class ShellPlaceholders(TimeProvider time)
             if (held.Remove(key, out var old))
                 replaced.Add(old.Token);
             if (minted.Token is { } token)
-                held[key] = (token, time.GetUtcNow() + Consent.MaxDuration);
+                held[key] = (token, minted.ExpiresAt ?? time.GetUtcNow() + Consent.MaxDuration);
         }
         return minted;
     }
