@@ -255,8 +255,6 @@ public partial class App : Application
         try
         {
             var result = await host!.UnlockAsync();
-            if (interactive)
-                guard!.Unlocked();
             Refresh();
             if (result is { Ok: false })
             {
@@ -277,6 +275,12 @@ public partial class App : Application
             else
                 AppLog.Error(e, "unlock from tir");
             return (false, e.Message);
+        }
+        finally
+        {
+            // Windows Hello passing from the app is what lifts "This wasn't me", even if the lease then failed.
+            if (interactive && host!.Keys.IsUnlocked)
+                guard!.Unlocked();
         }
     }
 
