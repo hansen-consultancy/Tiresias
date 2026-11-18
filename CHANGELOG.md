@@ -25,6 +25,9 @@ its section below.
 - Environment variables that look like secrets can be sealed out of your Windows environment
   (**Environment variables** in the tray menu, or `tir env protect`), put back, and given to one
   program at a time with `tir run -- <command>`. The status page warns about the ones left exposed.
+- A PowerShell profile hook (`tir env hook`) gives each terminal the sealed variables after you
+  allow it once, and a variable can be kept for one folder (`tir env set NAME --folder`, or the
+  folder field in the window): changing folder adds and removes its variables.
 - The secrets editor names projects instead of listing ids: add the folder you keep your code in
   under **Project folders**, use **Find a project**, or just run the project. Ids no project uses
   are grouped apart and can be moved to the Recycle Bin.

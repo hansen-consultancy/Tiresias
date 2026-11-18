@@ -1,7 +1,8 @@
 # Environment variables
 
-**Status:** phase 1 is built: the store, **Protect** / **Put back**, `tir env`, `tir run`, the
-**Environment variables** window and the status check. Phases 2 to 4 are design.
+**Status:** phases 1 and 2 are built: the store with folder sets, **Protect** / **Put back**,
+`tir env`, `tir run`, the PowerShell hook with consent once per terminal, the **Environment
+variables** window and the status check. Phases 3 and 4 are design.
 
 Many developers keep API keys and tokens in their Windows user environment (`setx OPENAI_API_KEY
 ...`). That makes them readable by every process the user starts, forever, with no record of who
@@ -51,25 +52,37 @@ drive root down to that directory; the nearest folder wins.
 
 ### In a terminal
 
-One line in the PowerShell profile (the app offers to add it, and `tir env hook` prints it):
+One line, last in the PowerShell profile (`$PROFILE`), after anything else that replaces the
+prompt; it works in PowerShell 7 and Windows PowerShell 5.1:
 
 ```powershell
-tir env hook pwsh | Invoke-Expression
+tir env hook | Out-String | Invoke-Expression
 ```
 
-The hook asks the agent over its pipe for the set for the current directory. The first request
-from a shell process asks for consent (a dialog naming the shell, its folder and the variable
-names). Once allowed, that shell process is remembered, keyed by its process id and start time,
-until it exits or the agent locks. Changing directory re-resolves the set: variables from the old
-folder are removed, the new folder's are added, with no new prompt unless a folder set adds
-variables the session has not been allowed.
+The hook wraps the prompt: when the terminal opens, and whenever the folder changes (never for
+each command), it runs `tir env shell`, which asks the app for the set for that folder. The first
+request from a shell asks for consent: a dialog naming the shell, its folder and the variable
+names. Once allowed, that shell is remembered, keyed by its process id and start time, until it
+exits or the agent locks. Changing folder re-resolves the set: variables from the old folder are
+removed, the new folder's are added, with no new prompt unless a folder set adds names the
+terminal has not been allowed.
 
-A locked agent leaves the terminal working, without the variables, and the prompt shows a short
-`tiresias: locked` hint once.
+- **A no** sticks to that terminal: it keeps what it was allowed before and is not asked again on
+  each `cd`. `Update-TiresiasEnvironment -Ask` asks again.
+- **Locked:** the first request unlocks (Windows Hello) as part of asking. Cancelling it counts as
+  a no for that terminal.
+- **Nothing sealed:** no prompt at all, not even to unlock.
+- **The app not running:** the terminal works without the variables, and says so once. `tir run`
+  still works, with Windows Hello as the consent.
+
+The app believes the shell process id the hook sends only when that process is an ancestor of
+the `tir` on the pipe, started before it, so another program can't borrow a terminal's consent by
+naming it. Values reach the hook as base64, which PowerShell decodes, so neither the console's
+code page nor PowerShell's parser touches them.
 
 ### For one command
 
-`tir run [--] <command> [args...]` resolves the set for the current directory, asks once, and
+`tir run -- <command> [args...]` resolves the set for the current directory, asks once, and
 starts the command with the variables in its environment only. For scripts, CI-like runs, and
 shells without a hook (cmd, Git Bash).
 
@@ -97,12 +110,17 @@ variable, and the editor says so rather than offering it everywhere.
   anywhere. Placeholder delivery is the answer where a tool allows it.
 - A whole terminal session sharing the values means anything run from that terminal gets them.
   That is the trade-off chosen over a prompt per command.
+- A program running as you could start `tir` with a forged parent and so pass for an allowed
+  terminal. It gains nothing it couldn't take anyway: a program running as you can read that
+  terminal's memory, environment included. Sealing protects against reading the registry, files
+  and new processes, not against malware already running as you.
 - The activity log records variable names, the program and the decision; never a value.
 
 ## Phases
 
 1. Store, **Protect** / **Put back**, `tir env`, `tir run`, and an **Environment variables** window
    (tray menu, and **Review...** on the status check). Built.
-2. The shell hook with session consent and folder sets.
+2. The shell hook with session consent and folder sets (`tir env hook`, `--folder`, a folder field
+   in the window). Built.
 3. Placeholder delivery through the vault and forwarder.
 4. The NuGet credential provider.

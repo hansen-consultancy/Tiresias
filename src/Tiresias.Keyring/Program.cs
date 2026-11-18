@@ -43,10 +43,15 @@ const string Usage = """
     tir env list
     tir env protect [<NAME>...] [--yes]
     tir env put-back <NAME>...
-    tir env set <NAME> [--from-stdin]
-    tir env remove <NAME>
+    tir env set <NAME> [--from-stdin] [--folder [<path>]]
+    tir env remove <NAME> [--folder [<path>]]
         Environment variables sealed out of your Windows user environment. protect with no names
         offers the ones that look like secrets; put-back returns them to Windows as they were.
+        --folder keeps a variable for commands run in that folder (the current one by default)
+        and below, adding to or overriding the global set.
+    tir env hook [pwsh]
+        Prints the PowerShell profile hook: tir env hook | Out-String | Invoke-Expression. Each
+        terminal asks once for the sealed variables, and changing folder applies its set.
     tir run -- <command> [args...]
         Runs the command with the sealed environment variables, after you allow it (in the app's
         dialog, or with Windows Hello when the app isn't running).
@@ -73,6 +78,7 @@ try
         ("exec", _) => await Exec.RunAsync(line),
         ("doctor", _) => await Commands.DoctorAsync(line),
         ("secrets", _) => SecretsCommand.Run(line),
+        ("env", "shell") => await EnvCommand.ShellAsync(line),
         ("env", _) => EnvCommand.Run(line),
         ("run", _) => await EnvCommand.RunCommandAsync(line),
         _ => throw new UsageException("Unknown command."),

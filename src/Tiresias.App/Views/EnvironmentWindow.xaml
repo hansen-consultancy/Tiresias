@@ -26,7 +26,12 @@
         <ItemsControl ItemsSource="{Binding Sealed}" Margin="0,4,0,0" AutomationProperties.Name="{l:S Env_SealedHeading}">
           <ItemsControl.ItemTemplate>
             <DataTemplate>
-              <CheckBox IsChecked="{Binding IsChecked}" Content="{Binding Name}" Margin="0,2" />
+              <CheckBox IsChecked="{Binding IsChecked}" Margin="0,2">
+                <TextBlock>
+                  <Run Text="{Binding Name, Mode=OneWay}" />
+                  <Run Text="{Binding Detail, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                </TextBlock>
+              </CheckBox>
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
@@ -47,6 +52,15 @@
           <PasswordBox x:Name="NewValue" Grid.Column="1" Margin="8,0,0,0" AutomationProperties.Name="{l:S Env_NewValue}" />
           <Button Grid.Column="2" Style="{StaticResource RowButton}" Content="{l:S Env_Seal}" Margin="8,0,0,0" Click="OnAdd" />
         </Grid>
+        <Grid Margin="0,8,0,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <TextBox Text="{Binding NewFolder, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="{l:S Env_NewFolder}" />
+          <Button Grid.Column="1" Style="{StaticResource RowButton}" Content="{l:S Env_FolderBrowse}" Margin="8,0,0,0" Click="OnBrowse" />
+        </Grid>
+        <TextBlock Text="{l:S Env_NewFolderHint}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,4,0,0" />
 
         <TextBlock Text="{l:S Env_WindowsHeading}" Style="{StaticResource SubtitleText}" AutomationProperties.HeadingLevel="Level2" Margin="0,20,0,4" />
         <TextBlock Text="{Binding WindowsSummary}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" />

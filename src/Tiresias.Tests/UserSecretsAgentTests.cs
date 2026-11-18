@@ -475,7 +475,7 @@ public class AgentPipeTests
         var pipe = $"tiresias-test-{Guid.NewGuid():N}";
         using var stop = new CancellationTokenSource();
         string? seenCaller = "unset";
-        var server = new AgentPipeServer<AgentRequest, AgentReply>(pipe,
+        var server = new AgentPipeServer<AgentRequest, AgentReply, string?>(pipe,
             (request, caller, _) =>
             {
                 seenCaller = caller;

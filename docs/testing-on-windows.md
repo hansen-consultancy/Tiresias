@@ -256,6 +256,22 @@ its device keys belong to that PC's Windows account.
 5. Tick it under **Sealed** and **Put back in Windows**; a new terminal has it again. Then
    `setx DEMO_API_KEY ""` or delete it in Windows settings.
 
+## 10. Environment variables in a terminal
+
+1. Seal a throwaway global one: `tir env set DEMO_API_KEY` (type any value), and one for a
+   folder: `cd C:\temp; tir env set DEMO_DB --folder` (any value).
+2. In a PowerShell window: `tir env hook | Out-String | Invoke-Expression`. The app asks once,
+   naming the shell, the folder and the variables; allow it. `$env:DEMO_API_KEY` has the value.
+3. `cd C:\temp`: the dialog asks about **DEMO_DB** only. `cd ..`: `$env:DEMO_DB` is gone, and
+   `cd C:\temp` again gives it back without asking.
+4. A second PowerShell window asks on its own. Deny it: nothing is set, and `cd` doesn't ask
+   again. `Update-TiresiasEnvironment -Ask` does.
+5. Lock Tiresias from the tray, then `cd` somewhere: Windows Hello asks before the dialog does.
+6. Quit the app: a new window says once that the app isn't running, and carries on.
+7. Clean up: `tir env remove DEMO_API_KEY` and `tir env remove DEMO_DB --folder C:\temp`.
+
+To keep it, add the hook line last in `$PROFILE`.
+
 ## What you can't test yet
 
 These are not built yet (see [desktop-app.md](desktop-app.md#what-is-built)):

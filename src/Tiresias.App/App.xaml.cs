@@ -5,6 +5,7 @@ using Microsoft.Win32;
 using Tiresias.Agent;
 using Tiresias.App.Logic;
 using Tiresias.App.Views;
+using Tiresias.EnvironmentVariables;
 using Tiresias.UserSecrets;
 
 namespace Tiresias.App;
@@ -21,6 +22,7 @@ public partial class App : Application
     readonly CancellationTokenSource stop = new();
     Mutex? instance;
     ConsentPresenter? consent;
+    readonly ShellConsent shells = new();
     AgentHost? host;
     TrayController? tray;
     AppUpdates? updates;
@@ -74,7 +76,13 @@ public partial class App : Application
         AppLog.Info($"started {Text.Of(AppBuild.Current.Label)} from {AppBuild.Current.Folder}");
 
         tray = new TrayController(this);
-        host.StateChanged += () => Dispatcher.BeginInvoke(Refresh);
+        host.StateChanged += () =>
+        {
+            // Locked: every terminal asks again, as it would after a restart.
+            if (!host.Keys.IsUnlocked)
+                shells.Clear();
+            Dispatcher.BeginInvoke(Refresh);
+        };
         host.UserSecrets.FirstSealed += id => Dispatcher.BeginInvoke(() =>
             tray?.Notify(Text.Get("Notify_FirstSealed_Title"), Text.Format("Notify_FirstSealed_Body", id)));
         SystemEvents.SessionSwitch += OnSessionSwitch;
@@ -258,14 +266,14 @@ public partial class App : Application
 
     void StartControlPipe()
     {
-        var server = new AgentPipeServer<ControlRequest, ControlReply>(ControlClient.PipeName, HandleControlAsync, PipeCaller.Identify);
+        var server = new AgentPipeServer<ControlRequest, ControlReply, PipeClient>(ControlClient.PipeName, HandleControlAsync, PipeCaller.Client);
         server.ConnectionFailed += e => AppLog.Error(e, "control pipe");
         var serving = server.RunAsync(stop.Token);
         serving.ContinueWith(t => AppLog.Error(t.Exception!, "control pipe stopped"), TaskContinuationOptions.OnlyOnFaulted);
     }
 
     /// <summary><c>tir</c>'s requests. Runs off the UI thread; anything visual is marshalled.</summary>
-    async Task<ControlReply> HandleControlAsync(ControlRequest request, string? caller, CancellationToken ct)
+    async Task<ControlReply> HandleControlAsync(ControlRequest request, PipeClient caller, CancellationToken ct)
     {
         if (request.V > ControlRequest.Version)
             return new(false, Text.Get("Control_NewerTir"));
@@ -285,10 +293,12 @@ public partial class App : Application
                 await Dispatcher.InvokeAsync(ShowHome);
                 return new(true);
             case ControlRequest.Consent:
-                var approved = await consent!.AskPlaceholderAsync(request.Title ?? "tir", request.Lines ?? [], caller, ct);
+                var approved = await consent!.AskPlaceholderAsync(request.Title ?? "tir", request.Lines ?? [], caller.Image, ct);
                 return new(true, Approved: approved);
             case ControlRequest.Environment:
-                return await EnvironmentForAsync(request, caller, ct);
+                return await EnvironmentForAsync(request, caller.Image, ct);
+            case ControlRequest.ShellEnvironment:
+                return await ShellEnvironmentAsync(request, caller, ct);
             case ControlRequest.Unlock:
                 var (ok, message) = await Dispatcher.InvokeAsync(() => UnlockAsync(interactive: false)).Task.Unwrap();
                 return new(ok, message);
@@ -311,7 +321,8 @@ public partial class App : Application
         }
         if (host.Keys.Hello is not { } hello)
             return new(false, Text.Get("Environment_Locked"));
-        var variables = await Task.Run(() => EnvironmentStore.Open(hello).Variables, ct);
+        var sealedNow = await Task.Run(() => EnvironmentStore.Open(hello).Environment, ct);
+        var variables = request.Directory is { } directory ? sealedNow.Resolve(directory) : sealedNow.Global;
         if (variables.Count == 0)
             return new(true, Text.Get("Environment_NoneSealed"), Approved: true, Variables: new Dictionary<string, string>());
         var program = request.Title ?? "tir run";
@@ -320,6 +331,55 @@ public partial class App : Application
         return approved
             ? new(true, Approved: true, Variables: variables.ToDictionary(v => v.Name, v => v.Value, StringComparer.OrdinalIgnoreCase))
             : new(true, Approved: false);
+    }
+
+    /// <summary>
+    /// The terminal hook, on opening a terminal and on each change of folder. Asks once per shell
+    /// session (again only for names a folder adds), and after a no stays quiet in that terminal
+    /// until the user asks again. Nothing sealed means no prompt at all, not even to unlock.
+    /// </summary>
+    async Task<ControlReply> ShellEnvironmentAsync(ControlRequest request, PipeClient caller, CancellationToken ct)
+    {
+        if (caller.ProcessId is not { } pid || request.Shell is not { } shellId || request.Directory is not { } directory
+            || ProcessTree.ShellOf(pid, shellId) is not { } shell)
+            return new(false, Text.Get("Shell_Unrecognised"));
+        if (!EnvironmentStore.IsSealed)
+            return new(true, Approved: true, Variables: new Dictionary<string, string>());
+        shells.Prune(ProcessTree.IsRunning);
+        if (!host!.Keys.IsUnlocked && shells.HasRefused(shell) && !request.AskAgain)
+            return new(true, Approved: false);
+        if (!host.Keys.IsUnlocked)
+        {
+            var (unlocked, message) = await Dispatcher.InvokeAsync(() => UnlockAsync(interactive: false)).Task.Unwrap();
+            if (!unlocked)
+            {
+                shells.Refuse(shell);
+                return new(true, Text.Format("Shell_NotUnlocked", message), Approved: false);
+            }
+        }
+        if (host.Keys.Hello is not { } hello)
+            return new(false, Text.Get("Environment_Locked"));
+        var variables = (await Task.Run(() => EnvironmentStore.Open(hello).Environment, ct)).Resolve(directory);
+        var (answer, fresh) = shells.Check(shell, variables.Select(v => v.Name), request.AskAgain);
+        string? note = null;
+        if (answer == ShellAnswer.Ask)
+        {
+            var approved = await consent!.AskShellAsync(shell.Program, directory, fresh, ct);
+            AppLog.Info($"terminal {System.IO.Path.GetFileName(shell.Program)} ({shell.ProcessId}): {(approved ? "allowed" : "denied")} {fresh.Count} environment variable(s)");
+            if (approved)
+            {
+                shells.Allow(shell, fresh);
+                fresh = [];
+            }
+            else
+            {
+                shells.Refuse(shell);
+                note = Text.Get("Shell_Refused");
+            }
+        }
+        // Whatever the shell was allowed before still reaches it; only the names it was refused stay out.
+        var given = variables.Where(v => !fresh.Contains(v.Name, StringComparer.OrdinalIgnoreCase));
+        return new(true, note, Approved: true, Variables: given.ToDictionary(v => v.Name, v => v.Value, StringComparer.OrdinalIgnoreCase));
     }
 
     void OnSessionSwitch(object? sender, SessionSwitchEventArgs e)

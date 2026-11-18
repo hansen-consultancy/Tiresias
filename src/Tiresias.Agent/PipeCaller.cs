@@ -5,14 +5,21 @@ using System.Runtime.InteropServices;
 
 namespace Tiresias.Agent;
 
+/// <summary>The process on the other end of a pipe, from the pipe handle itself.</summary>
+/// <param name="Image">The image path, <c>pid N</c> when the image can't be read, or <c>null</c> when Windows can't tell.</param>
+public sealed record PipeClient(int? ProcessId, string? Image);
+
 /// <summary>Who is on the other end of a pipe: the client process's image path, from the pipe handle itself.</summary>
 public static partial class PipeCaller
 {
     /// <returns>The image path, <c>pid N</c> when the image can't be read, or <c>null</c> when Windows can't tell.</returns>
-    public static string? Identify(NamedPipeServerStream pipe)
+    public static string? Identify(NamedPipeServerStream pipe) => Client(pipe).Image;
+
+    public static PipeClient Client(NamedPipeServerStream pipe) =>
+        GetNamedPipeClientProcessId(pipe.SafePipeHandle, out var pid) ? new((int)pid, Image(pid)) : new(null, null);
+
+    static string Image(uint pid)
     {
-        if (!GetNamedPipeClientProcessId(pipe.SafePipeHandle, out var pid))
-            return null;
         try
         {
             using var process = Process.GetProcessById((int)pid);
