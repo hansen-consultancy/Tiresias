@@ -51,6 +51,32 @@
                   Content="{l:S Status_RestoreButton}" Click="OnRestore" />
         </Grid>
       </Border>
+
+      <!-- After "This wasn't me": the lockdown until the next unlock, and the programs refused without asking. -->
+      <Border Style="{StaticResource Card}" Visibility="{Binding GuardVisibility}">
+        <StackPanel>
+          <TextBlock x:Name="BlockedTitle" Text="{l:S Status_BlockedTitle}" Style="{StaticResource SubtitleText}" />
+          <TextBlock Text="{l:S Status_LockedDown}" Style="{StaticResource CaptionText}" Visibility="{Binding LockedDownVisibility}" Margin="0,0,0,4" />
+          <ItemsControl ItemsSource="{Binding Blocked}" Focusable="False" AutomationProperties.LabeledBy="{Binding ElementName=BlockedTitle}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Grid Margin="0,4">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBox Text="{Binding Path, Mode=OneWay}" Style="{StaticResource SelectableText}" />
+                    <TextBlock Text="{Binding Since}" Style="{StaticResource CaptionText}" />
+                  </StackPanel>
+                  <Button Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0" Padding="12,4"
+                          Content="{l:S Status_Unblock}" AutomationProperties.Name="{Binding UnblockName}" Click="OnUnblock" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
     </StackPanel>
 
     <!-- Where to go next sits with the state it acts on; the footer keeps only what acts on this page. -->

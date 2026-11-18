@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Threading;
-using Tiresias.UserSecrets;
 
 namespace Tiresias.App.Views;
 
@@ -14,13 +13,23 @@ namespace Tiresias.App.Views;
 /// <param name="Command">The command line about to run, shown under the heading.</param>
 public sealed record ConsentView(string Heading, string? Program, string ListLabel, IReadOnlyList<string> Items, string Note, bool AllowSession, bool Unlock = false, string? Command = null);
 
+/// <summary>The button the user pressed; closing, timing out or locking counts as <see cref="Deny"/>.</summary>
+public enum ConsentChoice
+{
+    Deny,
+    AllowOnce,
+    AllowForSession,
+    /// <summary>"This wasn't me": deny, lock, and block the program.</summary>
+    NotMe,
+}
+
 /// <summary>
 /// The consent dialog: topmost, names the program and lists what it gets, and answers Deny when it
 /// is closed, times out, or the session locks (the caller cancels the token).
 /// </summary>
 public partial class ConsentWindow : Window
 {
-    readonly TaskCompletionSource<ConsentAnswer> answer = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    readonly TaskCompletionSource<ConsentChoice> answer = new(TaskCreationOptions.RunContinuationsAsynchronously);
     readonly DispatcherTimer tick = new() { Interval = TimeSpan.FromSeconds(1) };
     readonly DateTimeOffset deadline;
     readonly string? program;
@@ -54,10 +63,10 @@ public partial class ConsentWindow : Window
     }
 
     /// <summary>Shows the dialog and completes with the answer; Deny when <paramref name="ct"/> is cancelled first.</summary>
-    public static Task<ConsentAnswer> AskAsync(ConsentView view, TimeSpan timeout, int waiting, CancellationToken ct)
+    public static Task<ConsentChoice> AskAsync(ConsentView view, TimeSpan timeout, int waiting, CancellationToken ct)
     {
         var window = new ConsentWindow(view, timeout, waiting);
-        var registration = ct.Register(() => window.Dispatcher.BeginInvoke(() => window.Finish(ConsentAnswer.Deny)));
+        var registration = ct.Register(() => window.Dispatcher.BeginInvoke(() => window.Finish(ConsentChoice.Deny)));
         window.answer.Task.ContinueWith(_ => registration.Dispose(), TaskScheduler.Default);
         window.Show();
         window.Activate();
@@ -77,13 +86,13 @@ public partial class ConsentWindow : Window
         var left = deadline - DateTimeOffset.Now;
         if (left <= TimeSpan.Zero)
         {
-            Finish(ConsentAnswer.Deny);
+            Finish(ConsentChoice.Deny);
             return;
         }
         Countdown.Text = Text.Format("Consent_Countdown", $"{(int)left.TotalMinutes}:{left.Seconds:00}");
     }
 
-    void Finish(ConsentAnswer result)
+    void Finish(ConsentChoice result)
     {
         if (!answer.TrySetResult(result))
             return;
@@ -91,15 +100,17 @@ public partial class ConsentWindow : Window
         Close();
     }
 
-    void OnAllowOnce(object sender, RoutedEventArgs e) => Finish(ConsentAnswer.AllowOnce);
+    void OnAllowOnce(object sender, RoutedEventArgs e) => Finish(ConsentChoice.AllowOnce);
 
-    void OnAllowSession(object sender, RoutedEventArgs e) => Finish(ConsentAnswer.AllowForSession);
+    void OnAllowSession(object sender, RoutedEventArgs e) => Finish(ConsentChoice.AllowForSession);
 
-    void OnDeny(object sender, RoutedEventArgs e) => Finish(ConsentAnswer.Deny);
+    void OnDeny(object sender, RoutedEventArgs e) => Finish(ConsentChoice.Deny);
+
+    void OnNotMe(object sender, RoutedEventArgs e) => Finish(ConsentChoice.NotMe);
 
     protected override void OnClosing(CancelEventArgs e)
     {
-        answer.TrySetResult(ConsentAnswer.Deny);
+        answer.TrySetResult(ConsentChoice.Deny);
         tick.Stop();
         base.OnClosing(e);
     }

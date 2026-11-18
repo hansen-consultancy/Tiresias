@@ -22,6 +22,7 @@ public partial class App : Application
     readonly CancellationTokenSource stop = new();
     Mutex? instance;
     ConsentPresenter? consent;
+    ProgramGuard? guard;
     readonly ShellConsent shells = new();
     readonly ShellPlaceholders shellPlaceholders = new(TimeProvider.System);
     AgentHost? host;
@@ -32,6 +33,9 @@ public partial class App : Application
     internal AgentHost Host => host!;
 
     internal ConsentPresenter Consent => consent!;
+
+    /// <summary>The "This wasn't me" lockdown and blocklist.</summary>
+    internal ProgramGuard Guard => guard!;
 
     /// <summary>A window that must not be interrupted (consent, secrets editor, services, first run, recovery) is open.</summary>
     internal bool Busy => consent?.Busy == true || windows.ContainsKey(typeof(SecretsWindow)) || windows.ContainsKey(typeof(ServicesWindow))
@@ -58,7 +62,15 @@ public partial class App : Application
 
         consent = new ConsentPresenter(Dispatcher);
         host = new AgentHost(consent);
+        guard = new ProgramGuard();
         consent.Unlock = async () => (await UnlockAsync(interactive: true)).Ok;
+        consent.Gate = guard.Decide;
+        consent.NotMe = (asker, asked) =>
+        {
+            // Before the next waiting request is looked at: from here on everything is refused.
+            guard.LockDown();
+            _ = Dispatcher.InvokeAsync(() => NotMeAsync(asker, asked)).Task.Unwrap();
+        };
         host.Log += AppLog.Info;
         try
         {
@@ -237,6 +249,9 @@ public partial class App : Application
     /// <returns>Whether the agent ended up unlocked, and what to tell <c>tir</c>.</returns>
     internal async Task<(bool Ok, string Message)> UnlockAsync(bool interactive)
     {
+        // After "This wasn't me" only the user, from the app, unlocks: tir, a terminal or NuGet asking can't.
+        if (!interactive && guard!.Current.LockedDown)
+            return (false, Text.Get("Lockdown_UnlockFromApp"));
         try
         {
             var result = await host!.UnlockAsync();
@@ -261,6 +276,12 @@ public partial class App : Application
                 AppLog.Error(e, "unlock from tir");
             return (false, e.Message);
         }
+        finally
+        {
+            // Windows Hello passing from the app is what lifts "This wasn't me", even if the lease then failed.
+            if (interactive && host!.Keys.IsUnlocked)
+                guard!.Unlocked();
+        }
     }
 
     internal async Task LockAsync()
@@ -269,6 +290,34 @@ public partial class App : Application
         await host!.LockAsync();
         Refresh();
     }
+
+    /// <summary>
+    /// "This wasn't me", after the lockdown is already in place: lock (which forgets every session
+    /// consent, terminal and NuGet allowance, revokes the terminals' placeholders and ends the lease),
+    /// find the process and what started it, block the program, record it and show what to do next.
+    /// </summary>
+    async Task NotMeAsync(Asker asker, string asked)
+    {
+        AppLog.Info($"this wasn't me: {asker.Image ?? "unknown program"} asked for {asked}");
+        await LockAsync();
+        var (process, chain, sha) = await Task.Run(() =>
+        {
+            var found = asker.ProcessId is { } pid ? (ProcessTree.Ancestry(pid, 0) is [var self] ? self : null)
+                : asker.Image is { } path && System.IO.Path.IsPathFullyQualified(path) ? ProcessTree.Newest(path) : null;
+            var parents = found is null ? Array.Empty<string>()
+                : [.. ProcessTree.Ancestry(found.ProcessId).Skip(1).Select(p => $"{p.Program} ({p.ProcessId})")];
+            return (found, parents, asker.Image is { } program ? guard!.Sha256(program) : null);
+        });
+        guard!.Block(asker.Image, sha);
+        var blocked = asker.Image is { } image && guard.Current.Programs.Any(p => string.Equals(p.Path, image, StringComparison.OrdinalIgnoreCase));
+        host!.RecordIncident(asked, process is null ? asker.Image : $"{process.Program} ({process.ProcessId})", chain, blocked);
+        IncidentView view = new(asked, asker.Image, process, chain, blocked);
+        IncidentWindow.Show(view);
+    }
+
+    /// <summary>A request that came through <c>tir</c>: the program that ran it is the one asking, not <c>tir</c> itself.</summary>
+    static Asker TirCaller(PipeClient caller) =>
+        caller.ProcessId is { } pid && ProcessTree.ParentOf(pid) is { } parent ? new(parent.Program, parent.ProcessId) : new(caller.Image, caller.ProcessId);
 
     void StartControlPipe()
     {
@@ -299,10 +348,10 @@ public partial class App : Application
                 await Dispatcher.InvokeAsync(ShowHome);
                 return new(true);
             case ControlRequest.Consent:
-                var approved = await consent!.AskPlaceholderAsync(request.Title ?? "tir", request.Lines ?? [], caller.Image, ct);
+                var approved = await consent!.AskPlaceholderAsync(request.Title ?? "tir", request.Lines ?? [], caller.Image, TirCaller(caller), ct);
                 return new(true, Approved: approved);
             case ControlRequest.Environment:
-                return await EnvironmentForAsync(request, caller.Image, ct);
+                return await EnvironmentForAsync(request, caller, ct);
             case ControlRequest.ShellEnvironment:
                 return await ShellEnvironmentAsync(request, caller, ct);
             case ControlRequest.NuGetCredential:
@@ -319,8 +368,9 @@ public partial class App : Application
     }
 
     /// <summary><c>tir run</c>: unlocks if needed, then hands the sealed variables over only if the user allows this program.</summary>
-    async Task<ControlReply> EnvironmentForAsync(ControlRequest request, string? caller, CancellationToken ct)
+    async Task<ControlReply> EnvironmentForAsync(ControlRequest request, PipeClient client, CancellationToken ct)
     {
+        var caller = client.Image;
         if (!host!.Keys.IsUnlocked)
         {
             var (unlocked, message) = await Dispatcher.InvokeAsync(() => UnlockAsync(interactive: false)).Task.Unwrap();
@@ -336,7 +386,8 @@ public partial class App : Application
         if (variables.Count == 0)
             return new(true, Text.Get("Environment_NoneSealed"), Approved: true, Variables: new Dictionary<string, string>());
         var program = request.Title ?? "tir run";
-        var approved = await consent!.AskEnvironmentAsync(program, request.Lines, [.. variables.Select(v => EnvironmentDelivery.Describe(sealedNow, v.Name))], caller, ct);
+        var approved = await consent!.AskEnvironmentAsync(program, request.Lines, [.. variables.Select(v => EnvironmentDelivery.Describe(sealedNow, v.Name))], caller,
+            TirCaller(client), ct);
         AppLog.Info($"tir run {program}: {(approved ? "allowed" : "denied")} {variables.Count} environment variable(s)");
         host.RecordEnvironment(approved, program, variables.Select(v => EnvironmentDelivery.Describe(sealedNow, v.Name)), caller);
         if (!approved)
@@ -382,7 +433,7 @@ public partial class App : Application
         string? note = null;
         if (answer == ShellAnswer.Ask)
         {
-            var approved = await consent!.AskShellAsync(shell.Program, directory, [.. fresh.Select(name => EnvironmentDelivery.Describe(sealedNow, name))], ct);
+            var approved = await consent!.AskShellAsync(shell.Program, shell.ProcessId, directory, [.. fresh.Select(name => EnvironmentDelivery.Describe(sealedNow, name))], ct);
             AppLog.Info($"terminal {System.IO.Path.GetFileName(shell.Program)} ({shell.ProcessId}): {(approved ? "allowed" : "denied")} {fresh.Count} environment variable(s)");
             if (approved)
             {
@@ -443,7 +494,7 @@ public partial class App : Application
             known = nugetAllowed.Contains(key);
         if (!known)
         {
-            var answer = await consent!.AskNuGetAsync(program.Program, source.Source, variable.Name, ct);
+            var answer = await consent!.AskNuGetAsync(program.Program, program.ProcessId, source.Source, variable.Name, ct);
             AppLog.Info($"nuget {System.IO.Path.GetFileName(program.Program)} {source.Source}: {answer} {variable.Name}");
             if (answer == ConsentAnswer.Deny)
                 return new(true, Approved: false);
