@@ -272,6 +272,27 @@ its device keys belong to that PC's Windows account.
 
 To keep it, add the hook line last in `$PROFILE`.
 
+## 11. NuGet credentials from a sealed variable
+
+Needs the .NET 9.0.200 SDK or later and a private feed (Azure Artifacts, GitHub Packages) with a
+personal access token.
+
+1. `tir env set FEED_PAT` (paste the token), then
+   `tir env nuget add https://pkgs.dev.azure.com/example/_packaging/feed/nuget/v3/index.json FEED_PAT`
+   (GitHub Packages: add `--username <your GitHub login>`). `tir env nuget list` shows it.
+2. Remove that source's `packageSourceCredentials` from `NuGet.Config`, and clear
+   `NUGET_PLUGIN_PATHS` and `NuGetPackageSourceCredentials_*` if set.
+3. `where.exe nuget-plugin-tiresias` finds it next to `tir`. Run on its own, it explains itself.
+4. In a project using the feed: `dotnet nuget locals http-cache --clear`, then
+   `dotnet restore --interactive`. The app asks to give **FEED_PAT** to `dotnet`; allow it, and the
+   restore succeeds.
+5. Deny it instead: the restore fails with a 401 (with `-v n`, NuGet may show the plugin's
+   message; whether it does is part of what to check).
+6. Reseal a wrong value (`tir env set FEED_PAT`, type anything): the restore fails, and the
+   message names the variable to reseal rather than asking again.
+7. Quit the app: the restore says the app isn't running.
+8. Clean up: `tir env nuget remove <source-url>`, `tir env remove FEED_PAT`.
+
 ## What you can't test yet
 
 These are not built yet (see [desktop-app.md](desktop-app.md#what-is-built)):

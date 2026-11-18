@@ -86,6 +86,25 @@ sealed class ConsentPresenter(Dispatcher dispatcher) : IUserSecretsConsentPrompt
         }
     }
 
+    /// <summary>A NuGet feed's token for one program (<paramref name="program"/> is its image path), allowed once or until the agent locks.</summary>
+    public async Task<ConsentAnswer> AskNuGetAsync(string program, string source, string variable, CancellationToken ct)
+    {
+        try
+        {
+            return await ShowAsync(new ConsentView(
+                Text.Format("Consent_NuGet_Heading", System.IO.Path.GetFileNameWithoutExtension(program)),
+                program,
+                Text.Format("Consent_NuGet_ListLabel", source),
+                [variable],
+                Text.Get("Consent_NuGet_Note"),
+                AllowSession: true), UserSecretsService.ConsentTimeout, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            return ConsentAnswer.Deny;
+        }
+    }
+
     /// <summary>A placeholder or <c>tir exec</c> approval asked by <c>tir</c>; <c>tir</c> still asks for Windows Hello afterwards.</summary>
     public async Task<bool> AskPlaceholderAsync(string title, IReadOnlyList<string> lines, string? caller, CancellationToken ct)
     {

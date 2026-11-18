@@ -1,8 +1,9 @@
 # Environment variables
 
-**Status:** phases 1 and 2 are built: the store with folder sets, **Protect** / **Put back**,
+**Status:** phases 1, 2 and 4 are built: the store with folder sets, **Protect** / **Put back**,
 `tir env`, `tir run`, the PowerShell hook with consent once per terminal, the **Environment
-variables** window and the status check. Phases 3 and 4 are design.
+variables** window, the status check and the NuGet credential plugin. Phase 3 (placeholders) is
+design.
 
 Many developers keep API keys and tokens in their Windows user environment (`setx OPENAI_API_KEY
 ...`). That makes them readable by every process the user starts, forever, with no record of who
@@ -97,10 +98,21 @@ variable, and the editor says so rather than offering it everywhere.
 
 ### Programs started outside a shell
 
-- **NuGet:** a credential provider (`Tiresias.NuGet.CredentialProvider`, NuGet's plugin protocol)
-  answers for package sources the user maps to sealed variables. `dotnet restore`, Visual Studio
-  and Rider then authenticate without a token in `NuGet.Config` or the environment. Consent is per
-  program, as for user secrets.
+- **NuGet:** `nuget-plugin-tiresias.exe`, installed next to `tir`, speaks NuGet's
+  cross-platform credential plugin protocol (version 2). Map a source to a sealed variable with
+  `tir env nuget add <source-url> <NAME> [--username <name>]`, and remove the token from
+  `NuGet.Config`. When the feed answers 401, NuGet asks the plugin; the plugin asks the app, and
+  the app asks you once per program (the parent of the plugin: `dotnet`, `devenv`, `MSBuild`...)
+  and variable, with **Allow for this session** remembered until Tiresias locks.
+  - The plugin answers only for https sources on the mapped host and port: the source itself, or
+    anything under the folder its service index is in. Everything else is **NotFound**, so NuGet
+    carries on with its other providers.
+  - A retry (the feed refused the last answer) gets no value, only a message saying which
+    variable to reseal.
+  - The mapping is sealed with the variables, so nothing can quietly point a token at another host.
+  - NuGet finds `nuget-plugin-*` on PATH from NuGet 6.13 (.NET SDK 9.0.200, Visual Studio 17.13);
+    older ones also wanted plugins Authenticode-signed. Don't set `NUGET_PLUGIN_PATHS`: it
+    replaces NuGet's own discovery.
 - Anything else that only reads its environment at start-up stays in the registry, and the status
   page lists it as **unprotected** with the program that needs it, so the gap is visible rather
   than hidden.
@@ -116,6 +128,12 @@ variable, and the editor says so rather than offering it everywhere.
   terminal's memory, environment included. Sealing protects against reading the registry, files
   and new processes, not against malware already running as you.
 - The activity log records variable names, the program and the decision; never a value.
+- The NuGet plugin has been tested against the protocol as documented, not yet against a real
+  `dotnet restore`. In particular, which NuGet hosts (the .NET SDK, MSBuild under Visual Studio,
+  `nuget.exe`) look on PATH is not spelled out by NuGet's documentation.
+- The program asking for a NuGet token is the plugin's parent process. A program running as you
+  can start the plugin itself and pass for `dotnet`; as above, it could read `dotnet`'s memory
+  anyway.
 
 ## Phases
 
@@ -124,4 +142,4 @@ variable, and the editor says so rather than offering it everywhere.
 2. The shell hook with session consent and folder sets (`tir env hook`, `--folder`, a folder field
    in the window). Built.
 3. Placeholder delivery through the vault and forwarder.
-4. The NuGet credential provider.
+4. The NuGet credential plugin (`tir env nuget`, `nuget-plugin-tiresias.exe`). Built.

@@ -71,6 +71,7 @@ jobs:
           v="${{ steps.meta.outputs.version }}"
           dotnet publish src/Tiresias.App -c Release -r win-x64 --self-contained -p:Version="$v" -o publish
           dotnet publish src/Tiresias.Keyring -c Release -r win-x64 --self-contained -p:Version="$v" -o publish
+          dotnet publish src/Tiresias.NuGetPlugin -c Release -r win-x64 --self-contained -p:Version="$v" -o publish
 
       - name: Azure sign-in (OIDC)
         uses: azure/login@v2

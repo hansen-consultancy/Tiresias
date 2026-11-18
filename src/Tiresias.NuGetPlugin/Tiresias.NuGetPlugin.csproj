@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    NuGet credential plugin, published next to tir.exe. NuGet (6.13 and later, the .NET 9.0.200 SDK
+    onwards) finds executables named nuget-plugin-* on PATH, and the app keeps that folder on PATH.
+    It holds no secret itself: it asks the running app, which asks the user. Windows only.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net11.0-windows10.0.22621.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <AssemblyName>nuget-plugin-tiresias</AssemblyName>
+    <RootNamespace>Tiresias.NuGetPlugin</RootNamespace>
+    <!-- Same reason as tir: Agent references the broker, an Exe (NETSDK1152 on a self-contained publish). -->
+    <ErrorOnDuplicatePublishOutputFiles>false</ErrorOnDuplicatePublishOutputFiles>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Tiresias.Agent\Tiresias.Agent.csproj" />
+    <ProjectReference Include="..\Tiresias.Core\Tiresias.Core.csproj" />
+  </ItemGroup>
+
+</Project>

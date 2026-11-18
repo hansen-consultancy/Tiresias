@@ -26,8 +26,53 @@ static class EnvCommand
         "set" => Set(args.Require(2, "name"), Folder(args), args.Flag("--from-stdin")),
         "remove" => Remove(args.Require(2, "name"), Folder(args)),
         "hook" => Hook(args.At(2)),
-        _ => throw new UsageException("tir env takes list, protect, put-back, set, remove, hook or shell."),
+        "nuget" => NuGet(args),
+        _ => throw new UsageException("tir env takes list, protect, put-back, set, remove, hook, shell or nuget."),
     };
+
+    /// <summary>
+    /// <c>tir env nuget add|list|remove</c>: which package sources the NuGet plugin answers for, and
+    /// with which sealed variable. Sealed with the variables, so a mapping can't be changed behind
+    /// your back to send a token elsewhere.
+    /// </summary>
+    static int NuGet(CommandLine args)
+    {
+        using var hello = HelloKeyWrapper.Open(create: false);
+        var (sealedNow, version) = EnvironmentStore.Open(hello);
+        switch (args.At(2))
+        {
+            case "list":
+                if (sealedNow.NuGetSources.Count == 0)
+                    Console.WriteLine("No NuGet sources use a sealed variable. Add one: tir env nuget add <source-url> <NAME>.");
+                foreach (var source in sealedNow.NuGetSources)
+                    Console.WriteLine($"  {source.Source}  {source.Variable} (user name {source.Username})");
+                return 0;
+            case "add":
+                var url = args.Require(3, "source-url");
+                var name = args.Require(4, "NAME");
+                if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
+                    throw new UsageException("The source must be an https URL, as in NuGet.Config: https://pkgs.dev.azure.com/example/_packaging/feed/nuget/v3/index.json.");
+                if (!sealedNow.Global.Any(v => string.Equals(v.Name, name, StringComparison.OrdinalIgnoreCase)))
+                    throw new UsageException($"{name} is not a sealed variable. Seal the token first: tir env set {name} (or tir env protect {name}).");
+                EnvironmentStore.Save(sealedNow.WithNuGetSource(new(url, name, args.Option("--username") ?? SealedEnvironment.NuGetDefaultUsername)), version, hello);
+                Console.WriteLine($"NuGet now asks Tiresias for {url}, and gets {name} once you allow the program asking.");
+                Console.WriteLine("Remove the token from NuGet.Config (packageSourceCredentials) so NuGet asks. Needs the .NET 9.0.200 SDK or later.");
+                return 0;
+            case "remove":
+                var removing = args.Require(3, "source-url");
+                var left = sealedNow.WithoutNuGetSource(removing);
+                if (left.NuGetSources.Count == sealedNow.NuGetSources.Count)
+                {
+                    Console.Error.WriteLine($"{removing} isn't mapped. See tir env nuget list.");
+                    return 1;
+                }
+                EnvironmentStore.Save(left, version, hello);
+                Console.WriteLine($"NuGet no longer gets a sealed variable for {removing}. The variable itself stays sealed.");
+                return 0;
+            default:
+                throw new UsageException("tir env nuget takes add, list or remove.");
+        }
+    }
 
     /// <summary><c>--folder</c> alone means the current directory; absent means the global set.</summary>
     static string? Folder(CommandLine args) =>

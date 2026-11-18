@@ -30,6 +30,12 @@ public static partial class ProcessTree
         return null;
     }
 
+    /// <summary>The process that started <paramref name="caller"/>, when it is still running and started before it.</summary>
+    public static ShellIdentity? ParentOf(int caller) =>
+        Describe(caller) is { } child && Describe(child.Parent) is { } parent && parent.Started <= child.Started
+            ? new(parent.Id, parent.Started, parent.Image)
+            : null;
+
     /// <summary>Whether the process that had this id and start time is still running.</summary>
     public static bool IsRunning(int id, DateTime started) => Describe(id) is { } process && process.Started == started;
 

@@ -80,7 +80,11 @@ public partial class App : Application
         {
             // Locked: every terminal asks again, as it would after a restart.
             if (!host.Keys.IsUnlocked)
+            {
                 shells.Clear();
+                lock (nugetAllowed)
+                    nugetAllowed.Clear();
+            }
             Dispatcher.BeginInvoke(Refresh);
         };
         host.UserSecrets.FirstSealed += id => Dispatcher.BeginInvoke(() =>
@@ -299,6 +303,8 @@ public partial class App : Application
                 return await EnvironmentForAsync(request, caller.Image, ct);
             case ControlRequest.ShellEnvironment:
                 return await ShellEnvironmentAsync(request, caller, ct);
+            case ControlRequest.NuGetCredential:
+                return await NuGetCredentialAsync(request, caller, ct);
             case ControlRequest.Unlock:
                 var (ok, message) = await Dispatcher.InvokeAsync(() => UnlockAsync(interactive: false)).Task.Unwrap();
                 return new(ok, message);
@@ -381,6 +387,55 @@ public partial class App : Application
         // Whatever the shell was allowed before still reaches it; only the names it was refused stay out.
         var given = variables.Where(v => !fresh.Contains(v.Name, StringComparer.OrdinalIgnoreCase));
         return new(true, note, Approved: true, Variables: given.ToDictionary(v => v.Name, v => v.Value, StringComparer.OrdinalIgnoreCase));
+    }
+
+    /// <summary>Programs allowed a NuGet source's token until the agent locks: image path and variable.</summary>
+    readonly HashSet<(string Program, string Variable)> nugetAllowed = [];
+
+    /// <summary>
+    /// The NuGet credential plugin, asked by <c>dotnet restore</c>, Visual Studio or Rider. The
+    /// program asking is the plugin's parent, never anything the plugin says. Only a source mapped
+    /// to a sealed variable gets an answer; any other is left to NuGet's other providers.
+    /// </summary>
+    async Task<ControlReply> NuGetCredentialAsync(ControlRequest request, PipeClient caller, CancellationToken ct)
+    {
+        if (!Uri.TryCreate(request.Title, UriKind.Absolute, out var uri))
+            return new(false, Text.Get("NuGet_BadSource"));
+        if (!EnvironmentStore.IsSealed)
+            return new(true, Approved: false);
+        if (caller.ProcessId is not { } pid || ProcessTree.ParentOf(pid) is not { } program)
+            return new(false, Text.Get("Shell_Unrecognised"));
+        if (!host!.Keys.IsUnlocked)
+        {
+            var (unlocked, message) = await Dispatcher.InvokeAsync(() => UnlockAsync(interactive: false)).Task.Unwrap();
+            if (!unlocked)
+                return new(false, message);
+        }
+        if (host.Keys.Hello is not { } hello)
+            return new(false, Text.Get("Environment_Locked"));
+        var environment = await Task.Run(() => EnvironmentStore.Open(hello).Environment, ct);
+        if (environment.NuGetSourceFor(uri) is not { } source)
+            return new(true, Approved: false);
+        if (environment.Global.FirstOrDefault(v => string.Equals(v.Name, source.Variable, StringComparison.OrdinalIgnoreCase)) is not { } variable)
+            return new(true, Text.Format("NuGet_VariableMissing", source.Variable, source.Source), Approved: false);
+        if (request.AskAgain)
+            return new(true, Text.Format("NuGet_Refused", source.Variable, source.Source), Approved: false);
+
+        var key = (program.Program, variable.Name);
+        bool known;
+        lock (nugetAllowed)
+            known = nugetAllowed.Contains(key);
+        if (!known)
+        {
+            var answer = await consent!.AskNuGetAsync(program.Program, source.Source, variable.Name, ct);
+            AppLog.Info($"nuget {System.IO.Path.GetFileName(program.Program)} {source.Source}: {answer} {variable.Name}");
+            if (answer == ConsentAnswer.Deny)
+                return new(true, Approved: false);
+            if (answer == ConsentAnswer.AllowForSession)
+                lock (nugetAllowed)
+                    nugetAllowed.Add(key);
+        }
+        return new(true, Approved: true, Username: source.Username, Password: variable.Value);
     }
 
     void OnSessionSwitch(object? sender, SessionSwitchEventArgs e)

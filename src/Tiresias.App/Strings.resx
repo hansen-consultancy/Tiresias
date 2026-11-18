@@ -100,6 +100,15 @@
   <data name="Consent_Environment_Note" xml:space="preserve">
     <value>They go into this one program's environment, and whatever it starts. Allowing it hands over the values; they are never shown here.</value>
   </data>
+  <data name="Consent_NuGet_Heading" xml:space="preserve">
+    <value>Give a NuGet feed's token to {0}?</value>
+  </data>
+  <data name="Consent_NuGet_ListLabel" xml:space="preserve">
+    <value>For {0}:</value>
+  </data>
+  <data name="Consent_NuGet_Note" xml:space="preserve">
+    <value>The program uses it to download packages from this feed. Allowing it hands over the value; it is never shown here.</value>
+  </data>
   <data name="Consent_Shell_Heading" xml:space="preserve">
     <value>Give sealed variables to this {0} terminal?</value>
   </data>
@@ -234,6 +243,15 @@
   </data>
   <data name="FirstRun_RecoveryRestore_Title" xml:space="preserve">
     <value>Secrets sealed elsewhere</value>
+  </data>
+  <data name="NuGet_BadSource" xml:space="preserve">
+    <value>NuGet asked for a source that isn't a URL.</value>
+  </data>
+  <data name="NuGet_Refused" xml:space="preserve">
+    <value>the feed refused {0} for {1}. Check the token, then seal the new one with tir env set {0}.</value>
+  </data>
+  <data name="NuGet_VariableMissing" xml:space="preserve">
+    <value>{1} is mapped to {0}, which is no longer sealed. Seal it again with tir env set {0}.</value>
   </data>
   <data name="Recovery_Body" xml:space="preserve">
     <value>Some sealed secrets on this PC don't open with its Windows Hello: they were copied from another PC, or Windows Hello was reset since they were sealed. Type the recovery key they were sealed with. Nothing is decrypted or re-encrypted: each secret gets a copy of its key for this PC's Windows Hello, and keeps its recovery copy. Spaces and case don't matter.</value>
