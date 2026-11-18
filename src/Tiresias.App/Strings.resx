@@ -656,6 +656,90 @@ Switch to this copy, {2}, from {3}? The other copy quits first, ending its lease
   <data name="Consent_Deny" xml:space="preserve">
     <value>Deny</value>
   </data>
+  <data name="Consent_NotMe" xml:space="preserve">
+    <value>This wasn't me</value>
+  </data>
+  <data name="Consent_NotMe_Tip" xml:space="preserve">
+    <value>You didn't expect this request: deny it, lock Tiresias and block this program.</value>
+  </data>
+  <data name="Lockdown_UnlockFromApp" xml:space="preserve">
+    <value>Tiresias is locked because you chose "This wasn't me". Unlock it from the Tiresias tray icon or status page.</value>
+  </data>
+  <data name="Incident_WindowTitle" xml:space="preserve">
+    <value>Tiresias - locked</value>
+  </data>
+  <data name="Incident_Heading" xml:space="preserve">
+    <value>Tiresias is locked</value>
+  </data>
+  <data name="Incident_What" xml:space="preserve">
+    <value>You said you didn't expect: {0}. Tiresias denied it, locked, ended its lease and forgot every "Allow for this session", including terminals and NuGet.</value>
+    <comment>{0}: the consent dialog's heading</comment>
+  </data>
+  <data name="Incident_ProgramLabel" xml:space="preserve">
+    <value>The program that asked</value>
+  </data>
+  <data name="Incident_Blocked" xml:space="preserve">
+    <value>Blocked: Tiresias refuses this program without asking, even after you unlock, until you unblock it on the status page.</value>
+  </data>
+  <data name="Incident_NotBlocked" xml:space="preserve">
+    <value>Tiresias couldn't tell which file this program is, so it isn't blocked. Everything is refused until you unlock.</value>
+  </data>
+  <data name="Incident_ParentsLabel" xml:space="preserve">
+    <value>Started by (nearest first)</value>
+  </data>
+  <data name="Incident_ParentsUnknown" xml:space="preserve">
+    <value>Unknown: the process has ended, or Windows didn't say.</value>
+  </data>
+  <data name="Incident_ProcessNotFound" xml:space="preserve">
+    <value>Tiresias couldn't find this program running.</value>
+  </data>
+  <data name="Incident_ProcessRunning" xml:space="preserve">
+    <value>Still running as process {0}.</value>
+    <comment>{0}: process id</comment>
+  </data>
+  <data name="Incident_ProcessEnded" xml:space="preserve">
+    <value>Process {0} is no longer running.</value>
+    <comment>{0}: process id</comment>
+  </data>
+  <data name="Incident_EndProcess" xml:space="preserve">
+    <value>End this process</value>
+  </data>
+  <data name="Incident_EndFailed" xml:space="preserve">
+    <value>Couldn't end process {0}: {1}</value>
+    <comment>{0}: process id; {1}: the reason</comment>
+  </data>
+  <data name="Incident_ScanLabel" xml:space="preserve">
+    <value>Scan for malware</value>
+  </data>
+  <data name="Incident_ScanBody" xml:space="preserve">
+    <value>In Windows Security, open Virus &amp; threat protection, then Scan options, choose Custom scan and pick the folder above. A Full scan checks everything.</value>
+  </data>
+  <data name="Incident_OpenSecurity" xml:space="preserve">
+    <value>Open Windows Security</value>
+  </data>
+  <data name="Incident_Unlock" xml:space="preserve">
+    <value>Every request is refused until you unlock with Windows Hello from the Tiresias tray icon or status page. Nothing else on this PC was changed.</value>
+  </data>
+  <data name="Incident_Status" xml:space="preserve">
+    <value>Open status</value>
+  </data>
+  <data name="Status_BlockedTitle" xml:space="preserve">
+    <value>Blocked programs</value>
+  </data>
+  <data name="Status_LockedDown" xml:space="preserve">
+    <value>Locked after "This wasn't me": every request is refused until you unlock here.</value>
+  </data>
+  <data name="Status_Unblock" xml:space="preserve">
+    <value>Unblock</value>
+  </data>
+  <data name="Status_UnblockName" xml:space="preserve">
+    <value>Unblock {0}</value>
+    <comment>{0}: the program's path</comment>
+  </data>
+  <data name="Status_BlockedSince" xml:space="preserve">
+    <value>Blocked {0:g}</value>
+    <comment>{0}: when it was blocked</comment>
+  </data>
   <data name="Problem_WhyLabel" xml:space="preserve">
     <value>Why it matters</value>
   </data>

@@ -43,6 +43,14 @@ public sealed class AgentHost : IAsyncDisposable
     public static AuditRecord EnvironmentRecord(bool allowed, string program, IEnumerable<string> names, string? process) =>
         new(allowed ? AuditKind.Allow : AuditKind.Deny, Consumer: "environment", Service: program, Reason: string.Join(", ", names), Process: process);
 
+    /// <summary>
+    /// Records "This wasn't me" in the activity log: what was asked, the program and the processes
+    /// that started it (nearest first), and whether it is now blocked. Never a value.
+    /// </summary>
+    public void RecordIncident(string asked, string? process, IEnumerable<string> parents, bool blocked) =>
+        activity.Append(new(AuditKind.Deny, Consumer: "incident", Service: asked, Process: process,
+            Reason: $"This wasn't me: locked{(blocked ? ", program blocked" : "")}; started by {(parents.Any() ? string.Join(" < ", parents) : "unknown")}"));
+
     public UserSecretsService UserSecrets { get; }
 
     /// <summary>One line per event, for a log view or the terminal. Never a value.</summary>

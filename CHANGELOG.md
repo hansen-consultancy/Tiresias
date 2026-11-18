@@ -10,6 +10,11 @@ its section below.
 
 ### Added
 
+- **This wasn't me** on every consent dialog, for a prompt you didn't expect: it denies the
+  request, locks Tiresias, ends the lease and refuses everything until you unlock from the app,
+  and blocks the asking program until you unblock it on the status page. A follow-up window shows
+  the program's folder, can end the process, and points to a Microsoft Defender scan; Activity
+  records the process and what started it.
 - `tir env nuget import`, and **NuGet feeds** in the environment variables window, move a feed's
   token out of NuGet.Config (`%NAME%` or plain text) into the sealed environment.
 - The environment variables window can switch a sealed key to placeholder delivery and back.

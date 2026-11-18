@@ -3,22 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:l="clr-namespace:Tiresias.App"
         Title="{l:S Consent_WindowTitle}"
-        Width="520" SizeToContent="Height" MaxHeight="720" ResizeMode="NoResize"
+        Width="600" SizeToContent="Height" MaxHeight="720" ResizeMode="NoResize"
         WindowStartupLocation="CenterScreen" Topmost="True" ShowInTaskbar="True"
         Icon="pack://application:,,,/Assets/tiresias.ico">
-  <Window.Resources>
-    <!-- Reads as the mono text it replaces, but can be selected and copied. -->
-    <Style x:Key="SelectableText" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
-      <Setter Property="IsReadOnly" Value="True" />
-      <Setter Property="TextWrapping" Value="Wrap" />
-      <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="Padding" Value="0" />
-      <Setter Property="MinHeight" Value="0" />
-      <Setter Property="FontFamily" Value="Cascadia Mono, Consolas" />
-      <Setter Property="FontSize" Value="13" />
-    </Style>
-  </Window.Resources>
   <Grid Margin="{StaticResource PagePadding}">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
@@ -70,6 +57,9 @@
               Content="{l:S Consent_AllowOnce}" Click="OnAllowOnce" />
       <!-- Deny is the cancel button (Esc, closing the window) and nothing is the default: Enter never approves by accident. -->
       <Button x:Name="DenyButton" Style="{StaticResource RowButton}" Content="{l:S Consent_Deny}" IsCancel="True" Click="OnDeny" />
+      <!-- An unexpected prompt can mean malware: deny, lock everything and block the program (docs/desktop-app.md). -->
+      <Button x:Name="NotMeButton" Style="{StaticResource RowButton}" Content="{l:S Consent_NotMe}" Click="OnNotMe"
+              ToolTip="{l:S Consent_NotMe_Tip}" AutomationProperties.HelpText="{l:S Consent_NotMe_Tip}" />
     </StackPanel>
   </Grid>
 </Window>
