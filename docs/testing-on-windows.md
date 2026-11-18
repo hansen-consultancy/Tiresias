@@ -205,6 +205,11 @@ Things worth trying:
 - **Status...** runs the same checks as `tir doctor`. **Copy details** puts them on the clipboard
   for an issue. **Lock** there locks right away; **Unlock** asks for Windows Hello. **Edit user
   secrets...** and **Services...** under the state open those windows.
+- In the secrets editor, open **Project folders** and **Add folder...** with the folder you keep
+  your code in. Projects then show by name, an id used by a copied project lists every copy, and
+  ids no project uses move to **No project found**, where **Move to Recycle Bin** clears them (you
+  can put them back from the Recycle Bin). Running a project with `dotnet run` names its id too,
+  without a scan.
 - **Review...** on a plain-text project opens it in the secrets editor. **Seal now** asks first,
   because an app that doesn't use Tiresias.Extensions.Configuration yet then starts without its
   secrets. **Store in clear** undoes it.

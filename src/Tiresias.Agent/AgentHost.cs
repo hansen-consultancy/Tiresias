@@ -53,7 +53,7 @@ public sealed class AgentHost : IAsyncDisposable
     /// <exception cref="IOException">Another agent (the app, or <c>tir agent</c>) already runs in this session.</exception>
     public async Task StartAsync()
     {
-        var server = new AgentPipeServer<AgentRequest, AgentReply>(AgentWire.PipeName, UserSecrets.HandleAsync, PipeCaller.Identify);
+        var server = new AgentPipeServer<AgentRequest, AgentReply>(AgentWire.PipeName, HandleUserSecretsAsync, PipeCaller.Identify);
         server.ConnectionFailed += e => Say($"A user-secrets request failed: {e.Message}");
         var serving = server.RunAsync(stop.Token);
         if (serving.IsFaulted)
@@ -61,6 +61,14 @@ public sealed class AgentHost : IAsyncDisposable
         running.Add(serving);
         running.Add(keeper.RunAsync(stop.Token));
         await StartSoloBrokerAsync();
+    }
+
+    /// <summary>Answers the request, then links its id to the asking program's project, off the pipe's path.</summary>
+    async Task<AgentReply> HandleUserSecretsAsync(AgentRequest request, string? caller, CancellationToken ct)
+    {
+        var reply = await UserSecrets.HandleAsync(request, caller, ct);
+        _ = Task.Run(() => ProjectIndexStore.LinkFromCaller(caller, request.UserSecretsId), CancellationToken.None);
+        return reply;
     }
 
     /// <summary>Starts the solo broker when this device uses one and it isn't up; a failure is kept in <see cref="SoloBrokerProblem"/>, not thrown.</summary>

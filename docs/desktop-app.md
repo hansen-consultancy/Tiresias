@@ -26,6 +26,13 @@ CI and people who prefer it, and it talks to the same agent.
   they work in the terminal as before.
 - **Secrets editor**, excluded from screen capture (`WDA_EXCLUDEFROMCAPTURE`). Values are masked
   and shown one at a time. It drops every value when the agent locks, and saving always seals.
+  A user-secrets folder is named after its id only, so the editor names it after the project that
+  uses it: from folders the user adds under **Project folders** (rescanned each time it opens;
+  only project files are read, never `bin`, `obj` or `node_modules`), from **Find a project**, and
+  from the program that asked the agent for that id (traced back from its `bin` folder). The map
+  lives in `%LOCALAPPDATA%\Tiresias\projects.json`, paths and ids only. Ids no scanned project
+  uses are grouped under **No project found** and can be moved to the Recycle Bin, once at least
+  one folder has been scanned.
 - **Activity window** over the local logs: the agent's user-secrets decisions (`activity.jsonl`)
   and the solo broker's audit (`solo\audit.jsonl`). Filters: period, outcome, source and text.
 - **Status page** running the same checks as `tir doctor`, with copy details.

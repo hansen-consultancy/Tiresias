@@ -1,5 +1,4 @@
 using System.Text.Json.Nodes;
-using System.Text.RegularExpressions;
 using Microsoft.Extensions.Configuration.UserSecrets;
 using Tiresias.Protocol;
 using Tiresias.UserSecrets;
@@ -19,7 +18,7 @@ public sealed record UserSecretsFolder(string Id, string Directory)
 /// Opening and saving <c>secrets.json</c> files outside the pipe: <c>tir secrets</c> and the app's
 /// editor. Saving always seals, so editing never writes plaintext back.
 /// </summary>
-public static partial class UserSecretsFiles
+public static class UserSecretsFiles
 {
     /// <summary><c>%APPDATA%\Microsoft\UserSecrets</c>: where every project's folder lives.</summary>
     public static string Root { get; } = Path.GetDirectoryName(Path.GetDirectoryName(PathHelper.GetSecretsPathFromSecretsId("x")))!;
@@ -50,10 +49,8 @@ public static partial class UserSecretsFiles
                 _ => throw new InvalidOperationException($"Several project files in {path}. Pass --project <file.csproj>."),
             };
         }
-        var match = UserSecretsIdElement().Match(File.ReadAllText(path));
-        return match.Success
-            ? match.Groups[1].Value
-            : throw new InvalidOperationException($"{Path.GetFileName(path)} has no <UserSecretsId>. Run 'dotnet user-secrets init' in its folder first.");
+        return ProjectScanner.IdIn(File.ReadAllText(path))
+            ?? throw new InvalidOperationException($"{Path.GetFileName(path)} has no <UserSecretsId>. Run 'dotnet user-secrets init' in its folder first.");
     }
 
     /// <summary>Opens the document with the unlocked Hello wrapper. A missing file is an empty document.</summary>
@@ -83,7 +80,4 @@ public static partial class UserSecretsFiles
         File.WriteAllText(temp, document.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
         File.Move(temp, folder.FilePath, overwrite: true);
     }
-
-    [GeneratedRegex(@"<UserSecretsId>\s*([^<\s]+)\s*</UserSecretsId>")]
-    private static partial Regex UserSecretsIdElement();
 }
