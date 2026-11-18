@@ -200,6 +200,19 @@ public sealed partial class ServicesViewModel : ObservableObject
     }
 
     [RelayCommand]
+    void SetUpRaven()
+    {
+        var window = new RavenServerWindow { Owner = Owner() };
+        window.Saved += slug =>
+        {
+            Reload();
+            SelectedRow = Rows.FirstOrDefault(r => r.Slug == slug);
+            Message = Text.Format("Services_RavenSaved", slug);
+        };
+        window.ShowDialog();
+    }
+
+    [RelayCommand]
     void Save()
     {
         attempted = true;

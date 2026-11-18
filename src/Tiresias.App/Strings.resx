@@ -1642,4 +1642,88 @@ Store them in clear?</value>
   <data name="Sql_DoneWrite" xml:space="preserve">
     <value>Use /write instead of /read for an app that saves data. The app needs the Tiresias.Extensions.Configuration package, and gets a new login before the old one expires.</value>
   </data>
+  <data name="Services_SetUpRaven" xml:space="preserve">
+    <value>Set up a RavenDB...</value>
+  </data>
+  <data name="Services_RavenSaved" xml:space="preserve">
+    <value>Saved {0}. Apps reach it with tiresias:raven/{0} as their RavenDB URL.</value>
+  </data>
+  <data name="Raven_WindowTitle" xml:space="preserve">
+    <value>Set up a RavenDB - Tiresias</value>
+  </data>
+  <data name="Raven_Heading" xml:space="preserve">
+    <value>Set up a RavenDB</value>
+  </data>
+  <data name="Raven_Intro" xml:space="preserve">
+    <value>Keeps a RavenDB client certificate in the vault, so apps connect through Tiresias with a URL in their user secrets instead of a .pfx file on disk. What the app may read or write is the certificate's own access on the server.</value>
+  </data>
+  <data name="Raven_DatabaseHeading" xml:space="preserve">
+    <value>The server</value>
+  </data>
+  <data name="Raven_Server" xml:space="preserve">
+    <value>Server URL</value>
+  </data>
+  <data name="Raven_ServerHint" xml:space="preserve">
+    <value>The address RavenDB Studio opens on, e.g. https://a.raven.example.com or https://a.raven.example.com:8080. For a cluster, any one node.</value>
+  </data>
+  <data name="Raven_Database" xml:space="preserve">
+    <value>Database</value>
+  </data>
+  <data name="Raven_DatabaseHint" xml:space="preserve">
+    <value>The database the app uses. Tiresias checks the certificate can reach it before saving.</value>
+  </data>
+  <data name="Raven_Slug" xml:space="preserve">
+    <value>Service name</value>
+  </data>
+  <data name="Raven_Changes" xml:space="preserve">
+    <value>Allow the Changes API</value>
+  </data>
+  <data name="Raven_ChangesHint" xml:space="preserve">
+    <value>For apps that subscribe to changes (store.Changes()). It keeps a connection open for as long as the lease lasts; leave it off unless the app needs it.</value>
+  </data>
+  <data name="Raven_CertificateHeading" xml:space="preserve">
+    <value>The client certificate</value>
+  </data>
+  <data name="Raven_CertificateIntro" xml:space="preserve">
+    <value>The .pfx RavenDB gave you for this app, registered on the server. Tiresias checks it, then seals it in the vault; you can delete the file afterwards.</value>
+  </data>
+  <data name="Raven_File" xml:space="preserve">
+    <value>Certificate file</value>
+  </data>
+  <data name="Raven_Browse" xml:space="preserve">
+    <value>Browse...</value>
+  </data>
+  <data name="Raven_FileFilter" xml:space="preserve">
+    <value>Client certificates (*.pfx;*.p12)|*.pfx;*.p12|All files (*.*)|*.*</value>
+  </data>
+  <data name="Raven_FileUnreadable" xml:space="preserve">
+    <value>Couldn't read the file: {0}</value>
+  </data>
+  <data name="Raven_FileMissing" xml:space="preserve">
+    <value>Pick the certificate's .pfx file.</value>
+  </data>
+  <data name="Raven_CertificateInfo" xml:space="preserve">
+    <value>{0}, valid until {1} ({2})</value>
+  </data>
+  <data name="Raven_NeedsPassword" xml:space="preserve">
+    <value>The file has a password: type it below.</value>
+  </data>
+  <data name="Raven_Password" xml:space="preserve">
+    <value>Certificate password</value>
+  </data>
+  <data name="Raven_PasswordHint" xml:space="preserve">
+    <value>Leave it empty if the file has none. It is used to open the file here only; the vault keeps the certificate without it.</value>
+  </data>
+  <data name="Raven_Locked" xml:space="preserve">
+    <value>Tiresias is locked. Unlock it, then try again: the certificate is sealed to Windows Hello.</value>
+  </data>
+  <data name="Raven_StepStopped" xml:space="preserve">
+    <value>Stopped. Nothing was saved to the vault.</value>
+  </data>
+  <data name="Raven_DoneBody" xml:space="preserve">
+    <value>In an app's user secrets (Manage User Secrets in Visual Studio), use this instead of a URL and certificate:</value>
+  </data>
+  <data name="Raven_DoneCode" xml:space="preserve">
+    <value>Pass the URL to the DocumentStore as usual and leave its Certificate unset: Tiresias presents the certificate. The app needs the Tiresias.Extensions.Configuration package.</value>
+  </data>
 </root>

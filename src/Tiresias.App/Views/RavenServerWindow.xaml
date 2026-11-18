@@ -1,0 +1,136 @@
+<Window x:Class="Tiresias.App.Views.RavenServerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:Tiresias.App"
+        xmlns:v="clr-namespace:Tiresias.App.Views"
+        Title="{l:S Raven_WindowTitle}"
+        Width="720" Height="760" MinWidth="560" MinHeight="520"
+        WindowStartupLocation="CenterOwner"
+        Icon="pack://application:,,,/Assets/tiresias.ico">
+  <Window.Resources>
+    <BooleanToVisibilityConverter x:Key="Visible" />
+    <Style x:Key="FieldError" TargetType="TextBlock" BasedOn="{StaticResource CaptionText}">
+      <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+      <Setter Property="Margin" Value="0,4,0,0" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Style.Triggers>
+        <Trigger Property="Text" Value="">
+          <Setter Property="Visibility" Value="Collapsed" />
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+    <Style x:Key="Hint" TargetType="TextBlock" BasedOn="{StaticResource CaptionText}">
+      <Setter Property="Margin" Value="0,4,0,0" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Style.Triggers>
+        <Trigger Property="Text" Value="">
+          <Setter Property="Visibility" Value="Collapsed" />
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+    <Style x:Key="Field" TargetType="StackPanel">
+      <Setter Property="Margin" Value="0,0,0,12" />
+    </Style>
+  </Window.Resources>
+  <Grid Margin="{StaticResource PagePadding}">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <StackPanel Grid.Row="0">
+      <TextBlock Text="{l:S Raven_Heading}" Style="{StaticResource TitleText}" AutomationProperties.HeadingLevel="Level1" />
+      <TextBlock Text="{l:S Raven_Intro}" Style="{StaticResource BodyText}" TextWrapping="Wrap" />
+    </StackPanel>
+
+    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,8,0,0">
+      <StackPanel MaxWidth="620" HorizontalAlignment="Left">
+        <StackPanel IsEnabled="{Binding IsIdle}" Visibility="{Binding IsEditing, Converter={StaticResource Visible}}">
+          <TextBlock Text="{l:S Raven_DatabaseHeading}" Style="{StaticResource SubtitleText}" Margin="0,0,0,12" AutomationProperties.HeadingLevel="Level2" />
+
+          <StackPanel Style="{StaticResource Field}">
+            <Label x:Name="ServerLabel" Content="{l:S Raven_Server}" Target="{Binding ElementName=ServerBox}" Padding="0,0,0,4" />
+            <TextBox x:Name="ServerBox" Text="{Binding Server, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.LabeledBy="{Binding ElementName=ServerLabel}" />
+            <TextBlock Text="{l:S Raven_ServerHint}" Style="{StaticResource Hint}" />
+            <TextBlock Text="{Binding ServerError}" Style="{StaticResource FieldError}" />
+          </StackPanel>
+
+          <StackPanel Style="{StaticResource Field}">
+            <Label x:Name="DatabaseLabel" Content="{l:S Raven_Database}" Target="{Binding ElementName=DatabaseBox}" Padding="0,0,0,4" />
+            <TextBox x:Name="DatabaseBox" Text="{Binding Database, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.LabeledBy="{Binding ElementName=DatabaseLabel}" />
+            <TextBlock Text="{l:S Raven_DatabaseHint}" Style="{StaticResource Hint}" />
+            <TextBlock Text="{Binding DatabaseError}" Style="{StaticResource FieldError}" />
+          </StackPanel>
+
+          <StackPanel Style="{StaticResource Field}">
+            <Label x:Name="SlugLabel" Content="{l:S Raven_Slug}" Target="{Binding ElementName=SlugBox}" Padding="0,0,0,4" />
+            <TextBox x:Name="SlugBox" Text="{Binding Slug, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.LabeledBy="{Binding ElementName=SlugLabel}" />
+            <TextBlock Text="{l:S Sql_SlugHint}" Style="{StaticResource Hint}" />
+            <TextBlock Text="{Binding SlugError}" Style="{StaticResource FieldError}" />
+          </StackPanel>
+
+          <StackPanel Style="{StaticResource Field}">
+            <CheckBox IsChecked="{Binding AllowChanges}" Content="{l:S Raven_Changes}" />
+            <TextBlock Text="{l:S Raven_ChangesHint}" Style="{StaticResource Hint}" Margin="28,0,0,0" />
+          </StackPanel>
+
+          <TextBlock Text="{l:S Raven_CertificateHeading}" Style="{StaticResource SubtitleText}" Margin="0,8,0,4" AutomationProperties.HeadingLevel="Level2" />
+          <TextBlock Text="{l:S Raven_CertificateIntro}" Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,0,0,12" />
+
+          <StackPanel Style="{StaticResource Field}">
+            <Label x:Name="FileLabel" Content="{l:S Raven_File}" Target="{Binding ElementName=FileBox}" Padding="0,0,0,4" />
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBox x:Name="FileBox" Text="{Binding FileName, Mode=OneWay}" IsReadOnly="True" AutomationProperties.LabeledBy="{Binding ElementName=FileLabel}" />
+              <Button Grid.Column="1" Margin="8,0,0,0" Padding="12,6" Content="{l:S Raven_Browse}" Command="{Binding BrowseCommand}" />
+            </Grid>
+            <TextBlock Text="{Binding CertificateInfo}" Style="{StaticResource Hint}" />
+            <TextBlock Text="{Binding CertificateError}" Style="{StaticResource FieldError}" />
+          </StackPanel>
+
+          <StackPanel Style="{StaticResource Field}">
+            <Label x:Name="PasswordLabel" Content="{l:S Raven_Password}" Target="{Binding ElementName=PasswordBox}" Padding="0,0,0,4" />
+            <PasswordBox x:Name="PasswordBox" v:Password.Value="{Binding CertificatePassword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.LabeledBy="{Binding ElementName=PasswordLabel}" />
+            <TextBlock Text="{l:S Raven_PasswordHint}" Style="{StaticResource Hint}" />
+          </StackPanel>
+        </StackPanel>
+
+        <StackPanel Visibility="{Binding HasSteps, Converter={StaticResource Visible}}" Margin="0,8,0,0">
+          <TextBlock Text="{l:S Sql_ProgressHeading}" Style="{StaticResource SubtitleText}" Margin="0,0,0,8" AutomationProperties.HeadingLevel="Level2" />
+          <ItemsControl ItemsSource="{Binding Steps}" AutomationProperties.Name="{l:S Sql_ProgressHeading}" AutomationProperties.LiveSetting="Polite">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <TextBlock Text="{Binding}" Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,0,0,4" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <ProgressBar IsIndeterminate="True" Height="4" Margin="0,4,0,8" Visibility="{Binding IsBusy, Converter={StaticResource Visible}}" />
+          <TextBlock Text="{Binding Failure}" Style="{StaticResource FieldError}" FontSize="14" />
+        </StackPanel>
+
+        <Border Style="{StaticResource Card}" Visibility="{Binding IsDone, Converter={StaticResource Visible}}">
+          <StackPanel>
+            <TextBlock Text="{Binding DoneHeading}" Style="{StaticResource SubtitleText}" Margin="0,0,0,8" AutomationProperties.HeadingLevel="Level2" />
+            <TextBlock Text="{l:S Raven_DoneBody}" Style="{StaticResource BodyText}" TextWrapping="Wrap" />
+            <TextBox Text="{Binding Snippet, Mode=OneWay}" IsReadOnly="True" FontFamily="Cascadia Mono, Consolas" Margin="0,8,0,8" TextWrapping="Wrap"
+                     AutomationProperties.Name="{l:S Sql_SnippetName}" />
+            <Button HorizontalAlignment="Left" Padding="12,6" Content="{l:S Sql_Copy}" Command="{Binding CopyCommand}" />
+            <TextBlock Text="{l:S Raven_DoneCode}" Style="{StaticResource Hint}" Margin="0,12,0,0" />
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </ScrollViewer>
+
+    <StackPanel Grid.Row="2" Style="{StaticResource ButtonRow}" Margin="0,16,0,0">
+      <Button Style="{DynamicResource AccentButtonStyle}" MinWidth="96" Padding="12,6" Content="{l:S Sql_SetUp}" Command="{Binding SetUpCommand}"
+              IsDefault="True" Visibility="{Binding IsEditing, Converter={StaticResource Visible}}" />
+      <Button Style="{StaticResource RowButton}" Content="{l:S Sql_Back}" Command="{Binding BackCommand}"
+              Visibility="{Binding CanGoBack, Converter={StaticResource Visible}}" />
+      <Button Style="{StaticResource RowButton}" Content="{l:S Common_Close}" IsCancel="True" Click="OnClose" />
+    </StackPanel>
+  </Grid>
+</Window>
