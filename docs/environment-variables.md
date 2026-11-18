@@ -127,9 +127,13 @@ service's grants, and the activity log records each request.
 ### Programs started outside a shell
 
 - **NuGet:** `nuget-plugin-tiresias.exe`, installed next to `tir`, speaks NuGet's
-  cross-platform credential plugin protocol (version 2). Map a source to a sealed variable with
-  `tir env nuget add <source-url> <NAME> [--username <name>]`, and remove the token from
-  `NuGet.Config`. When the feed answers 401, NuGet asks the plugin; the plugin asks the app, and
+  cross-platform credential plugin protocol (version 2). `tir env nuget import` (or **Move to
+  Tiresias** under **NuGet feeds** in the environment variables window) finds the sources whose
+  `NuGet.Config` credentials are `%NAME%` or a plain-text token, seals the token (from Windows, or
+  from the file), maps the source, and takes its credentials out of the file: NuGet only asks a
+  plugin when the config has none. An encrypted `Password` can't be read, so it is left with a
+  note. `tir env nuget list` shows what is mapped and what is still in `NuGet.Config`. By hand:
+  `tir env nuget add <source-url> <NAME> [--username <name>]`, then remove the credentials. When the feed answers 401, NuGet asks the plugin; the plugin asks the app, and
   the app asks you once per program (the parent of the plugin: `dotnet`, `devenv`, `MSBuild`...)
   and variable, with **Allow for this session** remembered until Tiresias locks.
   - The plugin answers only for https sources on the mapped host and port: the source itself, or

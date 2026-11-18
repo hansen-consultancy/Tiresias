@@ -77,6 +77,38 @@
           </ItemsControl.ItemTemplate>
         </ItemsControl>
         <Button Style="{StaticResource RowButton}" Content="{l:S Env_Protect}" Command="{Binding ProtectCommand}" HorizontalAlignment="Left" Margin="0,8,0,0" />
+
+        <TextBlock Text="{l:S Env_NuGetHeading}" Style="{StaticResource SubtitleText}" AutomationProperties.HeadingLevel="Level2" Margin="0,20,0,4" />
+        <TextBlock Text="{Binding NuGetSummary}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
+        <ItemsControl ItemsSource="{Binding NuGetMapped}" Margin="0,4,0,0" AutomationProperties.Name="{l:S Env_NuGetHeading}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <CheckBox IsChecked="{Binding IsChecked}" IsEnabled="{Binding CanPick}" Margin="0,2">
+                <TextBlock TextWrapping="Wrap">
+                  <Run Text="{Binding Name, Mode=OneWay}" />
+                  <Run Text="{Binding Detail, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                </TextBlock>
+              </CheckBox>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Button Style="{StaticResource RowButton}" Content="{l:S Env_NuGetRemove}" Command="{Binding RemoveNuGetCommand}" HorizontalAlignment="Left" Margin="0,8,0,0"
+                Visibility="{Binding NuGetMappedVisibility}" />
+        <TextBlock Text="{l:S Env_NuGetFoundHeading}" Style="{StaticResource BodyText}" Margin="0,12,0,0" Visibility="{Binding NuGetFoundVisibility}" />
+        <ItemsControl ItemsSource="{Binding NuGetFound}" Margin="0,4,0,0" AutomationProperties.Name="{l:S Env_NuGetFoundHeading}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <CheckBox IsChecked="{Binding IsChecked}" IsEnabled="{Binding CanPick}" Margin="0,2">
+                <TextBlock TextWrapping="Wrap">
+                  <Run Text="{Binding Name, Mode=OneWay}" />
+                  <Run Text="{Binding Detail, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                </TextBlock>
+              </CheckBox>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Button Style="{StaticResource RowButton}" Content="{l:S Env_NuGetImport}" Command="{Binding ImportNuGetCommand}" HorizontalAlignment="Left" Margin="0,8,0,0"
+                Visibility="{Binding NuGetFoundVisibility}" />
       </StackPanel>
     </ScrollViewer>
 

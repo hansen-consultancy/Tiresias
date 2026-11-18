@@ -91,6 +91,9 @@
   <data name="Build_DevelopmentCommit" xml:space="preserve">
     <value>{0}, development build {1}</value>
   </data>
+  <data name="Consent_CommandLabel" xml:space="preserve">
+    <value>Command</value>
+  </data>
   <data name="Consent_Environment_Heading" xml:space="preserve">
     <value>Give environment variables to {0}?</value>
   </data>
@@ -108,6 +111,9 @@
   </data>
   <data name="Consent_NuGet_Note" xml:space="preserve">
     <value>The program uses it to download packages from this feed. Allowing it hands over the value; it is never shown here.</value>
+  </data>
+  <data name="Consent_OpenFolder" xml:space="preserve">
+    <value>Open folder</value>
   </data>
   <data name="Consent_Shell_Heading" xml:space="preserve">
     <value>Give sealed variables to this {0} terminal?</value>
@@ -135,6 +141,9 @@
   </data>
   <data name="Env_DetailFolder" xml:space="preserve">
     <value>for commands in {0}</value>
+  </data>
+  <data name="Env_DetailPlaceholder" xml:space="preserve">
+    <value>(a placeholder for {0})</value>
   </data>
   <data name="Env_DetailSecret" xml:space="preserve">
     <value>({0} characters, looks like a secret)</value>
@@ -171,6 +180,54 @@
   </data>
   <data name="Env_NothingPicked" xml:space="preserve">
     <value>Tick at least one variable first.</value>
+  </data>
+  <data name="Env_NuGetFoundHeading" xml:space="preserve">
+    <value>Still in NuGet.Config:</value>
+  </data>
+  <data name="Env_NuGetFoundSummary" xml:space="preserve">
+    <value>NuGet.Config still gives these feeds their token itself. Move them over: the token is sealed, and NuGet asks Tiresias for it instead.</value>
+  </data>
+  <data name="Env_NuGetHeading" xml:space="preserve">
+    <value>NuGet feeds</value>
+  </data>
+  <data name="Env_NuGetImport" xml:space="preserve">
+    <value>Move to Tiresias</value>
+  </data>
+  <data name="Env_NuGetImportBody" xml:space="preserve">
+    <value>Seals the tokens for {0} and takes their credentials out of {1}. NuGet then asks Tiresias, and you allow each program once.</value>
+  </data>
+  <data name="Env_NuGetImported" xml:space="preserve">
+    <value>Moved {0} to Tiresias. NuGet asks for the token from now on.</value>
+  </data>
+  <data name="Env_NuGetImportTitle" xml:space="preserve">
+    <value>Move these feeds to Tiresias?</value>
+  </data>
+  <data name="Env_NuGetMappedDetail" xml:space="preserve">
+    <value>uses {0}, user name {1}</value>
+  </data>
+  <data name="Env_NuGetNone" xml:space="preserve">
+    <value>No NuGet.Config in your profile has credentials for a feed, and no feed uses a sealed variable.</value>
+  </data>
+  <data name="Env_NuGetProtect" xml:space="preserve">
+    <value>%{0}% in {1}: seals {0}, now in your Windows environment</value>
+  </data>
+  <data name="Env_NuGetRemove" xml:space="preserve">
+    <value>Stop using for NuGet</value>
+  </data>
+  <data name="Env_NuGetRemoved" xml:space="preserve">
+    <value>NuGet no longer gets a sealed variable for {0}. The variables stay sealed.</value>
+  </data>
+  <data name="Env_NuGetSealClearText" xml:space="preserve">
+    <value>token in plain text in {1}: seals it as {0}</value>
+  </data>
+  <data name="Env_NuGetSealed" xml:space="preserve">
+    <value>%{0}% in {1}: {0} is sealed already</value>
+  </data>
+  <data name="Env_NuGetSkip" xml:space="preserve">
+    <value>left as is: {0}</value>
+  </data>
+  <data name="Env_NuGetSummary" xml:space="preserve">
+    <value>NuGet asks Tiresias for {0} feed(s), and you allow each program once. Needs the .NET 9.0.200 SDK or later.</value>
   </data>
   <data name="Env_Protect" xml:space="preserve">
     <value>Seal and remove from Windows</value>

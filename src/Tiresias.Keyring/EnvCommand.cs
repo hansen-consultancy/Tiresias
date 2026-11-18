@@ -90,21 +90,31 @@ static class EnvCommand
     }
 
     /// <summary>
-    /// <c>tir env nuget add|list|remove</c>: which package sources the NuGet plugin answers for, and
+    /// <c>tir env nuget add|list|remove|import</c>: which package sources the NuGet plugin answers for, and
     /// with which sealed variable. Sealed with the variables, so a mapping can't be changed behind
     /// your back to send a token elsewhere.
     /// </summary>
     static int NuGet(CommandLine args)
     {
+        if (args.At(2) == "import")
+            return NuGetImportCommand(args.Flag("--yes"));
         using var hello = HelloKeyWrapper.Open(create: false);
         var (sealedNow, version) = EnvironmentStore.Open(hello);
         switch (args.At(2))
         {
             case "list":
-                if (sealedNow.NuGetSources.Count == 0)
-                    Console.WriteLine("No NuGet sources use a sealed variable. Add one: tir env nuget add <source-url> <NAME>.");
                 foreach (var source in sealedNow.NuGetSources)
                     Console.WriteLine($"  {source.Source}  {source.Variable} (user name {source.Username})");
+                var waiting = PlanNuGetImport(sealedNow).Where(s => s.Acts).ToArray();
+                if (waiting.Length > 0)
+                {
+                    Console.WriteLine($"Still in NuGet.Config, not yet through Tiresias ({waiting.Length}):");
+                    foreach (var step in waiting)
+                        Console.WriteLine($"  {step.Credential.Source}  {Holds(step)}  ({step.File})");
+                    Console.WriteLine("Move them over: tir env nuget import.");
+                }
+                else if (sealedNow.NuGetSources.Count == 0)
+                    Console.WriteLine("No NuGet sources use a sealed variable. Move those in NuGet.Config over with tir env nuget import, or add one: tir env nuget add <source-url> <NAME>.");
                 return 0;
             case "add":
                 var url = args.Require(3, "source-url");
@@ -129,9 +139,53 @@ static class EnvCommand
                 Console.WriteLine($"NuGet no longer gets a sealed variable for {removing}. The variable itself stays sealed.");
                 return 0;
             default:
-                throw new UsageException("tir env nuget takes add, list or remove.");
+                throw new UsageException("tir env nuget takes list, import, add or remove.");
         }
     }
+
+    /// <summary>
+    /// <c>tir env nuget import</c>: every source whose NuGet.Config credentials name an environment
+    /// variable, or hold the token in plain text, is mapped to a sealed variable (sealing it first if
+    /// needed), and its credentials are taken out of the file so NuGet asks Tiresias instead.
+    /// </summary>
+    static int NuGetImportCommand(bool yes)
+    {
+        using var hello = HelloKeyWrapper.Open(create: false);
+        var steps = PlanNuGetImport(EnvironmentStore.Open(hello).Environment);
+        if (steps.Count == 0)
+        {
+            Console.WriteLine("No NuGet.Config here or in your profile has credentials for a package source.");
+            return 0;
+        }
+        foreach (var step in steps)
+        {
+            Console.WriteLine($"  {step.Credential.Key}  {step.Credential.Source ?? "(no URL)"}  ({step.File})");
+            Console.WriteLine(step.Skip is { } why ? $"    left as is: {why}." : $"    {Holds(step)}: {Action(step)}, user name {step.Username}");
+        }
+        var acting = steps.Where(s => s.Acts).ToArray();
+        if (acting.Length == 0)
+            return 1;
+        if (!yes && !Terminal.Confirm($"Move {acting.Length} over and take their credentials out of NuGet.Config?"))
+            return 1;
+
+        var result = NuGetImporter.Apply(acting, hello);
+        foreach (var file in result.Files)
+            Console.WriteLine($"Took the credentials out of {file}.");
+        if (result.Sealed.Count > 0)
+            Console.WriteLine($"Sealed {string.Join(", ", result.Sealed)}. A variable moved from Windows is gone from it; programs already running keep their copy until they restart.");
+        Console.WriteLine("NuGet now asks Tiresias for these feeds, and you allow each program once. Needs the .NET 9.0.200 SDK or later.");
+        return steps.Count == acting.Length ? 0 : 1;
+    }
+
+    static IReadOnlyList<NuGetImportStep> PlanNuGetImport(SealedEnvironment sealedNow) =>
+        NuGetImporter.Plan(sealedNow, Directory.GetCurrentDirectory());
+
+    static string Holds(NuGetImportStep step) => step.Credential.Kind == NuGetPasswordKind.ClearText ? "token in plain text" : $"%{step.Credential.Password}%";
+
+    static string Action(NuGetImportStep step) =>
+        step.SealClearText ? $"seal it as {step.Variable}"
+        : step.ProtectFirst ? $"seal {step.Variable} (now in your Windows environment)"
+        : $"{step.Variable} is sealed already";
 
     /// <summary><c>--folder</c> alone means the current directory; absent means the global set.</summary>
     static string? Folder(CommandLine args) =>

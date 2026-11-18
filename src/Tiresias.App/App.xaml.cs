@@ -336,7 +336,7 @@ public partial class App : Application
         if (variables.Count == 0)
             return new(true, Text.Get("Environment_NoneSealed"), Approved: true, Variables: new Dictionary<string, string>());
         var program = request.Title ?? "tir run";
-        var approved = await consent!.AskEnvironmentAsync(program, [.. variables.Select(v => EnvironmentDelivery.Describe(sealedNow, v.Name))], caller, ct);
+        var approved = await consent!.AskEnvironmentAsync(program, request.Lines, [.. variables.Select(v => EnvironmentDelivery.Describe(sealedNow, v.Name))], caller, ct);
         AppLog.Info($"tir run {program}: {(approved ? "allowed" : "denied")} {variables.Count} environment variable(s)");
         host.RecordEnvironment(approved, program, variables.Select(v => EnvironmentDelivery.Describe(sealedNow, v.Name)), caller);
         if (!approved)

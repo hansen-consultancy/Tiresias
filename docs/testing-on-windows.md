@@ -298,11 +298,14 @@ Uses the `httpbin` service from section 5 (secret `Bearer example-token`).
 Needs the .NET 9.0.200 SDK or later and a private feed (Azure Artifacts, GitHub Packages) with a
 personal access token.
 
-1. `tir env set FEED_PAT` (paste the token), then
-   `tir env nuget add https://pkgs.dev.azure.com/example/_packaging/feed/nuget/v3/index.json FEED_PAT`
-   (GitHub Packages: add `--username <your GitHub login>`). `tir env nuget list` shows it.
-2. Remove that source's `packageSourceCredentials` from `NuGet.Config`, and clear
-   `NUGET_PLUGIN_PATHS` and `NuGetPackageSourceCredentials_*` if set.
+1. With the feed's credentials in `%APPDATA%\NuGet\NuGet.Config` as `%FEED_PAT%` (or the token in
+   plain text): `tir env nuget list` shows it under **Still in NuGet.Config**. `tir env nuget import`
+   says what it will do, and after a yes seals the token, maps the source and takes the
+   credentials out of the file. The environment variables window's **NuGet feeds** does the same
+   with **Move to Tiresias**. By hand instead: `tir env set FEED_PAT`, then
+   `tir env nuget add <source-url> FEED_PAT` (GitHub Packages: `--username <your GitHub login>`),
+   and remove the source's `packageSourceCredentials`.
+2. Clear `NUGET_PLUGIN_PATHS` and `NuGetPackageSourceCredentials_*` if set.
 3. `where.exe nuget-plugin-tiresias` finds it next to `tir`. Run on its own, it explains itself.
 4. In a project using the feed: `dotnet nuget locals http-cache --clear`, then
    `dotnet restore --interactive`. The app asks to give **FEED_PAT** to `dotnet`; allow it, and the

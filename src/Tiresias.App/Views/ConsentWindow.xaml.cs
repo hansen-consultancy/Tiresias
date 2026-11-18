@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Threading;
@@ -10,7 +11,8 @@ namespace Tiresias.App.Views;
 /// <param name="Items">User secrets: the keys (never values). A placeholder: the consent lines tir prints.</param>
 /// <param name="AllowSession">Offer "Allow for this session": user secrets only, where the agent remembers the answer.</param>
 /// <param name="Unlock">Tiresias is locked: the one way forward is "Unlock with Windows Hello" (or Deny), and there is no list.</param>
-public sealed record ConsentView(string Heading, string? Program, string ListLabel, IReadOnlyList<string> Items, string Note, bool AllowSession, bool Unlock = false);
+/// <param name="Command">The command line about to run, shown under the heading.</param>
+public sealed record ConsentView(string Heading, string? Program, string ListLabel, IReadOnlyList<string> Items, string Note, bool AllowSession, bool Unlock = false, string? Command = null);
 
 /// <summary>
 /// The consent dialog: topmost, names the program and lists what it gets, and answers Deny when it
@@ -21,16 +23,24 @@ public partial class ConsentWindow : Window
     readonly TaskCompletionSource<ConsentAnswer> answer = new(TaskCreationOptions.RunContinuationsAsynchronously);
     readonly DispatcherTimer tick = new() { Interval = TimeSpan.FromSeconds(1) };
     readonly DateTimeOffset deadline;
+    readonly string? program;
 
     ConsentWindow(ConsentView view, TimeSpan timeout, int waiting)
     {
         InitializeComponent();
         deadline = DateTimeOffset.Now + timeout;
         Heading.Text = view.Heading;
+        if (view.Command is { Length: > 0 } command)
+        {
+            Command.Text = command;
+            Command.Visibility = Visibility.Visible;
+        }
         ProgramLabel.Text = Text.Get("Consent_ProgramLabel");
         ProgramName.Text = view.Program is null ? Text.Get("Consent_ProgramUnknown") : Path.GetFileName(view.Program);
         ProgramFolder.Text = view.Program is null ? "" : Path.GetDirectoryName(view.Program) ?? "";
         ProgramFolder.Visibility = ProgramFolder.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        program = view.Program;
+        OpenFolderLine.Visibility = File.Exists(view.Program) ? Visibility.Visible : Visibility.Collapsed;
         ListLabel.Text = view.ListLabel;
         Items.ItemsSource = view.Items.Count > 0 ? view.Items : [Text.Get("Consent_NoKeys")];
         Items.Visibility = view.Unlock ? Visibility.Collapsed : Visibility.Visible;
@@ -53,6 +63,13 @@ public partial class ConsentWindow : Window
         window.Activate();
         window.DenyButton.Focus();
         return window.answer.Task;
+    }
+
+    /// <summary>Explorer on the program's folder with the file selected, to look at it before answering.</summary>
+    void OnOpenFolder(object sender, RoutedEventArgs e)
+    {
+        if (File.Exists(program))
+            Process.Start(new ProcessStartInfo("explorer.exe") { ArgumentList = { $"/select,{program}" }, UseShellExecute = false });
     }
 
     void UpdateCountdown()
