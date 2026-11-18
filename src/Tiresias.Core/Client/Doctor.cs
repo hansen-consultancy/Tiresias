@@ -118,7 +118,9 @@ public static partial class Doctor
     /// </remarks>
     static DoctorCheck? UserSecretsFile(DoctorFile file)
     {
-        var id = System.IO.Path.GetFileName(System.IO.Path.GetDirectoryName(file.Path)) is { Length: > 0 } folder ? folder : file.Path;
+        // The folder name is the UserSecretsId. Split on both separators: the probe may hand over either.
+        var parts = file.Path.Split(['/', '\\'],StringSplitOptions.RemoveEmptyEntries);
+        var id = parts.Length >= 2 ? parts[^2] : file.Path;
         var name = $"user secrets {id}";
         switch (SecretsFile.Classify(file.Text))
         {
