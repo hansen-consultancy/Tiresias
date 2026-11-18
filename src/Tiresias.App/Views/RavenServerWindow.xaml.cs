@@ -23,10 +23,13 @@ public partial class RavenServerWindow : Window
     /// <summary>Raised after a service was saved, so the Services window can show it.</summary>
     public event Action<string>? Saved;
 
-    public RavenServerWindow()
+    /// <param name="existing">A service this setup saved, to edit: its certificate stays unless another file is picked.</param>
+    public RavenServerWindow(RavenSetupInput? existing = null)
     {
         InitializeComponent();
         Desktop.ExcludeFromCapture(this);
+        if (existing is not null)
+            model.Edit(existing);
         DataContext = model;
         model.Saved += slug => Saved?.Invoke(slug);
         Closed += (_, _) => model.Dispose();
@@ -44,6 +47,12 @@ public sealed partial class RavenServerViewModel : ObservableObject, IDisposable
     public event Action<string>? Saved;
 
     public System.Collections.ObjectModel.ObservableCollection<string> Steps { get; } = [];
+
+    [ObservableProperty]
+    public partial string Heading { get; set; } = Text.Get("Raven_Heading");
+
+    [ObservableProperty]
+    public partial string DatabaseHint { get; set; } = Text.Get("Raven_DatabaseHint");
 
     [ObservableProperty]
     public partial string Server { get; set; } = "";
@@ -153,6 +162,21 @@ public sealed partial class RavenServerViewModel : ObservableObject, IDisposable
         return plan.Service is null ? null : plan;
     }
 
+    /// <summary>
+    /// Opens on a saved service. The database isn't part of the service, so it is asked again: the
+    /// kept certificate is checked against it before the change is saved.
+    /// </summary>
+    public void Edit(RavenSetupInput existing)
+    {
+        slugTyped = true;
+        Slug = existing.Slug;
+        Server = existing.Server;
+        AllowChanges = existing.AllowChanges;
+        Heading = Text.Format("Raven_EditHeading", existing.Slug);
+        DatabaseHint = Text.Get("Raven_EditDatabaseHint");
+        CertificateInfo = Text.Get("Raven_Keeps");
+    }
+
     [RelayCommand]
     void Browse()
     {
@@ -206,7 +230,9 @@ public sealed partial class RavenServerViewModel : ObservableObject, IDisposable
         attempted = true;
         Failure = "";
         var plan = Validate();
-        if (!Inspect(quiet: false) || plan is null)
+        // A service set up before keeps its certificate unless another file is picked.
+        var keep = pfx is null && plan is { Replaces: true };
+        if ((!keep && !Inspect(quiet: false)) || plan is null)
             return;
         if (App.Current.Host.Keys.Hello is null)
             await App.Current.UnlockAsync(interactive: true);
@@ -218,7 +244,7 @@ public sealed partial class RavenServerViewModel : ObservableObject, IDisposable
 
         running = new CancellationTokenSource();
         var ct = running.Token;
-        var file = pfx!;
+        var file = keep ? null : pfx;
         var password = CertificatePassword;
         Steps.Clear();
         HasSteps = true;
@@ -228,7 +254,7 @@ public sealed partial class RavenServerViewModel : ObservableObject, IDisposable
             var progress = new Progress<string>(Steps.Add);
             var service = await Task.Run(() => RavenSetup.RunAsync(plan, file, password, hello, progress, ct), ct);
             AppLog.Info($"raven setup: service {service.Slug} saved for {service.Upstream}");
-            DoneHeading = Text.Format(plan.Replaces ? "Sql_DoneAgainHeading" : "Sql_DoneHeading", service.Slug);
+            DoneHeading = Text.Format(keep ? "Raven_DoneEditHeading" : plan.Replaces ? "Sql_DoneAgainHeading" : "Sql_DoneHeading", service.Slug);
             Snippet = $$"""
                 "RavenDB": {
                   "Urls": [ "{{Tiresias.Protocol.SecretsFile.ReferencePrefix}}raven/{{service.Slug}}" ],

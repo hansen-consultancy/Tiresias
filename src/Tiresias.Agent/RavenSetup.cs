@@ -29,16 +29,27 @@ public static class RavenSetup
         return Describe(certificate);
     }
 
+    /// <param name="pfx">The picked file, or <c>null</c> to keep the certificate the vault holds for this service (editing it).</param>
     /// <param name="hello">The agent's open Windows Hello wrapper: the vault is sealed to it.</param>
     /// <exception cref="InvalidOperationException">A step failed; the message says what to do. Nothing is saved unless the server accepted the certificate.</exception>
-    public static async Task<Service> RunAsync(RavenSetupPlan plan, byte[] pfx, string? password, HelloKeyWrapper hello,
+    public static async Task<Service> RunAsync(RavenSetupPlan plan, byte[]? pfx, string? password, HelloKeyWrapper hello,
         IProgress<string> progress, CancellationToken ct, RavenHandlerFactory? handlers = null)
     {
         var service = plan.Service ?? throw new InvalidOperationException("The plan has problems.");
-        using var certificate = Open(pfx, password);
+        var keep = pfx is null;
+        pfx ??= Sealed(plan, hello);
+        using var certificate = Open(pfx, keep ? null : password);
+        if (keep)
+            CryptographicOperations.ZeroMemory(pfx);
 
         progress.Report($"Asking {service.Upstream.Authority} for {plan.Database} with the certificate");
         await CheckAsync(service.Upstream, plan.Database, certificate, handlers ?? RavenClients.DefaultHandler, ct);
+
+        if (keep)
+        {
+            VaultEditor.SetService(service);
+            return service;
+        }
 
         progress.Report("Sealing the certificate in the vault");
         var passwordless = certificate.Export(X509ContentType.Pkcs12);
@@ -54,6 +65,20 @@ public static class RavenSetup
         }
         VaultEditor.SetService(service);
         return service;
+    }
+
+    static byte[] Sealed(RavenSetupPlan plan, HelloKeyWrapper hello)
+    {
+        if (!plan.Replaces || SqlServerSetup.ReadSecret(plan.CertificateSecret, hello) is not { } encoded)
+            throw new InvalidOperationException("The vault holds no certificate for this service. Pick the certificate's .pfx file.");
+        try
+        {
+            return Convert.FromBase64String(encoded);
+        }
+        catch (FormatException e)
+        {
+            throw new InvalidOperationException($"The vault's {plan.CertificateSecret} isn't a certificate. Pick the .pfx file to replace it.", e);
+        }
     }
 
     static X509Certificate2 Open(byte[] pfx, string? password)

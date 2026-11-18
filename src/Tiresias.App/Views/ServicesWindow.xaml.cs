@@ -60,7 +60,7 @@ public sealed partial class ServicesViewModel : ObservableObject
     public ObservableCollection<string> Secrets { get; } = [];
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(RemoveCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RemoveCommand), nameof(EditCommand))]
     public partial ServiceRow? SelectedRow { get; set; }
 
     [ObservableProperty]
@@ -199,10 +199,33 @@ public sealed partial class ServicesViewModel : ObservableObject
         window.ShowDialog();
     }
 
-    [RelayCommand]
-    void SetUpRaven()
+    /// <summary>The setup form a selected service can be edited with: only RavenDB services, so far.</summary>
+    RavenSetupInput? Editable() =>
+        SelectedRow is { } row && Load()?.FindService(row.Slug) is { } service ? RavenSetupPlanner.Recognize(service) : null;
+
+    static VaultDocument? Load()
     {
-        var window = new RavenServerWindow { Owner = Owner() };
+        try
+        {
+            return VaultEditor.Load();
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or System.Text.Json.JsonException)
+        {
+            return null;
+        }
+    }
+
+    bool CanEdit() => Editable() is not null;
+
+    [RelayCommand(CanExecute = nameof(CanEdit))]
+    void Edit() => SetUpRaven(Editable());
+
+    [RelayCommand]
+    void SetUpRaven() => SetUpRaven(null);
+
+    void SetUpRaven(RavenSetupInput? existing)
+    {
+        var window = new RavenServerWindow(existing) { Owner = Owner() };
         window.Saved += slug =>
         {
             Reload();

@@ -53,6 +53,20 @@ public class RavenSetupPlanTests
     public void A_slug_that_isnt_one_is_refused(string slug) =>
         Assert.That(Plan(slug: slug).Problems.Single().Field, Is.EqualTo(RavenSetupField.Slug));
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void A_service_this_setup_saved_is_recognized_to_edit_with_its_server_and_changes(bool changes) =>
+        Assert.That(RavenSetupPlanner.Recognize(Plan(server: "https://a.raven.example.com:8443", changes: changes).Service!),
+            Is.EqualTo(new RavenSetupInput("orders", "https://a.raven.example.com:8443", "", changes)));
+
+    [Test]
+    public void Other_services_are_not_recognized()
+    {
+        var sql = SqlServerSetupPlanner.Plan(new("appdb", "sql.example.com", "AppDb"), Empty).Service!;
+        var http = new Service("api", new Uri("https://api.example.com/"), [new Grant("app", "other-secret", Plan().Service!.Grants[0].Rule)]);
+        Assert.That((RavenSetupPlanner.Recognize(sql), RavenSetupPlanner.Recognize(http)), Is.EqualTo(((RavenSetupInput?)null, (RavenSetupInput?)null)));
+    }
+
     [Test]
     public void The_same_service_for_the_same_server_is_set_up_again_and_another_is_refused()
     {

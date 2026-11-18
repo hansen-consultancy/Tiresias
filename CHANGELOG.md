@@ -21,7 +21,8 @@ its section below.
   broker with no certificate on the PC.
 - **Set up a RavenDB** (Services window) checks a client certificate against the database, then
   seals it in the vault and adds the server as a service. Its password is used only to open the
-  file.
+  file. **Edit...** changes such a service later (e.g. the Changes API) and keeps the certificate,
+  so the file can be deleted once it is set up.
 - RavenDB's Changes API works through the broker and the forwarder, for grants that list the
   `WEBSOCKET` method. Each tunnel is audited when it opens and when it closes, and closes with the
   lease.

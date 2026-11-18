@@ -35,6 +35,17 @@ public static class RavenSetupPlanner
 
     static readonly string[] Methods = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"];
 
+    /// <summary>
+    /// The form for a service this setup saved, to edit it: <c>null</c> for any other service. The
+    /// database is left empty, because the service doesn't name one (any database the certificate
+    /// may use goes through it).
+    /// </summary>
+    public static RavenSetupInput? Recognize(Service service) =>
+        service is { Upstream.Scheme: "https", Grants: [{ Name: GrantName, IssuesLogins: false } grant] }
+            && grant.SecretSlug == $"{service.Slug}-certificate"
+            ? new(service.Slug, service.Upstream.GetLeftPart(UriPartial.Authority), "", grant.Rule.Methods.Contains("WEBSOCKET"))
+            : null;
+
     public static RavenSetupPlan Plan(RavenSetupInput input, VaultDocument vault)
     {
         var problems = new List<RavenSetupProblem>();

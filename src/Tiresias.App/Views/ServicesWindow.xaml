@@ -124,6 +124,7 @@
     <Grid Grid.Row="3" Margin="0,16,0,0">
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Visibility="{Binding IsListing, Converter={StaticResource Visible}}">
         <Button Padding="12,6" Content="{l:S Services_Add}" Command="{Binding AddCommand}" />
+        <Button Padding="12,6" Margin="8,0,0,0" Content="{l:S Services_Edit}" Command="{Binding EditCommand}" />
         <Button Padding="12,6" Margin="8,0,0,0" Content="{l:S Services_Remove}" Command="{Binding RemoveCommand}" />
         <Button Padding="12,6" Margin="8,0,0,0" Content="{l:S Services_SetUpSql}" Command="{Binding SetUpSqlCommand}" />
         <Button Padding="12,6" Margin="8,0,0,0" Content="{l:S Services_SetUpRaven}" Command="{Binding SetUpRavenCommand}" />

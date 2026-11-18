@@ -40,7 +40,7 @@
     </Grid.RowDefinitions>
 
     <StackPanel Grid.Row="0">
-      <TextBlock Text="{l:S Raven_Heading}" Style="{StaticResource TitleText}" AutomationProperties.HeadingLevel="Level1" />
+      <TextBlock Text="{Binding Heading}" Style="{StaticResource TitleText}" AutomationProperties.HeadingLevel="Level1" />
       <TextBlock Text="{l:S Raven_Intro}" Style="{StaticResource BodyText}" TextWrapping="Wrap" />
     </StackPanel>
 
@@ -59,7 +59,7 @@
           <StackPanel Style="{StaticResource Field}">
             <Label x:Name="DatabaseLabel" Content="{l:S Raven_Database}" Target="{Binding ElementName=DatabaseBox}" Padding="0,0,0,4" />
             <TextBox x:Name="DatabaseBox" Text="{Binding Database, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.LabeledBy="{Binding ElementName=DatabaseLabel}" />
-            <TextBlock Text="{l:S Raven_DatabaseHint}" Style="{StaticResource Hint}" />
+            <TextBlock Text="{Binding DatabaseHint}" Style="{StaticResource Hint}" />
             <TextBlock Text="{Binding DatabaseError}" Style="{StaticResource FieldError}" />
           </StackPanel>
 
