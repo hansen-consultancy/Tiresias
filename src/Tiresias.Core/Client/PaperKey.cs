@@ -38,7 +38,7 @@ public static class PaperKey
         return Enumerable.Range(0, (letters.Length + 3) / 4).Select(i => letters.Substring(i * 4, Math.Min(4, letters.Length - i * 4))).ToArray();
     }
 
-    /// <summary>Reads a typed key back, forgiving case, spaces, line breaks and dashes.</summary>
+    /// <summary>Reads a typed key back, forgiving case, spaces, line breaks, dashes and the digits 0, 1 and 8 for O, I and B.</summary>
     /// <returns>The bytes, or <c>null</c> when the text is not a key of <paramref name="length"/> bytes.</returns>
     public static byte[]? Parse(string text, int length = 32)
     {
@@ -49,7 +49,7 @@ public static class PaperKey
         {
             if (char.IsWhiteSpace(raw) || raw == '-')
                 continue;
-            var value = Alphabet.IndexOf(char.ToUpperInvariant(raw), StringComparison.Ordinal);
+            var value = Alphabet.IndexOf(Letter(raw), StringComparison.Ordinal);
             if (value < 0)
                 return null;
             buffer = (buffer << 5) | value;
@@ -104,7 +104,19 @@ public static class PaperKey
     }
 
     static bool Same(string expected, string typed) =>
-        string.Equals(expected, new string(typed.Where(c => !char.IsWhiteSpace(c)).ToArray()), StringComparison.OrdinalIgnoreCase);
+        string.Equals(expected, new string(typed.Where(c => !char.IsWhiteSpace(c)).Select(Letter).ToArray()), StringComparison.Ordinal);
+
+    /// <summary>
+    /// The alphabet has no 0, 1 or 8, so a typed digit can only be a misread O, I or B. Handwriting
+    /// and many fonts blur those, and a refused copy of a correct key is worse than no check.
+    /// </summary>
+    static char Letter(char typed) => char.ToUpperInvariant(typed) switch
+    {
+        '0' => 'O',
+        '1' => 'I',
+        '8' => 'B',
+        var c => c,
+    };
 
     static string Letters(ReadOnlySpan<byte> bytes)
     {

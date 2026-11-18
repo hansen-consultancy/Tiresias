@@ -216,6 +216,15 @@ public class PaperKeyTests
         Assert.That(PaperKey.Parse(text.ToLowerInvariant().Replace(' ', '-').Replace("\n", "  ")), Is.EqualTo(Raw));
     }
 
+    [Test]
+    public void Digits_read_as_the_letters_they_look_like()
+    {
+        var text = PaperKey.Format(Raw);
+        var typed = text.Replace('O', '0').Replace('I', '1').Replace('B', '8');
+        Assert.That(PaperKey.Parse(typed), Is.EqualTo(Raw));
+        Assert.That(PaperKey.Confirm(["BOIL", "SIX2"], (0, 1), "8o1l", " s1x2 "), Is.True);
+    }
+
     [TestCase("")]
     [TestCase("ABCD 1890")]
     [TestCase("ABCD EFGH")]
