@@ -142,6 +142,69 @@
   <data name="Recovery_WindowTitle" xml:space="preserve">
     <value>Tiresias - restore with recovery key</value>
   </data>
+  <data name="Secrets_AddFolder" xml:space="preserve">
+    <value>Add folder...</value>
+  </data>
+  <data name="Secrets_FolderPickTitle" xml:space="preserve">
+    <value>Folder to look for projects in</value>
+  </data>
+  <data name="Secrets_Folders" xml:space="preserve">
+    <value>Project folders</value>
+  </data>
+  <data name="Secrets_FoldersName" xml:space="preserve">
+    <value>Folders scanned for projects</value>
+  </data>
+  <data name="Secrets_GroupProjects" xml:space="preserve">
+    <value>Projects</value>
+  </data>
+  <data name="Secrets_GroupUnknown" xml:space="preserve">
+    <value>No project found</value>
+  </data>
+  <data name="Secrets_NoFolders" xml:space="preserve">
+    <value>Add the folder you keep your code in, and projects show by name instead of by id. Only project files are read.</value>
+  </data>
+  <data name="Secrets_NoProjectDetail" xml:space="preserve">
+    <value>No project in the scanned folders uses this id. It may be left over from a copied folder, or its project lives somewhere not scanned.</value>
+  </data>
+  <data name="Secrets_NotScannedDetail" xml:space="preserve">
+    <value>No project is linked to this id yet. Add the folder you keep your code in under Project folders, or use Find a project.</value>
+  </data>
+  <data name="Secrets_ProjectMore" xml:space="preserve">
+    <value>{0} (+{1} more)</value>
+  </data>
+  <data name="Secrets_Recycle" xml:space="preserve">
+    <value>Move to Recycle Bin</value>
+  </data>
+  <data name="Secrets_RecycleBody" xml:space="preserve">
+    <value>No project in {1} uses the user secrets you picked ({0} folder(s)). A project kept somewhere else still could. They go to the Recycle Bin, so you can put them back from there.</value>
+  </data>
+  <data name="Secrets_RecycleFailed" xml:space="preserve">
+    <value>Couldn't move {0} to the Recycle Bin; a program may have it open. Close it and try again.</value>
+  </data>
+  <data name="Secrets_RecycleTitle" xml:space="preserve">
+    <value>Move to the Recycle Bin?</value>
+  </data>
+  <data name="Secrets_RecycleUnused" xml:space="preserve">
+    <value>Move {0} unused to Recycle Bin</value>
+  </data>
+  <data name="Secrets_Recycled" xml:space="preserve">
+    <value>Moved {0} to the Recycle Bin.</value>
+  </data>
+  <data name="Secrets_RemoveFolder" xml:space="preserve">
+    <value>Remove</value>
+  </data>
+  <data name="Secrets_RemoveFolderName" xml:space="preserve">
+    <value>Stop scanning {0}</value>
+  </data>
+  <data name="Secrets_ScanNow" xml:space="preserve">
+    <value>Scan now</value>
+  </data>
+  <data name="Secrets_Scanned" xml:space="preserve">
+    <value>{0} of {1} named after their project. Rescanned each time this window opens.</value>
+  </data>
+  <data name="Secrets_Scanning" xml:space="preserve">
+    <value>Looking for projects...</value>
+  </data>
   <data name="Status_About" xml:space="preserve">
     <value>About</value>
   </data>

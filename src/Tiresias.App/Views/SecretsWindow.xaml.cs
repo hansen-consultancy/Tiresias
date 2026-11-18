@@ -3,10 +3,12 @@ using System.ComponentModel;
 using System.Text.Json.Nodes;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
 using Tiresias.Agent;
+using Tiresias.App.Logic;
 using Tiresias.Protocol;
 using Tiresias.UserSecrets;
 
@@ -27,6 +29,7 @@ public partial class SecretsWindow : Window
         Desktop.ExcludeFromCapture(this);
         DataContext = model;
         App.Current.Host.StateChanged += OnAgentStateChanged;
+        Loaded += (_, _) => _ = model.RescanAsync();
         Closed += (_, _) =>
         {
             App.Current.Host.StateChanged -= OnAgentStateChanged;
@@ -58,7 +61,11 @@ public partial class SecretsWindow : Window
     public void Select(string id) => model.Select(id);
 }
 
-public sealed record ProjectChoice(string Id, string Label);
+/// <summary>One project in the picker.</summary>
+/// <param name="Label">Name and state, as the list shows it.</param>
+/// <param name="Group">Named projects, or the ids no known project uses.</param>
+/// <param name="Detail">Where the project is, or why no project is named.</param>
+public sealed record ProjectChoice(string Id, string Label, string Group, string Detail, bool Known);
 
 public sealed partial class SecretRow : ObservableObject
 {
@@ -84,19 +91,41 @@ public sealed partial class SecretsViewModel : ObservableObject
     UserSecretsLoad? loaded;
     IReadOnlyList<KeyValuePair<string, string>> original = [];
     bool relabelling;
+    ProjectIndex index = ProjectIndexStore.Load();
+    IReadOnlyList<string> unused = [];
+    bool scanning, rescanQueued;
+
+    /// <summary>The last rescan in this window finished: until it does, no id is called unused.</summary>
+    bool scanned;
+
+    /// <summary>Ids opened here (Find a project, the status page) that have no folder yet.</summary>
+    readonly HashSet<string> extraIds = new(StringComparer.OrdinalIgnoreCase);
 
     public SecretsViewModel()
     {
-        Projects = new(UserSecretsFiles.All().Select(f => new ProjectChoice(f.Id, Label(f))));
+        ProjectView = new ListCollectionView(Projects);
+        ProjectView.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ProjectChoice.Group)));
+        Rebuild();
         State = Text.Get(Projects.Count == 0 ? "Secrets_StateNoProjects" : "Secrets_StatePick");
     }
 
-    public ObservableCollection<ProjectChoice> Projects { get; }
+    public ObservableCollection<ProjectChoice> Projects { get; } = [];
+
+    /// <summary><see cref="Projects"/> grouped: named projects, then the ids no known project uses.</summary>
+    public ListCollectionView ProjectView { get; }
+
+    public ObservableCollection<string> Folders { get; } = [];
 
     public ObservableCollection<SecretRow> Rows { get; } = [];
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SelectedDetail), nameof(CanRecycleSelected))]
     public partial ProjectChoice? SelectedProject { get; set; }
+
+    public string SelectedDetail => SelectedProject?.Detail ?? "";
+
+    /// <summary>The open project is one no scanned project uses, and its folder is there to move.</summary>
+    public bool CanRecycleSelected => SelectedProject is { } p && unused.Contains(p.Id, StringComparer.OrdinalIgnoreCase);
 
     [ObservableProperty]
     public partial SecretRow? SelectedRow { get; set; }
@@ -106,6 +135,15 @@ public sealed partial class SecretsViewModel : ObservableObject
 
     [ObservableProperty]
     public partial string Message { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string ScanStatus { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string RecycleUnusedLabel { get; set; } = "";
+
+    [ObservableProperty]
+    public partial bool HasUnused { get; set; }
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(AddCommand), nameof(RemoveCommand), nameof(SaveCommand))]
@@ -124,10 +162,113 @@ public sealed partial class SecretsViewModel : ObservableObject
 
     public void Select(string id)
     {
-        var choice = Projects.FirstOrDefault(p => string.Equals(p.Id, id, StringComparison.OrdinalIgnoreCase));
-        if (choice is null)
-            Projects.Add(choice = new ProjectChoice(id, id));
-        SelectedProject = choice;
+        if (!Projects.Any(p => string.Equals(p.Id, id, StringComparison.OrdinalIgnoreCase)))
+        {
+            extraIds.Add(id);
+            Rebuild();
+        }
+        SelectedProject = Projects.First(p => string.Equals(p.Id, id, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>Rescans the remembered folders in the background; a request during a scan runs one more after it.</summary>
+    public async Task RescanAsync()
+    {
+        if (scanning)
+        {
+            rescanQueued = true;
+            return;
+        }
+        scanning = true;
+        try
+        {
+            do
+            {
+                rescanQueued = false;
+                if (index.Folders.Count > 0)
+                    ScanStatus = Text.Get("Secrets_Scanning");
+                index = await Task.Run(() => ProjectIndexStore.Rescan());
+                scanned = true;
+                Rebuild();
+            }
+            while (rescanQueued);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            AppLog.Error(e, "scanning for projects");
+            scanned = false;
+            Rebuild();
+        }
+        finally
+        {
+            scanning = false;
+        }
+    }
+
+    [RelayCommand]
+    async Task AddFolderAsync()
+    {
+        var dialog = new OpenFolderDialog { Title = Text.Get("Secrets_FolderPickTitle") };
+        if (dialog.ShowDialog(Owner()) != true)
+            return;
+        index = ProjectIndexStore.Update(i => i.WithFolder(dialog.FolderName));
+        AppLog.Info($"project folder added: {dialog.FolderName}");
+        await RescanAsync();
+    }
+
+    [RelayCommand]
+    void RemoveFolder(string path)
+    {
+        index = ProjectIndexStore.Update(i => i.WithoutFolder(path));
+        AppLog.Info($"project folder removed: {path}");
+        Rebuild();
+    }
+
+    [RelayCommand]
+    Task ScanNowAsync() => RescanAsync();
+
+    [RelayCommand]
+    void RecycleSelected()
+    {
+        if (SelectedProject is { } project && CanRecycleSelected)
+            Recycle([project.Id]);
+    }
+
+    [RelayCommand]
+    void RecycleUnused() => Recycle(unused);
+
+    /// <summary>
+    /// Moves folders no scanned project uses to the Recycle Bin, after asking: a project kept
+    /// somewhere not scanned may still use one, and the Recycle Bin is where it comes back from.
+    /// </summary>
+    void Recycle(IReadOnlyList<string> ids)
+    {
+        if (ids.Count == 0)
+            return;
+        var body = Text.Format("Secrets_RecycleBody", ids.Count, string.Join(", ", index.Folders));
+        if (!AskWindow.Confirm(Owner(), Text.Get("Secrets_RecycleTitle"), body, Text.Get("Secrets_Recycle")))
+            return;
+        if (SelectedProject is { } open && ids.Contains(open.Id, StringComparer.OrdinalIgnoreCase))
+        {
+            Forget();
+            folder = null;
+            NeedsUnlock = false;
+            SelectedProject = null;
+            State = Text.Get("Secrets_StatePick");
+        }
+        var failed = new List<string>();
+        foreach (var id in ids.ToArray())
+        {
+            if (Desktop.Recycle(UserSecretsFiles.Folder(id).Directory))
+                extraIds.Remove(id);
+            else
+                failed.Add(id);
+        }
+        AppLog.Info($"user secrets: {ids.Count - failed.Count} unused folder(s) moved to the Recycle Bin, {failed.Count} failed");
+        var moved = ids.Count - failed.Count;
+        Rebuild();
+        Message = failed.Count == 0
+            ? Text.Format("Secrets_Recycled", moved)
+            : Text.Format("Secrets_RecycleFailed", string.Join(", ", failed));
     }
 
     [RelayCommand]
@@ -147,7 +288,7 @@ public sealed partial class SecretsViewModel : ObservableObject
             UserSecretsFiles.StoreInClear(folder, document);
             AppLog.Info($"user secrets {folder.Id}: stored in clear");
             Load(folder, hello);
-            Relabel();
+            Rebuild();
             Message = Text.Get("Secrets_StoredInClear");
         }
         catch (ArgumentException e)
@@ -176,6 +317,7 @@ public sealed partial class SecretsViewModel : ObservableObject
             await OpenAsync();
     }
 
+    /// <summary>Opens the project's secrets and remembers the project, so its name shows from now on.</summary>
     [RelayCommand]
     void FindProject()
     {
@@ -185,11 +327,9 @@ public sealed partial class SecretsViewModel : ObservableObject
         try
         {
             var id = UserSecretsFiles.IdFromProject(dialog.FileName);
-            var choice = Projects.FirstOrDefault(p => p.Id == id)
-                ?? new ProjectChoice(id, $"{Path.GetFileNameWithoutExtension(dialog.FileName)} ({id})");
-            if (!Projects.Contains(choice))
-                Projects.Add(choice);
-            SelectedProject = choice;
+            index = ProjectIndexStore.Update(i => i.Linked(new(Path.GetFullPath(dialog.FileName), id)));
+            Rebuild();
+            Select(id);
         }
         catch (Exception e) when (e is InvalidOperationException or IOException or UnauthorizedAccessException)
         {
@@ -234,7 +374,7 @@ public sealed partial class SecretsViewModel : ObservableObject
             UserSecretsFiles.Save(folder, loaded, document, hello);
             AppLog.Info($"user secrets {folder.Id}: saved, {changed} key(s) changed");
             Load(folder, hello);
-            Relabel();
+            Rebuild();
             Message = Text.Format("Secrets_Saved", changed);
             return true;
         }
@@ -309,37 +449,72 @@ public sealed partial class SecretsViewModel : ObservableObject
         IsSealed = loaded.Version > 0;
     }
 
-    /// <summary>Keeps the picker's "(sealed)" / "(not sealed yet)" true after a seal or a store in clear, without reopening.</summary>
-    void Relabel()
+    /// <summary>
+    /// Refills the picker from the folders on disk and the project index, keeping the open project
+    /// selected without reopening it: after a scan, a save (the "(sealed)" label), or a removal.
+    /// </summary>
+    void Rebuild()
     {
-        if (folder is null || SelectedProject is not { } current || Projects.IndexOf(current) is var index && index < 0)
-            return;
-        var replacement = current with { Label = Label(new UserSecretsFolder(folder.Id, folder.Directory)) };
-        if (replacement == current)
-            return;
+        var folders = UserSecretsFiles.All();
+        var kinds = folders.ToDictionary(f => f.Id, f => f.Kind, StringComparer.OrdinalIgnoreCase);
+        var entries = ProjectList.Build(folders.Select(f => f.Id).Concat(extraIds), index);
+        unused = scanned ? [.. ProjectList.Unused(entries, index).Where(kinds.ContainsKey)] : [];
+        var selectedId = SelectedProject?.Id;
         relabelling = true;
         try
         {
-            Projects[index] = replacement;
-            SelectedProject = replacement;
+            Projects.Clear();
+            foreach (var entry in entries)
+                Projects.Add(Choice(entry, kinds.GetValueOrDefault(entry.Id, SecretsFileKind.None)));
+            SelectedProject = selectedId is null ? null : Projects.FirstOrDefault(p => string.Equals(p.Id, selectedId, StringComparison.OrdinalIgnoreCase));
         }
         finally
         {
             relabelling = false;
         }
+        Folders.Clear();
+        foreach (var path in index.Folders)
+            Folders.Add(path);
+        HasUnused = unused.Count > 0;
+        RecycleUnusedLabel = Text.Format("Secrets_RecycleUnused", unused.Count);
+        ScanStatus = index.Folders.Count == 0
+            ? Text.Get("Secrets_NoFolders")
+            : Text.Format("Secrets_Scanned", entries.Count(e => e.Known), entries.Count);
+        OnPropertyChanged(nameof(SelectedDetail));
+        OnPropertyChanged(nameof(CanRecycleSelected));
+    }
+
+    ProjectChoice Choice(ProjectEntry entry, SecretsFileKind kind)
+    {
+        var name = entry.Paths.Count > 1 ? Text.Format("Secrets_ProjectMore", entry.Name, entry.Paths.Count - 1) : entry.Name;
+        var label = kind switch
+        {
+            SecretsFileKind.Sealed => Text.Format("Secrets_ProjectSealed", name),
+            SecretsFileKind.Plain => Text.Format("Secrets_ProjectPlain", name),
+            _ => name,
+        };
+        var detail = entry.Known
+            ? string.Join(Environment.NewLine, entry.Paths)
+            : Text.Get(index.Folders.Count == 0 ? "Secrets_NotScannedDetail" : "Secrets_NoProjectDetail");
+        return new(entry.Id, label, Text.Get(entry.Known ? "Secrets_GroupProjects" : "Secrets_GroupUnknown"), detail, entry.Known);
     }
 
     IReadOnlyList<KeyValuePair<string, string>> Edited() =>
         Rows.Select(r => new KeyValuePair<string, string>(r.Key.Trim(), r.Value)).ToArray();
 
     static string KeyCount(int count) => count == 1 ? Text.Get("Secrets_KeyCountOne") : Text.Format("Secrets_KeyCount", count);
+}
 
-    static string Label(UserSecretsFolder f) => f.Kind switch
-    {
-        SecretsFileKind.Sealed => Text.Format("Secrets_ProjectSealed", f.Id),
-        SecretsFileKind.Plain => Text.Format("Secrets_ProjectPlain", f.Id),
-        _ => f.Id,
-    };
+/// <summary>What a screen reader says for a folder's Remove button: which folder it stops scanning.</summary>
+public sealed class RemoveFolderName : IValueConverter
+{
+    public static RemoveFolderName Instance { get; } = new();
+
+    public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture) =>
+        Text.Format("Secrets_RemoveFolderName", value);
+
+    public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture) =>
+        throw new NotSupportedException();
 }
 
 /// <summary><c>v:Password.Value</c>: a two-way bindable value for a <see cref="PasswordBox"/>, which has none by design.</summary>

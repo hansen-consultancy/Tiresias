@@ -11,7 +11,7 @@ using Tiresias.App.Logic;
 
 namespace Tiresias.App;
 
-/// <summary>The bits of Windows the app touches directly: capture exclusion, the taskbar theme, shell links.</summary>
+/// <summary>The bits of Windows the app touches directly: capture exclusion, the taskbar theme, shell links, the Recycle Bin.</summary>
 static partial class Desktop
 {
     const uint WdaExcludeFromCapture = 0x11;
@@ -58,6 +58,37 @@ static partial class Desktop
         UnauthorizedAccessException or IOException => ProblemKind.FileAccess,
         _ => ProblemKind.Unexpected,
     };
+
+    /// <summary>Moves a folder to the Recycle Bin, quietly: the caller has asked already.</summary>
+    /// <returns>Whether it went; a folder open in another program stays where it is.</returns>
+    public static unsafe bool Recycle(string directory)
+    {
+        const uint Delete = 3;
+        const ushort AllowUndo = 0x40, NoConfirmation = 0x10, Silent = 0x4, NoErrorUi = 0x400;
+        // The shell takes a list of paths ended by an empty one.
+        var from = directory + "\0\0";
+        fixed (char* path = from)
+        {
+            var op = new ShellFileOperation { Function = Delete, From = path, Flags = AllowUndo | NoConfirmation | Silent | NoErrorUi };
+            return SHFileOperation(&op) == 0 && op.AnyAborted == 0;
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    unsafe struct ShellFileOperation
+    {
+        public nint Window;
+        public uint Function;
+        public char* From;
+        public char* To;
+        public ushort Flags;
+        public int AnyAborted;
+        public nint NameMappings;
+        public char* ProgressTitle;
+    }
+
+    [LibraryImport("shell32.dll", EntryPoint = "SHFileOperationW")]
+    private static unsafe partial int SHFileOperation(ShellFileOperation* operation);
 
     [LibraryImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
