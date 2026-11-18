@@ -58,6 +58,7 @@ public class IdentityKeyStoreTests
     [Test]
 
     [Platform(Exclude = "Win")]
+    [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
     public void Elsewhere_the_file_is_owner_only_and_a_wider_one_is_narrowed()
     {
         var store = IdentityKeyStore.ForPlatform(path, NullLogger.Instance);

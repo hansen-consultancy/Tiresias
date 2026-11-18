@@ -183,7 +183,7 @@ public class SqlEndpointTests
         var message = new HttpRequestMessage(HttpMethod.Post, endpoint) { Content = new ByteArrayContent(bytes) };
         message.Content.Headers.ContentType = new("application/json");
         message.Headers.Add(RequestSignature.DeviceHeader, "laptop");
-        message.Headers.Add(RequestSignature.TimestampHeader, ts.ToString());
+        message.Headers.Add(RequestSignature.TimestampHeader, ts.ToString(System.Globalization.CultureInfo.InvariantCulture));
         message.Headers.Add(RequestSignature.SignatureHeader, Convert.ToBase64String(RequestSignature.Sign(device, "POST", endpoint, ts, bytes)));
         return message;
     }

@@ -215,7 +215,7 @@ public class PaperKeyTests
         var text = PaperKey.Format(Raw);
         Assert.That(text.Split('\n'), Has.Length.EqualTo(2));
         Assert.That(PaperKey.Parse(text), Is.EqualTo(Raw));
-        Assert.That(PaperKey.Parse(text.ToLowerInvariant().Replace(' ', '-').Replace("\n", "  ")), Is.EqualTo(Raw));
+        Assert.That(PaperKey.Parse(text.ToLowerInvariant().Replace(' ', '-').Replace("\n", "  ", StringComparison.Ordinal)), Is.EqualTo(Raw));
     }
 
     [Test]

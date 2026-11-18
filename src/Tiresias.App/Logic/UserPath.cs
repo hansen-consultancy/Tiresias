@@ -31,7 +31,7 @@ public static class UserPath
         var app = Trim(appFolder);
         if (fileExists(app + @"\tir.exe"))
             return app;
-        var parent = app.LastIndexOf('\\') is var i and > 0 ? app[..i] : app;
+        var parent = app.LastIndexOf('\\', StringComparison.Ordinal) is var i and > 0 ? app[..i] : app;
         var cli = parent + @"\cli";
         return fileExists(cli + @"\tir.exe") ? cli : null;
     }

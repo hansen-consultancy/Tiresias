@@ -15,6 +15,7 @@ namespace Tiresias.App;
 /// <c>tir</c> on the control pipe. A second start of the same copy brings the first forward and
 /// exits; a different copy (a development build, the installed app) offers to take over.
 /// </summary>
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001", Justification = "WPF never disposes the Application; Quit disposes these in order (the lease ends before the pipes close).")]
 public partial class App : Application
 {
     readonly CancellationTokenSource stop = new();
@@ -260,7 +261,7 @@ public partial class App : Application
                     return new(false, Text.Get("Startup_SwitchBusy"));
                 AppLog.Info("quitting: another copy is taking over");
                 // After the reply is on its way: quitting closes this pipe.
-                _ = Task.Delay(250).ContinueWith(_ => Dispatcher.BeginInvoke(Quit), TaskScheduler.Default);
+                _ = Task.Delay(250, CancellationToken.None).ContinueWith(_ => Dispatcher.BeginInvoke(Quit), TaskScheduler.Default);
                 return new(true);
             case ControlRequest.Show:
                 await Dispatcher.InvokeAsync(ShowHome);

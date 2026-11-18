@@ -58,7 +58,7 @@ public class SignatureDerivedWrapperTests
             tampered[i] ^= 1;
             Assert.That(wrapper.Unwrap(tampered, "c"), Is.Null, $"byte {i}");
         }
-        Assert.That(wrapper.Unwrap(wrapped[..10], "c"), Is.Null);
+        Assert.That(wrapper.Unwrap(wrapped.AsSpan(..10).ToArray(), "c"), Is.Null);
     }
 
     [Test]
