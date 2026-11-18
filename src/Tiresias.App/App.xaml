@@ -58,6 +58,17 @@
         <Setter Property="MinWidth" Value="96" />
         <Setter Property="Padding" Value="12,6" />
       </Style>
+      <!-- Fluent's selected cell is accent blue under unchanged black text: hard to read, and loud
+           for a grid of text boxes. A subtle fill keeps the selection visible in light and dark. -->
+      <Style TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
+        <Style.Triggers>
+          <Trigger Property="IsSelected" Value="True">
+            <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+          </Trigger>
+        </Style.Triggers>
+      </Style>
     </ResourceDictionary>
   </Application.Resources>
 </Application>

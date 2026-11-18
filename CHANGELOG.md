@@ -22,6 +22,12 @@ its section below.
 
 - A development build no longer adds its `tir` to PATH, so it can't shadow the installed one.
 
+### Fixed
+
+- **Show** in the secrets editor reveals the value; it did nothing before.
+- A selected row in the secrets, services and activity lists is a subtle highlight instead of dark
+  blue under black text.
+
 ## [0.1.0-preview.4] - 2026-11-18
 
 ### Added
