@@ -16,7 +16,8 @@ configuration or its folder.
 - **RavenDB, HTTP proxied.** `* /raven/{instance}/**`: the broker presents the instance's client
   certificate (a PFX in the vault, loaded ephemeral, disposed at lease end) and rewrites topology
   responses so the client never learns a node URL (`RavenTopology`). WebSocket requests (Changes
-  API) get `501`, and the TCP protocol (subscriptions) is not reachable at all.
+  API) got `501` before phase 2 (see *Changes API* below), and the TCP protocol (subscriptions) is
+  not reachable at all.
 
 Neither serves an application that uses the normal drivers.
 
@@ -87,7 +88,7 @@ a login that expires that day.
 2. **HTTP**: as today.
 3. **Changes API (WebSocket)**: the forwarder accepts the upgrade and opens a WebSocket to the
    broker's same route; the broker opens one upstream with the certificate and pumps frames both
-   ways. Replaces the `501`.
+   ways. Replaces the `501`. Built in phase 2; see *Changes API: the `WEBSOCKET` method* below.
 4. **Subscriptions and other TCP operations**: the client asks `GET /info/tcp` and connects where
    the answer says. The broker rewrites that answer like topology: `Url` becomes
    `tcp://127.0.0.1:{relay}` on the forwarder and `Certificate` becomes `null`, so the client
@@ -95,8 +96,28 @@ a login that expires that day.
    WebSocket (`/raven/{instance}/{placeholder}/tcp`), keeping the device-signed channel; the broker
    opens TLS to the node with the client certificate and relays bytes.
 5. **Policy**: HTTP keeps its method/path rules. A WebSocket or TCP tunnel is opaque after the
-   handshake, so each is its own grant (`changes`, `tcp`), off by default, audited at open and
-   close with bytes moved.
+   handshake, so it is off by default and audited at open and close with bytes moved. The TCP
+   relay is still planned as its own grant (`tcp`); the Changes API was built differently, below.
+
+### Changes API: the `WEBSOCKET` method
+
+As built, the Changes API is not a separate `changes` grant. A grant opens WebSockets when its
+methods list `WEBSOCKET`, next to `GET`, `POST` and the rest:
+
+- **Matching.** The upgrade request is matched as method `WEBSOCKET` against the grant's methods
+  and path patterns, like any other request, so one grant can cover a database's HTTP calls and
+  its Changes feed. A grant without `WEBSOCKET` refuses the upgrade before anything reaches the
+  node, and the audit records `WEBSOCKET` with `not-covered`.
+- **Why a method, not a grant.** The deny-by-default rule and the audit already come from method
+  matching; a second kind of grant would have duplicated both. The RavenDB client also reaches
+  the Changes API over the same placeholder URL as its HTTP calls, so it cannot pick a different
+  grant for it.
+- **Off by default.** *Set up a RavenDB* in the app leaves it out; **Allow the Changes API**
+  adds it, and **Edit...** turns it on or off later without the certificate file.
+- **Audit.** Each tunnel is logged when it opens and when it closes, with the bytes moved each
+  way (`closed: 250 bytes up, 124 bytes down`). Ending the lease closes it.
+- **Opaque after the handshake.** Once open, the method and path rules no longer apply: what the
+  app may do over the feed is the certificate's own clearance on the server.
 
 ### Open questions
 
