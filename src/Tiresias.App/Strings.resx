@@ -1747,4 +1747,25 @@ Store them in clear?</value>
   <data name="Services_Saved" xml:space="preserve">
     <value>Saved {0}. Programs using it get the change at once.</value>
   </data>
+  <data name="Services_Usage" xml:space="preserve">
+    <value>How to use...</value>
+  </data>
+  <data name="Usage_WindowTitle" xml:space="preserve">
+    <value>How to use a service</value>
+  </data>
+  <data name="Usage_Heading" xml:space="preserve">
+    <value>Using {0}</value>
+  </data>
+  <data name="Usage_SnippetName" xml:space="preserve">
+    <value>What to paste</value>
+  </data>
+  <data name="Usage_RavenDatabase" xml:space="preserve">
+    <value>Replace &lt;database&gt; with the database the app uses.</value>
+  </data>
+  <data name="Usage_PlaceholderBody" xml:space="preserve">
+    <value>If the service's secret is an API key sent as Authorization: Bearer, a terminal can get a placeholder for it instead of the key:</value>
+  </data>
+  <data name="Usage_PlaceholderHint" xml:space="preserve">
+    <value>Or in the Environment variables window: check the sealed key, pick {0} under Hand out a placeholder instead, then Use a placeholder. Name the variable after the key the tool reads; the base URL variable points the tool at Tiresias.</value>
+  </data>
 </root>

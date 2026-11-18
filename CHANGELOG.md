@@ -26,6 +26,8 @@ its section below.
 - **Edit...** in the Services window also changes an HTTP service added there: its upstream,
   secret, methods, paths and Windows Hello requirement. The name stays, and programs using the
   service get the change at once.
+- **How to use...** in the Services window shows again what to paste for a saved service: the
+  user secrets line for a SQL Server or RavenDB, or a placeholder for an API key.
 - RavenDB's Changes API works through the broker and the forwarder, for grants that list the
   `WEBSOCKET` method. Each tunnel is audited when it opens and when it closes, and closes with the
   lease.

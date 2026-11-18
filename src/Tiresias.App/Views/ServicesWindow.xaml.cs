@@ -60,7 +60,7 @@ public sealed partial class ServicesViewModel : ObservableObject
     public ObservableCollection<string> Secrets { get; } = [];
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(RemoveCommand), nameof(EditCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RemoveCommand), nameof(EditCommand), nameof(UsageCommand))]
     public partial ServiceRow? SelectedRow { get; set; }
 
     [ObservableProperty]
@@ -206,6 +206,13 @@ public sealed partial class ServicesViewModel : ObservableObject
     }
 
     bool CanRemove() => SelectedRow is not null;
+
+    [RelayCommand(CanExecute = nameof(CanRemove))]
+    void Usage()
+    {
+        if (SelectedRow is { } row && Load()?.FindService(row.Slug) is { } service)
+            new UsageWindow(service) { Owner = Owner() }.ShowDialog();
+    }
 
     [RelayCommand]
     void SetUpSql()

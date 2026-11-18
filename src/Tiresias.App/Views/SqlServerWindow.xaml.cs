@@ -215,7 +215,7 @@ public sealed partial class SqlServerViewModel : ObservableObject, IDisposable
             foreach (var warning in result.Warnings)
                 Warnings.Add(warning);
             DoneHeading = Text.Format(plan.Replaces ? "Sql_DoneAgainHeading" : "Sql_DoneHeading", result.Service.Slug);
-            Snippet = $"\"ConnectionStrings:Default\": \"{SecretsReference(result.Service.Slug, "read")}\"";
+            Snippet = ServiceUsages.For(result.Service).Snippet;
             IsDone = true;
             Saved?.Invoke(result.Service.Slug);
         }
@@ -240,8 +240,6 @@ public sealed partial class SqlServerViewModel : ObservableObject, IDisposable
             running = null;
         }
     }
-
-    static string SecretsReference(string slug, string grant) => $"{Tiresias.Protocol.SecretsFile.ReferencePrefix}sql/{slug}/{grant}";
 
     [RelayCommand]
     void Copy() => Clipboard.SetText(Snippet);

@@ -255,12 +255,7 @@ public sealed partial class RavenServerViewModel : ObservableObject, IDisposable
             var service = await Task.Run(() => RavenSetup.RunAsync(plan, file, password, hello, progress, ct), ct);
             AppLog.Info($"raven setup: service {service.Slug} saved for {service.Upstream}");
             DoneHeading = Text.Format(keep ? "Raven_DoneEditHeading" : plan.Replaces ? "Sql_DoneAgainHeading" : "Sql_DoneHeading", service.Slug);
-            Snippet = $$"""
-                "RavenDB": {
-                  "Urls": [ "{{Tiresias.Protocol.SecretsFile.ReferencePrefix}}raven/{{service.Slug}}" ],
-                  "Database": "{{plan.Database}}"
-                }
-                """;
+            Snippet = ServiceUsages.For(service, plan.Database).Snippet;
             IsDone = true;
             Saved?.Invoke(service.Slug);
         }
