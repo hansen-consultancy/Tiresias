@@ -85,7 +85,7 @@
             </StackPanel>
             <StackPanel Style="{StaticResource Field}">
               <Label x:Name="PasswordLabel" Content="{l:S Sql_Password}" Target="{Binding ElementName=PasswordBox}" Padding="0,0,0,4" />
-              <PasswordBox x:Name="PasswordBox" v:Password.Value="{Binding AdminPassword, Mode=TwoWay}" AutomationProperties.LabeledBy="{Binding ElementName=PasswordLabel}" />
+              <PasswordBox x:Name="PasswordBox" v:Password.Value="{Binding AdminPassword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.LabeledBy="{Binding ElementName=PasswordLabel}" />
               <TextBlock Text="{Binding UserError}" Style="{StaticResource FieldError}" />
             </StackPanel>
           </StackPanel>

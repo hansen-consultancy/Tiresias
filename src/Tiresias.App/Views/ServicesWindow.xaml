@@ -89,7 +89,7 @@
 
         <StackPanel Style="{StaticResource Field}" Visibility="{Binding NeedsValue, Converter={StaticResource Visible}}">
           <Label x:Name="ValueLabel" Content="{l:S Services_Value}" Target="{Binding ElementName=ValueBox}" Padding="0,0,0,4" />
-          <PasswordBox x:Name="ValueBox" v:Password.Value="{Binding Value, Mode=TwoWay}" AutomationProperties.LabeledBy="{Binding ElementName=ValueLabel}" />
+          <PasswordBox x:Name="ValueBox" v:Password.Value="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.LabeledBy="{Binding ElementName=ValueLabel}" />
           <TextBlock Text="{l:S Services_ValueHint}" Style="{StaticResource CaptionText}" Margin="0,4,0,0" />
           <TextBlock Text="{Binding ValueError}" Style="{StaticResource FieldError}" />
         </StackPanel>
