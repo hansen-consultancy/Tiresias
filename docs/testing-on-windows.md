@@ -137,6 +137,9 @@ Things worth trying:
 - **Choose Deny,** or let the countdown run out. The sample stops at startup with "Access to user
   secrets 'tiresias-sample-2f7c' was denied by Tiresias", rather than running without them and
   failing later in a less obvious way.
+- **Quit the app, run the sample, then start the app within a minute.** The sample says it is
+  waiting for Tiresias, then carries on with the usual dialog once the app is up. Leave the app
+  closed and it stops after a minute with a message to start it.
 - **Lock, then run the sample.** The dialog appears with the sample's name and **Unlock with
   Windows Hello**. Unlock, and the usual consent dialog follows. Deny instead, and the sample stops
   at startup with a message to unlock.

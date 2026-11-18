@@ -117,6 +117,15 @@ sealed class ProtectedUserSecretsProvider(string userSecretsId, string directory
     /// </summary>
     internal static TextWriter Notices { get; set; } = Console.Error;
 
+    /// <summary>Short: an absent agent is the normal case on a colleague's machine and must not slow startup.</summary>
+    internal static readonly TimeSpan Glance = TimeSpan.FromMilliseconds(300);
+
+    /// <summary>
+    /// Sealed secrets are useless without the agent, so an absent one is waited for: an app that
+    /// starts at sign-in usually races the Tiresias app starting at the same moment.
+    /// </summary>
+    internal static readonly TimeSpan AgentStartWait = TimeSpan.FromSeconds(60);
+
     bool fromAgent;
 
     public override void Load()
@@ -141,7 +150,13 @@ sealed class ProtectedUserSecretsProvider(string userSecretsId, string directory
         if (kind == SecretsFileKind.None)
             return null; // Nothing to protect and nothing to ask anyone for.
 
-        var reply = agent.TryLoad(new AgentRequest(AgentRequest.LoadUserSecrets, userSecretsId, directory));
+        var request = new AgentRequest(AgentRequest.LoadUserSecrets, userSecretsId, directory);
+        var reply = agent.TryLoad(request, Glance);
+        if (reply is null && kind == SecretsFileKind.Sealed)
+        {
+            Notices.WriteLine($"Tiresias: user secrets '{userSecretsId}' are protected; waiting up to {AgentStartWait.TotalSeconds:0} seconds for the Tiresias app to start.");
+            reply = agent.TryLoad(request, AgentStartWait);
+        }
         switch (reply?.Status)
         {
             case AgentStatus.Ok:
@@ -160,7 +175,7 @@ sealed class ProtectedUserSecretsProvider(string userSecretsId, string directory
         {
             SecretsFileKind.Plain => text,
             SecretsFileKind.Sealed => throw new InvalidOperationException(
-                $"User secrets '{userSecretsId}' are protected by tir and the Tiresias agent is not running. Start the Tiresias app (or run 'tir agent'), then start this app again."),
+                $"User secrets '{userSecretsId}' are protected by tir and the Tiresias agent did not start within {AgentStartWait.TotalSeconds:0} seconds. Start the Tiresias app (or run 'tir agent'), then start this app again."),
             _ when optional => null,
             _ => throw new InvalidDataException($"'{path}' is not valid JSON."),
         };

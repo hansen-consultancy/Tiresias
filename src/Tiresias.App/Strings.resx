@@ -475,6 +475,18 @@
   <data name="Status_ReviewEnvironment" xml:space="preserve">
     <value>Seal environment variables that look like secrets</value>
   </data>
+  <data name="Status_StartWithWindows" xml:space="preserve">
+    <value>Start Tiresias when I sign in to Windows</value>
+  </data>
+  <data name="Status_StartWithWindowsDev" xml:space="preserve">
+    <value>Only an installed copy can start at sign-in; a development build's folder changes with every build.</value>
+  </data>
+  <data name="Status_StartWithWindowsFailed" xml:space="preserve">
+    <value>Couldn't change the sign-in setting. The app log has the details.</value>
+  </data>
+  <data name="Status_StartWithWindowsNote" xml:space="preserve">
+    <value>Apps that start at sign-in and use protected user secrets wait up to a minute for it.</value>
+  </data>
   <data name="Tray_About" xml:space="preserve">
     <value>About Tiresias</value>
   </data>
