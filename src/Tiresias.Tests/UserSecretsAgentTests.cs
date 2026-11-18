@@ -484,7 +484,7 @@ public class AgentPipeTests
             _ => "test-caller");
         var serving = server.RunAsync(stop.Token);
 
-        var reply = await Task.Run(() => new NamedPipeUserSecretsAgent(pipe).TryLoad(new(AgentRequest.LoadUserSecrets, "abc", "dir")));
+        var reply = await Task.Run(() => new NamedPipeUserSecretsAgent(pipe).TryLoad(new(AgentRequest.LoadUserSecrets, "abc", "dir"), TimeSpan.FromSeconds(5)));
 
         Assert.That(reply!.Status, Is.EqualTo(AgentStatus.Ok));
         Assert.That(reply.Json, Does.Contain("abc"));
@@ -495,5 +495,21 @@ public class AgentPipeTests
 
     [Test]
     public void Without_a_server_the_client_reports_no_agent() =>
-        Assert.That(new NamedPipeUserSecretsAgent($"tiresias-test-{Guid.NewGuid():N}").TryLoad(new(AgentRequest.LoadUserSecrets, "abc", "dir")), Is.Null);
+        Assert.That(new NamedPipeUserSecretsAgent($"tiresias-test-{Guid.NewGuid():N}").TryLoad(new(AgentRequest.LoadUserSecrets, "abc", "dir"), TimeSpan.FromMilliseconds(300)), Is.Null);
+
+    [Test]
+    public async Task The_client_waits_for_a_server_that_starts_after_it_asked()
+    {
+        var pipe = $"tiresias-test-{Guid.NewGuid():N}";
+        using var stop = new CancellationTokenSource();
+        var asking = Task.Run(() => new NamedPipeUserSecretsAgent(pipe).TryLoad(new(AgentRequest.LoadUserSecrets, "abc", "dir"), TimeSpan.FromSeconds(10)));
+        await Task.Delay(500);
+        var server = new AgentPipeServer<AgentRequest, AgentReply, string?>(pipe,
+            (_, _, _) => Task.FromResult(new AgentReply(AgentStatus.Ok, "{}")), _ => null);
+        var serving = server.RunAsync(stop.Token);
+
+        Assert.That((await asking)?.Status, Is.EqualTo(AgentStatus.Ok));
+        await stop.CancelAsync();
+        await serving;
+    }
 }
