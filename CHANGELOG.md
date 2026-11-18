@@ -10,6 +10,12 @@ its section below.
 
 ### Added
 
+- `tir service add <slug> --upstream <https-url>` sets up a service for `tir exec` in one
+  command: it asks for the secret's value if the vault doesn't have it yet, allows `GET` on every
+  path unless you narrow it with `--method` and `--allow`, and refuses a plain-http address or a
+  broken pattern with what to type instead. `tir service list` and `tir service remove` go with
+  it. In solo mode the change works from the next request, with no lock and unlock, and a vault
+  file that can't be read leaves the broker on its previous settings.
 - **Tiresias desktop app** for Windows 11, in the notification area. It unlocks with Windows Hello
   and shows whether you are locked or unlocked, and until when. It asks before anything gets a
   secret, in a dialog that shows which program is asking and which keys it gets, never their

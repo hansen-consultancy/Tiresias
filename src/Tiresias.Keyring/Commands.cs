@@ -9,8 +9,6 @@ namespace Tiresias.Keyring;
 /// <summary>The <c>tir</c> commands. Each returns the process exit code.</summary>
 static class Commands
 {
-    static readonly Regex Slug = new("^[a-z0-9][a-z0-9-]{0,62}$", RegexOptions.CultureInvariant);
-
     public static int Enroll(CommandLine args)
     {
         var url = new Uri(args.Require("--broker"));
@@ -123,37 +121,38 @@ static class Commands
     public static int VaultAdd(CommandLine args)
     {
         var slug = args.Require(2, "slug");
-        if (!Slug.IsMatch(slug))
+        if (!ServicePlanner.IsSlug(slug))
             throw new UsageException("A slug is lower-case letters, digits and dashes.");
-        var settings = KeyringStore.Settings;
-        var recovery = RecoveryKey.Wrapper()
-            ?? throw new UsageException("No recovery key yet. Run tir recovery init first, so no secret depends on the TPM alone.");
+        var version = SealSecret(slug, args.Flag("--from-stdin"));
+        Console.WriteLine($"Sealed {slug} v{version} into {VaultEditor.Path}. {PickedUp()}");
+        return 0;
+    }
 
-        var vault = File.Exists(settings.VaultPath) ? VaultFile.Load(settings.VaultPath) : new VaultDocument([], []);
-        var version = (vault.FindSecret(slug)?.Version ?? 0) + 1;
-
-        var value = args.Flag("--from-stdin")
+    /// <summary>Reads a secret's value (typed without echo, or piped in with <paramref name="fromStdin"/>) and seals it into the vault.</summary>
+    /// <returns>The version written.</returns>
+    public static int SealSecret(string slug, bool fromStdin)
+    {
+        if (RecoveryKey.Wrapper() is null)
+            throw new UsageException("No recovery key yet. Run tir recovery init first, so no secret depends on the TPM alone.");
+        var value = fromStdin
             ? Terminal.ReadStdin()
             : Terminal.ReadHidden($"Value for {slug} (the whole Authorization header, e.g. 'Bearer sk-...'): ");
-        SealedSecret secret;
         try
         {
             if (value.Length == 0)
                 throw new UsageException("Empty value.");
-            using var hello = HelloKeyWrapper.Open(create: true);
-            secret = SecretEnvelope.Seal(slug, version, value, [hello, recovery]);
+            return VaultEditor.SealSecret(slug, value);
         }
         finally
         {
             Array.Clear(value);
         }
-
-        VaultFile.Save(settings.VaultPath, vault with { Secrets = [.. vault.Secrets.Where(s => s.Slug != slug), secret] });
-        Console.WriteLine(KeyringStore.Tenant is { Solo: true }
-            ? $"Sealed {slug} v{version} into {settings.VaultPath}. The solo broker picks it up at the next unlock."
-            : $"Sealed {slug} v{version} into {settings.VaultPath}. Copy that file to the broker's VaultPath and restart the broker.");
-        return 0;
     }
+
+    /// <summary>How a vault change reaches the broker.</summary>
+    public static string PickedUp() => KeyringStore.Tenant is { Solo: true }
+        ? "The solo broker uses the change from its next request; no need to lock and unlock."
+        : "Copy that file to the broker's VaultPath and restart the broker.";
 
     public static async Task<int> UnlockAsync(CommandLine args)
     {

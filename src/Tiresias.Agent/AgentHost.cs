@@ -26,6 +26,8 @@ public sealed class AgentHost : IAsyncDisposable
         UserSecrets.Log += Say;
         keeper.Log += Say;
         keeper.Locked += reason => Lock(reason);
+        solo.Log += Say;
+        solo.SecretsUnleased = SealIntoLeaseAsync;
     }
 
     /// <summary>The agent's own decisions (user secrets), beside the broker's audit log.</summary>
@@ -68,10 +70,7 @@ public sealed class AgentHost : IAsyncDisposable
             return;
         try
         {
-            if (solo.Running)
-                await solo.RefreshAsync();
-            else
-                await solo.StartAsync();
+            await solo.StartAsync();
             SoloBrokerProblem = null;
         }
         catch (Exception e) when (e is not OperationCanceledException)
@@ -100,6 +99,23 @@ public sealed class AgentHost : IAsyncDisposable
         Say(result.Message);
         StateChanged?.Invoke();
         return result;
+    }
+
+    /// <summary>Solo mode: seals secrets added to the vault since the unlock into the open lease, when unlocked; locked, the next unlock seals them.</summary>
+    async Task SealIntoLeaseAsync(IReadOnlyList<string> slugs)
+    {
+        if (Keys.Hello is not { } hello)
+            return;
+        try
+        {
+            if (await LeaseControl.SealIntoOpenLeaseAsync(hello, slugs) is { Length: > 0 } message)
+                Say(message);
+        }
+        catch (Exception e) when (e is HttpRequestException or IOException or InvalidDataException or System.Text.Json.JsonException
+            or InvalidOperationException or System.Security.Cryptography.CryptographicException)
+        {
+            Say($"Couldn't add {string.Join(", ", slugs)} to the lease ({e.Message}). Lock and unlock to use them.");
+        }
     }
 
     /// <summary>Forgets the keys and every session consent, and ends the lease when there is one.</summary>

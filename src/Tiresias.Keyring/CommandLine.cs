@@ -8,7 +8,7 @@ namespace Tiresias.Keyring;
 sealed class CommandLine
 {
     readonly List<string> positional = [];
-    readonly Dictionary<string, string?> options = new(StringComparer.Ordinal);
+    readonly Dictionary<string, List<string?>> options = new(StringComparer.Ordinal);
 
     public CommandLine(string[] args)
     {
@@ -22,9 +22,9 @@ sealed class CommandLine
             if (!args[i].StartsWith("--", StringComparison.Ordinal))
                 positional.Add(args[i]);
             else if (i + 1 < args.Length && !args[i + 1].StartsWith("--", StringComparison.Ordinal))
-                options[args[i]] = args[++i];
+                Add(args[i], args[++i]);
             else
-                options[args[i]] = null;
+                Add(args[i], null);
         }
     }
 
@@ -35,12 +35,23 @@ sealed class CommandLine
 
     public string Require(int index, string name) => At(index) ?? throw new UsageException($"Missing <{name}>.");
 
-    public string? Option(string name) => options.GetValueOrDefault(name);
+    /// <summary>The option's value; the last one when it was given more than once.</summary>
+    public string? Option(string name) => options.GetValueOrDefault(name)?[^1];
+
+    /// <summary>Every value of an option that may repeat, e.g. <c>--method GET --method POST</c>.</summary>
+    public IReadOnlyList<string> Options(string name) => options.GetValueOrDefault(name)?.OfType<string>().ToArray() ?? [];
 
     public string Require(string name) =>
         Option(name) is { Length: > 0 } value ? value : throw new UsageException($"Missing {name} <value>.");
 
     public bool Flag(string name) => options.ContainsKey(name);
+
+    void Add(string name, string? value)
+    {
+        if (!options.TryGetValue(name, out var values))
+            options[name] = values = [];
+        values.Add(value);
+    }
 }
 
 sealed class UsageException(string message) : Exception(message);

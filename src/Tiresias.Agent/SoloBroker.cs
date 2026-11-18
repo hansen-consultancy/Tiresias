@@ -1,5 +1,8 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Text.Json;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -21,15 +24,32 @@ namespace Tiresias.Agent;
 /// and <c>tir doctor</c> says so.
 /// </summary>
 /// <remarks>
-/// The broker loads the vault when it starts, so a vault changed since (a secret added) is picked
-/// up by <see cref="RefreshAsync"/>, which the agent calls before every unlock.
+/// The vault can change while the broker runs (<c>tir service add</c>, <c>tir vault add</c>, the
+/// app's Services window). Before each request the broker checks the file's timestamp and, when it
+/// moved, swaps the new vault in without ending the lease (<see cref="BrokerState.ReplaceVault"/>).
+/// Secrets of the open lease left without a DEK are handed to <see cref="SecretsUnleased"/>, which
+/// the agent answers by sealing them to the lease, before the request goes on. A vault that doesn't
+/// load is reported on <see cref="Log"/> and the broker keeps the one it had.
 /// </remarks>
 public sealed class SoloBroker : IAsyncDisposable
 {
     public static readonly Uri Url = new("http://127.0.0.1:7780");
 
     WebApplication? app;
+    readonly Lock vaultGate = new();
+    readonly SemaphoreSlim sealing = new(1, 1);
     DateTime vaultStamp;
+    IReadOnlyList<string> unleased = [];
+
+    /// <summary>One line per vault reload, or why one failed. Never a value.</summary>
+    public event Action<string>? Log;
+
+    /// <summary>
+    /// Called with the open lease's secrets that have no DEK after a reload (a secret just added or
+    /// re-sealed). The agent seals them to the lease, if it is unlocked; the request that noticed
+    /// the change waits for it, so it already sees the new secret.
+    /// </summary>
+    public Func<IReadOnlyList<string>, Task>? SecretsUnleased { get; set; }
 
     public static string Directory => Path.Combine(KeyringStore.Directory, "solo");
     public static string AuditPath => Path.Combine(Directory, "audit.jsonl");
@@ -70,6 +90,12 @@ public sealed class SoloBroker : IAsyncDisposable
         builder.Logging.ClearProviders();
 
         var built = BrokerHost.Build(builder);
+        var state = built.Services.GetRequiredService<BrokerState>();
+        built.Use(async (context, next) =>
+        {
+            await KeepVaultCurrentAsync(state, tenant.VaultPath, context.Request.Path);
+            await next(context);
+        });
         try
         {
             await built.StartAsync();
@@ -90,15 +116,55 @@ public sealed class SoloBroker : IAsyncDisposable
         await running.DisposeAsync();
     }
 
-    /// <summary>Restarts the broker when the vault changed since it started, so new secrets can be leased.</summary>
-    public async Task RefreshAsync()
+    async Task KeepVaultCurrentAsync(BrokerState state, string vaultPath, PathString path)
     {
-        if (app is null || KeyringStore.Tenant is not { Solo: true } tenant)
+        ReloadIfChanged(state, vaultPath);
+        // The agent's own sealing (and an unlock) goes through /lease; those requests must not wait for it.
+        if (path.StartsWithSegments("/lease", StringComparison.Ordinal) || SecretsUnleased is not { } seal)
             return;
-        if (File.GetLastWriteTimeUtc(tenant.VaultPath) == vaultStamp)
+        if (Volatile.Read(ref unleased).Count == 0)
             return;
-        await StopAsync();
-        await StartAsync();
+        await sealing.WaitAsync();
+        try
+        {
+            var slugs = Interlocked.Exchange(ref unleased, []);
+            if (slugs.Count > 0)
+                await seal(slugs);
+        }
+        finally
+        {
+            sealing.Release();
+        }
+    }
+
+    void ReloadIfChanged(BrokerState state, string vaultPath)
+    {
+        lock (vaultGate)
+        {
+            var stamp = File.GetLastWriteTimeUtc(vaultPath);
+            if (stamp == vaultStamp)
+                return;
+            VaultDocument vault;
+            try
+            {
+                vault = VaultFile.Load(vaultPath);
+            }
+            catch (IOException)
+            {
+                // Mid-write or held open: try again at the next request.
+                return;
+            }
+            catch (Exception e) when (e is JsonException or InvalidDataException or ArgumentException or UnauthorizedAccessException or NotSupportedException)
+            {
+                vaultStamp = stamp;
+                Log?.Invoke($"The vault changed but can't be read ({e.Message}). The solo broker keeps using the services and secrets it had; fix {vaultPath} or undo the change.");
+                return;
+            }
+            vaultStamp = stamp;
+            var missing = state.ReplaceVault(vault);
+            Volatile.Write(ref unleased, missing);
+            Log?.Invoke($"Vault reloaded: {vault.Services.Count} service(s), {vault.Secrets.Count} secret(s).");
+        }
     }
 
     /// <summary>The broker identity's public key (base64), creating the identity on first use. The Keyring pins it.</summary>

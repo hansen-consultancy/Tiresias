@@ -19,7 +19,8 @@ public sealed record KeyringSettings(string DeviceId, string VaultPath, string? 
 public sealed record TenantConfig(string Name, Uri Url, string IdentityKey, string VaultPath, string? GenesisHash = null, bool Solo = false);
 
 /// <summary>The lease <c>tir unlock</c> opened, so <c>tir agent</c>, <c>tir status</c> and <c>tir lock</c> can find it.</summary>
-public sealed record OpenLease(string LeaseId, DateTimeOffset HardCapAt);
+/// <param name="LeaseKey">The lease's public X25519 key (base64) from the verified offer, so a secret added later can be sealed to the same lease. Absent in a lease file written before it was kept.</param>
+public sealed record OpenLease(string LeaseId, DateTimeOffset HardCapAt, string? LeaseKey = null);
 
 /// <summary>
 /// Everything the Keyring keeps on disk, under <c>%LOCALAPPDATA%\Tiresias</c>. None of it is a

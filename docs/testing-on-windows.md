@@ -143,32 +143,23 @@ Things worth trying:
 
 ## 5. `tir exec` through the solo broker
 
-Add a secret to the vault. Its value is the whole `Authorization` header. Use a dummy one: this
-demo calls a public echo service.
+Describe the service and its secret in one command. The secret's value is the whole
+`Authorization` header. Use a dummy one: this demo calls a public echo service.
 
 ```powershell
-tir vault add httpbin-demo
-# Value: Bearer example-token
+tir service add httpbin --upstream https://httpbin.org --allow '^/headers$'
+# Value for httpbin: Bearer example-token
 ```
 
-Then describe what may use it. Open `%LOCALAPPDATA%\Tiresias\vault.json` and replace its
-`"services": []` with:
+The secret is named after the service (`--secret <name>` picks another, or reuses one already in
+the vault), the grant allows `GET` only (`--method` adds others), and only `/headers` is allowed.
+Leave out `--allow` and every path is allowed; `tir` says so. `tir service list` shows what is
+configured, never a value, and `tir service remove httpbin` takes the service out but keeps its
+secret.
 
-```json
-"services": [
-  {
-    "slug": "httpbin",
-    "upstream": "https://httpbin.org",
-    "grants": [
-      { "name": "read", "secretSlug": "httpbin-demo", "requiresElevation": false,
-        "methods": [ "GET" ], "allow": [ "^/headers$" ], "deny": [], "maxBodyBytes": null }
-    ]
-  }
-]
-```
-
-The solo broker reads the vault when it starts, so restart the lease with `tir lock`, then
-`tir unlock`. Then run a command with a placeholder in its environment:
+With the app running and unlocked, there is nothing else to do: the solo broker notices the vault
+changed at its next request and seals the new secret into the open lease, without a lock and unlock.
+Run a command with a placeholder in its environment:
 
 ```powershell
 tir exec httpbin --purpose "try the solo broker" -- pwsh -NoProfile -Command 'curl.exe -s "$env:HTTPBIN_BASE_URL/headers" -H "Authorization: Bearer $env:HTTPBIN_TOKEN"'

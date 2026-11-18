@@ -12,6 +12,14 @@ const string Usage = """
         Solo mode: the broker runs inside the Tiresias app on this PC, no server needed. Creates
         the recovery key if there is none (or asks for it) and a one-device trust chain.
     tir vault add <slug> [--from-stdin]
+    tir service add <slug> --upstream <https-url> [--secret <slug>] [--method GET]... [--allow <regex>]...
+                    [--deny <regex>]... [--grant <name>] [--elevation] [--from-stdin]
+        Adds a service with one grant. The secret defaults to the service's slug and is asked for
+        (without echo) when the vault doesn't have it yet; methods default to GET; with no --allow,
+        every path is allowed. A solo broker uses the change from its next request.
+    tir service list
+    tir service remove <slug>
+        Removes the service, keeps its secret.
     tir unlock [--secrets a,b]
     tir lock
     tir status
@@ -40,6 +48,7 @@ try
         ("recovery", "init") => Commands.RecoveryInit(),
         ("solo", "init") => Commands.SoloInit(),
         ("vault", "add") => Commands.VaultAdd(line),
+        ("service", _) => ServiceCommand.Run(line),
         ("unlock", _) => await Commands.UnlockAsync(line),
         ("lock", _) => await Commands.LockAsync(),
         ("status", _) => await Commands.StatusAsync(),
