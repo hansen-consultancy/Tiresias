@@ -28,9 +28,13 @@ restarts.
    update to preview releases; stable builds only to stable ones.
 3. **Check the run.** For the app, the **Verify signatures** step lists each signed file and its
    signer.
-4. **Check the release** on GitHub. An app release carries `TiresiasApp-win-Setup.exe` (the
-   installer), `TiresiasApp-win-Portable.zip`, the `-full.nupkg` and `-delta.nupkg` packages, and the
-   `releases.win.json` feed that installed apps read.
+4. **Check the release** on GitHub. An app release carries, for x64, `TiresiasApp-win-Setup.exe`
+   (the installer), `TiresiasApp-win-Portable.zip`, the `-full.nupkg` and `-delta.nupkg` packages,
+   and the `releases.win.json` feed that installed apps read; and the same for Arm64 with
+   `win-arm64` in each name (`TiresiasApp-win-arm64-Setup.exe`, `releases.win-arm64.json`). Each
+   architecture is its own Velopack channel, so an install only updates to its own. x64 stays on
+   the default `win` channel that installs from before Arm64 builds follow. The first Arm64
+   release has no previous package to build a delta from, so it ships the full package only.
 
 The NuGet workflow needs nuget.org trusted publishing (the `nuget` environment and the
 `NUGET_USER` secret, see `release.yml`). The app workflow needs the one-time Azure setup below.

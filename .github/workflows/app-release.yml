@@ -65,12 +65,15 @@ jobs:
         run: dotnet test src/Tiresias.Tests/Tiresias.Tests.csproj -c Release
 
       # Self-contained: installing the app doesn't need a .NET runtime. tir ships in the same folder.
+      # Once per architecture: x64, and Arm64 so Windows on Arm runs it natively, not emulated.
       - name: Publish
         shell: bash
         run: |
           v="${{ steps.meta.outputs.version }}"
-          dotnet publish src/Tiresias.App -c Release -r win-x64 --self-contained -p:Version="$v" -o publish
-          dotnet publish src/Tiresias.Keyring -c Release -r win-x64 --self-contained -p:Version="$v" -o publish
+          for rid in win-x64 win-arm64; do
+            dotnet publish src/Tiresias.App -c Release -r $rid --self-contained -p:Version="$v" -o publish/$rid
+            dotnet publish src/Tiresias.Keyring -c Release -r $rid --self-contained -p:Version="$v" -o publish/$rid
+          done
 
       - name: Azure sign-in (OIDC)
         uses: azure/login@v2
@@ -94,34 +97,48 @@ jobs:
         run: dotnet tool install --global vpk --version 1.2.161
 
       # The previous release's full package lets vpk build a delta, so updates download only what changed.
+      # Each architecture is its own Velopack channel, so an install only ever updates to its own.
+      # x64 keeps the default channel ("win") that every install before Arm64 builds is on.
       - name: Previous release
         shell: bash
-        run: vpk download github --repoUrl "https://github.com/${{ github.repository }}" --token "${{ secrets.GITHUB_TOKEN }}" --outputDir Releases --pre || true
+        run: |
+          vpk download github --repoUrl "https://github.com/${{ github.repository }}" --token "${{ secrets.GITHUB_TOKEN }}" --outputDir Releases --pre || true
+          vpk download github --repoUrl "https://github.com/${{ github.repository }}" --token "${{ secrets.GITHUB_TOKEN }}" --outputDir Releases --pre --channel win-arm64 || true
 
       - name: Pack
         shell: bash
         run: |
           # Not "Tiresias": Velopack installs to %LOCALAPPDATA%\{packId} and deletes that whole folder on
           # uninstall, and %LOCALAPPDATA%\Tiresias holds the vault and the device key. PackagingTests guards it.
-          vpk pack --packId TiresiasApp --packTitle Tiresias --packAuthors "Tiresias contributors" \
-            --packVersion "${{ steps.meta.outputs.version }}" --packDir publish --mainExe Tiresias.exe \
-            --icon assets/export/tiresias.ico --releaseNotes "$RUNNER_TEMP/notes.md" --outputDir Releases \
-            --azureTrustedSignFile "$RUNNER_TEMP/signing.json"
+          for rid in win-x64 win-arm64; do
+            channel=""; [ "$rid" = "win-arm64" ] && channel="--channel win-arm64"
+            vpk pack --packId TiresiasApp --packTitle Tiresias --packAuthors "Tiresias contributors" \
+              --packVersion "${{ steps.meta.outputs.version }}" --packDir publish/$rid --mainExe Tiresias.exe \
+              --runtime $rid $channel \
+              --icon assets/export/tiresias.ico --releaseNotes "$RUNNER_TEMP/notes.md" --outputDir Releases \
+              --azureTrustedSignFile "$RUNNER_TEMP/signing.json"
+          done
 
       # vpk signs Tiresias.exe, tir.exe and every other unsigned binary in the package, then the
-      # installer. Stop here if anything users run came out unsigned or untimestamped: check the
-      # installer and the two executables inside the full package that updates install. Artifact
+      # installer. Stop here if anything users run came out unsigned or untimestamped: check each
+      # installer and the two executables inside each full package that updates install. Artifact
       # Signing certificates live three days, so a signature without a timestamp stops verifying
       # three days after the release.
       - name: Verify signatures
         shell: pwsh
         run: |
-          $full = Get-ChildItem Releases -Filter "*-${{ steps.meta.outputs.version }}-full.nupkg" | Select-Object -First 1
-          Copy-Item $full.FullName "$env:RUNNER_TEMP/full.zip"   # Expand-Archive only takes a .zip name
-          Expand-Archive "$env:RUNNER_TEMP/full.zip" -DestinationPath "$env:RUNNER_TEMP/full" -Force
-          $files = @(Get-ChildItem "$env:RUNNER_TEMP/full" -Include Tiresias.exe, tir.exe -Recurse) + @(Get-ChildItem Releases -Filter *-Setup.exe)
+          $fulls = @(Get-ChildItem Releases -Filter "*-${{ steps.meta.outputs.version }}*-full.nupkg")
+          $files = @()
+          foreach ($full in $fulls) {
+            $into = "$env:RUNNER_TEMP/full/$($full.BaseName)"
+            Copy-Item $full.FullName "$into.zip"   # Expand-Archive only takes a .zip name
+            Expand-Archive "$into.zip" -DestinationPath $into -Force
+            $files += @(Get-ChildItem $into -Include Tiresias.exe, tir.exe -Recurse)
+          }
+          $files += @(Get-ChildItem Releases -Filter *-Setup.exe)
           $bad = $files | Where-Object { $s = Get-AuthenticodeSignature $_.FullName; $s.Status -ne 'Valid' -or -not $s.TimeStamperCertificate }
-          if ($files.Count -lt 3 -or $bad) {
+          # Two architectures: two full packages, each with two executables, and two installers.
+          if ($fulls.Count -lt 2 -or $files.Count -lt 6 -or $bad) {
             Write-Output "::error title=Unsigned or untimestamped files::$($bad.Name -join ', ')"
             exit 1
           }

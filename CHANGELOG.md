@@ -10,6 +10,7 @@ its section below.
 
 ### Added
 
+- A native Windows on Arm build: `TiresiasApp-win-arm64-Setup.exe` on each app release.
 - **About Tiresias** (tray menu and status page): the version, where it runs from, since when, and
   this version's release notes, with links to GitHub.
 - A development build says so: its tray icon has an orange corner, and the tray menu, tooltip,
