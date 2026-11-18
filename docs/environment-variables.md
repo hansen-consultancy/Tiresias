@@ -84,7 +84,10 @@ code page nor PowerShell's parser touches them.
 ### For one command
 
 `tir run -- <command> [args...]` resolves the set for the current directory, asks once, and
-starts the command with the variables in its environment only. For scripts, CI-like runs, and
+starts the command with the variables in its environment only. `--only NAME[,NAME...]` narrows
+that to the names given, in the dialog too; a name not sealed for that folder is an error rather
+than silently missing. The dialog's **Asked by** is `tir`, the program the app can verify on its
+pipe; the heading names the command it is about to start. For scripts, CI-like runs, and
 shells without a hook (cmd, Git Bash).
 
 ### Placeholders instead of values

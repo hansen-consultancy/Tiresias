@@ -62,6 +62,15 @@ public class EnvironmentPlaceholderTests
     }
 
     [Test]
+    public void Tir_run_only_picks_the_names_it_was_given_and_reports_the_rest()
+    {
+        var (picked, missing) = SealedVariables.Pick(Sealed.Global, ["db_password", "NOPE"]);
+        Assert.That(picked.Select(v => v.Name), Is.EqualTo(new[] { "DB_PASSWORD" }));
+        Assert.That(missing, Is.EqualTo(new[] { "NOPE" }));
+        Assert.That(SealedVariables.Pick(Sealed.Global, null).Picked, Has.Count.EqualTo(2));
+    }
+
+    [Test]
     public void Consent_lists_a_placeholder_as_one()
     {
         Assert.That(EnvironmentDelivery.Describe(Sealed, "OPENAI_API_KEY"), Is.EqualTo("OPENAI_API_KEY (a placeholder for openai)"));

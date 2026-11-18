@@ -330,7 +330,9 @@ public partial class App : Application
         if (host.Keys.Hello is not { } hello)
             return new(false, Text.Get("Environment_Locked"));
         var sealedNow = await Task.Run(() => EnvironmentStore.Open(hello).Environment, ct);
-        var variables = request.Directory is { } directory ? sealedNow.Resolve(directory) : sealedNow.Global;
+        var (variables, missing) = SealedVariables.Pick(request.Directory is { } directory ? sealedNow.Resolve(directory) : sealedNow.Global, request.Names);
+        if (missing.Count > 0)
+            return new(false, Text.Format("Environment_NotSealed", string.Join(", ", missing)));
         if (variables.Count == 0)
             return new(true, Text.Get("Environment_NoneSealed"), Approved: true, Variables: new Dictionary<string, string>());
         var program = request.Title ?? "tir run";

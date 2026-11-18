@@ -28,6 +28,8 @@ its section below.
 - A PowerShell profile hook (`tir env hook`) gives each terminal the sealed variables after you
   allow it once, and a variable can be kept for one folder (`tir env set NAME --folder`, or the
   folder field in the window): changing folder adds and removes its variables.
+- `tir run --only NAME[,NAME...]` hands over just the variables named, instead of every one
+  sealed for the folder.
 - A sealed API key can be handed out as a placeholder instead of its value
   (`tir env placeholder add OPENAI_API_KEY openai`): terminals and `tir run` get a `tirph_`
   placeholder and the forwarder's address in `OPENAI_BASE_URL`, so the program never holds the key.

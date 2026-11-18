@@ -252,7 +252,9 @@ its device keys belong to that PC's Windows account.
 3. **Seal and remove from Windows**. A new terminal no longer has it: `echo $env:DEMO_API_KEY`
    prints nothing.
 4. `tir run -- pwsh -NoProfile -Command '$env:DEMO_API_KEY'` asks in the app's dialog, which lists
-   the variable names only, and prints the value once you allow it.
+   the variable names only, and prints the value once you allow it. With
+   `tir run --only DEMO_API_KEY -- ...` the dialog lists just that one; `--only NOPE` fails with
+   **Not sealed for this folder: NOPE**.
 5. Tick it under **Sealed** and **Put back in Windows**; a new terminal has it again. Then
    `setx DEMO_API_KEY ""` or delete it in Windows settings.
 

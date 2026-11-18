@@ -62,9 +62,9 @@ const string Usage = """
     tir env hook [pwsh]
         Prints the PowerShell profile hook: tir env hook | Out-String | Invoke-Expression. Each
         terminal asks once for the sealed variables, and changing folder applies its set.
-    tir run -- <command> [args...]
+    tir run [--only NAME[,NAME...]] -- <command> [args...]
         Runs the command with the sealed environment variables, after you allow it (in the app's
-        dialog, or with Windows Hello when the app isn't running).
+        dialog, or with Windows Hello when the app isn't running). --only gives it just those.
     """;
 
 var line = new CommandLine(args);

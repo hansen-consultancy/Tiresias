@@ -300,7 +300,8 @@ static class EnvCommand
             throw new UsageException("Nothing to run. Put the command after --: tir run -- dotnet run.");
         var program = Path.GetFileName(args.Rest[0]);
         var directory = Directory.GetCurrentDirectory();
-        var variables = await FromAppAsync(program, args.Rest, directory) ?? await FromTerminalAsync(program, directory);
+        var only = args.Option("--only")?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var variables = await FromAppAsync(program, args.Rest, directory, only) ?? await FromTerminalAsync(program, directory, only);
         if (ReferenceEquals(variables, Denied))
         {
             Console.Error.WriteLine("Not approved.");
@@ -337,7 +338,7 @@ static class EnvCommand
     }
 
     /// <returns>The variables, <see cref="Denied"/> for a denial, or <c>null</c> when the app isn't running.</returns>
-    static async Task<IReadOnlyDictionary<string, string>?> FromAppAsync(string program, IReadOnlyList<string> commandLine, string directory)
+    static async Task<IReadOnlyDictionary<string, string>?> FromAppAsync(string program, IReadOnlyList<string> commandLine, string directory, IReadOnlyList<string>? only)
     {
         ControlReply? reply;
         try
@@ -345,7 +346,7 @@ static class EnvCommand
             if (await AppLink.StateAsync() is null)
                 return null;
             Console.WriteLine("Waiting for your answer in the Tiresias app...");
-            reply = await ControlClient.TryAsync(new(ControlRequest.Environment, commandLine, program, Directory: directory), ConsentWait);
+            reply = await ControlClient.TryAsync(new(ControlRequest.Environment, commandLine, program, Directory: directory, Names: only), ConsentWait);
         }
         catch (Exception e) when (e is IOException or OperationCanceledException)
         {
@@ -362,13 +363,15 @@ static class EnvCommand
 
     static readonly IReadOnlyDictionary<string, string> Denied = new Dictionary<string, string>();
 
-    static async Task<IReadOnlyDictionary<string, string>> FromTerminalAsync(string program, string directory)
+    static async Task<IReadOnlyDictionary<string, string>> FromTerminalAsync(string program, string directory, IReadOnlyList<string>? only)
     {
         Console.WriteLine("Windows Hello will ask you to confirm it's you.");
         SealedEnvironment sealedNow;
         using (var hello = HelloKeyWrapper.Open(create: false))
             sealedNow = EnvironmentStore.Open(hello).Environment;
-        var variables = sealedNow.Resolve(directory);
+        var (variables, missing) = SealedVariables.Pick(sealedNow.Resolve(directory), only);
+        if (missing.Count > 0)
+            throw new UsageException($"Not sealed for this folder: {string.Join(", ", missing)}. See tir env list.");
         if (variables.Count > 0)
             Console.WriteLine($"With {string.Join(", ", variables.Select(v => EnvironmentDelivery.Describe(sealedNow, v.Name)))}.");
         // The app isn't running, so tir records the hand-over itself.

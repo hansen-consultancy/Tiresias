@@ -223,6 +223,9 @@
   <data name="Environment_NoneSealed" xml:space="preserve">
     <value>No environment variables are sealed yet.</value>
   </data>
+  <data name="Environment_NotSealed" xml:space="preserve">
+    <value>Not sealed for this folder: {0}. See tir env list.</value>
+  </data>
   <data name="FirstRun_RecoveryRestore_Body" xml:space="preserve">
     <value>This PC already has sealed secrets: copied from another PC, or left by an earlier setup. Windows Hello here can't open them, but the recovery key they were sealed with can. Type it from your paper copy and they open on this PC as before; this PC then uses the same recovery key, so the paper you have keeps covering everything. Spaces and case don't matter.</value>
   </data>
