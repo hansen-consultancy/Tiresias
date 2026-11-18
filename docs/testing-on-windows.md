@@ -128,7 +128,9 @@ Things worth trying:
 
 - **Run the sample a third time.** There is no dialog, because the session allowance holds until
   you lock or for 12 hours.
-- **Choose Deny,** or let the countdown run out. The sample starts without the secret.
+- **Choose Deny,** or let the countdown run out. The sample stops at startup with "Access to user
+  secrets 'tiresias-sample-2f7c' was denied by Tiresias", rather than running without them and
+  failing later in a less obvious way.
 - **Lock, then run the sample.** It refuses the sealed file with a message to unlock.
 - **Start the sample several times at once.** The dialogs come one after another, and each says how
   many are waiting.
