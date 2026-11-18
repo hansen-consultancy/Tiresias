@@ -111,6 +111,14 @@ sealed class ProtectedUserSecretsSource(string userSecretsId, string directory, 
 sealed class ProtectedUserSecretsProvider(string userSecretsId, string directory, bool optional, IUserSecretsAgent agent)
     : JsonStreamConfigurationProvider(new JsonStreamConfigurationSource())
 {
+    /// <summary>
+    /// Where the one-line notice goes when Tiresias provided the secrets: stderr, so it never mixes
+    /// into an app's own output. Configuration loads before logging exists, so there is no ILogger.
+    /// </summary>
+    internal static TextWriter Notices { get; set; } = Console.Error;
+
+    bool fromAgent;
+
     public override void Load()
     {
         var json = Fetch();
@@ -121,6 +129,8 @@ sealed class ProtectedUserSecretsProvider(string userSecretsId, string directory
         }
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
         Load(stream);
+        if (fromAgent)
+            Notices.WriteLine($"Tiresias: user secrets '{userSecretsId}' provided ({(Data.Count == 1 ? "1 key" : $"{Data.Count} keys")}).");
     }
 
     string? Fetch()
@@ -135,6 +145,7 @@ sealed class ProtectedUserSecretsProvider(string userSecretsId, string directory
         switch (reply?.Status)
         {
             case AgentStatus.Ok:
+                fromAgent = true;
                 return reply.Json;
             case AgentStatus.Denied:
                 throw new InvalidOperationException($"Access to user secrets '{userSecretsId}' was denied by Tiresias: "

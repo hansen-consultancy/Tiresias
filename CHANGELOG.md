@@ -20,6 +20,8 @@ its section below.
 - **Protected user secrets now work end to end.** With the app (or `tir agent`) running, an app's
   `secrets.json` is sealed the first time it loads. After that it gets its secrets only after you
   approve. Use "Allow for this session" to stop being asked until you lock.
+  When Tiresias provides an app's secrets, the app prints one line saying so on its error output,
+  with the number of keys and never their names or values.
 - `tir secrets list | set | remove` edits a project's protected user secrets without ever
   printing a value.
 - When the app is running, `tir grant` and `tir exec` ask for approval in the app, `tir unlock`
