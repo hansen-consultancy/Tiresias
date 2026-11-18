@@ -63,10 +63,15 @@ Note three values: the endpoint URI, the account name and the certificate profil
 2. Note its **Application (client) ID** and **Directory (tenant) ID**.
 3. Open **Certificates & secrets**, then **Federated credentials**, then **Add credential**:
    - scenario: **GitHub Actions deploying Azure resources**;
-   - organization: `hansen-consultancy`; repository: `Tiresias`;
+   - organization: `hansen-consultancy`, organization ID: `18004248`;
+   - repository: `Tiresias`, repository ID: `1461937520`;
    - entity type: **Environment**; environment name: `app-release`.
 
-   The subject this creates is `repo:hansen-consultancy/Tiresias:environment:app-release`. An
+   The subject this creates is
+   `repo:hansen-consultancy@18004248/Tiresias@1461937520:environment:app-release`. The repository
+   issues tokens in GitHub's immutable-ID subject format, so leaving the two ID fields empty
+   stores the literal `{Organization ID}` and the sign-in fails. To see the format a repository
+   uses, run `gh api repos/hansen-consultancy/Tiresias/actions/oidc/customization/sub`. An
    environment is used rather than a tag, because Azure doesn't take wildcards and every release
    has its own tag.
 
@@ -94,6 +99,14 @@ registration from step 2.
    | `AZURE_SIGNING_PROFILE` | the certificate profile name |
 
 Keep the values out of the repository. The workflow reads them only from these variables.
+
+### Certificate lifetime
+
+Artifact Signing issues a new certificate every day, valid for three days, so the certificate
+profile always shows an expiry date a few days away. That is expected and needs no renewal. A
+signature stays valid after its certificate expires only because it carries a trusted timestamp.
+The **Verify signatures** step therefore fails on any file whose signature has no timestamp. What
+does need renewing is the identity validation behind the profile, before its own expiry date.
 
 ### Checking the setup
 
