@@ -14,7 +14,12 @@ public sealed record Service(string Slug, Uri Upstream, IReadOnlyList<Grant> Gra
 /// </summary>
 /// <param name="SecretSlug">Vault secret injected when this grant is chosen.</param>
 /// <param name="RequiresElevation">The grant is usable only while an elevation for it is active (a fresh Hello prompt, time-boxed).</param>
-public sealed record Grant(string Name, string SecretSlug, RequestRule Rule, bool RequiresElevation = false);
+/// <param name="IssuesLogins">
+/// SQL Server only: the grant may be handed to an application as a temporary login for the lease
+/// (<c>POST /sql/{instance}/{grant}/login</c>), not only used by the broker for one statement at a
+/// time. Opt-in, because a handed-out login is no longer checked statement by statement.
+/// </param>
+public sealed record Grant(string Name, string SecretSlug, RequestRule Rule, bool RequiresElevation = false, bool IssuesLogins = false);
 
 /// <summary>Which requests a grant covers. Deny patterns win over allow patterns.</summary>
 /// <param name="Methods">Upper-case HTTP methods. Empty allows none.</param>

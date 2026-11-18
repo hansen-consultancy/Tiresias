@@ -56,7 +56,7 @@ sealed class TestVault : IDisposable
         [
             new Service("appdb", new Uri("mssql://db.example/AppDb"),
             [
-                new Grant("read", "appdb-read", new(new HashSet<string>(), [])),
+                new Grant("read", "appdb-read", new(new HashSet<string>(), []), IssuesLogins: true),
                 new Grant("write", "appdb-write", new(new HashSet<string>(), [])),
             ]),
         ]

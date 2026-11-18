@@ -69,6 +69,36 @@ public class SqlAuthorizationTests
     }
 
     [Test]
+    public void A_grant_that_issues_logins_hands_out_its_provisioner_secret_audited_as_a_login()
+    {
+        var (allowed, refusal) = state.AuthorizeSqlLogin("Bearer " + Mint(), "appdb", "read");
+        Assert.That(refusal, Is.Null);
+        using (allowed)
+        {
+            Assert.That(allowed!.TakeSecret(), Is.EqualTo(ReadSecret));
+            allowed.Complete(200);
+        }
+        Assert.That(Audit(), Does.Contain("\"kind\":\"Allow\"").And.Contain("\"method\":\"LOGIN\"").And.Contain("\"reason\":\"login\""));
+    }
+
+    [Test]
+    public void A_grant_that_does_not_issue_logins_is_refused_a_login()
+    {
+        var (allowed, refusal) = state.AuthorizeSqlLogin("Bearer " + Mint(), "appdb", "write");
+        Assert.That(allowed, Is.Null);
+        Assert.That(refusal!.Status, Is.EqualTo(403));
+        Assert.That(refusal.Reason, Is.EqualTo("no-logins"));
+        Assert.That(Audit(), Does.Contain("\"method\":\"LOGIN\"").And.Contain("\"reason\":\"no-logins\""));
+    }
+
+    [Test]
+    public void A_login_still_respects_the_placeholders_ceiling()
+    {
+        var (_, refusal) = state.AuthorizeSqlLogin("Bearer " + Mint(ceiling: "read"), "appdb", "write");
+        Assert.That(refusal!.Reason, Is.EqualTo("not-covered"));
+    }
+
+    [Test]
     public void A_write_on_the_read_grant_is_refused_with_the_classifier_reason()
     {
         var (allowed, refusal) = state.AuthorizeSql("Bearer " + Mint(), "appdb", "read", "DELETE FROM dbo.Orders WHERE Marker = 1");
@@ -232,6 +262,35 @@ public class SqlEndpointTests
     }
 
     [Test]
+    public async Task A_login_comes_back_as_a_connection_string_with_its_expiry()
+    {
+        var (leaseId, token) = await OpenLeaseAndMint();
+        var message = new HttpRequestMessage(HttpMethod.Post, "/sql/appdb/read/login");
+        message.Headers.Authorization = new("Bearer", token);
+        var response = await client.SendAsync(message);
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK), await response.Content.ReadAsStringAsync());
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.That(json.GetProperty("connectionString").GetString(), Is.EqualTo("Server=db.example;User ID=tir_x_read;Password=temp"));
+        Assert.That(json.GetProperty("expiresAt").GetInt64(), Is.EqualTo(FakeGateway.Expiry.ToUnixTimeSeconds()));
+        var target = gateway.Logins.Single();
+        Assert.That(target.LeaseId, Is.EqualTo(leaseId));
+        Assert.That(target.ProvisionerConnectionString, Does.Contain("tiresias_provisioner"));
+    }
+
+    [Test]
+    public async Task A_login_on_a_grant_that_does_not_issue_logins_never_reaches_the_gateway()
+    {
+        var (_, token) = await OpenLeaseAndMint();
+        var message = new HttpRequestMessage(HttpMethod.Post, "/sql/appdb/write/login");
+        message.Headers.Authorization = new("Bearer", token);
+        var response = await client.SendAsync(message);
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Forbidden));
+        Assert.That(gateway.Logins, Is.Empty);
+    }
+
+    [Test]
     public async Task A_write_on_the_read_grant_never_reaches_the_gateway()
     {
         var (_, token) = await OpenLeaseAndMint();
@@ -294,6 +353,16 @@ public class SqlEndpointTests
             if (Error is not null)
                 throw Error;
             return Task.FromResult(new SqlResult([new Dictionary<string, object?> { ["Id"] = 7 }], false, -1));
+        }
+
+        public static readonly DateTimeOffset Expiry = new(2026, 11, 18, 18, 0, 0, TimeSpan.Zero);
+
+        public ConcurrentQueue<SqlLeaseTarget> Logins { get; } = new();
+
+        public Task<SqlLogin> LoginAsync(SqlLeaseTarget target, CancellationToken ct)
+        {
+            Logins.Enqueue(target);
+            return Task.FromResult(new SqlLogin("Server=db.example;User ID=tir_x_read;Password=temp", Expiry));
         }
 
         public Task EndLeaseAsync(string leaseId)
