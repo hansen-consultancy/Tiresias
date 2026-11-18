@@ -80,7 +80,7 @@ public sealed record SealedEnvironment(IReadOnlyList<SealedVariable> Global, IRe
     }
 
     static bool Contains(string folder, string directory) =>
-        directory == folder || directory.StartsWith(folder.EndsWith('/') || folder.EndsWith(':') ? folder : folder + "/", StringComparison.Ordinal);
+        directory == folder || directory.StartsWith(folder.EndsWith('/', StringComparison.Ordinal) || folder.EndsWith(':', StringComparison.Ordinal) ? folder : folder + "/", StringComparison.Ordinal);
 
     static string Normalize(string path) => Trim(path).Replace('\\', '/').ToUpperInvariant();
 

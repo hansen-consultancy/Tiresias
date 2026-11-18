@@ -328,6 +328,7 @@ public partial class App : Application
         var program = request.Title ?? "tir run";
         var approved = await consent!.AskEnvironmentAsync(program, [.. variables.Select(v => v.Name)], caller, ct);
         AppLog.Info($"tir run {program}: {(approved ? "allowed" : "denied")} {variables.Count} environment variable(s)");
+        host.RecordEnvironment(approved, program, variables.Select(v => v.Name), caller);
         return approved
             ? new(true, Approved: true, Variables: variables.ToDictionary(v => v.Name, v => v.Value, StringComparer.OrdinalIgnoreCase))
             : new(true, Approved: false);
