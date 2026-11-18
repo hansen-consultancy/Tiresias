@@ -119,6 +119,8 @@ service's grants, and the activity log records each request.
 - **No placeholder** (broker unreachable, service missing, no lease): the variable is left out
   and the reason shown. It never falls back to the real value.
 - `tir env placeholder list` shows the deliveries, `remove` switches a variable back to its value.
+  The environment variables window does both: check a sealed key, pick the service under **Hand
+  out a placeholder instead**, then **Use a placeholder**; **Hand out the value** undoes it.
   The sealed value stays, so **Put back** and `remove` lose nothing.
 - Only tools that send the key as `Authorization: Bearer` and read a base-URL variable work this
   way: the OpenAI SDKs and most OpenAI-compatible clients do. A tool sending the key in another

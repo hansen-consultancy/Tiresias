@@ -229,6 +229,48 @@
   <data name="Env_NuGetSummary" xml:space="preserve">
     <value>NuGet asks Tiresias for {0} feed(s), and you allow each program once. Needs the .NET 9.0.200 SDK or later.</value>
   </data>
+  <data name="Env_PlaceholderAdd" xml:space="preserve">
+    <value>Use a placeholder</value>
+  </data>
+  <data name="Env_PlaceholderAdded" xml:space="preserve">
+    <value>Handed out as a placeholder from now on: {0}. Terminals pick it up at their next folder change.</value>
+  </data>
+  <data name="Env_PlaceholderAddedItem" xml:space="preserve">
+    <value>{0} (for {1}, with {2})</value>
+  </data>
+  <data name="Env_PlaceholderBaseUrl" xml:space="preserve">
+    <value>Base URL variable</value>
+  </data>
+  <data name="Env_PlaceholderBaseUrlHint" xml:space="preserve">
+    <value>The variable the tool reads its API address from. Left empty, it follows the key's name: OPENAI_API_KEY gives OPENAI_BASE_URL.</value>
+  </data>
+  <data name="Env_PlaceholderBaseUrlSealed" xml:space="preserve">
+    <value>{0} is itself a sealed variable, so it can't also carry the forwarder's address.</value>
+  </data>
+  <data name="Env_PlaceholderHeading" xml:space="preserve">
+    <value>Hand out a placeholder instead</value>
+  </data>
+  <data name="Env_PlaceholderNeedsBaseUrl" xml:space="preserve">
+    <value>Name the variable the tool reads its API address from (for example OPENAI_BASE_URL).</value>
+  </data>
+  <data name="Env_PlaceholderNoServices" xml:space="preserve">
+    <value>No https service in the vault for a placeholder to stand in for. Add one under Services, with the key as its secret ("Bearer &lt;key&gt;").</value>
+  </data>
+  <data name="Env_PlaceholderPickOne" xml:space="preserve">
+    <value>Check one variable in the global set to hand out as a placeholder.</value>
+  </data>
+  <data name="Env_PlaceholderRemove" xml:space="preserve">
+    <value>Hand out the value</value>
+  </data>
+  <data name="Env_PlaceholderRemoved" xml:space="preserve">
+    <value>Handed out as the value again: {0}.</value>
+  </data>
+  <data name="Env_PlaceholderService" xml:space="preserve">
+    <value>Service</value>
+  </data>
+  <data name="Env_PlaceholderSummary" xml:space="preserve">
+    <value>Check one sealed API key above, pick the vault service whose secret is that key ("Bearer &lt;key&gt;"), and Tiresias hands out a tirph_ placeholder with the forwarder's address instead of the key.</value>
+  </data>
   <data name="Env_Protect" xml:space="preserve">
     <value>Seal and remove from Windows</value>
   </data>

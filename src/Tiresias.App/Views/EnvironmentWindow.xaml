@@ -38,7 +38,24 @@
         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
           <Button Style="{StaticResource RowButton}" Content="{l:S Env_PutBack}" Command="{Binding PutBackCommand}" />
           <Button Style="{StaticResource RowButton}" Content="{l:S Env_Remove}" Command="{Binding RemoveCommand}" Margin="8,0,0,0" />
+          <Button Style="{StaticResource RowButton}" Content="{l:S Env_PlaceholderRemove}" Command="{Binding RemovePlaceholderCommand}" Margin="8,0,0,0" />
         </StackPanel>
+
+        <TextBlock x:Name="PlaceholderLabel" Text="{l:S Env_PlaceholderHeading}" Style="{StaticResource SubtitleText}" AutomationProperties.HeadingLevel="Level2" Margin="0,20,0,4" />
+        <TextBlock Text="{Binding PlaceholderSummary}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
+        <Grid Margin="0,4,0,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <ComboBox ItemsSource="{Binding PlaceholderServices}" SelectedItem="{Binding PlaceholderService}" HorizontalAlignment="Stretch"
+                    AutomationProperties.Name="{l:S Env_PlaceholderService}" />
+          <TextBox Grid.Column="1" Text="{Binding PlaceholderBaseUrl, UpdateSourceTrigger=PropertyChanged}" FontFamily="Cascadia Mono, Consolas" Margin="8,0,0,0"
+                   AutomationProperties.Name="{l:S Env_PlaceholderBaseUrl}" ToolTip="{l:S Env_PlaceholderBaseUrlHint}" />
+          <Button Grid.Column="2" Style="{StaticResource RowButton}" Content="{l:S Env_PlaceholderAdd}" Command="{Binding AddPlaceholderCommand}" Margin="8,0,0,0" />
+        </Grid>
+        <TextBlock Text="{l:S Env_PlaceholderBaseUrlHint}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,4,0,0" />
 
         <TextBlock x:Name="AddLabel" Text="{l:S Env_AddHeading}" Style="{StaticResource SubtitleText}" AutomationProperties.HeadingLevel="Level2" Margin="0,20,0,4" />
         <Grid>

@@ -1,3 +1,5 @@
+using Tiresias.Client;
+using Tiresias.Policy;
 using Tiresias.Access;
 using Tiresias.EnvironmentVariables;
 
@@ -10,6 +12,16 @@ namespace Tiresias.Agent;
 /// </summary>
 public static class PlaceholderMinter
 {
+    /// <summary>
+    /// A placeholder can stand in only for an https API the forwarder relays, whose secret is the
+    /// key as the Authorization header; a GitHub App mints its own tokens instead.
+    /// </summary>
+    public static bool CanStandIn(Service service) => service.Upstream.Scheme == Uri.UriSchemeHttps && !ExecPlan.IsGitHubApp(service);
+
+    /// <summary>The vault's services a placeholder can stand in for, by slug.</summary>
+    public static IReadOnlyList<string> Services() =>
+        [.. VaultEditor.Load().Services.Where(CanStandIn).Select(s => s.Slug).Order(StringComparer.Ordinal)];
+
     /// <summary>The forwarder, which relays to a remote broker. A solo broker is called directly.</summary>
     static readonly Uri Forwarder = new("http://127.0.0.1:7781");
 

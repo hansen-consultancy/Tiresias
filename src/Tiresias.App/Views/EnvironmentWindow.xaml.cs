@@ -70,6 +70,19 @@ public sealed partial class EnvironmentViewModel : ObservableObject
 
     IReadOnlyList<NuGetImportStep> nugetSteps = [];
 
+    /// <summary>Vault services a placeholder can stand in for.</summary>
+    public ObservableCollection<string> PlaceholderServices { get; } = [];
+
+    [ObservableProperty]
+    public partial string? PlaceholderService { get; set; }
+
+    /// <summary>Empty means the name that follows from the variable's (<c>OPENAI_API_KEY</c> gives <c>OPENAI_BASE_URL</c>).</summary>
+    [ObservableProperty]
+    public partial string PlaceholderBaseUrl { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string PlaceholderSummary { get; set; } = "";
+
     [ObservableProperty]
     public partial string NuGetSummary { get; set; } = "";
 
@@ -132,7 +145,74 @@ public sealed partial class EnvironmentViewModel : ObservableObject
         SealedSummary = Sealed.Count == 0 ? Text.Get("Env_NoneSealed") : Text.Format("Env_SealedSummary", Sealed.Count);
         WindowsSummary = Text.Format("Env_WindowsSummary", user.Count(v => v.LooksSecret));
         RefreshNuGet(sealedNow);
+        RefreshPlaceholders();
         CanEdit = true;
+    }
+
+    void RefreshPlaceholders()
+    {
+        var selected = PlaceholderService;
+        PlaceholderServices.Clear();
+        try
+        {
+            foreach (var slug in PlaceholderMinter.Services())
+                PlaceholderServices.Add(slug);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            AppLog.Info($"environment: couldn't read the vault's services: {e.Message}");
+        }
+        PlaceholderService = selected is not null && PlaceholderServices.Contains(selected) ? selected : PlaceholderServices.FirstOrDefault();
+        PlaceholderSummary = Text.Get(PlaceholderServices.Count == 0 ? "Env_PlaceholderNoServices" : "Env_PlaceholderSummary");
+    }
+
+    /// <summary>The one checked global variable is handed out as a placeholder for the chosen service from now on.</summary>
+    [RelayCommand]
+    void AddPlaceholder()
+    {
+        var picked = Checked(Sealed);
+        if (picked.Length != 1 || picked[0].Folder is not null)
+        {
+            Message = Text.Get("Env_PlaceholderPickOne");
+            return;
+        }
+        var name = picked[0].Name;
+        if (PlaceholderService is not { } service)
+        {
+            Message = Text.Get("Env_PlaceholderNoServices");
+            return;
+        }
+        var baseUrl = PlaceholderBaseUrl.Trim() is { Length: > 0 } typed ? typed : SealedEnvironment.BaseUrlVariableFor(name);
+        if (baseUrl is null || baseUrl.Contains('=', StringComparison.Ordinal))
+        {
+            Message = Text.Get("Env_PlaceholderNeedsBaseUrl");
+            return;
+        }
+        Act(picked, hello =>
+        {
+            var (environment, version) = EnvironmentStore.Open(hello);
+            if (environment.IsSealedAnywhere(baseUrl))
+                throw new InvalidOperationException(Text.Format("Env_PlaceholderBaseUrlSealed", baseUrl));
+            EnvironmentStore.Save(environment.WithPlaceholder(new(name, service, baseUrl)), version, hello);
+            return [Text.Format("Env_PlaceholderAddedItem", name, service, baseUrl)];
+        }, "Env_PlaceholderAdded");
+        PlaceholderBaseUrl = "";
+    }
+
+    /// <summary>The checked variables are handed out as their value again; the vault service keeps its secret.</summary>
+    [RelayCommand]
+    void RemovePlaceholder()
+    {
+        var picked = Checked(Sealed);
+        Act(picked, hello =>
+        {
+            var (environment, version) = EnvironmentStore.Open(hello);
+            var removing = picked.Select(r => r.Name).Where(n => environment.PlaceholderFor(n) is not null).ToArray();
+            foreach (var name in removing)
+                environment = environment.WithoutPlaceholder(name);
+            EnvironmentStore.Save(environment, version, hello);
+            return removing;
+        }, "Env_PlaceholderRemoved");
     }
 
     /// <summary>The feeds mapped, and what NuGet.Config in the user's profile still holds. Read only; nothing changes until a button.</summary>

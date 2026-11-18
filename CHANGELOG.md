@@ -12,6 +12,7 @@ its section below.
 
 - `tir env nuget import`, and **NuGet feeds** in the environment variables window, move a feed's
   token out of NuGet.Config (`%NAME%` or plain text) into the sealed environment.
+- The environment variables window can switch a sealed key to placeholder delivery and back.
 - The `tir run` consent dialog shows the command line; the program's folder can be copied or
   opened in Explorer. The status window has an **Environment variables** button.
 - **About Tiresias** (tray menu and status page): the version, where it runs from, since when, and

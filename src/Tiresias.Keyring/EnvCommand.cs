@@ -85,7 +85,7 @@ static class EnvCommand
         var path = KeyringStore.Settings.VaultPath;
         var service = (File.Exists(path) ? VaultFile.Load(path).FindService(slug) : null)
             ?? throw new UsageException($"No service '{slug}' in the vault. Add it, with the key as its secret (\"Bearer <key>\"): tir service add {slug} --upstream https://api.example.com/v1.");
-        if (ExecPlan.IsGitHubApp(service) || service.Upstream.Scheme != Uri.UriSchemeHttps)
+        if (!PlaceholderMinter.CanStandIn(service))
             throw new UsageException($"{slug} isn't an https API, so a placeholder can't stand in for its key. Use tir exec {slug} instead.");
     }
 
