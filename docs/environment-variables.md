@@ -1,8 +1,9 @@
 # Environment variables
 
-**Status:** phases 1 and 2 are built: the store with folder sets, **Protect** / **Put back**,
+**Status:** phases 1, 2 and 4 are built: the store with folder sets, **Protect** / **Put back**,
 `tir env`, `tir run`, the PowerShell hook with consent once per terminal, the **Environment
-variables** window and the status check. Phases 3 and 4 are design.
+variables** window, the status check and the NuGet credential plugin. Phase 3 (placeholders) is
+design.
 
 Many developers keep API keys and tokens in their Windows user environment (`setx OPENAI_API_KEY
 ...`). That makes them readable by every process the user starts, forever, with no record of who
