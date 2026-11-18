@@ -108,6 +108,13 @@ The goal is one command or one download, then a first-run wizard:
   Uninstalling deletes that folder only. The vault, Keyring and logs live in
   `%LOCALAPPDATA%\Tiresias` and stay, so a reinstall unlocks the same secrets. The app puts that folder on the user
   `PATH` at every start (so a moved install heals) and Velopack's uninstall hook takes it off.
+- **Development builds:** a copy Velopack didn't install is a development build (`AppBuild`,
+  `Logic/BuildInfo.cs`). Its tray icon gets an orange corner, its version and commit show in the
+  tray, status page and About window, it never updates itself and it leaves PATH alone. Only one
+  copy runs per session (a mutex); a second start of the same folder brings the first forward,
+  and a different copy asks to switch: the running one quits over the control pipe (`quit`,
+  refused while a consent, editor or setup window is open), then the new one takes the mutex.
+  An app older than 0.1.0-preview.5 can't hand over and is quit from its tray menu.
 - **When:** at start, then daily. A check that fails (no network, GitHub down) is logged and
   retried an hour later; the user sees nothing. A preview build follows preview releases, a stable
   build only stable ones.

@@ -50,6 +50,8 @@
 
   <ItemGroup>
     <Resource Include="..\..\assets\export\tiresias.ico" Link="Assets\tiresias.ico" />
+    <!-- The About window shows this version's section. -->
+    <EmbeddedResource Include="..\..\CHANGELOG.md" LogicalName="CHANGELOG.md" />
     <Resource Include="..\..\assets\export\tray-light-theme.ico" Link="Assets\tray-light-theme.ico" />
     <Resource Include="..\..\assets\export\tray-dark-theme.ico" Link="Assets\tray-dark-theme.ico" />
   </ItemGroup>

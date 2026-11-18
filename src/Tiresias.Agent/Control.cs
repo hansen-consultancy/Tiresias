@@ -16,13 +16,17 @@ public sealed record ControlRequest(string Op, IReadOnlyList<string>? Lines = nu
     public const string Consent = "consent";
     public const string Unlock = "unlock";
     public const string Lock = "lock";
-    /// <summary>Bring the app's window forward: a second start of the app sends this, then exits.</summary>
+    /// <summary>Bring the app's window forward: a second start of the same copy sends this, then exits.</summary>
     public const string Show = "show";
+    /// <summary>Quit so another copy (a development build, the installed app) can take over the session.</summary>
+    public const string Quit = "quit";
 }
 
 /// <param name="Approved">For a consent: the user allowed it.</param>
 /// <param name="State">A one-line description of the agent's state, for <c>tir status</c>.</param>
-public sealed record ControlReply(bool Ok, string? Message = null, bool Approved = false, string? State = null);
+/// <param name="Build">For a ping: the app's version, marked when it is a development build. Absent from apps before 0.1.0-preview.5.</param>
+/// <param name="Folder">For a ping: where the running app's files are, which tells two copies apart.</param>
+public sealed record ControlReply(bool Ok, string? Message = null, bool Approved = false, string? State = null, string? Build = null, string? Folder = null);
 
 /// <summary><c>tir</c>'s side of the control pipe.</summary>
 public static class ControlClient

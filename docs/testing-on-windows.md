@@ -21,9 +21,11 @@ dotnet build Tiresias.slnx
 dotnet test src/Tiresias.Tests/Tiresias.Tests.csproj
 ```
 
-Then publish the app and `tir` into folders of their own. The app adds the `cli` folder to your
-user PATH when it starts (step 2), so terminals opened after that find `tir`. The last line but
-one does the same for this terminal, which was open before:
+Then publish the app and `tir` into folders of their own. This is a development build: its tray
+icon has an orange corner, and it leaves PATH alone so it can't shadow an installed `tir`. The
+last line but one puts this build's `tir` first, for this terminal only. If the installed app is
+running, starting this build offers to switch to it; switch back by starting Tiresias from the
+Start menu.
 
 ```powershell
 $root = "$env:LOCALAPPDATA\Programs\Tiresias"
@@ -71,8 +73,9 @@ Things worth trying:
   If you close it after the recovery key was shown, a resumed solo setup asks you to type the key
   back from paper.
 - **Run `tir agent` while the app runs.** It refuses and says the app is the agent.
-- **Open a new terminal and run `tir status`.** It works without setting PATH: the app added the
-  `cli` folder to your user PATH. A terminal that was already open keeps its old PATH.
+- **Open a new terminal and run `tir status`.** With the installed app, it works without setting
+  PATH: the app put its folder on your user PATH. A terminal that was already open keeps its old
+  PATH. The `App:` and `tir:` lines say which build answered and where each runs from.
 
 ## 3. Unlock and lock
 

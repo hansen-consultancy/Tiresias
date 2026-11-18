@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text.RegularExpressions;
 using Tiresias.Access;
 using Tiresias.Agent;
@@ -194,7 +195,13 @@ static class Commands
         Console.WriteLine($"Device:   {settings.DeviceId}");
         Console.WriteLine($"Vault:    {settings.VaultPath}" + (File.Exists(settings.VaultPath) ? $" ({VaultFile.Load(settings.VaultPath).Secrets.Count} secrets)" : " (missing)"));
         Console.WriteLine($"Recovery: {(settings.RecoveryPublicKey is null ? "NOT SET (run tir recovery init)" : "set")}");
-        Console.WriteLine($"App:      {await AppLink.StateAsync() ?? "not running (start Tiresias, or run tir agent)"}");
+        var app = await AppLink.PingAsync();
+        Console.WriteLine($"App:      {app?.State ?? "not running (start Tiresias, or run tir agent)"}");
+        if (app?.Build is { } build)
+            Console.WriteLine($"          {build}, from {app.Folder}");
+        // Which tir answered: a stale one earlier on PATH shows up here.
+        var tirVersion = typeof(Commands).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0];
+        Console.WriteLine($"tir:      {tirVersion}, from {Path.TrimEndingDirectorySeparator(AppContext.BaseDirectory)}");
 
         var remembered = KeyringStore.Lease;
         var (lease, ended) = await LeaseControl.CheckAsync();

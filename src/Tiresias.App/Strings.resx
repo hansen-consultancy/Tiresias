@@ -25,6 +25,101 @@
   <data name="Common_TryAgain" xml:space="preserve">
     <value>Try again</value>
   </data>
+  <data name="About_WindowTitle" xml:space="preserve">
+    <value>About Tiresias</value>
+  </data>
+  <data name="About_Heading" xml:space="preserve">
+    <value>Tiresias {0}</value>
+  </data>
+  <data name="About_Installed" xml:space="preserve">
+    <value>Installed with the installer. Tiresias updates itself from its GitHub releases and asks before restarting.</value>
+  </data>
+  <data name="About_Development" xml:space="preserve">
+    <value>A development build: run from a build folder, not installed, so it doesn't update itself. Its tray icon has an orange corner, so you can tell it from the installed app.</value>
+  </data>
+  <data name="About_Version" xml:space="preserve">
+    <value>Version</value>
+  </data>
+  <data name="About_Commit" xml:space="preserve">
+    <value>Commit</value>
+  </data>
+  <data name="About_Built" xml:space="preserve">
+    <value>Built</value>
+  </data>
+  <data name="About_Since" xml:space="preserve">
+    <value>This version since</value>
+  </data>
+  <data name="About_Folder" xml:space="preserve">
+    <value>Running from</value>
+  </data>
+  <data name="About_Data" xml:space="preserve">
+    <value>Data folder</value>
+  </data>
+  <data name="About_Runtime" xml:space="preserve">
+    <value>.NET</value>
+  </data>
+  <data name="About_Windows" xml:space="preserve">
+    <value>Windows</value>
+  </data>
+  <data name="About_Unknown" xml:space="preserve">
+    <value>unknown</value>
+  </data>
+  <data name="About_NotesHeading" xml:space="preserve">
+    <value>What's new in {0}</value>
+  </data>
+  <data name="About_NotesUnreleased" xml:space="preserve">
+    <value>Changes not released yet</value>
+  </data>
+  <data name="About_NoNotes" xml:space="preserve">
+    <value>There are no notes for this version in the changelog.</value>
+  </data>
+  <data name="About_GitHub" xml:space="preserve">
+    <value>GitHub</value>
+  </data>
+  <data name="About_ReleasePage" xml:space="preserve">
+    <value>Release page</value>
+  </data>
+  <data name="About_CommitPage" xml:space="preserve">
+    <value>Commit on GitHub</value>
+  </data>
+  <data name="Build_Installed" xml:space="preserve">
+    <value>{0}</value>
+  </data>
+  <data name="Build_Development" xml:space="preserve">
+    <value>{0}, development build</value>
+  </data>
+  <data name="Build_DevelopmentCommit" xml:space="preserve">
+    <value>{0}, development build {1}</value>
+  </data>
+  <data name="Status_About" xml:space="preserve">
+    <value>About</value>
+  </data>
+  <data name="Status_Build" xml:space="preserve">
+    <value>{0}, from {1}</value>
+  </data>
+  <data name="Tray_About" xml:space="preserve">
+    <value>About Tiresias</value>
+  </data>
+  <data name="Startup_SwitchHeading" xml:space="preserve">
+    <value>Another copy of Tiresias is running</value>
+  </data>
+  <data name="Startup_SwitchBody" xml:space="preserve">
+    <value>Tiresias {0} is running from {1}.
+
+Switch to this copy, {2}, from {3}? The other copy quits first, ending its lease, and this one starts locked.</value>
+  </data>
+  <data name="Startup_Switch" xml:space="preserve">
+    <value>Switch</value>
+  </data>
+  <data name="Startup_SwitchBusy" xml:space="preserve">
+    <value>The running copy is waiting on an open window: a consent question, the secrets editor, services or setup. Finish or close it, then start this copy again.</value>
+  </data>
+  <data name="Startup_SwitchOld" xml:space="preserve">
+    <value>The copy that is running is older and can't hand over. Quit it from its tray menu, then start this copy again.</value>
+  </data>
+  <data name="Startup_SwitchFailed" xml:space="preserve">
+    <value>The other copy didn't quit within 15 seconds. Quit it from its tray menu, then start this copy again.</value>
+  </data>
   <data name="Startup_AlreadyRunning" xml:space="preserve">
     <value>Tiresias is already running. Look for its icon in the notification area, next to the clock (it may be behind the ^ arrow).</value>
   </data>

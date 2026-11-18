@@ -18,8 +18,6 @@ namespace Tiresias.App;
 /// </summary>
 sealed class AppUpdates(App app, TrayController tray) : IDisposable
 {
-    const string Repository = "https://github.com/hansen-consultancy/Tiresias";
-
     readonly DispatcherTimer timer = new() { Interval = UpdatePlan.Tick };
     UpdateManager? manager;
     UpdateInfo? ready;
@@ -30,7 +28,7 @@ sealed class AppUpdates(App app, TrayController tray) : IDisposable
 
     public void Start()
     {
-        manager = new UpdateManager(new GithubSource(Repository, accessToken: null, prerelease: UpdatePlan.FollowsPrereleases(CurrentVersion)));
+        manager = new UpdateManager(new GithubSource(AppBuild.Repository, accessToken: null, prerelease: UpdatePlan.FollowsPrereleases(CurrentVersion)));
         if (!manager.IsInstalled)
         {
             // Run from a build folder (dotnet run, dotnet publish): there is nothing to update in place.

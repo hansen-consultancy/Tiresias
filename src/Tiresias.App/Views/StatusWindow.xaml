@@ -26,6 +26,7 @@
         <StackPanel>
           <TextBlock Text="{Binding Headline}" Style="{StaticResource SubtitleText}" />
           <TextBlock Text="{Binding Mode}" Style="{StaticResource CaptionText}" />
+          <TextBlock Text="{Binding Build}" Style="{StaticResource CaptionText}" />
         </StackPanel>
         <Button Grid.Column="1" VerticalAlignment="Center" Padding="12,6" Margin="12,0,0,0" MinWidth="96"
                 Content="{Binding LockLabel}" Command="{Binding ToggleLockCommand}" />
@@ -36,6 +37,7 @@
     <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,12">
       <Button Content="{l:S Tray_Secrets}" Padding="12,6" Click="OnSecrets" />
       <Button Content="{l:S Status_Services}" Padding="12,6" Margin="8,0,0,0" Click="OnServices" />
+      <Button Content="{l:S Status_About}" Padding="12,6" Margin="8,0,0,0" Click="OnAbout" />
     </StackPanel>
 
     <Grid Grid.Row="3">
