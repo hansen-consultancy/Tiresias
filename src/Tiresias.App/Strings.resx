@@ -16,6 +16,12 @@
   <data name="Common_Close" xml:space="preserve">
     <value>Close</value>
   </data>
+  <data name="Common_OK" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="Common_Cancel" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
   <data name="Common_TryAgain" xml:space="preserve">
     <value>Try again</value>
   </data>
@@ -604,6 +610,12 @@ Store them in clear?</value>
   </data>
   <data name="Secrets_Remove" xml:space="preserve">
     <value>Remove</value>
+  </data>
+  <data name="Secrets_Discard" xml:space="preserve">
+    <value>Don't save</value>
+  </data>
+  <data name="Secrets_Seal" xml:space="preserve">
+    <value>Seal</value>
   </data>
   <data name="Secrets_Save" xml:space="preserve">
     <value>Save</value>

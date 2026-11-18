@@ -49,7 +49,7 @@ public partial class App : Application
         {
             // Already running in this session: bring it forward instead of starting a second agent.
             if (await ControlClient.TryAsync(new(ControlRequest.Show)) is null)
-                MessageBox.Show(Text.Get("Startup_AlreadyRunning"), Text.Get("App_Name"), MessageBoxButton.OK, MessageBoxImage.Information);
+                AskWindow.Tell(null, null, Text.Get("Startup_AlreadyRunning"));
             Shutdown();
             return;
         }
@@ -64,7 +64,7 @@ public partial class App : Application
         }
         catch (IOException)
         {
-            MessageBox.Show(Text.Get("Startup_OtherAgent"), Text.Get("App_Name"), MessageBoxButton.OK, MessageBoxImage.Warning);
+            AskWindow.Tell(null, null, Text.Get("Startup_OtherAgent"));
             Shutdown();
             return;
         }

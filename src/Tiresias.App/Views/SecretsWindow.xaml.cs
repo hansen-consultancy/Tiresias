@@ -44,9 +44,9 @@ public partial class SecretsWindow : Window
     {
         if (model.IsDirty)
         {
-            var choice = MessageBox.Show(this, Text.Get("Secrets_UnsavedBody"), Text.Get("Secrets_UnsavedTitle"),
-                MessageBoxButton.YesNoCancel, MessageBoxImage.Question, MessageBoxResult.Cancel);
-            if (choice == MessageBoxResult.Cancel || (choice == MessageBoxResult.Yes && !model.TrySave()))
+            var choice = AskWindow.Show(this, Text.Get("Secrets_UnsavedTitle"), Text.Get("Secrets_UnsavedBody"),
+                Text.Get("Secrets_Save"), Text.Get("Secrets_Discard"), Text.Get("Common_Cancel"));
+            if (choice is null || (choice == true && !model.TrySave()))
                 e.Cancel = true;
         }
         base.OnClosing(e);
@@ -77,6 +77,9 @@ public sealed partial class SecretRow : ObservableObject
 
 public sealed partial class SecretsViewModel : ObservableObject
 {
+    /// <summary>The window this model drives, so a question opens over it.</summary>
+    static Window? Owner() => Application.Current.Windows.OfType<SecretsWindow>().FirstOrDefault();
+
     UserSecretsFolder? folder;
     UserSecretsLoad? loaded;
     IReadOnlyList<KeyValuePair<string, string>> original = [];
@@ -135,8 +138,7 @@ public sealed partial class SecretsViewModel : ObservableObject
             Message = Text.Get("Secrets_LockedCannotSave");
             return;
         }
-        if (MessageBox.Show(Text.Format("Secrets_ClearConfirmBody", folder.Id), Text.Get("Secrets_ClearConfirmTitle"),
-                MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
+        if (!AskWindow.Confirm(Owner(), Text.Get("Secrets_ClearConfirmTitle"), Text.Format("Secrets_ClearConfirmBody", folder.Id), Text.Get("Secrets_StoreInClear")))
             return;
         try
         {
@@ -222,8 +224,7 @@ public sealed partial class SecretsViewModel : ObservableObject
         }
         // The first seal can break an app that doesn't use Tiresias yet: say so once, before it happens.
         if (loaded.Version == 0 && File.Exists(folder.FilePath)
-            && MessageBox.Show(Text.Format("Secrets_SealConfirmBody", folder.Id), Text.Get("Secrets_SealConfirmTitle"),
-                MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes)
+            && !AskWindow.Confirm(Owner(), Text.Get("Secrets_SealConfirmTitle"), Text.Format("Secrets_SealConfirmBody", folder.Id), Text.Get("Secrets_Seal")))
             return false;
         try
         {

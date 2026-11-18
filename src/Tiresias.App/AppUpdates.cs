@@ -78,7 +78,7 @@ sealed class AppUpdates(App app, TrayController tray) : IDisposable
     {
         if (app.Busy)
         {
-            MessageBox.Show(Text.Get("Update_Busy"), Text.Get("App_Name"), MessageBoxButton.OK, MessageBoxImage.Information);
+            AskWindow.Tell(null, null, Text.Get("Update_Busy"));
             return;
         }
         var window = new UpdateWindow(release.Version.ToString(), release.NotesMarkdown);
@@ -87,7 +87,7 @@ sealed class AppUpdates(App app, TrayController tray) : IDisposable
         // Something may have opened while the notes were read.
         if (app.Busy)
         {
-            MessageBox.Show(Text.Get("Update_Busy"), Text.Get("App_Name"), MessageBoxButton.OK, MessageBoxImage.Information);
+            AskWindow.Tell(null, null, Text.Get("Update_Busy"));
             return;
         }
         AppLog.Info($"applying update {release.Version}");

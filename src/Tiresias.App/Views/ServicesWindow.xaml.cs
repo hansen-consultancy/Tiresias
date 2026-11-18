@@ -43,6 +43,9 @@ public sealed record ServiceRow(string Slug, string Upstream, string Grants);
 
 public sealed partial class ServicesViewModel : ObservableObject
 {
+    /// <summary>The window this model drives, so a question opens over it.</summary>
+    static Window? Owner() => Application.Current.Windows.OfType<ServicesWindow>().FirstOrDefault();
+
     bool attempted;
 
     public ServicesViewModel()
@@ -166,8 +169,7 @@ public sealed partial class ServicesViewModel : ObservableObject
     {
         if (SelectedRow is not { } row)
             return;
-        if (MessageBox.Show(Text.Format("Services_RemoveConfirmBody", row.Slug), Text.Get("Services_RemoveConfirmTitle"),
-                MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes)
+        if (!AskWindow.Confirm(Owner(), Text.Get("Services_RemoveConfirmTitle"), Text.Format("Services_RemoveConfirmBody", row.Slug), Text.Get("Services_Remove")))
             return;
         try
         {
