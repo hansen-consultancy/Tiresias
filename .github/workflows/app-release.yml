@@ -109,8 +109,10 @@ jobs:
             --azureTrustedSignFile "$RUNNER_TEMP/signing.json"
 
       # vpk signs Tiresias.exe, tir.exe and every other unsigned binary in the package, then the
-      # installer. Stop here if anything users run came out unsigned: check the installer and the
-      # two executables inside the full package that updates install.
+      # installer. Stop here if anything users run came out unsigned or untimestamped: check the
+      # installer and the two executables inside the full package that updates install. Artifact
+      # Signing certificates live three days, so a signature without a timestamp stops verifying
+      # three days after the release.
       - name: Verify signatures
         shell: pwsh
         run: |
@@ -118,12 +120,12 @@ jobs:
           Copy-Item $full.FullName "$env:RUNNER_TEMP/full.zip"   # Expand-Archive only takes a .zip name
           Expand-Archive "$env:RUNNER_TEMP/full.zip" -DestinationPath "$env:RUNNER_TEMP/full" -Force
           $files = @(Get-ChildItem "$env:RUNNER_TEMP/full" -Include Tiresias.exe, tir.exe -Recurse) + @(Get-ChildItem Releases -Filter *-Setup.exe)
-          $bad = $files | Where-Object { (Get-AuthenticodeSignature $_.FullName).Status -ne 'Valid' }
+          $bad = $files | Where-Object { $s = Get-AuthenticodeSignature $_.FullName; $s.Status -ne 'Valid' -or -not $s.TimeStamperCertificate }
           if ($files.Count -lt 3 -or $bad) {
-            Write-Output "::error title=Unsigned files::$($bad.Name -join ', ')"
+            Write-Output "::error title=Unsigned or untimestamped files::$($bad.Name -join ', ')"
             exit 1
           }
-          $files | ForEach-Object { "{0}: {1}" -f $_.Name, (Get-AuthenticodeSignature $_.FullName).SignerCertificate.Subject }
+          $files | ForEach-Object { $s = Get-AuthenticodeSignature $_.FullName; "{0}: {1}, timestamped by {2}" -f $_.Name, $s.SignerCertificate.Subject, $s.TimeStamperCertificate.Subject }
 
       - name: Publish the release
         shell: bash
