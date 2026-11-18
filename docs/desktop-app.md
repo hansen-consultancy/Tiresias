@@ -22,6 +22,19 @@ CI and people who prefer it, and it talks to the same agent.
   focus and is the Esc answer. A countdown runs, and no answer means Deny. Requests that arrive
   while one is open wait their turn, and the dialog shows how many are waiting. Workstation lock,
   logoff or sleep answers every open dialog with Deny.
+- **"This wasn't me"**, beside Deny on every consent dialog, for a prompt you didn't cause (it
+  could be malware). It denies the request and locks at once: session consents, terminal and NuGet
+  allowances are forgotten, the terminals' placeholders revoked and the broker lease ended. Until
+  you unlock with Windows Hello from the tray or the status page, every request is refused without
+  a dialog; `tir unlock`, a terminal or NuGet can't unlock in the meantime. The asking program
+  (for `tir` requests, the program that ran `tir`) is blocked by path and by the file's SHA-256,
+  so a copy elsewhere is blocked too: it is refused without asking, also after unlocking, until you
+  **Unblock** it on the status page. Lockdown and blocklist live in
+  `%LOCALAPPDATA%\Tiresias\blocklist.json`; a damaged file counts as locked down. Activity records
+  the incident with the process and the processes that started it. A follow-up window shows the
+  program's folder (selectable, with **Open folder**), **End this process**, and how to scan with
+  Microsoft Defender. Tiresias changes nothing else: no network or security setting, nothing that
+  needs an administrator; that would cut off investigation without protecting the vault.
 - **`tir` uses the app when it runs.** `tir grant` and `tir exec` ask in the app's dialog,
   `tir unlock` and `tir lock` go through it, and `tir status` prints its state. Without the app
   they work in the terminal as before.

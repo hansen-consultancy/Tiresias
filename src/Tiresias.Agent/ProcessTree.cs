@@ -36,6 +36,38 @@ public static partial class ProcessTree
             ? new(parent.Id, parent.Started, parent.Image)
             : null;
 
+    /// <summary>The process and the ones that started it, nearest first, as far up as each parent is still running and started before its child.</summary>
+    public static IReadOnlyList<ShellIdentity> Ancestry(int process, int levels = 8)
+    {
+        var chain = new List<ShellIdentity>();
+        var child = Describe(process);
+        if (child is not { } first)
+            return chain;
+        chain.Add(new(first.Id, first.Started, first.Image));
+        for (var depth = 0; depth < levels && Describe(child.Value.Parent) is { } parent && parent.Started <= child.Value.Started; depth++)
+        {
+            chain.Add(new(parent.Id, parent.Started, parent.Image));
+            child = parent;
+        }
+        return chain;
+    }
+
+    /// <summary>The most recently started running process with this image path, for a caller known only by its path.</summary>
+    public static ShellIdentity? Newest(string image)
+    {
+        ShellIdentity? newest = null;
+        foreach (var process in System.Diagnostics.Process.GetProcesses())
+        {
+            using (process)
+            {
+                if (Describe(process.Id) is { } info && string.Equals(info.Image, image, StringComparison.OrdinalIgnoreCase)
+                    && (newest is null || info.Started > newest.Started))
+                    newest = new(info.Id, info.Started, info.Image);
+            }
+        }
+        return newest;
+    }
+
     /// <summary>Whether the process that had this id and start time is still running.</summary>
     public static bool IsRunning(int id, DateTime started) => Describe(id) is { } process && process.Started == started;
 

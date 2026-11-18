@@ -25,7 +25,23 @@ public partial class StatusWindow : Window
         DataContext = model;
         Loaded += (_, _) => model.Refresh();
         App.Current.Host.StateChanged += OnAgentStateChanged;
-        Closed += (_, _) => App.Current.Host.StateChanged -= OnAgentStateChanged;
+        App.Current.Guard.Changed += OnGuardChanged;
+        Closed += (_, _) =>
+        {
+            App.Current.Host.StateChanged -= OnAgentStateChanged;
+            App.Current.Guard.Changed -= OnGuardChanged;
+        };
+    }
+
+    void OnGuardChanged() => Dispatcher.BeginInvoke(model.ShowGuard);
+
+    void OnUnblock(object sender, RoutedEventArgs e)
+    {
+        if (((FrameworkElement)sender).DataContext is BlockedRow row)
+        {
+            AppLog.Info($"unblocked {row.Path}");
+            App.Current.Guard.Unblock(row.Path);
+        }
     }
 
     void OnAgentStateChanged() => Dispatcher.BeginInvoke(model.Refresh);
@@ -84,8 +100,33 @@ public sealed record CheckRow(string Name, string StatusText, string Glyph, Brus
         : OpensEnvironment ? Text.Get("Status_ReviewEnvironment") : "";
 }
 
+/// <summary>A program refused without asking since "This wasn't me".</summary>
+public sealed record BlockedRow(string Path, string Since)
+{
+    public string UnblockName => Text.Format("Status_UnblockName", Path);
+}
+
 public sealed partial class StatusViewModel : ObservableObject
 {
+    public ObservableCollection<BlockedRow> Blocked { get; } = [];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(GuardVisibility))]
+    public partial Visibility LockedDownVisibility { get; set; } = Visibility.Collapsed;
+
+    public Visibility GuardVisibility => LockedDownVisibility == Visibility.Visible || Blocked.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+    /// <summary>The lockdown and the blocklist as they are now.</summary>
+    public void ShowGuard()
+    {
+        var list = App.Current.Guard.Current;
+        Blocked.Clear();
+        foreach (var program in list.Programs.OrderByDescending(p => p.Since))
+            Blocked.Add(new(program.Path, Text.Format("Status_BlockedSince", program.Since.ToLocalTime())));
+        LockedDownVisibility = list.LockedDown ? Visibility.Visible : Visibility.Collapsed;
+        OnPropertyChanged(nameof(GuardVisibility));
+    }
+
     [ObservableProperty]
     public partial string Headline { get; set; } = "";
 
@@ -147,6 +188,7 @@ public sealed partial class StatusViewModel : ObservableObject
 
     void ShowState()
     {
+        ShowGuard();
         var view = TrayStatus.Describe(App.Current.Snapshot());
         Headline = Text.Of(view.Headline);
         Mode = view.Mode is null ? Text.Get("Status_ModeNone") : Text.Get("Status_ModeSolo");
