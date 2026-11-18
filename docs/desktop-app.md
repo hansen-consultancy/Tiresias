@@ -120,7 +120,8 @@ The goal is one command or one download, then a first-run wizard:
 
 - **Where from:** this repository's GitHub Releases, from the `app-v*` tags that
   `.github/workflows/app-release.yml` publishes. They are separate from the NuGet `v*` releases.
-  The installer is `TiresiasApp-win-Setup.exe` on each app release. It installs per user, with no
+  The installer is `TiresiasApp-win-Setup.exe` on each app release (`TiresiasApp-win-arm64-Setup.exe`
+  for Windows on Arm, which then runs natively rather than emulated). It installs per user, with no
   admin rights, into `%LOCALAPPDATA%\TiresiasApp`, and `tir.exe` sits next to `Tiresias.exe`.
   Uninstalling deletes that folder only. The vault, Keyring and logs live in
   `%LOCALAPPDATA%\Tiresias` and stay, so a reinstall unlocks the same secrets. The app puts that folder on the user

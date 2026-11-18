@@ -15,6 +15,7 @@ its section below.
 - The environment variables window can switch a sealed key to placeholder delivery and back.
 - The `tir run` consent dialog shows the command line; the program's folder can be copied or
   opened in Explorer. The status window has an **Environment variables** button.
+- A native Windows on Arm build: `TiresiasApp-win-arm64-Setup.exe` on each app release.
 - **About Tiresias** (tray menu and status page): the version, where it runs from, since when, and
   this version's release notes, with links to GitHub.
 - A development build says so: its tray icon has an orange corner, and the tray menu, tooltip,
