@@ -29,7 +29,8 @@ sealed class FakeTsa : ITsaClient, IDisposable
         using var rsa = RSA.Create(2048);
         var request = new CertificateRequest("CN=Fake TSA", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
         request.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension([new Oid("1.3.6.1.5.5.7.3.8")], critical: true));
-        certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
+        // Valid from before the fixed Now below until long after today: a token signed at Now must verify on any later day.
+        certificate = request.CreateSelfSigned(new DateTimeOffset(2026, 11, 16, 0, 0, 0, TimeSpan.Zero), DateTimeOffset.UtcNow.AddYears(10));
     }
 
     public DateTimeOffset Now { get; set; } = new(2026, 11, 17, 9, 0, 0, TimeSpan.Zero);
