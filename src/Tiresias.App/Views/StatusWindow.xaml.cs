@@ -106,6 +106,21 @@ public sealed partial class StatusViewModel : ObservableObject
     [ObservableProperty]
     public partial string LockLabel { get; set; } = "";
 
+    /// <summary>A development build never registers itself: its folder goes stale with the next build.</summary>
+    public bool CanStartWithWindows { get; } = AppBuild.Current.Installed;
+
+    [ObservableProperty]
+    public partial bool StartsWithWindows { get; set; } = StartWithWindows.IsOn;
+
+    [ObservableProperty]
+    public partial string StartWithWindowsNote { get; set; } = Text.Get(AppBuild.Current.Installed ? "Status_StartWithWindowsNote" : "Status_StartWithWindowsDev");
+
+    partial void OnStartsWithWindowsChanged(bool value)
+    {
+        if (!StartWithWindows.Set(value))
+            StartWithWindowsNote = Text.Get("Status_StartWithWindowsFailed");
+    }
+
     /// <summary>Lock right here, or unlock with one Hello prompt; the agent's state change refreshes the page.</summary>
     [RelayCommand]
     async Task ToggleLockAsync()

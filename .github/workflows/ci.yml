@@ -43,9 +43,11 @@ jobs:
         if: runner.os == 'Windows'
         shell: bash
         run: |
-          dotnet publish src/Tiresias.App -c Release -r win-x64 --self-contained -o publish
-          dotnet publish src/Tiresias.Keyring -c Release -r win-x64 --self-contained -o publish
-          dotnet publish src/Tiresias.NuGetPlugin -c Release -r win-x64 --self-contained -o publish
+          for rid in win-x64 win-arm64; do
+            dotnet publish src/Tiresias.App -c Release -r $rid --self-contained -o publish/$rid
+            dotnet publish src/Tiresias.Keyring -c Release -r $rid --self-contained -o publish/$rid
+            dotnet publish src/Tiresias.NuGetPlugin -c Release -r $rid --self-contained -o publish/$rid
+          done
 
   denylist:
     # Names that must never land here (hosts, people, customers). The list lives in a repository

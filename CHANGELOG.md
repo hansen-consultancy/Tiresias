@@ -17,12 +17,17 @@ its section below.
   signs in once, for that window only, and the service is saved with a `read` and a `write` grant.
 - `tir exec` gives a SQL Server child its temporary login in `{SLUG}_CONNECTION_STRING`, for
   grants that hand out logins.
-
+- The app starts when you sign in to Windows. The installer turns it on; the status page turns it
+  off.
+- An app with sealed user secrets (or `tiresias:` values) waits up to a minute for the Tiresias app instead of failing at
+  once, so both can start at sign-in. A plaintext `secrets.json` without Tiresias loads as before,
+  with no delay.
 - `tir env nuget import`, and **NuGet feeds** in the environment variables window, move a feed's
   token out of NuGet.Config (`%NAME%` or plain text) into the sealed environment.
 - The environment variables window can switch a sealed key to placeholder delivery and back.
 - The `tir run` consent dialog shows the command line; the program's folder can be copied or
   opened in Explorer. The status window has an **Environment variables** button.
+- A native Windows on Arm build: `TiresiasApp-win-arm64-Setup.exe` on each app release.
 - **About Tiresias** (tray menu and status page): the version, where it runs from, since when, and
   this version's release notes, with links to GitHub.
 - A development build says so: its tray icon has an orange corner, and the tray menu, tooltip,

@@ -108,11 +108,13 @@ public class ProtectedUserSecretsProviderTests
 {
     sealed class FakeAgent(AgentReply? reply) : IUserSecretsAgent
     {
-        public int Calls { get; private set; }
+        public int Calls => Waits.Count;
 
-        public AgentReply? TryLoad(AgentRequest request)
+        public List<TimeSpan> Waits { get; } = [];
+
+        public AgentReply? TryLoad(AgentRequest request, TimeSpan wait)
         {
-            Calls++;
+            Waits.Add(wait);
             return reply;
         }
     }
@@ -177,7 +179,7 @@ public class ProtectedUserSecretsProviderTests
         int next;
         public int Calls => next;
 
-        public AgentReply? TryLoad(AgentRequest request) => replies[Math.Min(next++, replies.Length - 1)];
+        public AgentReply? TryLoad(AgentRequest request, TimeSpan wait) => replies[Math.Min(next++, replies.Length - 1)];
     }
 
     [Test, NonParallelizable]
@@ -241,7 +243,29 @@ public class ProtectedUserSecretsProviderTests
     public void Without_an_agent_a_plain_file_loads_like_stock_user_secrets()
     {
         WriteFile("""{ "ConnectionStrings": { "Default": "x" } }""");
-        Assert.That(Build(new FakeAgent(null))["ConnectionStrings:Default"], Is.EqualTo("x"));
+        var agent = new FakeAgent(null);
+        Assert.That(Build(agent)["ConnectionStrings:Default"], Is.EqualTo("x"));
+        Assert.That(agent.Waits, Is.EqualTo(new[] { ProtectedUserSecretsProvider.Glance }), "a colleague without tir is never slowed down");
+    }
+
+    [Test, NonParallelizable]
+    public void A_sealed_file_waits_for_an_agent_still_starting_and_says_so()
+    {
+        var notices = new StringWriter();
+        var before = ProtectedUserSecretsProvider.Notices;
+        ProtectedUserSecretsProvider.Notices = notices;
+        try
+        {
+            WriteFile("""{ "$tiresias": { "v": 1, "sealed": "AA==" } }""");
+            var agent = new FakeAgent(null);
+            Assert.That(() => Build(agent), Throws.InvalidOperationException.With.Message.Contains("did not start within 60 seconds"));
+            Assert.That(agent.Waits, Is.EqualTo(new[] { ProtectedUserSecretsProvider.Glance, ProtectedUserSecretsProvider.AgentStartWait }));
+            Assert.That(notices.ToString(), Does.Contain("waiting up to 60 seconds"));
+        }
+        finally
+        {
+            ProtectedUserSecretsProvider.Notices = before;
+        }
     }
 
     [Test]
