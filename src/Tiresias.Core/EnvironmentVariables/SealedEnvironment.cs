@@ -9,16 +9,26 @@ public sealed record FolderSet(string Folder, IReadOnlyList<SealedVariable> Vari
 public sealed record NuGetSource(string Source, string Variable, string Username);
 
 /// <summary>
+/// A variable delivered as a broker placeholder instead of its value: the process gets a
+/// <c>tirph_</c> placeholder in <paramref name="Variable"/> and the forwarder's URL for
+/// <paramref name="Service"/> (a vault service, which holds the real key) in
+/// <paramref name="BaseUrlVariable"/>.
+/// </summary>
+public sealed record EnvironmentPlaceholder(string Variable, string Service, string BaseUrlVariable);
+
+/// <summary>
 /// Everything sealed: one global set, plus folder sets kept in the store rather than in the folder,
 /// so nothing can be committed to a repository by mistake. <see cref="Resolve"/> gives the variables
 /// for a working directory: the global set, overlaid by each folder set from the drive root down,
 /// the nearest folder winning. Folder paths compare as Windows does, ignoring case and treating
 /// <c>\</c> and <c>/</c> alike. NuGet sources are sealed with the rest, so nobody can point a feed of
-/// theirs at your token by editing a file.
+/// theirs at your token by editing a file. So are placeholder deliveries, keyed by variable name
+/// wherever that name resolves, so nothing can quietly switch one back to the real value.
 /// </summary>
-public sealed record SealedEnvironment(IReadOnlyList<SealedVariable> Global, IReadOnlyList<FolderSet> Folders, IReadOnlyList<NuGetSource> NuGetSources)
+public sealed record SealedEnvironment(IReadOnlyList<SealedVariable> Global, IReadOnlyList<FolderSet> Folders, IReadOnlyList<NuGetSource> NuGetSources,
+    IReadOnlyList<EnvironmentPlaceholder> Placeholders)
 {
-    public static readonly SealedEnvironment Empty = new([], [], []);
+    public static readonly SealedEnvironment Empty = new([], [], [], []);
 
     /// <summary>Azure Artifacts, GitHub Packages and most token feeds accept any user name with a token as the password.</summary>
     public const string NuGetDefaultUsername = "tiresias";
@@ -91,6 +101,37 @@ public sealed record SealedEnvironment(IReadOnlyList<SealedVariable> Global, IRe
         return trimmed.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ? trimmed[..trimmed.LastIndexOf('/', StringComparison.Ordinal)] : trimmed;
     }
 
+    /// <summary><paramref name="placeholder"/> replacing any delivery for the same variable.</summary>
+    public SealedEnvironment WithPlaceholder(EnvironmentPlaceholder placeholder) =>
+        this with { Placeholders = [.. Placeholders.Where(p => !SameName(p.Variable, placeholder.Variable)), placeholder] };
+
+    public SealedEnvironment WithoutPlaceholder(string variable) =>
+        this with { Placeholders = [.. Placeholders.Where(p => !SameName(p.Variable, variable))] };
+
+    /// <summary>How <paramref name="variable"/> is delivered as a placeholder, or <c>null</c> when it gets its value.</summary>
+    public EnvironmentPlaceholder? PlaceholderFor(string variable) => Placeholders.FirstOrDefault(p => SameName(p.Variable, variable));
+
+    /// <summary>
+    /// Whether <paramref name="name"/> is sealed anywhere: globally or in a folder set.
+    /// </summary>
+    public bool IsSealedAnywhere(string name) =>
+        Global.Concat(Folders.SelectMany(f => f.Variables)).Any(v => SameName(v.Name, name));
+
+    /// <summary>
+    /// The base-URL variable tools conventionally pair with an API key variable:
+    /// <c>OPENAI_API_KEY</c> → <c>OPENAI_BASE_URL</c>. <c>null</c> when the name doesn't end in
+    /// <c>_API_KEY</c>, <c>_KEY</c> or <c>_TOKEN</c>, or nothing is left in front of it.
+    /// </summary>
+    public static string? BaseUrlVariableFor(string variable)
+    {
+        foreach (var suffix in (string[])["_API_KEY", "_KEY", "_TOKEN"])
+            if (variable.Length > suffix.Length && variable.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+                return variable[..^suffix.Length].ToUpperInvariant() + "_BASE_URL";
+        return null;
+    }
+
+    static bool SameName(string a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+
     public FolderSet? Find(string folder) => Folders.FirstOrDefault(f => Normalize(f.Folder) == Normalize(folder));
 
     /// <summary>The document this is sealed as. A phase-1 document, with only the global set, reads unchanged.</summary>
@@ -107,6 +148,11 @@ public sealed record SealedEnvironment(IReadOnlyList<SealedVariable> Global, IRe
             nuget[source.Source] = new JsonObject { ["variable"] = source.Variable, ["username"] = source.Username };
         if (nuget.Count > 0)
             document["nuget"] = nuget;
+        var placeholders = new JsonObject();
+        foreach (var placeholder in Placeholders)
+            placeholders[placeholder.Variable] = new JsonObject { ["service"] = placeholder.Service, ["baseUrl"] = placeholder.BaseUrlVariable };
+        if (placeholders.Count > 0)
+            document["placeholders"] = placeholders;
         return document;
     }
 
@@ -130,7 +176,15 @@ public sealed record SealedEnvironment(IReadOnlyList<SealedVariable> Global, IRe
                 : throw new InvalidDataException($"The sealed NuGet source {pair.Key} names no variable.")).ToArray(),
             _ => throw new InvalidDataException("The sealed NuGet sources are not an object."),
         };
-        return new(SealedVariables.FromDocument(document), folders, nuget);
+        var placeholders = document["placeholders"] switch
+        {
+            null => [],
+            JsonObject deliveries => deliveries.Select(pair => pair.Value is JsonObject map && (string?)map["service"] is { } service && (string?)map["baseUrl"] is { } baseUrl
+                ? new EnvironmentPlaceholder(pair.Key, service, baseUrl)
+                : throw new InvalidDataException($"The placeholder delivery for {pair.Key} names no service or base-URL variable.")).ToArray(),
+            _ => throw new InvalidDataException("The sealed placeholder deliveries are not an object."),
+        };
+        return new(SealedVariables.FromDocument(document), folders, nuget, placeholders);
     }
 
     static bool Contains(string folder, string directory) =>

@@ -272,7 +272,26 @@ its device keys belong to that PC's Windows account.
 
 To keep it, add the hook line last in `$PROFILE`.
 
-## 11. NuGet credentials from a sealed variable
+## 11. A placeholder instead of a value
+
+Uses the `httpbin` service from section 5 (secret `Bearer example-token`).
+
+1. `tir env set HTTPBIN_TOKEN` (type anything: the placeholder replaces it), then
+   `tir env placeholder add HTTPBIN_TOKEN httpbin`. It says `HTTPBIN_BASE_URL` gets the forwarder's
+   address. `tir env list` shows **HTTPBIN_TOKEN (a placeholder for httpbin)**.
+2. In a terminal with the hook, `cd` once: the dialog lists it as a placeholder. Allow it.
+   `$env:HTTPBIN_TOKEN` starts with `tirph_httpbin_`; `$env:HTTPBIN_BASE_URL` is the address.
+3. `curl.exe -s "$env:HTTPBIN_BASE_URL/headers" -H "Authorization: Bearer $env:HTTPBIN_TOKEN"`:
+   httpbin echoes `Bearer example-token`, and **Activity...** shows the request.
+4. `cd` elsewhere and back: `$env:HTTPBIN_TOKEN` is the same placeholder.
+5. Copy the placeholder, close that terminal, and `cd` in another one with the hook. The copied
+   placeholder is now refused.
+6. `tir run -- pwsh -NoProfile -Command 'echo $env:HTTPBIN_TOKEN'` prints a different placeholder,
+   which no longer works once the command has exited.
+7. Quit the app and `tir run` again: HTTPBIN_TOKEN is left out, and `tir` says why.
+8. Clean up: `tir env placeholder remove HTTPBIN_TOKEN`, `tir env remove HTTPBIN_TOKEN`.
+
+## 12. NuGet credentials from a sealed variable
 
 Needs the .NET 9.0.200 SDK or later and a private feed (Azure Artifacts, GitHub Packages) with a
 personal access token.

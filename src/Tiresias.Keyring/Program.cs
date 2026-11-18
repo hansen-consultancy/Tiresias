@@ -54,6 +54,11 @@ const string Usage = """
     tir env nuget remove <source-url>
         NuGet package sources that authenticate with a sealed variable: dotnet restore, Visual
         Studio and Rider ask the app for the token, and you allow each program once.
+    tir env placeholder add <NAME> <service> [--base-url <VARIABLE>]
+    tir env placeholder list
+    tir env placeholder remove <NAME>
+        Hand a sealed API key out as a placeholder for a vault service instead of its value, with
+        the forwarder's address in the tool's base-URL variable (OPENAI_API_KEY: OPENAI_BASE_URL).
     tir env hook [pwsh]
         Prints the PowerShell profile hook: tir env hook | Out-String | Invoke-Expression. Each
         terminal asks once for the sealed variables, and changing folder applies its set.

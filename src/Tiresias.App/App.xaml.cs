@@ -23,6 +23,7 @@ public partial class App : Application
     Mutex? instance;
     ConsentPresenter? consent;
     readonly ShellConsent shells = new();
+    readonly ShellPlaceholders shellPlaceholders = new(TimeProvider.System);
     AgentHost? host;
     TrayController? tray;
     AppUpdates? updates;
@@ -82,6 +83,7 @@ public partial class App : Application
             if (!host.Keys.IsUnlocked)
             {
                 shells.Clear();
+                _ = PlaceholderMinter.RevokeAsync(shellPlaceholders.Release((_, _) => false));
                 lock (nugetAllowed)
                     nugetAllowed.Clear();
             }
@@ -332,12 +334,17 @@ public partial class App : Application
         if (variables.Count == 0)
             return new(true, Text.Get("Environment_NoneSealed"), Approved: true, Variables: new Dictionary<string, string>());
         var program = request.Title ?? "tir run";
-        var approved = await consent!.AskEnvironmentAsync(program, [.. variables.Select(v => v.Name)], caller, ct);
+        var approved = await consent!.AskEnvironmentAsync(program, [.. variables.Select(v => EnvironmentDelivery.Describe(sealedNow, v.Name))], caller, ct);
         AppLog.Info($"tir run {program}: {(approved ? "allowed" : "denied")} {variables.Count} environment variable(s)");
-        return approved
-            ? new(true, Approved: true, Variables: variables.ToDictionary(v => v.Name, v => v.Value, StringComparer.OrdinalIgnoreCase))
-            : new(true, Approved: false);
+        if (!approved)
+            return new(true, Approved: false);
+        // tir revokes these placeholders when the command exits.
+        var delivery = await EnvironmentDelivery.DeliverAsync(sealedNow, variables, PlaceholderMinter.Endpoint,
+            (placeholder, _) => PlaceholderMinter.MintAsync(placeholder, $"run:{program}", caller), ct);
+        return new(true, Note(delivery), Approved: true, Variables: delivery.Variables);
     }
+
+    static string? Note(Delivery delivery) => delivery.Problems.Count > 0 ? string.Join(Environment.NewLine, delivery.Problems) : null;
 
     /// <summary>
     /// The terminal hook, on opening a terminal and on each change of folder. Asks once per shell
@@ -365,12 +372,14 @@ public partial class App : Application
         }
         if (host.Keys.Hello is not { } hello)
             return new(false, Text.Get("Environment_Locked"));
-        var variables = (await Task.Run(() => EnvironmentStore.Open(hello).Environment, ct)).Resolve(directory);
+        _ = PlaceholderMinter.RevokeAsync(shellPlaceholders.Release(ProcessTree.IsRunning));
+        var sealedNow = await Task.Run(() => EnvironmentStore.Open(hello).Environment, ct);
+        var variables = sealedNow.Resolve(directory);
         var (answer, fresh) = shells.Check(shell, variables.Select(v => v.Name), request.AskAgain);
         string? note = null;
         if (answer == ShellAnswer.Ask)
         {
-            var approved = await consent!.AskShellAsync(shell.Program, directory, fresh, ct);
+            var approved = await consent!.AskShellAsync(shell.Program, directory, [.. fresh.Select(name => EnvironmentDelivery.Describe(sealedNow, name))], ct);
             AppLog.Info($"terminal {System.IO.Path.GetFileName(shell.Program)} ({shell.ProcessId}): {(approved ? "allowed" : "denied")} {fresh.Count} environment variable(s)");
             if (approved)
             {
@@ -385,7 +394,12 @@ public partial class App : Application
         }
         // Whatever the shell was allowed before still reaches it; only the names it was refused stay out.
         var given = variables.Where(v => !fresh.Contains(v.Name, StringComparer.OrdinalIgnoreCase));
-        return new(true, note, Approved: true, Variables: given.ToDictionary(v => v.Name, v => v.Value, StringComparer.OrdinalIgnoreCase));
+        var observed = $"{shell.Program} ({shell.ProcessId})";
+        var delivery = await EnvironmentDelivery.DeliverAsync(sealedNow, given, PlaceholderMinter.Endpoint,
+            (placeholder, _) => shellPlaceholders.GetAsync(shell, placeholder,
+                () => PlaceholderMinter.MintAsync(placeholder, $"terminal:{System.IO.Path.GetFileNameWithoutExtension(shell.Program)}", observed)), ct);
+        return new(true, string.Join(Environment.NewLine, new[] { note, Note(delivery) }.OfType<string>()) is { Length: > 0 } text ? text : null,
+            Approved: true, Variables: delivery.Variables);
     }
 
     /// <summary>Programs allowed a NuGet source's token until the agent locks: image path and variable.</summary>
