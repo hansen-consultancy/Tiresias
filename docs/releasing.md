@@ -115,7 +115,13 @@ run fails. A failure at **Check signing configuration** means a variable is miss
 **Azure sign-in** means the federated credential's subject doesn't match the environment. A
 signing error during **Pack** usually means the role assignment is missing or hasn't taken effect
 yet; it can take a few minutes. Nothing is published until the signatures are verified. After a
-failure, fix the setup and re-run the workflow, or delete the tag and push it again.
+failure before **Publish the release**, fix the setup and re-run the workflow, or delete the tag and
+push it again.
+
+Releases in this repository are **immutable**: once a release is published, no file can be added
+to it and its tag can't be moved or reused, even after the release is deleted. If a run fails at or
+after **Publish the release**, that version is spent. Delete the incomplete release, so installed
+apps don't find a release with no update feed, and release the next version.
 
 ## Not covered yet
 
