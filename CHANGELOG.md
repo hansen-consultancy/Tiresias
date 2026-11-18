@@ -36,6 +36,8 @@ its section below.
   locked, the app shows who is asking with **Unlock with Windows Hello**, then the usual consent
   dialog, instead of the app stopping with "unlock first". An app now waits up to five minutes for
   that answer rather than three.
+- The installer puts the app in `%LOCALAPPDATA%\TiresiasApp`, apart from your vault in
+  `%LOCALAPPDATA%\Tiresias`, so uninstalling the app never deletes your secrets.
 - The app puts `tir` on your user `PATH` when it starts, so `tir` works in any terminal you open
   afterwards, and takes it off again when you uninstall.
 - `tir secrets list | set | remove` edits a project's protected user secrets without ever

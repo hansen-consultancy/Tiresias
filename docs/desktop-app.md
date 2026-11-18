@@ -103,8 +103,10 @@ The goal is one command or one download, then a first-run wizard:
 
 - **Where from:** this repository's GitHub Releases, from the `app-v*` tags that
   `.github/workflows/app-release.yml` publishes. They are separate from the NuGet `v*` releases.
-  The installer is `Tiresias-win-Setup.exe` on each app release. It installs per user, with no
-  admin rights, and `tir.exe` sits next to `Tiresias.exe`. The app puts that folder on the user
+  The installer is `TiresiasApp-win-Setup.exe` on each app release. It installs per user, with no
+  admin rights, into `%LOCALAPPDATA%\TiresiasApp`, and `tir.exe` sits next to `Tiresias.exe`.
+  Uninstalling deletes that folder only. The vault, Keyring and logs live in
+  `%LOCALAPPDATA%\Tiresias` and stay, so a reinstall unlocks the same secrets. The app puts that folder on the user
   `PATH` at every start (so a moved install heals) and Velopack's uninstall hook takes it off.
 - **When:** at start, then daily. A check that fails (no network, GitHub down) is logged and
   retried an hour later; the user sees nothing. A preview build follows preview releases, a stable

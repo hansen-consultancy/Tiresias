@@ -211,7 +211,7 @@ Things worth trying:
 ## 7. Updates
 
 A build from source doesn't update itself. To try updates you need two app releases: install the
-older one with its `Tiresias-win-Setup.exe`, then publish the newer one. Within a day, or at the
+older one with its `TiresiasApp-win-Setup.exe`, then publish the newer one. Within a day, or at the
 next start, the tray menu offers **Update to ... available - restart to apply**. Choosing it shows
 the release notes, then restarts into the new version. Choose it while a consent dialog or the
 secrets editor is open: it asks you to finish that first.

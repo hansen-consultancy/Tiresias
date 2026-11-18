@@ -28,8 +28,8 @@ restarts.
    update to preview releases; stable builds only to stable ones.
 3. **Check the run.** For the app, the **Verify signatures** step lists each signed file and its
    signer.
-4. **Check the release** on GitHub. An app release carries `Tiresias-win-Setup.exe` (the
-   installer), `Tiresias-win-Portable.zip`, the `-full.nupkg` and `-delta.nupkg` packages, and the
+4. **Check the release** on GitHub. An app release carries `TiresiasApp-win-Setup.exe` (the
+   installer), `TiresiasApp-win-Portable.zip`, the `-full.nupkg` and `-delta.nupkg` packages, and the
    `releases.win.json` feed that installed apps read.
 
 The NuGet workflow needs nuget.org trusted publishing (the `nuget` environment and the

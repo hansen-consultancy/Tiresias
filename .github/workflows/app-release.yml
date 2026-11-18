@@ -101,7 +101,9 @@ jobs:
       - name: Pack
         shell: bash
         run: |
-          vpk pack --packId Tiresias --packTitle Tiresias --packAuthors "Tiresias contributors" \
+          # Not "Tiresias": Velopack installs to %LOCALAPPDATA%\{packId} and deletes that whole folder on
+          # uninstall, and %LOCALAPPDATA%\Tiresias holds the vault and the device key. PackagingTests guards it.
+          vpk pack --packId TiresiasApp --packTitle Tiresias --packAuthors "Tiresias contributors" \
             --packVersion "${{ steps.meta.outputs.version }}" --packDir publish --mainExe Tiresias.exe \
             --icon assets/export/tiresias.ico --releaseNotes "$RUNNER_TEMP/notes.md" --outputDir Releases \
             --azureTrustedSignFile "$RUNNER_TEMP/signing.json"
