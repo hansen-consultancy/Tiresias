@@ -1,5 +1,7 @@
+using System.Runtime.InteropServices;
 using System.Text;
 using Tiresias.Vault;
+using Windows.Foundation;
 using Windows.Security.Credentials;
 using Windows.Security.Cryptography;
 
@@ -21,7 +23,7 @@ namespace Tiresias.Agent;
 /// and is zeroed after derivation; it exists in this process's memory for that moment.
 /// One instance costs one Hello prompt, on first use.
 /// </remarks>
-public sealed class HelloKeyWrapper : IKeyWrapper, IDisposable
+public sealed partial class HelloKeyWrapper : IKeyWrapper, IDisposable
 {
     /// <summary>Whether the Tiresias Hello credential exists. Asks Windows without a prompt.</summary>
     public static bool Exists() =>
@@ -66,7 +68,9 @@ public sealed class HelloKeyWrapper : IKeyWrapper, IDisposable
                 ? new HelloException(HelloProblem.CredentialMissing, $"No Windows Hello credential '{CredentialName}' on this machine. Re-wrap the vault from the recovery key.")
                 : new HelloException(Problem(opened.Status), $"Windows Hello credential unavailable: {opened.Status}.");
 
-        var created = KeyCredentialManager.RequestCreateAsync(CredentialName, KeyCredentialCreationOption.FailIfExists).AsTask().GetAwaiter().GetResult();
+        var created = Prompt(() => KeyCredentialManager.RequestCreateAsync(CredentialName, KeyCredentialCreationOption.FailIfExists));
+        if (created.Status == KeyCredentialStatus.CredentialAlreadyExists)
+            created = KeyCredentialManager.OpenAsync(CredentialName).AsTask().GetAwaiter().GetResult();
         return created.Status == KeyCredentialStatus.Success
             ? created.Credential
             : throw new HelloException(Problem(created.Status), $"Could not create the Windows Hello credential: {created.Status}.");
@@ -74,12 +78,60 @@ public sealed class HelloKeyWrapper : IKeyWrapper, IDisposable
 
     static byte[] Sign(KeyCredential credential, byte[] data)
     {
-        var result = credential.RequestSignAsync(CryptographicBuffer.CreateFromByteArray(data)).AsTask().GetAwaiter().GetResult();
+        var result = Prompt(() => credential.RequestSignAsync(CryptographicBuffer.CreateFromByteArray(data)));
         if (result.Status != KeyCredentialStatus.Success)
             throw new HelloException(Problem(result.Status), $"Windows Hello did not sign: {result.Status}.");
         CryptographicBuffer.CopyToByteArray(result.Result, out var signature);
         return signature;
     }
+
+    /// <summary>
+    /// Runs a call that shows the Hello prompt. Windows opens that prompt behind or beside a desktop
+    /// app's windows (a known Windows bug, also worked around by Chromium and KeePassXC), so this
+    /// brings it to the front while the call runs. Windows sometimes fails the call with a bare
+    /// HRESULT instead of a status; that becomes a <see cref="HelloException"/> the app can explain.
+    /// </summary>
+    static T Prompt<T>(Func<IAsyncOperation<T>> start)
+    {
+        using var done = new CancellationTokenSource();
+        var front = Task.Run(() => KeepPromptInFront(done.Token));
+        try
+        {
+            return start().AsTask().GetAwaiter().GetResult();
+        }
+        catch (COMException e)
+        {
+            throw new HelloException(HelloProblem.Unavailable, $"Windows Hello failed (0x{e.HResult:X8}).", e);
+        }
+        finally
+        {
+            done.Cancel();
+            front.Wait();
+        }
+    }
+
+    static void KeepPromptInFront(CancellationToken done)
+    {
+        // Poll fast until the prompt first appears (up to 4 s), then slowly: a wrong PIN re-shows it.
+        var found = false;
+        for (var i = 0; !done.IsCancellationRequested && (found || i < 40); i++)
+        {
+            var hwnd = FindWindowW("Credential Dialog Xaml Host", null);
+            if (hwnd != 0)
+            {
+                SetForegroundWindow(hwnd);
+                found = true;
+            }
+            done.WaitHandle.WaitOne(found ? 500 : 100);
+        }
+    }
+
+    [LibraryImport("user32.dll", StringMarshalling = StringMarshalling.Utf16)]
+    private static partial nint FindWindowW(string className, string? windowName);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool SetForegroundWindow(nint hwnd);
 
     static HelloProblem Problem(KeyCredentialStatus status) => status switch
     {
@@ -103,7 +155,7 @@ public enum HelloProblem
 }
 
 /// <summary>Windows Hello failed for a reason the caller may explain differently; still an <see cref="InvalidOperationException"/>.</summary>
-public sealed class HelloException(HelloProblem problem, string message) : InvalidOperationException(message)
+public sealed class HelloException(HelloProblem problem, string message, Exception? inner = null) : InvalidOperationException(message, inner)
 {
     public HelloProblem Problem { get; } = problem;
 }
