@@ -56,7 +56,7 @@ public sealed record Blocklist(bool LockedDown, IReadOnlyList<BlockedProgram> Pr
     /// </summary>
     public Blocklist Escalate(string? program, string? sha256, DateTimeOffset now)
     {
-        if (program is null || !System.IO.Path.IsPathFullyQualified(program))
+        if (program is null || !IsWindowsPath(program))
             return this with { LockedDown = true };
         var others = Programs.Where(p => !SamePath(p.Path, program));
         return new(true, [.. others, new BlockedProgram(program, sha256, now)]);
@@ -66,6 +66,10 @@ public sealed record Blocklist(bool LockedDown, IReadOnlyList<BlockedProgram> Pr
     public Blocklist Unlocked() => this with { LockedDown = false };
 
     public Blocklist Unblock(string path) => this with { Programs = [.. Programs.Where(p => !SamePath(p.Path, path))] };
+
+    /// <summary>A full Windows path (<c>C:\…</c> or <c>\\server\…</c>), judged the same on any OS so the tests run on Linux too.</summary>
+    static bool IsWindowsPath(string path) =>
+        (path is [var drive, ':', '\\' or '/', ..] && char.IsAsciiLetter(drive)) || path.StartsWith(@"\\", StringComparison.Ordinal);
 
     static bool SamePath(string a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
 
