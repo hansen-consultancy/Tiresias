@@ -10,6 +10,11 @@ its section below.
 
 ### Added
 
+- The app starts when you sign in to Windows. The installer turns it on; the status page turns it
+  off.
+- An app with sealed user secrets waits up to a minute for the Tiresias app instead of failing at
+  once, so both can start at sign-in. A plaintext `secrets.json` without Tiresias loads as before,
+  with no delay.
 - `tir env nuget import`, and **NuGet feeds** in the environment variables window, move a feed's
   token out of NuGet.Config (`%NAME%` or plain text) into the sealed environment.
 - The environment variables window can switch a sealed key to placeholder delivery and back.
