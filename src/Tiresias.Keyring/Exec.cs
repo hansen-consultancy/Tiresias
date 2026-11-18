@@ -63,7 +63,7 @@ static class Exec
                 if (!ExecPlan.IsGitHubApp(service))
                     minted.Add(token);
                 var connectionString = ExecPlan.LoginGrant(service, ceiling) is { } login
-                    ? await SqlLogin.RequestAsync(service.Slug, login.Name, token)
+                    ? (await SqlLogin.RequestAsync(service.Slug, login.Name, token)).ConnectionString
                     : null;
                 credentials.Add(new(service, token, connectionString));
             }

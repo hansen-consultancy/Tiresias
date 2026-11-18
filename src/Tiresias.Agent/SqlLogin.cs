@@ -12,9 +12,9 @@ public static class SqlLogin
 {
     static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(30) };
 
-    /// <returns>The login as a connection string.</returns>
+    /// <returns>The login as a connection string, and when it is dropped.</returns>
     /// <exception cref="InvalidOperationException">The broker refused, with its reason.</exception>
-    public static async Task<string> RequestAsync(string service, string grant, string placeholder, CancellationToken ct = default)
+    public static async Task<(string ConnectionString, DateTimeOffset ExpiresAt)> RequestAsync(string service, string grant, string placeholder, CancellationToken ct = default)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post,
             new Uri(PlaceholderMinter.Endpoint, $"/sql/{Uri.EscapeDataString(service)}/{Uri.EscapeDataString(grant)}/login"));
@@ -26,6 +26,6 @@ public static class SqlLogin
             var reason = body.ValueKind == JsonValueKind.Object && body.TryGetProperty("reason", out var r) ? r.GetString() : null;
             throw new InvalidOperationException($"{service}: no SQL login ({(int)response.StatusCode} {reason ?? response.ReasonPhrase}).");
         }
-        return body.GetProperty("connectionString").GetString()!;
+        return (body.GetProperty("connectionString").GetString()!, DateTimeOffset.FromUnixTimeSeconds(body.GetProperty("expiresAt").GetInt64()));
     }
 }

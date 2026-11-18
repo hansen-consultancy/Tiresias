@@ -166,6 +166,78 @@ public class ProtectedUserSecretsProviderTests
     }
 
     [Test]
+    public void Without_an_agent_a_plain_file_naming_a_reference_fails_rather_than_pass_it_on()
+    {
+        WriteFile("""{ "ConnectionStrings": { "Default": "tiresias:sql/appdb/read" } }""");
+        Assert.That(() => Build(new FakeAgent(null)), Throws.InvalidOperationException.With.Message.Contains("only the Tiresias app can fetch"));
+    }
+
+    sealed class SequenceAgent(params AgentReply[] replies) : IUserSecretsAgent
+    {
+        int next;
+        public int Calls => next;
+
+        public AgentReply? TryLoad(AgentRequest request) => replies[Math.Min(next++, replies.Length - 1)];
+    }
+
+    [Test, NonParallelizable]
+    public void Values_that_expire_are_loaded_again_before_they_do_and_the_reload_token_fires()
+    {
+        var before = (ProtectedUserSecretsProvider.Notices, ProtectedUserSecretsProvider.RenewalRetry);
+        ProtectedUserSecretsProvider.Notices = new StringWriter();
+        try
+        {
+            WriteFile("""{ "$tiresias": { "v": 1, "sealed": "AA==" } }""");
+            var soon = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            var agent = new SequenceAgent(
+                new(AgentStatus.Ok, """{ "Db": "login-1" }""", RefreshAt: soon),
+                new(AgentStatus.Ok, """{ "Db": "login-2" }"""));
+            var config = Build(agent);
+            using var _ = config as IDisposable;
+            var reloaded = new ManualResetEventSlim();
+            config.GetReloadToken().RegisterChangeCallback(_ => reloaded.Set(), null);
+
+            Assert.That(config["Db"], Is.EqualTo("login-1"));
+            Assert.That(reloaded.Wait(TimeSpan.FromSeconds(10)), Is.True, "no renewal");
+            Assert.That(config["Db"], Is.EqualTo("login-2"));
+            Assert.That(agent.Calls, Is.EqualTo(2));
+        }
+        finally
+        {
+            (ProtectedUserSecretsProvider.Notices, ProtectedUserSecretsProvider.RenewalRetry) = before;
+        }
+    }
+
+    [Test, NonParallelizable]
+    public void A_failed_renewal_keeps_the_old_values_says_so_and_tries_again()
+    {
+        var notices = new StringWriter();
+        var before = (ProtectedUserSecretsProvider.Notices, ProtectedUserSecretsProvider.RenewalRetry);
+        (ProtectedUserSecretsProvider.Notices, ProtectedUserSecretsProvider.RenewalRetry) = (TextWriter.Synchronized(notices), TimeSpan.FromMilliseconds(50));
+        try
+        {
+            WriteFile("""{ "$tiresias": { "v": 1, "sealed": "AA==" } }""");
+            var soon = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            var agent = new SequenceAgent(
+                new(AgentStatus.Ok, """{ "Db": "login-1" }""", RefreshAt: soon),
+                new(AgentStatus.Error, Message: "the broker is down"),
+                new(AgentStatus.Ok, """{ "Db": "login-2" }"""));
+            var config = Build(agent);
+            using var _ = config as IDisposable;
+            var reloaded = new ManualResetEventSlim();
+            config.GetReloadToken().RegisterChangeCallback(_ => reloaded.Set(), null);
+
+            Assert.That(reloaded.Wait(TimeSpan.FromSeconds(10)), Is.True, "no renewal after the retry");
+            Assert.That(config["Db"], Is.EqualTo("login-2"));
+            Assert.That(notices.ToString(), Does.Contain("could not renew user secrets 'test-id'").And.Contain("the broker is down"));
+        }
+        finally
+        {
+            (ProtectedUserSecretsProvider.Notices, ProtectedUserSecretsProvider.RenewalRetry) = before;
+        }
+    }
+
+    [Test]
     public void Without_an_agent_a_plain_file_loads_like_stock_user_secrets()
     {
         WriteFile("""{ "ConnectionStrings": { "Default": "x" } }""");

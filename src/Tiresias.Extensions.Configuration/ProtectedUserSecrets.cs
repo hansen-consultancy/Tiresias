@@ -106,11 +106,16 @@ sealed class ProtectedUserSecretsSource(string userSecretsId, string directory, 
 /// <summary>
 /// Gets the secrets document from the agent when one listens, else from the plain file, and parses
 /// it with the stock JSON configuration parser so keys come out exactly as <c>AddUserSecrets</c>
-/// would produce them.
+/// would produce them. When the document holds values that expire (a temporary SQL login), it loads
+/// again before they do and raises the reload token, so <c>IOptionsMonitor</c> and connection
+/// factories that read configuration per use pick up the new login.
 /// </summary>
 sealed class ProtectedUserSecretsProvider(string userSecretsId, string directory, bool optional, IUserSecretsAgent agent)
-    : JsonStreamConfigurationProvider(new JsonStreamConfigurationSource())
+    : JsonStreamConfigurationProvider(new JsonStreamConfigurationSource()), IDisposable
 {
+    /// <summary>How long a failed renewal waits before trying again, while the old values still work.</summary>
+    internal static TimeSpan RenewalRetry { get; set; } = TimeSpan.FromMinutes(1);
+
     /// <summary>
     /// Where the one-line notice goes when Tiresias provided the secrets: stderr, so it never mixes
     /// into an app's own output. Configuration loads before logging exists, so there is no ILogger.
@@ -118,6 +123,8 @@ sealed class ProtectedUserSecretsProvider(string userSecretsId, string directory
     internal static TextWriter Notices { get; set; } = Console.Error;
 
     bool fromAgent;
+    DateTimeOffset? refreshAt;
+    Timer? renewal;
 
     public override void Load()
     {
@@ -131,7 +138,32 @@ sealed class ProtectedUserSecretsProvider(string userSecretsId, string directory
         Load(stream);
         if (fromAgent)
             Notices.WriteLine($"Tiresias: user secrets '{userSecretsId}' provided ({(Data.Count == 1 ? "1 key" : $"{Data.Count} keys")}).");
+        if (refreshAt is { } at)
+            Schedule(at - DateTimeOffset.UtcNow);
     }
+
+    void Schedule(TimeSpan due)
+    {
+        due = due < TimeSpan.FromSeconds(1) ? TimeSpan.FromSeconds(1) : due;
+        renewal ??= new Timer(_ => Renew());
+        renewal.Change(due, Timeout.InfiniteTimeSpan);
+    }
+
+    void Renew()
+    {
+        try
+        {
+            Load();
+            OnReload();
+        }
+        catch (Exception e) when (e is InvalidOperationException or InvalidDataException or IOException)
+        {
+            Notices.WriteLine($"Tiresias: could not renew user secrets '{userSecretsId}' ({e.Message}); trying again in {RenewalRetry.TotalSeconds:0} seconds.");
+            Schedule(RenewalRetry);
+        }
+    }
+
+    public void Dispose() => renewal?.Dispose();
 
     string? Fetch()
     {
@@ -146,6 +178,7 @@ sealed class ProtectedUserSecretsProvider(string userSecretsId, string directory
         {
             case AgentStatus.Ok:
                 fromAgent = true;
+                refreshAt = reply.RefreshAt is { } at ? DateTimeOffset.FromUnixTimeSeconds(at) : null;
                 return reply.Json;
             case AgentStatus.Denied:
                 throw new InvalidOperationException($"Access to user secrets '{userSecretsId}' was denied by Tiresias: "
@@ -158,6 +191,8 @@ sealed class ProtectedUserSecretsProvider(string userSecretsId, string directory
         // carrying on without them only surfaces later as a confusing connection error.
         return kind switch
         {
+            SecretsFileKind.Plain when SecretsFile.NamesReferences(text!) => throw new InvalidOperationException(
+                $"User secrets '{userSecretsId}' name tiresias: values, which only the Tiresias app can fetch, and it is not running. Start it (or run 'tir agent'), then start this app again."),
             SecretsFileKind.Plain => text,
             SecretsFileKind.Sealed => throw new InvalidOperationException(
                 $"User secrets '{userSecretsId}' are protected by tir and the Tiresias agent is not running. Start the Tiresias app (or run 'tir agent'), then start this app again."),

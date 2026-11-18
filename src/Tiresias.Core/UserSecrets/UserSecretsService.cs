@@ -49,13 +49,17 @@ public sealed class UserSecretsService : IDisposable
     readonly IUserSecretsConsentPrompt prompt;
     readonly TimeProvider time;
     readonly AuditLog? audit;
+    readonly ISecretReferenceResolver? references;
     readonly SemaphoreSlim screen = new(1, 1);
     readonly Lock writeGate = new();
     CancellationTokenSource locked = new();
 
     /// <param name="audit">Where decisions are recorded (keys and programs only), or <c>null</c>.</param>
-    public UserSecretsService(string userSecretsRoot, IUserSecretsKeys keys, IUserSecretsConsentPrompt prompt, TimeProvider time, AuditLog? audit = null)
+    /// <param name="references">Fetches what <c>tiresias:</c> values name, or <c>null</c> where nothing can (<c>tir agent</c> without a broker).</param>
+    public UserSecretsService(string userSecretsRoot, IUserSecretsKeys keys, IUserSecretsConsentPrompt prompt, TimeProvider time, AuditLog? audit = null,
+        ISecretReferenceResolver? references = null)
     {
+        this.references = references;
         this.userSecretsRoot = userSecretsRoot;
         this.keys = keys;
         this.prompt = prompt;
@@ -118,6 +122,14 @@ public sealed class UserSecretsService : IDisposable
         switch (plan.Action)
         {
             case UserSecretsAction.ServeAsIs:
+                // A reference served as is would reach the app as a connection string that can't work.
+                if (text is not null && SecretsFile.NamesReferences(text))
+                {
+                    var fetchable = "this file names tiresias: values, which are fetched only once the file can be sealed; "
+                        + (wrapper is null ? "unlock Tiresias, then start the app again" : "create the recovery key in the Tiresias app, then start the app again");
+                    Record(AuditKind.Deny, request, caller, fetchable);
+                    return new(AgentStatus.Error, Message: fetchable);
+                }
                 if (plan.Message is not null)
                     Say($"{request.UserSecretsId}: {plan.Message}");
                 return new(AgentStatus.Ok, text);
@@ -157,8 +169,30 @@ public sealed class UserSecretsService : IDisposable
             if (plan.Action == UserSecretsAction.SealAndServe)
                 FirstSealed?.Invoke(request.UserSecretsId);
         }
+        DateTimeOffset? refreshAt;
+        try
+        {
+            refreshAt = await SecretReferences.ResolveAsync(load.Document, time.GetUtcNow(), async (key, reference) =>
+            {
+                try
+                {
+                    return references is null
+                        ? throw new InvalidOperationException("only the Tiresias app can fetch it")
+                        : await references.ResolveAsync(reference, caller, request.UserSecretsId, ct);
+                }
+                catch (InvalidOperationException e)
+                {
+                    throw new InvalidOperationException($"{key} ({reference}): {e.Message}", e);
+                }
+            });
+        }
+        catch (Exception e) when (e is InvalidOperationException or InvalidDataException)
+        {
+            Record(AuditKind.Deny, request, caller, e.Message);
+            return new(AgentStatus.Error, Message: e.Message);
+        }
         Record(AuditKind.Allow, request, caller, $"{reason}; {load.Keys.Count} key(s)");
-        return new(AgentStatus.Ok, load.Document.ToJsonString());
+        return new(AgentStatus.Ok, load.Document.ToJsonString(), RefreshAt: refreshAt?.ToUnixTimeSeconds());
     }
 
     /// <summary>Takes its turn with the consent screens; another request may have unlocked meanwhile.</summary>
