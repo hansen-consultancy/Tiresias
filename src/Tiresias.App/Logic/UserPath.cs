@@ -28,16 +28,19 @@ public static class UserPath
     /// <returns><c>null</c> when neither has it (a plain <c>dotnet run</c>).</returns>
     public static string? TirFolder(string appFolder, Func<string, bool> fileExists)
     {
-        var app = Path.TrimEndingDirectorySeparator(appFolder);
-        if (fileExists(Path.Combine(app, "tir.exe")))
+        var app = Trim(appFolder);
+        if (fileExists(app + @"\tir.exe"))
             return app;
-        var cli = Path.Combine(Path.GetDirectoryName(app) ?? app, "cli");
-        return fileExists(Path.Combine(cli, "tir.exe")) ? cli : null;
+        var parent = app.LastIndexOf('\\') is var i and > 0 ? app[..i] : app;
+        var cli = parent + @"\cli";
+        return fileExists(cli + @"\tir.exe") ? cli : null;
     }
 
     static string[] Split(string? path) =>
         (path ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-    static bool Same(string a, string b) =>
-        string.Equals(Path.TrimEndingDirectorySeparator(a), Path.TrimEndingDirectorySeparator(b), StringComparison.OrdinalIgnoreCase);
+    static bool Same(string a, string b) => string.Equals(Trim(a), Trim(b), StringComparison.OrdinalIgnoreCase);
+
+    // Windows paths spelled out rather than through Path, whose separators follow the OS the tests run on.
+    static string Trim(string folder) => folder.TrimEnd('\\', '/');
 }
