@@ -167,6 +167,8 @@ public static class SqlServerSetup
             Encrypt = SqlConnectionEncryptOption.Mandatory,
             TrustServerCertificate = trustServerCertificate,
             ConnectTimeout = 15,
+            // Shows in the server's audit (APP_NAME(), DDL trigger logs) as what made the changes.
+            ApplicationName = "Tiresias setup",
         };
         if (signIn.User is null)
             builder.IntegratedSecurity = true;

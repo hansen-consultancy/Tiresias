@@ -224,7 +224,7 @@ sealed class SqlServerGateway(ILogger<SqlServerGateway> logger) : ISqlGateway, I
         {
             try
             {
-                await using var connection = new SqlConnection(provisioner);
+                await using var connection = new SqlConnection(AsBroker(provisioner));
                 await connection.OpenAsync();
                 await using var command = new SqlCommand("tir.EndLease", connection) { CommandType = CommandType.StoredProcedure };
                 command.Parameters.Add("@LeaseId", SqlDbType.VarChar, 32).Value = leaseId;
@@ -239,6 +239,13 @@ sealed class SqlServerGateway(ILogger<SqlServerGateway> logger) : ISqlGateway, I
 
     public void Dispose() => gate.Dispose();
 
+    /// <summary>What the server's audit (APP_NAME(), DDL trigger logs, sessions) shows for the broker's own connections.</summary>
+    const string ApplicationName = "Tiresias broker";
+
+    // The sealed provisioner secret may name another application (or none); the broker's statements say who ran them.
+    static string AsBroker(string connectionString) =>
+        new SqlConnectionStringBuilder(connectionString) { ApplicationName = ApplicationName }.ConnectionString;
+
     async Task<(string ConnectionString, DateTimeOffset ExpiresAt)> TemporaryLoginAsync(SqlLeaseTarget target, CancellationToken ct)
     {
         await gate.WaitAsync(ct);
@@ -248,7 +255,7 @@ sealed class SqlServerGateway(ILogger<SqlServerGateway> logger) : ISqlGateway, I
             if (logins.TryGetValue(key, out var known))
                 return (known.Temporary, known.ExpiresAt);
 
-            await using var connection = new SqlConnection(target.ProvisionerConnectionString);
+            await using var connection = new SqlConnection(AsBroker(target.ProvisionerConnectionString));
             await connection.OpenAsync(ct);
             await using var command = new SqlCommand("tir.BeginLease", connection) { CommandType = CommandType.StoredProcedure };
             command.Parameters.Add("@LeaseId", SqlDbType.VarChar, 32).Value = target.LeaseId;
@@ -268,7 +275,7 @@ sealed class SqlServerGateway(ILogger<SqlServerGateway> logger) : ISqlGateway, I
                 Password = (string)password.Value,
                 IntegratedSecurity = false,
                 Pooling = false,
-                ApplicationName = "Tiresias",
+                ApplicationName = ApplicationName,
             }.ConnectionString;
             var expiresAt = new DateTimeOffset(expires, TimeSpan.Zero);
             logins[key] = (target.ProvisionerConnectionString, temporary, expiresAt);
