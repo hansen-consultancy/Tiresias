@@ -69,6 +69,9 @@ public static class GrantSelector
         if (!PathGuard.IsClean(request.PathAndQuery))
             return new(null, DenyReason.SuspiciousPath);
 
+        if (ceiling is not null && service.Grants.All(grant => grant.Name != ceiling))
+            return new(null, DenyReason.NotCovered);
+
         var method = request.Method.ToUpperInvariant();
         var normalized = request with { Method = method };
 

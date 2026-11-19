@@ -37,6 +37,15 @@ public class GrantSelectorTests
     }
 
     [Test]
+    public void Removing_a_named_ceiling_invalidates_the_old_approval()
+    {
+        var updated = Llm with { Grants = Llm.Grants.Where(grant => grant.Name != "read").ToArray() };
+        var decision = GrantSelector.Select(updated, new("POST", "/v1/jobs", 0), "read", None);
+        Assert.That(decision.Reason, Is.EqualTo(DenyReason.NotCovered));
+        Assert.That(decision.Allowed, Is.False);
+    }
+
+    [Test]
     public void A_read_ceiling_still_serves_reads() =>
         Assert.That(Select("GET", "/v1/models", ceiling: "read").Grant?.Name, Is.EqualTo("read"));
 
