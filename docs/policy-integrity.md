@@ -93,7 +93,9 @@ README's setup step 5 becomes `tir service add`/`edit`.
 - `ReplaceVault` checks every leased DEK against the new vault's bindings. A bound secret whose
   ciphertext is unchanged but no longer opens means an unapproved policy change: the reload is
   refused, the old vault kept, and the solo broker logs it. A re-sealed secret (approved) loses its
-  old DEK as before, until the agent seals the new one.
+  old DEK as before, and the agent seals the new one to the lease before the request goes on.
+  Rotating a value mid-lease (`tir vault add`) is such a re-seal: a new ciphertext under a fresh
+  DEK, sealed for the current policy, so it keeps working as today.
 - Placeholders and elevations retire when their service's policy changes: the reload compares each
   service's hash (`PolicyBinding.ServiceHash`) and revokes the placeholders (audited
   `PlaceholderRevoked`, reason `policy-changed`) and elevations of every service that differs or
