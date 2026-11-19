@@ -17,6 +17,9 @@ CI and people who prefer it, and it talks to the same agent.
   An option opens the Services add form, Set up a SQL Server or a RavenDB, the environment
   variables or the secrets editor, or a guide when there is no secret to keep
   ([design](what-do-you-need.md)). `tir advise "<words>"` prints the same list.
+- **Home shows what is in use**: Secrets, Services, Environment variables and Activity appear
+  once they have something in them (or a finding leads there); the rest are reached through
+  **Add...**.
 - **One per user session.** Starting it again brings the running one forward. `tir agent` refuses
   to start while the app runs.
 - **The agent runs in the app:** the user-secrets pipe server, the lease heartbeat, locking on

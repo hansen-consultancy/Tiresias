@@ -13,6 +13,10 @@ public enum FixAction
     CopyCommand,
     /// <summary>Edit... on a RavenDB service, to pick a new certificate.</summary>
     ReplaceRaven,
+    /// <summary>Remove an extension with its host's command, after the user approves.</summary>
+    RemoveExtension,
+    /// <summary>Show a file in Explorer.</summary>
+    RevealFile,
 }
 
 /// <summary>
@@ -63,6 +67,8 @@ public static class FindingView
         SetUpRaven => (FixAction.SetUpRaven, "Finding_FixRaven"),
         ReferenceConfigurationPackage => (FixAction.CopyCommand, "Finding_FixCopy"),
         ReplaceRavenCertificate => (FixAction.ReplaceRaven, "Finding_FixRavenReplace"),
+        RemoveExtension => (FixAction.RemoveExtension, "Finding_FixRemoveExtension"),
+        RevealFile => (FixAction.RevealFile, "Finding_FixReveal"),
         _ => null,
     };
 

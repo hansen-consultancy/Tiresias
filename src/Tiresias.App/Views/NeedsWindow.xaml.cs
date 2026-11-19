@@ -37,6 +37,8 @@ public partial class NeedsWindow : Window
             return;
         }
         Close();
+        if (HomeAreas.Of(step) is { } area)
+            Home.Open(area);
         switch (step)
         {
             case NeedStep.AddService:
