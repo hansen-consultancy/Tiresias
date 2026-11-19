@@ -211,6 +211,11 @@ public sealed partial class SqlServerViewModel : ObservableObject, IDisposable
 
             var progress = new Progress<string>(Steps.Add);
             var result = await Task.Run(() => SqlServerSetup.RunAsync(plan, admin, TrustServerCertificate, hello, progress, ct), ct);
+            if (!await PolicyApproval.ApplyAsync(Owner(), [result.Service], []))
+            {
+                Failure = Text.Get("Policy_Declined");
+                return;
+            }
             AppLog.Info($"sql setup: service {result.Service.Slug} saved for {result.Service.Upstream}");
             foreach (var warning in result.Warnings)
                 Warnings.Add(warning);

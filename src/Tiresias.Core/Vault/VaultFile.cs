@@ -34,7 +34,7 @@ public static class VaultFile
             throw new InvalidDataException($"Vault file '{path}' has unsupported version {dto.Version}.");
 
         return new(
-            dto.Secrets.Select(s => new SealedSecret(s.Slug, s.Version, s.WrappedDeks, s.Nonce, s.Ciphertext, s.BoundToPolicy)).ToArray(),
+            dto.Secrets.Select(s => new SealedSecret(s.Slug, s.Version, s.WrappedDeks, s.Nonce, s.Ciphertext, s.PolicyHash)).ToArray(),
             dto.Services.Select(ToService).ToArray());
     }
 
@@ -42,8 +42,8 @@ public static class VaultFile
     {
         // Version 2 only once a secret is bound, so a vault without one stays readable by older builds.
         var dto = new VaultDto(
-            vault.Secrets.Any(s => s.BoundToPolicy) ? 2 : 1,
-            vault.Secrets.Select(s => new SecretDto(s.Slug, s.Version, new Dictionary<string, byte[]>(s.WrappedDeks), s.Nonce, s.Ciphertext, s.BoundToPolicy)).ToArray(),
+            vault.Secrets.Any(s => s.PolicyHash is not null) ? 2 : 1,
+            vault.Secrets.Select(s => new SecretDto(s.Slug, s.Version, new Dictionary<string, byte[]>(s.WrappedDeks), s.Nonce, s.Ciphertext, s.PolicyHash)).ToArray(),
             vault.Services.Select(ToDto).ToArray());
 
         var full = Path.GetFullPath(path);
@@ -94,9 +94,9 @@ public static class VaultFile
 
     sealed record VaultDto(int Version, SecretDto[] Secrets, ServiceDto[] Services);
 
-    /// <param name="BoundToPolicy">Version 2 only; absent reads as <c>false</c>.</param>
+    /// <param name="PolicyHash">Version 2 only; absent means unbound.</param>
     sealed record SecretDto(string Slug, int Version, Dictionary<string, byte[]> WrappedDeks, byte[] Nonce, byte[] Ciphertext,
-        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool BoundToPolicy = false);
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] byte[]? PolicyHash = null);
 
     sealed record ServiceDto(string Slug, Uri Upstream, GrantDto[] Grants);
 

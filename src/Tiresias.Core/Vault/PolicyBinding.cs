@@ -10,13 +10,21 @@ namespace Tiresias.Vault;
 /// (ceilings are positional), rule and flags, in vault order. A bound secret's ciphertext carries the
 /// hash of this as associated data (<see cref="SecretEnvelope"/>), so it opens only under the policy
 /// it was sealed for: editing an upstream, widening a rule or pointing another grant at the secret
-/// makes it unreadable until someone who can open its DEK approves the change by re-sealing.
+/// makes it unusable until someone who can open its DEK approves the change
+/// (<see cref="SecretEnvelope.Rebind"/>).
 /// </summary>
 public static class PolicyBinding
 {
     /// <summary>SHA-256 of the canonical policy of <paramref name="secretSlug"/> in <paramref name="vault"/>.</summary>
     public static byte[] Hash(VaultDocument vault, string secretSlug) =>
         SHA256.HashData(Canonical(vault.Services, grant => grant.SecretSlug == secretSlug));
+
+    /// <summary>
+    /// Whether <paramref name="secret"/> may be used under <paramref name="vault"/>'s policy: it is
+    /// unbound, or the policy approved for it is the one in force.
+    /// </summary>
+    public static bool Allows(VaultDocument vault, SealedSecret secret) =>
+        secret.PolicyHash is not { } approved || approved.AsSpan().SequenceEqual(Hash(vault, secret.Slug));
 
     /// <summary>SHA-256 of one service's whole policy, for noticing that it changed.</summary>
     public static byte[] ServiceHash(Service service) =>

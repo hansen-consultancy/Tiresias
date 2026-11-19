@@ -1,7 +1,7 @@
 # Policy integrity
 
-Status: **phase 1 built** (binding, bound envelope, broker checks); nothing seals bound secrets
-yet (see *Phases*). Tracks issue #24. This page designs how the broker refuses a
+Status: **phases 1 and 2 built** (binding, broker checks, approval); secrets saved before them
+stay unbound until migration (see *Phases*). Tracks issue #24. This page designs how the broker refuses a
 service policy the user didn't approve: upstreams, grant rules and which secret each grant uses.
 
 ## The problem
@@ -68,19 +68,41 @@ The grant's index within its service is included because ceilings are positional
 privileged). A secret no grant uses binds to the empty list, so it can't be used until a policy is
 approved for it.
 
-A bound secret (`boundToPolicy` in vault file version 2) adds `SHA-256(binding)` to the value AAD
-next to the slug and version. A vault with no bound secret is still written as version 1.
+A bound secret stores `SHA-256(binding)` of the policy approved for it (`policyHash` in vault file
+version 2) and adds it to the value AAD next to the slug and version, so changing or clearing it on
+disk makes the value fail to open. The broker uses a bound secret only while that hash equals the
+binding of its current vault (`PolicyBinding.Allows`). Storing the hash, rather than recomputing
+it, means whoever holds the DEK can always open the value and approve the policy now on disk after
+seeing it; without it, an unapproved edit would lose the value for good. A vault with no bound
+secret is still written as version 1.
 Rebinding keeps the DEK: it re-encrypts the value and re-wraps the DEK for the new version, so the
 broker's leased DEK still opens it and no new lease seal is needed.
 
 ### Who rebinds
 
-`VaultEditor` gains one entry point, `Approve(PolicyChange, HelloKeyWrapper fresh)`, used by the
-Services window, the SQL Server and RavenDB setups, and `tir service add` (through the agent, which
-shows the dialog). It unwraps each affected secret's DEK with a **newly created** `HelloKeyWrapper`
-(one prompt), re-encrypts the value with the new binding, bumps the secret's version and saves.
-The pure part, which secrets a change touches and what the dialog lists, is a planner tested
-directly (`PolicyChangePlanner`).
+Services change only through `VaultEditor.Plan(set, remove)` and `VaultEditor.Approve(PolicyChange,
+HelloKeyWrapper fresh)`, used by the Services window (save and remove), the SQL Server and RavenDB
+setups (which seal their secrets, then hand the service back to be approved) and `tir service
+add`/`remove`. `Approve` re-plans from the file and refuses if the vault changed since the user
+looked, then unwraps each affected secret's DEK with a **newly opened** `HelloKeyWrapper` (one
+prompt), re-encrypts the value with the new binding (`SecretEnvelope.Rebind`), bumps the
+secret's version and saves.
+
+`PolicyChangePlanner`, pure and tested directly, decides what the user sees and which secrets
+are rebound: those whose binding the change alters, and those of the services saved that aren't
+approved for their policy yet. Saving a service unchanged therefore approves it as it is on disk,
+which is how a user takes back a secret after an edit they didn't make, having seen it. Unbound
+secrets the change doesn't touch stay unbound until migration. The dialog lists each service's
+upstream and numbered grants (ceilings are positional) with secret slugs, methods, patterns and
+flags; never a value.
+
+`tir service add`/`remove` print the change and ask for approval in the app's dialog when the app
+runs, in the terminal otherwise (as every `tir` consent does), then show the Hello prompt
+themselves.
+
+A new value (`VaultEditor.SealSecret`, e.g. `tir vault add`) approves no policy: it keeps the hash
+approved for the previous version, and a new secret gets the empty binding, so a service using it
+needs approval. Sealing over a bound secret whose policy changed without approval is refused.
 
 Hand-editing `services` in `vault.json` stops being a supported way to change policy: the broker
 README's setup step 5 becomes `tir service add`/`edit`.
@@ -140,7 +162,7 @@ admin's machine as today, after `tir vault migrate` there.
 
 1. **Built.** Binding, bound envelope, broker fail-closed on open and on reload, placeholders and
    elevations retired on a policy change.
-2. Approval dialog and `VaultEditor.Approve`, wired into the Services window, both setups and
-   `tir service add`.
+2. **Built.** Approval dialog and `VaultEditor.Approve`, wired into the Services window, both
+   setups and `tir service add`/`remove`; the approved hash stored with each bound secret.
 3. Migration on unlock, `tir vault migrate`, doctor line, broker README and CHANGELOG.
 4. Rollback high-water mark, persisted once the Windows service exists.

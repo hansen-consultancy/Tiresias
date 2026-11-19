@@ -84,7 +84,7 @@ public class BoundSecretEnvelopeTests
     public void TearDown() => tpmKey.Dispose();
 
     [Test]
-    public void A_bound_secret_opens_only_under_its_policy_hash()
+    public void A_bound_secret_carries_its_policy_hash_and_fails_to_open_when_it_is_changed()
     {
         var tpm = X25519KeyWrapper.ForKey("tpm", tpmKey);
         var hash = new byte[32];
@@ -92,24 +92,56 @@ public class BoundSecretEnvelopeTests
         var secret = SecretEnvelope.Seal("s", 1, "value"u8, [tpm], hash);
         var dek = SecretEnvelope.UnwrapDek(secret, tpm)!;
 
-        Assert.That(secret.BoundToPolicy, Is.True);
-        Assert.That(SecretEnvelope.Open(secret, dek, hash), Is.EqualTo("value"u8.ToArray()));
-        Assert.That(SecretEnvelope.Open(secret, dek, new byte[32]), Is.Null, "another policy");
-        Assert.That(SecretEnvelope.Open(secret, dek), Is.Null, "no policy");
-        Assert.That(SecretEnvelope.Open(secret with { BoundToPolicy = false }, dek), Is.Null, "the flag cleared on disk");
+        Assert.That(secret.PolicyHash, Is.EqualTo(hash));
+        Assert.That(SecretEnvelope.Open(secret, dek), Is.EqualTo("value"u8.ToArray()));
+        Assert.That(SecretEnvelope.Open(secret with { PolicyHash = new byte[32] }, dek), Is.Null, "another hash written on disk");
+        Assert.That(SecretEnvelope.Open(secret with { PolicyHash = null }, dek), Is.Null, "the hash cleared on disk");
     }
 
     [Test]
-    public void An_unbound_secret_ignores_the_policy_hash()
+    public void Allows_compares_the_approved_policy_with_the_one_in_force()
+    {
+        using var vault = TestVault.CreateBound();
+        using var plain = TestVault.Create();
+        var secret = vault.Document.FindSecret("llm-read")!;
+        var widened = vault.Document with { Services = [.. vault.Document.Services.Select(s => s with { Upstream = new Uri("https://attacker.example/") })] };
+
+        Assert.That(PolicyBinding.Allows(vault.Document, secret), Is.True);
+        Assert.That(PolicyBinding.Allows(widened, secret), Is.False);
+        Assert.That(PolicyBinding.Allows(widened, plain.Document.FindSecret("llm-read")!), Is.True, "an unbound secret");
+    }
+
+    [Test]
+    public void Rebind_keeps_the_value_and_the_DEK_under_the_next_version_and_new_policy()
+    {
+        var tpm = X25519KeyWrapper.ForKey("tpm", tpmKey);
+        var secret = SecretEnvelope.Seal("s", 3, "value"u8, [tpm], new byte[32]);
+        var dek = SecretEnvelope.UnwrapDek(secret, tpm)!;
+        var next = new byte[32];
+        next[31] = 7;
+
+        var rebound = SecretEnvelope.Rebind(secret, dek, next, [tpm])!;
+
+        Assert.That(rebound.Version, Is.EqualTo(4));
+        Assert.That(rebound.PolicyHash, Is.EqualTo(next));
+        Assert.That(SecretEnvelope.UnwrapDek(rebound, tpm), Is.EqualTo(dek), "the same DEK, wrapped for the new version");
+        Assert.That(SecretEnvelope.Open(rebound, dek), Is.EqualTo("value"u8.ToArray()));
+        Assert.That(SecretEnvelope.Rebind(secret, new byte[32], next, [tpm]), Is.Null, "a wrong DEK");
+    }
+
+    [Test]
+    public void Rebind_binds_an_unbound_secret()
     {
         var tpm = X25519KeyWrapper.ForKey("tpm", tpmKey);
         var secret = SecretEnvelope.Seal("s", 1, "value"u8, [tpm]);
         var dek = SecretEnvelope.UnwrapDek(secret, tpm)!;
-        Assert.That(SecretEnvelope.Open(secret, dek, new byte[32]), Is.EqualTo("value"u8.ToArray()));
+        var rebound = SecretEnvelope.Rebind(secret, dek, new byte[32], [tpm])!;
+        Assert.That(rebound.PolicyHash, Is.Not.Null);
+        Assert.That(SecretEnvelope.Open(rebound, dek), Is.EqualTo("value"u8.ToArray()));
     }
 
     [Test]
-    public void The_vault_file_keeps_the_flag_and_stays_version_1_without_it()
+    public void The_vault_file_keeps_the_policy_hash_and_stays_version_1_without_one()
     {
         using var vault = TestVault.CreateBound();
         using var plain = TestVault.Create();
@@ -121,9 +153,9 @@ public class BoundSecretEnvelopeTests
             VaultFile.Save(boundPath, vault.Document);
             VaultFile.Save(plainPath, plain.Document);
 
-            Assert.That(VaultFile.Load(boundPath).Secrets.All(s => s.BoundToPolicy), Is.True);
+            Assert.That(VaultFile.Load(boundPath).Secrets.Select(s => s.PolicyHash), Is.EqualTo(vault.Document.Secrets.Select(s => s.PolicyHash)));
             Assert.That(File.ReadAllText(boundPath), Does.Contain("\"version\": 2"));
-            Assert.That(File.ReadAllText(plainPath), Does.Contain("\"version\": 1").And.Not.Contain("boundToPolicy"));
+            Assert.That(File.ReadAllText(plainPath), Does.Contain("\"version\": 1").And.Not.Contain("policyHash"));
         }
         finally
         {
@@ -237,7 +269,7 @@ public class BrokerPolicyTests
         var approved = changed with { Secrets = [.. changed.Secrets.Select(old =>
         {
             var dek = SecretEnvelope.UnwrapDek(old, vault.Tpm)!;
-            var value = SecretEnvelope.Open(old, dek, PolicyBinding.Hash(vault.Document, old.Slug))!;
+            var value = SecretEnvelope.Open(old, dek)!;
             return SecretEnvelope.Seal(old.Slug, 2, value, [vault.Tpm], PolicyBinding.Hash(changed, old.Slug));
         })] };
 
@@ -245,6 +277,24 @@ public class BrokerPolicyTests
 
         Assert.That(reload.Unapproved, Is.Empty, "re-sealed secrets are not an unapproved change");
         Assert.That(reload.Unleased, Is.EquivalentTo(new[] { "llm-read", "llm-write", "llm-admin" }), "their new DEKs must be sealed to the lease");
+    }
+
+    [Test]
+    public void An_approved_rebind_keeps_the_leased_DEK_serving()
+    {
+        OpenLease();
+        var changed = Tampered(s => s with { Upstream = new Uri("https://llm2.example/") });
+        var approved = changed with { Secrets = [.. changed.Secrets.Select(old =>
+            SecretEnvelope.Rebind(old, SecretEnvelope.UnwrapDek(old, vault.Tpm)!, PolicyBinding.Hash(changed, old.Slug), [vault.Tpm])!)] };
+
+        var reload = state.ReplaceVault(approved);
+
+        Assert.That(reload.Unapproved, Is.Empty);
+        Assert.That(reload.Unleased, Is.Empty, "the lease's DEKs still open the rebound secrets");
+        var (allowed, refusal) = state.Authorize($"Bearer {Mint()}", "llm", new("GET", "/v1/models", 0));
+        Assert.That(refusal, Is.Null);
+        using (allowed)
+            Assert.That(allowed!.Service.Upstream, Is.EqualTo(new Uri("https://llm2.example/")));
     }
 
     [Test]

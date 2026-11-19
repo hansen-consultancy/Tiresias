@@ -76,8 +76,9 @@ own account is planned (see [docs/desktop-app.md](docs/desktop-app.md#solo-mode)
 
 Services are added with one command, for example
 `tir service add httpbin --upstream https://httpbin.org --allow '^/headers$'`, which asks for the
-secret's value when the vault doesn't have it yet. `tir service list` and `tir service remove`
-do the rest. The solo broker picks vault changes up at its next request, without a lock and
+secret's value when the vault doesn't have it yet, then shows the change and asks you to approve
+it with Windows Hello: the secret is then bound to that service's settings, and the broker refuses
+it if anything else edits them. `tir service list` and `tir service remove` do the rest. The solo broker picks vault changes up at its next request, without a lock and
 unlock.
 
 ## Trust model in one paragraph

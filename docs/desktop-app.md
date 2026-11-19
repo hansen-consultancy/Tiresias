@@ -99,7 +99,7 @@ hosts:
 | Placeholder consent (`tir grant`, `tir exec`) | terminal y/N | dialog; the CLI asks the agent |
 | Unlock / lock | `tir unlock`, `tir lock` | tray menu, plus the Hello prompt |
 | Secrets editing | `tir vault add` | capture-excluded editor: the full JSON view, like App Service |
-| Services for `tir exec` | `tir service add`, `list`, `remove` | Services window: list, add (same checks as the CLI), remove |
+| Services for `tir exec` | `tir service add`, `list`, `remove` | Services window: list, add (same checks as the CLI), remove; each change shown and approved with Windows Hello |
 | SQL Server per-lease logins | (none yet) | Services window, **Set up a SQL Server**: runs the setup script with a one-off administrator sign-in, seals the provisioner, saves the service |
 | Activity | not built | window with filters (tenant, service, process, decision) |
 | Health | `tir doctor` | status page, same checks, a "fix" button where it's safe |

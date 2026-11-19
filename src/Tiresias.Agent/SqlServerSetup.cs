@@ -48,7 +48,8 @@ public static class SqlServerSetup
 
     /// <summary>Runs the setup and saves the service. Call <see cref="InspectAsync"/> first and ask about what it found.</summary>
     /// <param name="hello">The agent's open Windows Hello wrapper: the vault is sealed to it.</param>
-    /// <exception cref="InvalidOperationException">A step failed; the message names it. Nothing is saved to the vault unless every required step worked.</exception>
+    /// <returns>The service to save, which the caller has the user approve (<see cref="VaultEditor.Approve"/>); its secrets are sealed already.</returns>
+    /// <exception cref="InvalidOperationException">A step failed; the message names it. Nothing is sealed unless every required step worked.</exception>
     public static async Task<SqlServerSetupResult> RunAsync(SqlServerSetupPlan plan, SqlAdminSignIn admin, bool trustServerCertificate,
         HelloKeyWrapper hello, IProgress<string> progress, CancellationToken ct)
     {
@@ -136,7 +137,6 @@ public static class SqlServerSetup
         progress.Report("Sealing the connection in the vault");
         Seal(plan.SigningSecret, signing, hello);
         Seal(plan.ProvisionerSecret, provisioner, hello);
-        VaultEditor.SetService(service);
         return new(service, warnings);
     }
 
@@ -271,7 +271,7 @@ public static class SqlServerSetup
             return null;
         try
         {
-            return SecretEnvelope.Open(secret, dek, PolicyBinding.Hash(vault, slug)) is { } value ? Encoding.UTF8.GetString(value) : null;
+            return PolicyBinding.Allows(vault, secret) && SecretEnvelope.Open(secret, dek) is { } value ? Encoding.UTF8.GetString(value) : null;
         }
         finally
         {

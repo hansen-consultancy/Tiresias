@@ -40,6 +40,8 @@ public partial class RavenServerWindow : Window
 
 public sealed partial class RavenServerViewModel : ObservableObject, IDisposable
 {
+    static Window? Owner() => Application.Current.Windows.OfType<RavenServerWindow>().FirstOrDefault();
+
     CancellationTokenSource? running;
     bool attempted;
     byte[]? pfx;
@@ -253,6 +255,11 @@ public sealed partial class RavenServerViewModel : ObservableObject, IDisposable
         {
             var progress = new Progress<string>(Steps.Add);
             var service = await Task.Run(() => RavenSetup.RunAsync(plan, file, password, hello, progress, ct), ct);
+            if (!await PolicyApproval.ApplyAsync(Owner(), [service], []))
+            {
+                Failure = Text.Get("Policy_Declined");
+                return;
+            }
             AppLog.Info($"raven setup: service {service.Slug} saved for {service.Upstream}");
             DoneHeading = Text.Format(keep ? "Raven_DoneEditHeading" : plan.Replaces ? "Sql_DoneAgainHeading" : "Sql_DoneHeading", service.Slug);
             Snippet = ServiceUsages.For(service, plan.Database).Snippet;
