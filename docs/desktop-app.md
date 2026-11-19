@@ -11,7 +11,15 @@ CI and people who prefer it, and it talks to the same agent.
 
 - **Tray icon** following the taskbar theme (light/dark icon). Its menu shows the state (not set
   up, locked, unlocked until 18:00, built-in broker not running), **Solo** when the broker runs in
-  the app, Unlock (Windows Hello) / Lock, Edit user secrets, Activity, Status and Quit.
+  the app, Unlock (Windows Hello) / Lock, Status, Add... (*What do you need?*), Activity and Quit.
+- **What do you need?** (**Add...** in the tray and the Services window): the needs, each with its
+  ways to meet it strongest first and what each gives up, and a search box matched on this PC.
+  An option opens the Services add form, Set up a SQL Server or a RavenDB, the environment
+  variables or the secrets editor, or a guide when there is no secret to keep
+  ([design](what-do-you-need.md)). `tir advise "<words>"` prints the same list.
+- **Home shows what is in use**: Secrets, Services, Environment variables and Activity appear
+  once they have something in them (or a finding leads there); the rest are reached through
+  **Add...**.
 - **One per user session.** Starting it again brings the running one forward. `tir agent` refuses
   to start while the app runs.
 - **The agent runs in the app:** the user-secrets pipe server, the lease heartbeat, locking on
@@ -100,7 +108,7 @@ hosts:
 | Unlock / lock | `tir unlock`, `tir lock` | tray menu, plus the Hello prompt |
 | Secrets editing | `tir vault add` | capture-excluded editor: the full JSON view, like App Service |
 | Services for `tir exec` | `tir service add`, `list`, `remove` | Services window: list, add (same checks as the CLI), remove; each change shown and approved with Windows Hello |
-| SQL Server per-lease logins | (none yet) | Services window, **Set up a SQL Server**: runs the setup script with a one-off administrator sign-in, seals the provisioner, saves the service |
+| SQL Server per-lease logins | (none yet) | **Add...**, *An app needs a database*, **Set up a SQL Server**: runs the setup script with a one-off administrator sign-in, seals the provisioner, saves the service |
 | Activity | not built | window with filters (tenant, service, process, decision) |
 | Health | `tir doctor` | status page, same checks, a "fix" button where it's safe |
 | Enrolment | `tir enroll` + flags | first-run wizard |

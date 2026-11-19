@@ -43,8 +43,11 @@ public static class KeyringStore
     static string BrokerPath => Path.Combine(Directory, "broker.json");
     static string TenantsPath => Path.Combine(Directory, "tenants.json");
     static string SettingsPath => Path.Combine(Directory, "keyring.json");
-    static string LeasePath => Path.Combine(Directory, selected is null or DefaultTenant ? "lease.json" : $"lease-{selected}.json");
-    static string ChainHeadPath => Path.Combine(Directory, selected is null or DefaultTenant ? "chain-head.json" : $"chain-head-{selected}.json");
+    static string LeasePath => TenantFile("lease");
+    static string ChainHeadPath => TenantFile("chain-head");
+
+    /// <summary>The selected tenant's <c>{stem}.json</c> beside the vault: <c>{stem}-{tenant}.json</c> for any but the default tenant.</summary>
+    internal static string TenantFile(string stem) => Path.Combine(Directory, selected is null or DefaultTenant ? $"{stem}.json" : $"{stem}-{selected}.json");
     static string DeviceKeyPath => Path.Combine(Directory, "device.key");
 
     public static string DefaultVaultPath => Path.Combine(Directory, "vault.json");

@@ -34,6 +34,14 @@ const string Usage = """
     tir elevate <service> <grant> [--for 15m]
     tir exec <service>[,<service>...] --purpose <text> [--for 1h] [--ceiling <grant>] -- <command> [args...]
     tir doctor [--projects <dir>]
+        Checks this device and how its credentials are delivered. --projects also looks under <dir>
+        for projects without the protected provider, passwords in appsettings*.json connection
+        strings, and private keys in files. A finding shows where it sits on the two axes (E5/C3:
+        readable, used silently) and where its fix takes it.
+    tir advise ["<what you need>"]
+        The ways to meet a need, strongest first on both axes, and what each gives up: "OpenAI key
+        for a script", "my EF Core app talks to Azure SQL". With no words, every need. The words are
+        matched on this machine; nothing is sent anywhere.
 
     tir secrets list [--project <path> | --id <UserSecretsId>]
     tir secrets set <key> [--from-stdin] [--project <path> | --id <UserSecretsId>]
@@ -92,6 +100,7 @@ try
         ("elevate", _) => await Commands.ElevateAsync(line),
         ("exec", _) => await Exec.RunAsync(line),
         ("doctor", _) => await Commands.DoctorAsync(line),
+        ("advise", _) => Commands.Advise(line),
         ("secrets", _) => SecretsCommand.Run(line),
         ("env", "shell") => await EnvCommand.ShellAsync(line),
         ("env", _) => EnvCommand.Run(line),

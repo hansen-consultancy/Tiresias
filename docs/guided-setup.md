@@ -1,6 +1,6 @@
 # Guided setup: the strongest option first
 
-Status: **design, not built** (#32). This page designs how Tiresias steers people toward the safest way to
+Status: **phases 1 to 4 built** (#32): the axes and findings in `tir doctor`, findings in the app, *What do you need?*, and Home showing what is in use; **phase 5's first slice built**; the rest is design. This page designs how Tiresias steers people toward the safest way to
 hold each credential, finds the weaker setups already on the machine, and keeps a growing feature
 set reachable without a row of buttons per feature.
 
@@ -87,7 +87,9 @@ a placeholder and E4 for a program that gets the value. The finding is about the
 
 ## Findings
 
-A **finding** is a delivery weaker, on either axis, than it could be, with the fix that raises it. Findings come from **checks**: small, read-only probes over files and services the user
+A **finding** is something the user can act on: any check with a fix, and any delivery weaker, on
+either axis, than it could be (a delivery finding says where it sits and where its fix takes it,
+even when the app has no fix for it yet, like a certificate file that isn't RavenDB's). Findings come from **checks**: small, read-only probes over files and services the user
 already pointed Tiresias at (user-secrets folders, project folders, sealed services), never a
 crawl of the whole disk.
 
@@ -99,9 +101,9 @@ First checks, by what they find and what they offer:
 | Secret-looking environment variables | Unsealed user variables (already in `tir doctor`) | Seal them; for an API key, placeholder delivery (→ E3/C1) |
 | Connection string with a password | `Password=`/`Pwd=` in `appsettings*.json`, user secrets or a sealed value; the key name and the server, not the password | *An app needs a database*: a `tiresias:sql/…` reference (→ E2/C1), or Windows / Entra sign-in where the server takes it (→ E1) |
 | RavenDB certificate on disk | A `.pfx`/`.pem` in a project folder, or a `Certificate` path in RavenDB configuration | *Set up a RavenDB* with that file (→ E3/C1), then offer to delete it |
-| Broad RavenDB clearance | A RavenDB service whose certificate is Cluster Admin or Operator, or has access to databases the app doesn't use (asked through the broker; the endpoint is to be confirmed) | Issue a certificate scoped to the databases the app uses, and swap it in with **Edit...** |
-| Certificate expiry | A sealed certificate expiring within 30 days | Renew it before programs start failing |
-| Sealed key handed out as a value | An API key whose service accepts `Authorization: Bearer`, delivered as its value | Placeholder delivery (E4 → E3) |
+| Broad RavenDB clearance | A RavenDB service whose certificate is Cluster Admin or Operator, or has access to databases the app doesn't use (asked through the broker; not built: RavenDB's `/certificates/whoami` isn't confirmed against a real server yet) | Issue a certificate scoped to the databases the app uses, and swap it in with **Edit...** |
+| Certificate expiry | Built: a RavenDB service's certificate expiring within 30 days, or expired, from the subject, thumbprint and expiry recorded at setup (`raven-certificates.json`, beside the vault) | **Edit...** on the service with a new `.pfx` |
+| Sealed key handed out as a value | Built: a global sealed variable delivered as its value whose name has a base-URL partner (`*_API_KEY`, `*_KEY`, `*_TOKEN`), for a vault https service or a known Bearer API (OpenAI and compatible); not Anthropic, Azure or GitHub keys. Needs Tiresias unlocked, so `tir doctor` skips it | Placeholder delivery (E4 → E3): Environment variables with the key checked, or `tir env placeholder add` |
 | Publishing key | A NuGet or npm API key, sealed or plaintext | Trusted publishing in CI (→ E1); keep a short-lived key for local pushes only |
 | Git token in a remote URL | `https://user:token@…` in a project's `.git/config` | Out of the URL first (E5 → E4), then through the broker (→ C1) |
 | A CLI acting as the user, unseen | `gh` signed in with a stored token, the Azure CLI with a cached Entra session (asked through each tool's own status command, never the token) | Run it through `tir exec` with a token minted per run after consent (C3 → C1); keep the tool's own sign-in only for interactive use, or sign it out |
@@ -109,6 +111,12 @@ First checks, by what they find and what they offer:
 A finding can be **dismissed** with a reason ("this server only takes SQL logins", "not mine").
 The dismissal is kept per finding, so the same thing isn't raised again; one that comes back
 changed (a new key, another server) is a new finding.
+
+A check that can raise the same finding many times names its **kind** ("projects that set
+`<UserSecretsId>` but don't reference the package"). The findings of one kind show as one line with
+their count, ahead of single findings only when they fail; the line opens to its members, each with
+its own fix, and **Dismiss all** sets them aside with one reason. A drive of repositories raises
+hundreds of findings, mostly copies in worktrees; one line per kind keeps them readable.
 
 ## "What do you need?"
 
@@ -170,14 +178,33 @@ Existing windows remain the places where the work happens; this changes how peop
 
 ## Phases
 
-1. **The axes and findings in `tir doctor`**: the planner in Core, the existing checks rewritten as
+1. **Built. The axes and findings in `tir doctor`**: the planner in Core, the existing checks rewritten as
    findings with positions and fixes, plus the connection-string and certificate-on-disk checks.
-2. **Findings in the app**: a findings section on Home, one-click fixes opening today's windows filled
-   in, dismissals.
-3. **What do you need?**: the catalogue, the ranked options, the free-text match; Add, Set up a SQL
-   Server and Set up a RavenDB move behind it.
-4. **Show what is in use**: the home screen keeps only the areas that apply; the rest live in the catalogue.
-5. **Attack surface**: installed software and extensions as findings, ranked by what uses
-   credentials ([attack surface](attack-surface.md)).
-6. **More checks**: RavenDB clearance and expiry, sealed keys handed out as values, publishing keys,
-   git tokens, each landing with its own fix ([more checks](more-checks.md)).
+2. **Built. Findings in the app**: a findings section on Home, one-click fixes opening today's windows filled
+   in, dismissals. The app checks the project folders the secrets editor scans. A dismissal is keyed
+   by the line, its fix's inputs and its position, hashed (`Dismissals.KeyOf`), so a changed finding
+   comes back; `dismissals.json` beside the keyring is shared with `tir doctor`.
+3. **Built. What do you need?**: the catalogue, the ranked options, the free-text match; Add, Set up a SQL
+   Server and Set up a RavenDB move behind it ([design](what-do-you-need.md)). `tir advise` prints the same list.
+4. **Built. Show what is in use**: the home screen keeps only the areas that apply; the rest live in the catalogue
+   ([design](what-do-you-need.md#phase-4-what-is-in-use)).
+5. **Built, first slice. Attack surface**: installed software and extensions as findings, ranked
+   by what uses credentials ([attack surface](attack-surface.md)). Offline only: it reads the
+   extension metadata of VS Code, VS Code Insiders, Cursor and Windsurf, the user and machine Run
+   keys and the Startup folder (with an offline Authenticode check of each program; Windows' and
+   Store apps' own files count as unchecked), the blocklist, and which program got which credential
+   in the last 90 days from the activity and audit logs. It raises three kinds of findings, none
+   with a position: an extension with an unknown publisher or unchanged for two years inside a
+   program that used a credential (**Remove...** runs the host's `--uninstall-extension` after
+   approval), an unsigned program that starts at log-on, and a blocked program still on the PC
+   (both **Show file**). A finding's reasons are in its name, so a dismissal survives a version
+   update and a new reason brings it back. Still design: the opt-in trust lookups (OSV,
+   deps.dev, marketplaces, winget-pkgs) and the vulnerability and unverified-publisher findings
+   they raise; **Update** and `winget`/`dotnet tool`/`npm` uninstalls; "not used in 90 days" with
+   UserAssist, and **DisableStartup**; global tools and other hosts' extensions; scope on a managed
+   PC; the **Installed** list and the "*n* programs unused" line; trusting a publisher; separate
+   *How credentials are held* and *What can reach them* groups; `tir doctor --surface` and a daily
+   inventory instead of one per run.
+6. **Built, except RavenDB clearance. More checks**: RavenDB certificate expiry, sealed keys handed
+   out as values, publishing keys, git tokens, each landing with its own fix ([more checks](more-checks.md)). RavenDB
+   clearance waits for `/certificates/whoami` to be confirmed against a real server.

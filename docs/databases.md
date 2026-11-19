@@ -116,6 +116,12 @@ methods list `WEBSOCKET`, next to `GET`, `POST` and the rest:
   grant for it.
 - **Off by default.** *Set up a RavenDB* in the app leaves it out; **Allow the Changes API**
   adds it, and **Edit...** turns it on or off later without the certificate file.
+- **Expiry.** Setting up or editing a RavenDB records the certificate's subject, thumbprint and
+  expiry in `raven-certificates.json` (`raven-certificates-<tenant>.json` for another tenant)
+  beside the vault, outside it: none of it is secret and a changed date only shows or hides a
+  warning. `tir doctor` and the status page warn 30 days
+  before expiry and fail once expired, with **Replace certificate...** opening **Edit...**. A
+  service set up before this shows "expiry unknown" until edited and saved once.
 - **Audit.** Each tunnel is logged when it opens and when it closes, with the bytes moved each
   way (`closed: 250 bytes up, 124 bytes down`). Ending the lease closes it.
 - **Opaque after the handshake.** Once open, the method and path rules no longer apply: what the
@@ -144,6 +150,6 @@ methods list `WEBSOCKET`, next to `GET`, `POST` and the rest:
 2. **RavenDB placeholder path and Changes** (built): path-carried placeholder, WebSocket relay
    behind the `WEBSOCKET` method.
 3. **RavenDB TCP relay**, after the spike (not started). Guide: *RavenDB through the broker*.
-4. **Agent side** (app built): *Set up a SQL Server* and *Set up a RavenDB* in the desktop app's
-   Services window, with **Edit...** and **How to use...**. Still to do: the same in `tir`, and
+4. **Agent side** (app built): *Set up a SQL Server* and *Set up a RavenDB* in the desktop app
+   (**Add...**, *An app needs a database*), and in the Services window with **Edit...** and **How to use...**. Still to do: the same in `tir`, and
    schema discovery on `/sql`.

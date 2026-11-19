@@ -1,3 +1,4 @@
+using System.IO.Enumeration;
 using System.Net.Sockets;
 using Tiresias.Client;
 using Tiresias.Protocol;
@@ -7,8 +8,25 @@ using Microsoft.Extensions.Configuration.UserSecrets;
 namespace Tiresias.Agent;
 
 /// <summary>The facts <see cref="Doctor"/> judges, read from this machine for the selected tenant. <c>tir doctor</c> and the app's status page both use it.</summary>
-public sealed class MachineProbe(string? projectsRoot = null) : IDoctorProbe
+/// <param name="projectRoots">Folders whose projects are checked too: <c>tir doctor --projects</c>, or the folders the secrets editor scans.</param>
+public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDoctorProbe
 {
+    public MachineProbe(string? projectsRoot)
+        : this(projectsRoot is null ? null : [projectsRoot])
+    {
+    }
+
+    /// <summary>The roots as full paths, without those gone or inside another, so no file is reported twice.</summary>
+    readonly string[] roots = Roots(projectRoots ?? []);
+
+    static string[] Roots(IEnumerable<string> folders)
+    {
+        var full = folders.Select(f => Path.TrimEndingDirectorySeparator(Path.GetFullPath(f))).Where(Directory.Exists)
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        return [.. full.Where(f => !full.Any(o => !string.Equals(o, f, StringComparison.OrdinalIgnoreCase)
+            && f.StartsWith(o + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)))];
+    }
+
     public bool Enrolled => KeyringStore.Broker is not null;
     public bool Solo => KeyringStore.Tenant is { Solo: true };
     public bool HasDeviceKey => KeyringStore.HasDeviceKey;
@@ -71,13 +89,105 @@ public sealed class MachineProbe(string? projectsRoot = null) : IDoctorProbe
     public IReadOnlyList<string> ExposedVariables =>
         [.. EnvironmentStore.UserVariables().Where(v => v.LooksSecret).Select(v => v.Name)];
 
-    public IEnumerable<DoctorFile> Projects()
+    public IEnumerable<DoctorFile> Projects() => Found.Projects.Select(Read);
+
+    public IEnumerable<DoctorFile> ConfigFiles() => Found.Configs.Select(Read);
+
+    public IEnumerable<string> KeyFiles() => Found.Keys.Concat(Found.Pems.Where(HoldsPemPrivateKey));
+
+    public IEnumerable<DoctorRavenCertificate> RavenCertificates() => RavenCertificateStore.ForVault();
+
+    /// <summary>The unlocked key, for the checks that need the sealed environment's names; <c>null</c> skips them. Never prompts.</summary>
+    public IKeyWrapper? Hello { get; init; }
+
+    /// <summary>Opening the environment decrypts its values too; only names leave this property.</summary>
+    public DoctorEnvironment? SealedEnvironment
     {
-        if (projectsRoot is null)
-            return [];
-        return Directory.EnumerateFiles(projectsRoot, "*.csproj", SearchOption.AllDirectories)
-            .Where(p => !p.Split(Path.DirectorySeparatorChar).Any(d => d is "bin" or "obj" or "node_modules"))
-            .Select(Read);
+        get
+        {
+            if (Hello is null)
+                return null;
+            var environment = EnvironmentStore.Open(Hello).Environment;
+            var services = VaultEditor.Load().Services.Where(PlaceholderMinter.CanStandIn).Select(s => new DoctorService(s.Slug, s.Upstream.Host)).ToArray();
+            return new([.. environment.Global.Select(v => v.Name).Where(n => environment.PlaceholderFor(n) is null)], services);
+        }
+    }
+
+    public IEnumerable<InstalledExtension> Extensions() => SurfaceProbe.Extensions();
+
+    public IEnumerable<StartupEntry> StartupEntries() => SurfaceProbe.StartupEntries();
+
+    public IEnumerable<CredentialUse> CredentialUses() => SurfaceProbe.CredentialUses();
+
+    public IEnumerable<string> BlockedPrograms() => SurfaceProbe.BlockedPrograms();
+
+    /// <summary>How long the walk of the project roots took and what it covered; <c>null</c> until a check needed it.</summary>
+    public ScanStats? Scan => found?.Stats;
+
+    public sealed record ScanStats(TimeSpan Elapsed, int Folders, int Files);
+
+    sealed record FoundFiles(List<string> Projects, List<string> Configs, List<string> Keys, List<string> Pems, ScanStats Stats);
+
+    FoundFiles? found;
+    FoundFiles Found => found ??= Walk();
+
+    static readonly string[] Patterns = ["*.csproj", "appsettings*.json", "*.pfx", "*.p12", "*.pem", "*.key"];
+
+    /// <summary>
+    /// One walk of the project roots for every file a check reads. Build output, packages and git
+    /// internals are never entered: they only copy what is found elsewhere, and on a drive full of
+    /// repositories they are half the folders.
+    /// </summary>
+    FoundFiles Walk()
+    {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        List<string> projects = [], configs = [], keys = [], pems = [];
+        var folders = roots.Length;
+        var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true };
+        foreach (var root in roots)
+        {
+            var files = new FileSystemEnumerable<string>(root, (ref FileSystemEntry entry) => entry.ToFullPath(), options)
+            {
+                ShouldRecursePredicate = (ref FileSystemEntry entry) =>
+                {
+                    if (entry.FileName is "bin" or "obj" or "node_modules" or ".git")
+                        return false;
+                    folders++;
+                    return true;
+                },
+                ShouldIncludePredicate = (ref FileSystemEntry entry) => !entry.IsDirectory && Wanted(entry.FileName.ToString()),
+            };
+            foreach (var path in files)
+            {
+                var name = Path.GetFileName(path);
+                if (Matches("*.csproj", name))
+                    projects.Add(path);
+                else if (Matches("appsettings*.json", name))
+                    configs.Add(path);
+                else if (Matches("*.pfx", name) || Matches("*.p12", name))
+                    keys.Add(path);
+                else
+                    pems.Add(path);
+            }
+        }
+        return new(projects, configs, keys, pems, new(clock.Elapsed, folders, projects.Count + configs.Count + keys.Count + pems.Count));
+    }
+
+    static bool Wanted(string name) => Patterns.Any(p => Matches(p, name));
+
+    static bool Matches(string pattern, string name) => FileSystemName.MatchesSimpleExpression(pattern, name, ignoreCase: true);
+
+    /// <summary>Whether a PEM file holds a private key: only its header lines are looked at, and nothing is kept.</summary>
+    static bool HoldsPemPrivateKey(string path)
+    {
+        try
+        {
+            return File.ReadLines(path).Take(200).Any(line => line.StartsWith("-----BEGIN", StringComparison.Ordinal) && line.Contains("PRIVATE KEY", StringComparison.Ordinal));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 
     static DoctorFile Read(string path)

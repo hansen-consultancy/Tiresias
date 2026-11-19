@@ -31,6 +31,14 @@ public partial class SqlServerWindow : Window
         Closed += (_, _) => model.Dispose();
     }
 
+    /// <summary>Filled in from a finding: the server and database a connection string named.</summary>
+    public SqlServerWindow(string server, string? database)
+        : this()
+    {
+        model.Server = server;
+        model.Database = database ?? "";
+    }
+
     void OnClose(object sender, RoutedEventArgs e) => Close();
 }
 
