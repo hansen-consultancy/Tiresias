@@ -16,6 +16,10 @@ public.
 - [ ] Seal user environment variables and hand them back per shell session ([design](environment-variables.md))
 - [x] Databases for applications: SQL Server logins per lease, RavenDB through the broker ([design](databases.md))
 - [ ] RavenDB subscriptions through the broker (the TCP relay, [phase 3](databases.md#phases))
+- [ ] Guided setup: the strongest option first, findings with one-click fixes, and a "What do you
+      need?" flow ([design](guided-setup.md), #32)
+- [ ] Attack surface: installed software, extensions and global tools, ranked by what uses
+      credentials ([design](attack-surface.md), #34)
 - [x] Velopack installer and auto-update from GitHub Releases (`app-release.yml`)
 - [ ] Signed with Azure Artifact Signing (the workflow is ready; it needs the Azure setup in
       [releasing.md](releasing.md))
