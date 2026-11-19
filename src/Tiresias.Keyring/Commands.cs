@@ -272,6 +272,33 @@ static class Commands
         return checks.Any(c => c.Status == Tiresias.Client.DoctorStatus.Fail) ? 1 : 0;
     }
 
+    /// <summary><c>tir advise "&lt;words&gt;"</c>: the needs the words match, each with its options strongest first, as the app's <i>What do you need?</i> lists them.</summary>
+    public static int Advise(CommandLine args)
+    {
+        var facts = new Tiresias.Client.NeedFacts(HasBroker: KeyringStore.Broker is not null);
+        var first = true;
+        foreach (var match in Tiresias.Client.NeedMatcher.Match(string.Join(' ', args.Positional.Skip(1))))
+        {
+            if (!first)
+                Console.WriteLine();
+            first = false;
+            Console.WriteLine(match.Need.Title);
+            foreach (var (option, recommended, unavailable) in Tiresias.Client.NeedCatalog.Rank(match.Need, facts))
+            {
+                var mark = recommended ? "*" : unavailable is not null ? "-" : " ";
+                var named = option.Id == match.Preselect ? "  (the service you named)" : "";
+                Console.WriteLine($"  {mark} {option.Position}  {option.Title}{(recommended ? "  (recommended)" : "")}{named}");
+                Console.WriteLine($"           {option.Summary}");
+                if (option.GivesUp is { } givesUp)
+                    Console.WriteLine($"           gives up: {givesUp}");
+                if (unavailable is not null)
+                    Console.WriteLine($"           not here: {unavailable}");
+                Console.WriteLine($"           do: {option.Action.Instruction}");
+            }
+        }
+        return 0;
+    }
+
     public static async Task<int> GrantAsync(CommandLine args)
     {
         var settings = KeyringStore.Settings;
