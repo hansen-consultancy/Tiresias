@@ -71,13 +71,30 @@ public sealed class MachineProbe(string? projectsRoot = null) : IDoctorProbe
     public IReadOnlyList<string> ExposedVariables =>
         [.. EnvironmentStore.UserVariables().Where(v => v.LooksSecret).Select(v => v.Name)];
 
-    public IEnumerable<DoctorFile> Projects()
+    public IEnumerable<DoctorFile> Projects() => Under("*.csproj").Select(Read);
+
+    public IEnumerable<DoctorFile> ConfigFiles() => Under("appsettings*.json").Select(Read);
+
+    public IEnumerable<string> KeyFiles() =>
+        Under("*.pfx").Concat(Under("*.p12")).Concat(Under("*.pem").Concat(Under("*.key")).Where(HoldsPemPrivateKey));
+
+    /// <summary>Files under the projects root, skipping build output and packages, which only copy what is already found.</summary>
+    IEnumerable<string> Under(string pattern) => projectsRoot is null
+        ? []
+        : Directory.EnumerateFiles(Path.GetFullPath(projectsRoot), pattern, new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true })
+            .Where(p => !p.Split(Path.DirectorySeparatorChar).Any(d => d is "bin" or "obj" or "node_modules" or ".git"));
+
+    /// <summary>Whether a PEM file holds a private key: only its header lines are looked at, and nothing is kept.</summary>
+    static bool HoldsPemPrivateKey(string path)
     {
-        if (projectsRoot is null)
-            return [];
-        return Directory.EnumerateFiles(projectsRoot, "*.csproj", SearchOption.AllDirectories)
-            .Where(p => !p.Split(Path.DirectorySeparatorChar).Any(d => d is "bin" or "obj" or "node_modules"))
-            .Select(Read);
+        try
+        {
+            return File.ReadLines(path).Take(200).Any(line => line.StartsWith("-----BEGIN", StringComparison.Ordinal) && line.Contains("PRIVATE KEY", StringComparison.Ordinal));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 
     static DoctorFile Read(string path)

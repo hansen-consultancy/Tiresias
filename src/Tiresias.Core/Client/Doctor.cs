@@ -13,8 +13,17 @@ public enum DoctorStatus
     Fail,
 }
 
-/// <param name="UserSecretsId">Set on a user-secrets line, so a UI can open that project to fix it.</param>
-public sealed record DoctorCheck(string Name, DoctorStatus Status, string Detail, string? UserSecretsId = null);
+/// <summary>
+/// One line of <c>tir doctor</c>. A line about how a credential is delivered is a <b>finding</b>:
+/// it says where that delivery sits on the two axes now, where its fix takes it, and the fix.
+/// </summary>
+/// <param name="Fix">What raises it, for a UI to open filled in or the CLI to print.</param>
+/// <param name="Now">The delivery's position today; <c>null</c> on a line about Tiresias's own health.</param>
+/// <param name="Better">The position <paramref name="Fix"/> reaches.</param>
+public sealed record DoctorCheck(string Name, DoctorStatus Status, string Detail, DoctorFix? Fix = null, Position? Now = null, Position? Better = null)
+{
+    public bool IsFinding => Now is not null;
+}
 
 /// <summary>What the vault file says about recoverability: which secrets lack a Hello or a recovery wrap.</summary>
 /// <param name="Unbound">Secrets not yet bound to their policy, which the broker refuses until migrated.</param>
@@ -53,6 +62,12 @@ public interface IDoctorProbe
 
     /// <summary>Names of user environment variables that look like secrets and aren't sealed. Never values.</summary>
     IReadOnlyList<string> ExposedVariables => [];
+
+    /// <summary><c>appsettings*.json</c> files to check for passwords and certificate paths; empty unless asked for.</summary>
+    IEnumerable<DoctorFile> ConfigFiles() => [];
+
+    /// <summary>Paths of files holding a private key (<c>.pfx</c>, <c>.p12</c>, or a PEM with one); empty unless asked for. Never their contents.</summary>
+    IEnumerable<string> KeyFiles() => [];
 }
 
 /// <summary>
@@ -95,12 +110,14 @@ public static partial class Doctor
         {
             [] => new(VariablesCheck, DoctorStatus.Ok, "none of your user environment variables look like secrets"),
             var names => new(VariablesCheck, DoctorStatus.Warn,
-                $"{names.Count} look like secrets and every program you run can read them: {string.Join(", ", names)}. Seal them in the app's Environment variables window, or with tir env protect"),
+                $"{names.Count} look like secrets and every program you run can read them: {string.Join(", ", names)}. Seal them in the app's Environment variables window, or with tir env protect",
+                new ProtectVariables(names), Position.Plaintext, Position.SealedApproved),
         });
+        checks.AddRange(ConfigChecks(probe.UserSecretsFiles(), probe.ConfigFiles(), probe.KeyFiles()));
         return checks;
     }
 
-    /// <summary>The name of the environment variables check, which a UI offers to fix.</summary>
+    /// <summary>The name of the environment variables check.</summary>
     public const string VariablesCheck = "environment variables";
 
     /// <summary>What solo mode gives up next to a remote broker (docs/desktop-app.md), stated on every run.</summary>
@@ -134,9 +151,7 @@ public static partial class Doctor
     /// </remarks>
     static DoctorCheck? UserSecretsFile(DoctorFile file)
     {
-        // The folder name is the UserSecretsId. Split on both separators: the probe may hand over either.
-        var parts = file.Path.Split(['/', '\\'],StringSplitOptions.RemoveEmptyEntries);
-        var id = parts.Length >= 2 ? parts[^2] : file.Path;
+        var id = UserSecretsIdOf(file.Path);
         var name = $"user secrets {id}";
         switch (SecretsFile.Classify(file.Text))
         {
@@ -144,9 +159,10 @@ public static partial class Doctor
                 var keys = UserSecretsVault.FlattenKeys(Parse(file.Text!)).Count;
                 return keys == 0
                     ? null
-                    : new(name, DoctorStatus.Warn, $"in plain text: {Keys(keys)} any program running as you can read. Seal it once the project uses Tiresias.Extensions.Configuration: run the app once, or use Seal now in the secrets editor", id);
+                    : new(name, DoctorStatus.Warn, $"in plain text: {Keys(keys)} any program running as you can read. Seal it once the project uses Tiresias.Extensions.Configuration: run the app once, or use Seal now in the secrets editor",
+                        new ReviewUserSecrets(id), Position.Plaintext, Position.SealedApproved);
             case SecretsFileKind.Invalid:
-                return new(name, DoctorStatus.Fail, "not valid JSON; apps reading it will fail at startup", id);
+                return new(name, DoctorStatus.Fail, "not valid JSON; apps reading it will fail at startup", new ReviewUserSecrets(id));
             case SecretsFileKind.Sealed:
                 JsonObject? plain;
                 try
@@ -155,11 +171,12 @@ public static partial class Doctor
                 }
                 catch (Exception e) when (e is InvalidDataException or FormatException or JsonException or InvalidOperationException)
                 {
-                    return new(name, DoctorStatus.Fail, $"sealed envelope unreadable ({e.Message})", id);
+                    return new(name, DoctorStatus.Fail, $"sealed envelope unreadable ({e.Message})", new ReviewUserSecrets(id));
                 }
                 return plain is null
                     ? null
-                    : new(name, DoctorStatus.Warn, $"sealed, but {UserSecretsVault.FlattenKeys(plain).Count} plaintext key(s) were added beside it; they are sealed on the next run", id);
+                    : new(name, DoctorStatus.Warn, $"sealed, but {UserSecretsVault.FlattenKeys(plain).Count} plaintext key(s) were added beside it; they are sealed on the next run",
+                        new ReviewUserSecrets(id), Position.Plaintext, Position.SealedApproved);
             default:
                 return null;
         }
@@ -169,9 +186,10 @@ public static partial class Doctor
     {
         if (file.Text is null || !UserSecretsId().IsMatch(file.Text))
             return null;
-        return file.Text.Contains("Tiresias.Extensions.Configuration", StringComparison.Ordinal)
+        return file.Text.Contains(ReferenceConfigurationPackage.Package, StringComparison.Ordinal)
             ? null
-            : new($"project {file.Path}", DoctorStatus.Warn, "sets <UserSecretsId> but doesn't reference Tiresias.Extensions.Configuration, so its secrets.json stays plaintext");
+            : new($"project {file.Path}", DoctorStatus.Warn, "sets <UserSecretsId> but doesn't reference Tiresias.Extensions.Configuration, so its secrets.json stays plaintext",
+                new ReferenceConfigurationPackage(file.Path), Position.Plaintext, Position.SealedApproved);
     }
 
     static string Keys(int count) => count == 1 ? "1 key" : $"{count} keys";

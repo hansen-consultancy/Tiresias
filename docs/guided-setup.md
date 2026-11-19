@@ -1,6 +1,6 @@
 # Guided setup: the strongest option first
 
-Status: **design, not built** (#32). This page designs how Tiresias steers people toward the safest way to
+Status: **phase 1 built** (#32): the axes and findings in `tir doctor`; the rest is design. This page designs how Tiresias steers people toward the safest way to
 hold each credential, finds the weaker setups already on the machine, and keeps a growing feature
 set reachable without a row of buttons per feature.
 
@@ -170,7 +170,7 @@ Existing windows remain the places where the work happens; this changes how peop
 
 ## Phases
 
-1. **The axes and findings in `tir doctor`**: the planner in Core, the existing checks rewritten as
+1. **Built. The axes and findings in `tir doctor`**: the planner in Core, the existing checks rewritten as
    findings with positions and fixes, plus the connection-string and certificate-on-disk checks.
 2. **Findings in the app**: a findings section on Home, one-click fixes opening today's windows filled
    in, dismissals.

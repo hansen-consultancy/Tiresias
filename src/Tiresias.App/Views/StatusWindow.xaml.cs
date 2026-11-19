@@ -73,15 +73,15 @@ public partial class StatusWindow : Window
 
     void OnRecoveryClosed(object? sender, EventArgs e) => model.Refresh();
 
-    /// <summary>Opens the secrets editor on the row's project: the fix for a user-secrets line.</summary>
+    /// <summary>Opens the window that fixes the row's finding.</summary>
     void OnReview(object sender, RoutedEventArgs e)
     {
         switch (((FrameworkElement)sender).DataContext)
         {
-            case CheckRow { UserSecretsId: { } id }:
+            case CheckRow { Fix: ReviewUserSecrets { UserSecretsId: var id } }:
                 App.Current.ShowWindow<SecretsWindow>().Select(id);
                 break;
-            case CheckRow { OpensEnvironment: true }:
+            case CheckRow { Fix: ProtectVariables }:
                 ShowEnvironment();
                 break;
         }
@@ -89,15 +89,19 @@ public partial class StatusWindow : Window
 }
 
 /// <summary>One check as a row. Status is said in words and a glyph, never by colour alone.</summary>
-/// <param name="OpensEnvironment">Review opens the environment variables window: the fix for exposed variables.</param>
-public sealed record CheckRow(string Name, string StatusText, string Glyph, Brush? Brush, string Detail, string? UserSecretsId = null, bool OpensEnvironment = false)
+/// <param name="Fix">The check's fix; Review opens its window, for the fixes this window has one for.</param>
+public sealed record CheckRow(string Name, string StatusText, string Glyph, Brush? Brush, string Detail, DoctorFix? Fix = null)
 {
     public string Spoken => $"{Name}: {StatusText}. {Detail}";
 
-    public Visibility ReviewVisibility => UserSecretsId is null && !OpensEnvironment ? Visibility.Collapsed : Visibility.Visible;
+    public Visibility ReviewVisibility => ReviewName.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
 
-    public string ReviewName => UserSecretsId is not null ? Text.Format("Status_ReviewName", UserSecretsId)
-        : OpensEnvironment ? Text.Get("Status_ReviewEnvironment") : "";
+    public string ReviewName => Fix switch
+    {
+        ReviewUserSecrets { UserSecretsId: var id } => Text.Format("Status_ReviewName", id),
+        ProtectVariables => Text.Get("Status_ReviewEnvironment"),
+        _ => "",
+    };
 }
 
 /// <summary>A program refused without asking since "This wasn't me".</summary>
@@ -262,10 +266,9 @@ public sealed partial class StatusViewModel : ObservableObject
 
     static CheckRow Row(DoctorCheck check) => check.Status switch
     {
-        DoctorStatus.Ok => new(check.Name, Text.Get("Status_Ok"), "\uE73E", Brush("SystemFillColorSuccessBrush"), check.Detail, check.UserSecretsId),
-        DoctorStatus.Warn => new(check.Name, Text.Get("Status_Warn"), "\uE7BA", Brush("SystemFillColorCautionBrush"), check.Detail, check.UserSecretsId,
-            check.Name == Doctor.VariablesCheck),
-        _ => new(check.Name, Text.Get("Status_Fail"), "\uEA39", Brush("SystemFillColorCriticalBrush"), check.Detail, check.UserSecretsId),
+        DoctorStatus.Ok => new(check.Name, Text.Get("Status_Ok"), "\uE73E", Brush("SystemFillColorSuccessBrush"), check.Detail, check.Fix),
+        DoctorStatus.Warn => new(check.Name, Text.Get("Status_Warn"), "\uE7BA", Brush("SystemFillColorCautionBrush"), check.Detail, check.Fix),
+        _ => new(check.Name, Text.Get("Status_Fail"), "\uEA39", Brush("SystemFillColorCriticalBrush"), check.Detail, check.Fix),
     };
 
     static Brush? Brush(string key) => Application.Current.TryFindResource(key) as Brush;
