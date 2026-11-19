@@ -1,6 +1,6 @@
 # More checks
 
-Status: **design, not built**. Phase 6 of [guided setup](guided-setup.md) (#32). Phase 1 gave the
+Status: **built, except RavenDB clearance**. Phase 6 of [guided setup](guided-setup.md) (#32). Phase 1 gave the
 doctor its shape: a probe gathers facts, the pure planner in `Doctor` turns them into checks, and
 a check that can go higher carries its `Now` and `Better` positions and a typed `DoctorFix`. Each
 check below adds probe facts, planner cases and at most one fix type, and ships on its own.
