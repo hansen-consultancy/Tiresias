@@ -142,10 +142,16 @@ public sealed class UserSecretsService : IDisposable
         }
 
         var load = UserSecretsVault.Open(request.UserSecretsId, text, wrapper!);
+        var requested = SecretReferences.Find(load.Document);
+        var scope = requested.Count == 0 ? "" : JsonSerializer.Serialize(requested
+            .OrderBy(item => item.Key, StringComparer.Ordinal)
+            .ThenBy(item => item.Reference.ToString(), StringComparer.Ordinal)
+            .Select(item => new { item.Key, item.Reference }));
         string reason;
-        if (plan.Action == UserSecretsAction.AskConsent)
+        if (plan.Action == UserSecretsAction.AskConsent || requested.Count > 0)
         {
-            var (answer, why) = await AskAsync(new(caller, request.UserSecretsId, load.Keys), ct);
+            var entries = load.Keys.Concat(requested.Select(item => $"{item.Key} → {item.Reference}")).ToArray();
+            var (answer, why) = await AskAsync(new(caller, request.UserSecretsId, entries), scope, ct);
             if (answer == ConsentAnswer.Deny)
             {
                 Record(AuditKind.Deny, request, caller, why);
@@ -222,7 +228,7 @@ public sealed class UserSecretsService : IDisposable
         }
     }
 
-    async Task<(ConsentAnswer Answer, string Reason)> AskAsync(UserSecretsConsentRequest consent, CancellationToken ct)
+    async Task<(ConsentAnswer Answer, string Reason)> AskAsync(UserSecretsConsentRequest consent, string scope, CancellationToken ct)
     {
         using var timeout = new CancellationTokenSource(ConsentTimeout, time);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token, locked.Token);
@@ -237,11 +243,11 @@ public sealed class UserSecretsService : IDisposable
         try
         {
             // The user may have allowed this program for the session while this request waited.
-            if (Memory.IsAllowed(consent.Executable, consent.UserSecretsId, time.GetUtcNow()))
+            if (Memory.IsAllowed(consent.Executable, consent.UserSecretsId, time.GetUtcNow(), scope))
                 return (ConsentAnswer.AllowOnce, "allowed for this session");
             var answer = await prompt.AskAsync(consent, linked.Token);
             if (answer == ConsentAnswer.AllowForSession)
-                Memory.Remember(consent.Executable, consent.UserSecretsId, time.GetUtcNow() + SessionLength);
+                Memory.Remember(consent.Executable, consent.UserSecretsId, time.GetUtcNow() + SessionLength, scope);
             return answer switch
             {
                 ConsentAnswer.Deny => (answer, "You declined on the Tiresias consent screen."),
