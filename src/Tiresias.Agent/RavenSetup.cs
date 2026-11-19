@@ -47,7 +47,10 @@ public static class RavenSetup
         await CheckAsync(service.Upstream, plan.Database, certificate, handlers ?? RavenClients.DefaultHandler, ct);
 
         if (keep)
+        {
+            RavenCertificateStore.Record(service.Slug, Describe(certificate));
             return service;
+        }
 
         progress.Report("Sealing the certificate in the vault");
         var passwordless = certificate.Export(X509ContentType.Pkcs12);
@@ -61,6 +64,7 @@ public static class RavenSetup
             CryptographicOperations.ZeroMemory(passwordless);
             CryptographicOperations.ZeroMemory(encoded);
         }
+        RavenCertificateStore.Record(service.Slug, Describe(certificate));
         return service;
     }
 

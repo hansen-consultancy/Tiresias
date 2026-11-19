@@ -487,9 +487,6 @@
   <data name="Status_StartWithWindowsNote" xml:space="preserve">
     <value>Apps that start at sign-in and use protected user secrets wait up to a minute for it.</value>
   </data>
-  <data name="Tray_About" xml:space="preserve">
-    <value>About Tiresias</value>
-  </data>
   <data name="Startup_SwitchHeading" xml:space="preserve">
     <value>Another copy of Tiresias is running</value>
   </data>
@@ -1378,9 +1375,6 @@ Store them in clear?</value>
   <data name="Update_Busy" xml:space="preserve">
     <value>Finish what's open first (an approval, the secrets editor, the services window or setup), then choose the update in the tray menu again.</value>
   </data>
-  <data name="Tray_Services" xml:space="preserve">
-    <value>Services for tir exec...</value>
-  </data>
   <data name="Services_WindowTitle" xml:space="preserve">
     <value>Services - Tiresias</value>
   </data>
@@ -1556,9 +1550,6 @@ Store them in clear?</value>
   <data name="Status_Services" xml:space="preserve">
     <value>Services...</value>
   </data>
-  <data name="Services_SetUpSql" xml:space="preserve">
-    <value>Set up a SQL Server...</value>
-  </data>
   <data name="Services_SqlSaved" xml:space="preserve">
     <value>Saved {0}. Apps reach it with tiresias:sql/{0}/read or /write in their user secrets.</value>
   </data>
@@ -1663,9 +1654,6 @@ Store them in clear?</value>
   </data>
   <data name="Sql_DoneWrite" xml:space="preserve">
     <value>Use /write instead of /read for an app that saves data. The app needs the Tiresias.Extensions.Configuration package, and gets a new login before the old one expires.</value>
-  </data>
-  <data name="Services_SetUpRaven" xml:space="preserve">
-    <value>Set up a RavenDB...</value>
   </data>
   <data name="Services_RavenSaved" xml:space="preserve">
     <value>Saved {0}. Apps reach it with tiresias:raven/{0} as their RavenDB URL.</value>
@@ -1789,5 +1777,155 @@ Store them in clear?</value>
   </data>
   <data name="Usage_PlaceholderHint" xml:space="preserve">
     <value>Or in the Environment variables window: check the sealed key, pick {0} under Hand out a placeholder instead, then Use a placeholder. Name the variable after the key the tool reads; the base URL variable points the tool at Tiresias.</value>
+  </data>
+  <data name="Finding_Title" xml:space="preserve">
+    <value>Findings</value>
+  </data>
+  <data name="Finding_Intro" xml:space="preserve">
+    <value>Credentials delivered more weakly than they could be, each saying where it is now and where its fix takes it, and programs that can reach them with a reason to doubt them.</value>
+  </data>
+  <data name="Finding_FixSecrets" xml:space="preserve">
+    <value>Open in the secrets editor</value>
+  </data>
+  <data name="Finding_FixVariables" xml:space="preserve">
+    <value>Seal variables...</value>
+  </data>
+  <data name="Finding_FixSql" xml:space="preserve">
+    <value>Set up SQL Server...</value>
+  </data>
+  <data name="Finding_FixRaven" xml:space="preserve">
+    <value>Set up RavenDB...</value>
+  </data>
+  <data name="Finding_FixCopy" xml:space="preserve">
+    <value>Copy command</value>
+  </data>
+  <data name="Finding_FixName" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
+  <data name="Finding_Dismiss" xml:space="preserve">
+    <value>Dismiss</value>
+  </data>
+  <data name="Finding_DismissName" xml:space="preserve">
+    <value>Dismiss {0}</value>
+  </data>
+  <data name="Finding_ReasonLabel" xml:space="preserve">
+    <value>Why? It stays dismissed until it changes.</value>
+  </data>
+  <data name="Finding_ReasonName" xml:space="preserve">
+    <value>Reason for dismissing</value>
+  </data>
+  <data name="Finding_ConfirmDismiss" xml:space="preserve">
+    <value>Dismiss</value>
+  </data>
+  <data name="Finding_DismissedHeader" xml:space="preserve">
+    <value>Dismissed ({0})</value>
+  </data>
+  <data name="Finding_ShowAgain" xml:space="preserve">
+    <value>Show again</value>
+  </data>
+  <data name="Finding_RestoreName" xml:space="preserve">
+    <value>Show {0} again</value>
+  </data>
+  <data name="Finding_DismissFailed" xml:space="preserve">
+    <value>The dismissal couldn't be saved: {0}</value>
+  </data>
+  <data name="Finding_Copied" xml:space="preserve">
+    <value>Copied: {0}</value>
+  </data>
+  <data name="Finding_CopyFailed" xml:space="preserve">
+    <value>The clipboard is busy. Run this yourself: {0}</value>
+  </data>
+  <data name="Finding_RecycleHeading" xml:space="preserve">
+    <value>Move the certificate file to the Recycle Bin?</value>
+  </data>
+  <data name="Finding_RecycleBody" xml:space="preserve">
+    <value>The certificate is sealed in Tiresias now, and the broker presents it. The copy at {0} can still be read by any program running as you. Programs that read the file need to use tiresias:raven first.</value>
+  </data>
+  <data name="Finding_Recycle" xml:space="preserve">
+    <value>Move to Recycle Bin</value>
+  </data>
+  <data name="Finding_Keep" xml:space="preserve">
+    <value>Keep it</value>
+  </data>
+  <data name="Finding_RecycleFailed" xml:space="preserve">
+    <value>{0} couldn't be moved; it may be open in another program.</value>
+  </data>
+  <data name="Finding_FixRemoveExtension" xml:space="preserve">
+    <value>Remove...</value>
+  </data>
+  <data name="Finding_FixReveal" xml:space="preserve">
+    <value>Show file</value>
+  </data>
+  <data name="Finding_RemoveExtensionHeading" xml:space="preserve">
+    <value>Remove {0} from {1}?</value>
+  </data>
+  <data name="Finding_RemoveExtensionBody" xml:space="preserve">
+    <value>Tiresias runs {0}. You can install the extension again from {1} later.</value>
+  </data>
+  <data name="Finding_Remove" xml:space="preserve">
+    <value>Remove</value>
+  </data>
+  <data name="Finding_Removed" xml:space="preserve">
+    <value>Removed {0} from {1}.</value>
+  </data>
+  <data name="Finding_RemoveFailed" xml:space="preserve">
+    <value>{0} couldn't be removed. Run this yourself: {1}</value>
+  </data>
+  <data name="Tray_Add" xml:space="preserve">
+    <value>Add...</value>
+  </data>
+  <data name="Needs_WindowTitle" xml:space="preserve">
+    <value>What do you need? - Tiresias</value>
+  </data>
+  <data name="Needs_Heading" xml:space="preserve">
+    <value>What do you need?</value>
+  </data>
+  <data name="Needs_Search" xml:space="preserve">
+    <value>Describe it, or pick one below</value>
+  </data>
+  <data name="Needs_SearchHint" xml:space="preserve">
+    <value>For example "OpenAI key for a script" or "my EF Core app talks to Azure SQL". What you type is matched on this PC and never sent anywhere.</value>
+  </data>
+  <data name="Needs_GivesUp" xml:space="preserve">
+    <value>Gives up: {0}</value>
+  </data>
+  <data name="Needs_Recommended" xml:space="preserve">
+    <value>Recommended</value>
+  </data>
+  <data name="Needs_Named" xml:space="preserve">
+    <value>Matches what you typed</value>
+  </data>
+  <data name="Needs_ActionName" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
+  <data name="Needs_AddService" xml:space="preserve">
+    <value>Add the service...</value>
+  </data>
+  <data name="Needs_SetUpSql" xml:space="preserve">
+    <value>Set up a SQL Server...</value>
+  </data>
+  <data name="Needs_SetUpRaven" xml:space="preserve">
+    <value>Set up a RavenDB...</value>
+  </data>
+  <data name="Needs_OpenEnvironment" xml:space="preserve">
+    <value>Environment variables...</value>
+  </data>
+  <data name="Needs_OpenSecrets" xml:space="preserve">
+    <value>Secrets...</value>
+  </data>
+  <data name="Needs_OpenGuide" xml:space="preserve">
+    <value>Read the guide</value>
+  </data>
+  <data name="Finding_DismissAll" xml:space="preserve">
+    <value>Dismiss all</value>
+  </data>
+  <data name="Finding_ShowMembers" xml:space="preserve">
+    <value>Show all {0}</value>
+  </data>
+  <data name="Finding_FixRavenReplace" xml:space="preserve">
+    <value>Replace certificate...</value>
+  </data>
+  <data name="Finding_FixPlaceholder" xml:space="preserve">
+    <value>Use a placeholder...</value>
   </data>
 </root>

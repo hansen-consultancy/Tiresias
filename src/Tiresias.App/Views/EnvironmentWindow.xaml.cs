@@ -21,7 +21,25 @@ public partial class EnvironmentWindow : Window
         InitializeComponent();
         Desktop.ExcludeFromCapture(this);
         DataContext = model;
-        Loaded += async (_, _) => await model.LoadAsync();
+        Loaded += async (_, _) =>
+        {
+            await model.LoadAsync();
+            ShowPick();
+        };
+    }
+
+    /// <summary>A finding's fix: <paramref name="variable"/> checked under Sealed, <paramref name="service"/> chosen, and the placeholder section in view.</summary>
+    public void PickForPlaceholder(string variable, string? service)
+    {
+        model.Pick = (variable, service);
+        if (IsLoaded)
+            ShowPick();
+    }
+
+    void ShowPick()
+    {
+        if (model.ApplyPick())
+            PlaceholderLabel.BringIntoView();
     }
 
     void OnBrowse(object sender, RoutedEventArgs e)
@@ -147,6 +165,22 @@ public sealed partial class EnvironmentViewModel : ObservableObject
         RefreshNuGet(sealedNow);
         RefreshPlaceholders();
         CanEdit = true;
+    }
+
+    /// <summary>A variable and service to select once loaded, from a finding's fix.</summary>
+    internal (string Variable, string? Service)? Pick { get; set; }
+
+    /// <summary>Checks the picked variable alone and chooses its service; whether there was one to pick.</summary>
+    internal bool ApplyPick()
+    {
+        if (Pick is not { } pick || !CanEdit)
+            return false;
+        Pick = null;
+        foreach (var row in Sealed)
+            row.IsChecked = row.Folder is null && string.Equals(row.Name, pick.Variable, StringComparison.OrdinalIgnoreCase);
+        if (pick.Service is { Length: > 0 } service && PlaceholderServices.Contains(service))
+            PlaceholderService = service;
+        return true;
     }
 
     void RefreshPlaceholders()

@@ -10,6 +10,41 @@ its section below.
 
 ### Added
 
+- `tir doctor` and the status page warn when a RavenDB service's certificate expires within 30
+  days, and fail once it has, with **Replace certificate...** opening **Edit...** on the service.
+  The expiry is recorded when a RavenDB is set up or edited; one set up earlier says "expiry
+  unknown" until it is edited and saved once.
+- The status page finds sealed API keys handed out as their value where a placeholder would do
+  (an OpenAI-style key, or one with a matching vault service), and **Use a placeholder...** opens
+  Environment variables with the key checked. It needs Tiresias unlocked; `tir doctor` skips it.
+- The status page and `tir doctor` point out code that can reach your credentials and has a reason
+  to be doubted: an extension from an unknown publisher, or unchanged for two years, inside an
+  editor that used a credential through Tiresias in the last 90 days (**Remove...** uninstalls it
+  after you approve), a program that starts at log-on without a signature, and a program you
+  blocked with **This wasn't me** that is still on the PC (**Show file**). Nothing leaves the
+  machine, and only names and metadata are read.
+- **What do you need?** (**Add...** in the tray and the Services window) is the one way to add
+  anything: pick or type what you need ("OpenAI key for a script") and see every way to meet it,
+  strongest first, each saying what it gives up. Set up a SQL Server, Set up a RavenDB and the
+  Services add form now open from there. What you type is matched on your PC and never sent.
+  `tir advise "<words>"` prints the same list. The tray menu is shorter: Status, Add..., Activity.
+  A dismissed SQL Server or RavenDB finding shows once more, as its fix now names Add....
+- The status page shows **Add...**, and only the areas this PC uses: Secrets, Services,
+  Environment variables and Activity appear once they hold something, or a finding leads there.
+
+- The status page shows findings of one kind as one line with their count, for example
+  "230 projects that set <UserSecretsId> but don't reference Tiresias.Extensions.Configuration". The
+  line opens to each finding with its own fix, and **Dismiss all** sets them aside with one reason.
+  Any check with a fix now counts as a finding too, such as a user secrets file that isn't valid JSON.
+
+- The status page lists **findings** first: each says where a credential's delivery stands, where
+  its fix takes it, and has a button that opens the fix filled in (Set up SQL Server with the
+  server and database, Set up RavenDB with the certificate file and then an offer to move the file
+  to the Recycle Bin, the secrets editor, Environment variables), or copies the command for a step
+  outside the app. A finding can be dismissed with a reason; it stays dismissed until it changes,
+  and `tir doctor` shows the reason too. The checks cover the project folders the secrets editor
+  scans.
+
 - **SQL Server logins in user secrets.** A `secrets.json` value `tiresias:sql/<service>/<grant>`
   becomes a temporary login for the lease when the app loads its configuration, and the app gets a
   new one before it expires (the reload token fires). No password stays in the file. A renewal
@@ -78,6 +113,12 @@ its section below.
 - The secrets editor names projects instead of listing ids: add the folder you keep your code in
   under **Project folders**, use **Find a project**, or just run the project. Ids no project uses
   are grouped apart and can be moved to the Recycle Bin.
+- **`tir doctor` findings.** A line about how a credential is delivered shows where it sits on the
+  two axes, what can escape and who may use it unseen (`E5/C3` is readable and used silently), and
+  where its fix takes it, with the fix as a command or a place in the app. New checks: a
+  connection string with a password, in user secrets or (with `--projects`) `appsettings*.json`,
+  offers per-lease SQL logins; a private key in a file, or a certificate path in configuration,
+  offers having the broker present a RavenDB certificate. Passwords are never shown.
 
 ### Changed
 
@@ -90,6 +131,11 @@ its section below.
 - A development build no longer adds its `tir` to PATH, so it can't shadow the installed one.
 
 ### Fixed
+
+- The status page and `tir doctor --projects` look through the project folders once instead of six
+  times, and skip build output, packages and git internals: on a drive of repositories the checks
+  take seconds rather than half a minute. The findings list builds only the rows in view, so hundreds
+  of findings show at once. The app logs how long the checks and showing them took.
 
 - A placeholder limited to a grant that was later renamed or removed from its service is
   refused. Before, it could use every grant of the service, write and admin included.

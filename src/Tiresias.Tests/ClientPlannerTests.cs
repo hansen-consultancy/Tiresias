@@ -112,12 +112,20 @@ public class DoctorTests
         public bool Forwarder { get; set; } = true;
         public List<DoctorFile> Secrets { get; } = [];
         public List<DoctorFile> ProjectFiles { get; } = [];
+        public List<DoctorFile> Config { get; } = [];
+        public List<string> Keys { get; } = [];
 
         public Task<int?> BrokerStatusAsync() => Task.FromResult(BrokerStatus);
         public Task<bool> ForwarderListeningAsync() => Task.FromResult(Forwarder);
         public IEnumerable<DoctorFile> UserSecretsFiles() => Secrets;
         public IEnumerable<DoctorFile> Projects() => ProjectFiles;
+        public IEnumerable<DoctorFile> ConfigFiles() => Config;
+        public IEnumerable<string> KeyFiles() => Keys;
     }
+
+    static readonly Position Plaintext = new(Exposure.Readable, Control.Silent);
+    static readonly Position SealedApproved = new(Exposure.Sealed, Control.Approved);
+    static readonly string Root = Path.Combine(Path.GetTempPath(), "doctor-projects");
 
     static async Task<DoctorCheck> Check(FakeProbe probe, string namePrefix) =>
         (await Doctor.RunAsync(probe)).Single(c => c.Name.StartsWith(namePrefix, StringComparison.Ordinal));
@@ -127,7 +135,7 @@ public class DoctorTests
     {
         var checks = await Doctor.RunAsync(new FakeProbe());
         Assert.That(checks.Select(c => c.Status), Is.All.EqualTo(DoctorStatus.Ok));
-        Assert.That(checks.Select(c => c.Name), Is.EqualTo(new[] { "broker pinned", "device key", "recovery key", "vault", "broker reachable", "forwarder", "environment variables" }));
+        Assert.That(checks.Select(c => c.Name), Is.EqualTo(new[] { "broker pinned", "device key", "recovery key", "vault", "broker reachable", "forwarder", "environment variables", Doctor.KeysAsValuesCheck }));
     }
 
     [Test]
@@ -194,7 +202,8 @@ public class DoctorTests
         var check = await Check(probe, "user secrets");
 
         Assert.That(check.Status, Is.EqualTo(DoctorStatus.Warn));
-        Assert.That(check.UserSecretsId, Is.EqualTo("abc"));
+        Assert.That(check.Fix, Is.EqualTo(new ReviewUserSecrets("abc")));
+        Assert.That((check.Now, check.Better), Is.EqualTo((Plaintext, SealedApproved)));
         Assert.That(check.Detail, Does.Contain("2 keys"));
         Assert.That(check.Detail, Does.Not.Contain("hunter2").And.Not.Contain("sk-live").And.Not.Contain("ApiKey").And.Not.Contain("ConnectionStrings"));
     }
@@ -240,6 +249,155 @@ public class DoctorTests
         var projects = (await Doctor.RunAsync(probe)).Where(c => c.Name.StartsWith("project", StringComparison.Ordinal)).ToArray();
         Assert.That(projects.Select(c => c.Name), Is.EqualTo(new[] { "project bare.csproj" }));
         Assert.That(projects[0].Status, Is.EqualTo(DoctorStatus.Warn));
+        Assert.That(projects[0].Fix, Is.EqualTo(new ReferenceConfigurationPackage("bare.csproj")));
+        Assert.That(projects[0].Fix!.Instruction, Is.EqualTo("dotnet add \"bare.csproj\" package Tiresias.Extensions.Configuration"));
+    }
+
+    [Test]
+    public async Task Lines_about_Tiresias_itself_are_not_findings()
+    {
+        var checks = await Doctor.RunAsync(new FakeProbe { RecoveryKeySet = false, BrokerStatus = null });
+        Assert.That(checks.Where(c => c.IsFinding), Is.Empty);
+    }
+
+    [Test]
+    public async Task Exposed_variables_are_a_finding_whose_fix_protects_exactly_them()
+    {
+        var check = (await Doctor.RunAsync(new FakeProbe { ExposedVariables = ["OPENAI_API_KEY", "HF_TOKEN"] })).Single(c => c.Name == Doctor.VariablesCheck);
+        Assert.That(check.Fix, Is.EqualTo(new ProtectVariables(["OPENAI_API_KEY", "HF_TOKEN"])));
+        Assert.That(check.Fix!.Instruction, Is.EqualTo("tir env protect OPENAI_API_KEY HF_TOKEN"));
+        Assert.That(check.Now.ToString(), Is.EqualTo("E5/C3"));
+        Assert.That(check.Better.ToString(), Is.EqualTo("E4/C1"));
+    }
+
+    static async Task<DoctorCheck[]> ConnectionStrings(FakeProbe probe) =>
+        [.. (await Doctor.RunAsync(probe)).Where(c => c.Name.StartsWith("connection string", StringComparison.Ordinal))];
+
+    static DoctorFile AppSettings(string json) => new(Path.Combine(Root, "Api", "appsettings.json"), json);
+
+    [TestCase("Data Source=tcp:db.example.com,1433;Initial Catalog=Orders;User ID=app;Password=hunter2;TrustServerCertificate=True", "tcp:db.example.com,1433", true)]
+    [TestCase("server=db.example.com;database=Orders;uid=app;pwd=hunter2;MultipleActiveResultSets=true", "db.example.com", true)]
+    [TestCase("Server=db.example.com;Database=Orders;User Id=app;Password=hunter2;Encrypt=True", "db.example.com", true)]
+    [TestCase("Server=db.example.com;Database=Orders;User Id=app;Password=hunter2", "db.example.com", false)]
+    [TestCase("Server=db.example.com;Database=Orders;User=app;Password=hunter2;Application Name=Jobs;Encrypt=False", "db.example.com", false)]
+    [TestCase("Server = db.example.com; Database = Orders; User Id = app; Password = hunter2; Encrypt = True", "db.example.com", true)]
+    public async Task A_sql_server_password_in_appsettings_is_a_finding_offering_a_login_per_lease(string connectionString, string server, bool certain)
+    {
+        var probe = new FakeProbe();
+        probe.Config.Add(AppSettings($$$"""{"ConnectionStrings":{"Default":"{{{connectionString}}}"}}"""));
+        var check = (await ConnectionStrings(probe)).Single();
+
+        Assert.That(check.Name, Is.EqualTo($"connection string ConnectionStrings:Default in {Path.Combine(Root, "Api", "appsettings.json")}"));
+        Assert.That(check.Status, Is.EqualTo(DoctorStatus.Warn));
+        Assert.That(check.Fix, Is.EqualTo(new SetUpSqlServer(server, "Orders")));
+        Assert.That((check.Now, check.Better), Is.EqualTo((Plaintext, new Position(Exposure.ShortLived, Control.Approved))));
+        Assert.That(check.Detail + check.Fix!.Instruction, Does.Not.Contain("hunter2"));
+        // MySQL takes User Id too, so one keyword SQL Server shares with others isn't enough to say so.
+        Assert.That(check.Detail.Contains("If this is SQL Server", StringComparison.Ordinal), Is.EqualTo(!certain));
+    }
+
+    [TestCase("Host=pg.example.com;Database=Orders;Username=app;Password=hunter2")]
+    [TestCase("Host=pg.example.com;Username=app;Password=hunter2;Trust Server Certificate=true")]
+    [TestCase("Server=my.example.com;Database=Orders;User Id=app;Password=hunter2;SslMode=Required")]
+    [TestCase("Server=my.example.com;Database=Orders;User Id=app;Password=hunter2;CharSet=utf8mb4")]
+    [TestCase("Data Source=app.db;Encrypt=True;Password=hunter2")]
+    [TestCase("Server=my.example.com;Port=3306;Database=Orders;Uid=app;Pwd=hunter2")]
+    [TestCase("Data Source=db.example.com/ORCL;User Id=app;Password=hunter2")]
+    [TestCase("Password=hunter2")]
+    public async Task A_password_for_another_kind_of_server_is_a_finding_without_a_login_to_offer(string connectionString)
+    {
+        var probe = new FakeProbe();
+        probe.Config.Add(AppSettings($$"""{"Db":"{{connectionString}}"}"""));
+        var check = (await ConnectionStrings(probe)).Single();
+
+        Assert.That(check.Fix, Is.Null);
+        Assert.That((check.Now, check.Better), Is.EqualTo((Plaintext, SealedApproved)));
+        Assert.That(check.Detail, Does.Contain("SQL Server only").And.Not.Contain("hunter2"));
+    }
+
+    [TestCase("""{"ConnectionStrings":{"Default":"Server=db;Database=Orders;Integrated Security=true"}}""")]
+    [TestCase("""{"ConnectionStrings":{"Default":"Server=db;Database=Orders;User Id=app;Password="}}""")]
+    [TestCase("""{"ConnectionStrings":{"Default":"tiresias:sql/orders/read"}}""")]
+    [TestCase("""{"Smtp":{"Password":"hunter2"}}""")]
+    [TestCase("""{"Note":"set password= in the portal"}""")]
+    [TestCase("{ not json")]
+    public async Task Configuration_without_a_password_in_a_connection_string_has_no_such_finding(string json)
+    {
+        var probe = new FakeProbe();
+        probe.Config.Add(AppSettings(json));
+        Assert.That(await ConnectionStrings(probe), Is.Empty);
+    }
+
+    [Test]
+    public async Task A_connection_string_in_user_secrets_is_found_in_plain_files_and_beside_sealed_ones()
+    {
+        var probe = new FakeProbe();
+        probe.Secrets.Add(new(Path.Combine(Root, "plain-id", "secrets.json"), """{"ConnectionStrings":{"Db":"Server=db;User Id=app;Password=hunter2"}}"""));
+        probe.Secrets.Add(new(Path.Combine(Root, "sealed-id", "secrets.json"), """{"$tiresias":{"v":1,"sealed":"AQID"},"Cs":"Server=db;User Id=app;Password=hunter2"}"""));
+        var names = (await ConnectionStrings(probe)).Select(c => c.Name);
+        Assert.That(names, Is.EqualTo(new[] { "connection string ConnectionStrings:Db in user secrets plain-id", "connection string Cs in user secrets sealed-id" }));
+    }
+
+    [Test]
+    public async Task A_key_file_named_for_ravendb_offers_the_broker_presenting_it()
+    {
+        var path = Path.Combine(Root, "Api", "raven-client.pfx");
+        var probe = new FakeProbe();
+        probe.Keys.Add(path);
+        var check = await Check(probe, "certificate");
+
+        Assert.That(check.Fix, Is.EqualTo(new SetUpRaven(path)));
+        Assert.That((check.Now, check.Better), Is.EqualTo((Plaintext, new Position(Exposure.BrokerOnly, Control.Approved))));
+    }
+
+    [Test]
+    public async Task Any_other_key_file_is_a_finding_without_a_fix_to_start()
+    {
+        var probe = new FakeProbe();
+        probe.Keys.Add(Path.Combine(Root, "signing.pfx"));
+        var check = await Check(probe, "certificate");
+
+        Assert.That(check.Fix, Is.Null);
+        Assert.That(check.IsFinding);
+        Assert.That(check.Detail, Does.Contain("RavenDB").And.Contain("non-exportable"));
+    }
+
+    [Test]
+    public async Task A_key_file_ravendb_configuration_points_at_is_one_finding_naming_the_key()
+    {
+        var path = Path.Combine(Root, "Api", "certs", "client.pfx");
+        var probe = new FakeProbe();
+        probe.Config.Add(AppSettings("""{"RavenDb":{"CertificatePath":"certs/client.pfx"}}"""));
+        probe.Keys.Add(path);
+        var check = await Check(probe, "certificate");
+
+        Assert.That(check.Name, Is.EqualTo($"certificate {path}"));
+        Assert.That(check.Fix, Is.EqualTo(new SetUpRaven(path)));
+        Assert.That(check.Detail, Does.Contain("RavenDb:CertificatePath"));
+    }
+
+    [Test]
+    public async Task A_key_file_found_under_a_relative_root_still_matches_the_configuration_naming_it()
+    {
+        var probe = new FakeProbe();
+        probe.Config.Add(new(Path.Combine("Api", "appsettings.json"), """{"RavenDb":{"CertificatePath":"certs/client.pfx"}}"""));
+        probe.Keys.Add(Path.Combine(".", "Api", "certs", "client.pfx"));
+        var check = await Check(probe, "certificate");
+
+        Assert.That(check.Fix, Is.InstanceOf<SetUpRaven>());
+        Assert.That(check.Detail, Does.Contain("RavenDb:CertificatePath"));
+    }
+
+    [Test]
+    public async Task A_certificate_configuration_names_outside_the_scanned_folder_is_still_a_finding()
+    {
+        var elsewhere = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "elsewhere", "cluster.pfx"));
+        var probe = new FakeProbe();
+        probe.Config.Add(AppSettings($$$"""{"Raven":{"Certificate":{{{JsonSerializer.Serialize(elsewhere)}}}},"Logging":{"Certificate":"none"}}"""));
+        var check = await Check(probe, "certificate");
+
+        Assert.That(check.Fix, Is.EqualTo(new SetUpRaven(elsewhere)));
+        Assert.That(check.Detail, Does.Contain("Raven:Certificate"));
     }
 }
 
