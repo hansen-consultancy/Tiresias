@@ -46,7 +46,7 @@ is not the priority; guides are.
 | **Guides** | [Need no secret at all](avoid-secrets.md) · Protect `secrets.json` in an existing app · Seal environment variables · Give an AI agent API access without the key · `tir exec` with the GitHub CLI · SQL Server with per-lease logins · RavenDB through the broker · Set up a broker on a VPS · Enrol a second device · Lose a device, revoke it · Recover with the paper key · Teams and tenants · Known locations and alerts · Timestamped audit evidence |
 | **Concepts** | Placeholders · Leases · Grants, ceilings and elevation · Consent · Trust chain · Control plane · Audit log and anchoring |
 | **Reference** | CLI · Configuration (Keyring, broker, forwarder) · Broker endpoints · Control-plane protocol · File formats (vault, sealed `secrets.json`, trust links, audit records) |
-| **Security** | Whitepaper (design, threat model, cryptography) · Honest limits · Reporting a vulnerability |
+| **Security** | Whitepaper (design, [threat model](threats/README.md), cryptography) · Honest limits · Reporting a vulnerability |
 
 Every guide states its goal, its prerequisites, the exact steps (GUI and CLI), and how to check
 that it worked. Every page of a guide is tested against a real install before the release that

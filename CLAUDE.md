@@ -59,6 +59,9 @@ All projects live in `src/`; `Tiresias.slnx` is hand-written (add new projects t
 - [Conventional Commits](https://www.conventionalcommits.org/), scopes `core`, `protocol`,
   `config`, `broker`, `forwarder`, `keyring`, `app`, plus `ci`/`build`/`docs` as types.
 - Behaviour changes update `README.md` or `docs/` in the same commit.
+- A change that adds or closes a threat edits its file in `docs/threats/` in the same PR: one file
+  per finding, no shared header or version, summary printed by `python -I tools/threats.py`
+  ([format](docs/threats/README.md)).
 - User-facing changes add a line under `## [Unreleased]` in `CHANGELOG.md`, written for users, in the
   same PR. Release notes (GitHub and the app's update dialog) are that file's version sections
   (`docs/releasing.md`).
