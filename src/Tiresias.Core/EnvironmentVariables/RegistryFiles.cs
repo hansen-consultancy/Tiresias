@@ -74,7 +74,11 @@ public static partial class NpmRc
     [GeneratedRegex(@"(?<=\n)")]
     private static partial Regex LineBreak();
 
-    [GeneratedRegex(@"^[ \t]*(?<key>[^;#\s=][^=\r\n]*?)[ \t]*=[ \t]*(?<value>[^\r\n]*?)[ \t]*\r?\n?$")]
+    /// <remarks>
+    /// A key never holds a quote, <c>$</c> or a backtick (npm's never do): keys are printed inside a
+    /// command to copy, and a project's file could otherwise smuggle shell syntax into it.
+    /// </remarks>
+    [GeneratedRegex(@"^[ \t]*(?<key>[^;#\s=""'$`][^=\r\n""'$`]*?)[ \t]*=[ \t]*(?<value>[^\r\n]*?)[ \t]*\r?\n?$")]
     private static partial Regex Entry();
 }
 
@@ -116,7 +120,8 @@ public static partial class PyPiRc
         foreach (var line in NpmRc.Lines(text))
         {
             if (Section().Match(line) is { Success: true } header)
-                current = header.Groups["name"].Value;
+                // A section name is printed inside a command to copy; one holding shell syntax is passed over.
+                current = header.Groups["name"].Value.IndexOfAny(['"', '\'', '$', '`']) < 0 ? header.Groups["name"].Value : null;
             else if (current is not null && Password().Match(line) is { Success: true } password)
                 yield return (current, password.Groups["value"].Value);
         }

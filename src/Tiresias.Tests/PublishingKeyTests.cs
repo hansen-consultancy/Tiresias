@@ -117,8 +117,15 @@ public class PublishingKeyTests
     [TestCase("//registry.npmjs.org/:_authToken=\n")]
     [TestCase("; //registry.npmjs.org/:_authToken=abc\n")]
     [TestCase("[not ini\n=\n")]
-    public void An_npm_reference_comment_or_empty_entry_is_no_finding(string npmrc) =>
+    [TestCase("//x\" & start calc & rem/:_authToken=abc\n")]
+    [TestCase("//$(calc)/:_authToken=abc\n")]
+    [TestCase("//`calc`/:_authToken=abc\n")]
+    public void An_npm_reference_comment_or_empty_entry_or_shell_syntax_is_no_finding(string npmrc) =>
         Assert.That(Checks(".npmrc", npmrc), Is.Empty);
+
+    [Test]
+    public void A_pypirc_section_with_shell_syntax_is_passed_over() =>
+        Assert.That(Checks(Pypirc, $"[pypi]\nusername = a\n[x\"$(calc)]\npassword = {Secret}\n"), Is.Empty);
 
     [Test]
     public void A_bare_npm_password_is_for_the_registry_the_file_names()
