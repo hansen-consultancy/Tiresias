@@ -24,8 +24,8 @@ its section below.
   file. **Edit...** changes such a service later (e.g. the Changes API) and keeps the certificate,
   so the file can be deleted once it is set up.
 - **Edit...** in the Services window also changes an HTTP service added there: its upstream,
-  secret, methods, paths and Windows Hello requirement. The name stays, and programs using the
-  service get the change at once.
+  secret, methods, paths and Windows Hello requirement. The name stays. Placeholders handed out
+  for the old settings stop working, so programs using the service ask again.
 - **How to use...** in the Services window shows again what to paste for a saved service: the
   user secrets line for a SQL Server or RavenDB, or a placeholder for an API key.
 - RavenDB's Changes API works through the broker and the forwarder, for grants that list the
@@ -95,6 +95,9 @@ its section below.
   key with what it asks for (e.g. `ConnectionStrings:Db → tiresias:sql/appdb/read`). Before, the
   first load fetched it without asking, and Allow for this session also covered values changed
   later.
+- When a service's settings change (upstream, methods, paths, which secret a grant uses), the
+  placeholders and elevations approved for the old settings end. Before, they carried over to the
+  new ones.
 
 ## [0.1.0-preview.4] - 2026-11-18
 

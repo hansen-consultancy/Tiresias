@@ -266,11 +266,12 @@ public static class SqlServerSetup
 
     internal static string? ReadSecret(string slug, HelloKeyWrapper hello)
     {
-        if (VaultEditor.Load().FindSecret(slug) is not { } secret || SecretEnvelope.UnwrapDek(secret, hello) is not { } dek)
+        var vault = VaultEditor.Load();
+        if (vault.FindSecret(slug) is not { } secret || SecretEnvelope.UnwrapDek(secret, hello) is not { } dek)
             return null;
         try
         {
-            return SecretEnvelope.Open(secret, dek) is { } value ? Encoding.UTF8.GetString(value) : null;
+            return SecretEnvelope.Open(secret, dek, PolicyBinding.Hash(vault, slug)) is { } value ? Encoding.UTF8.GetString(value) : null;
         }
         finally
         {

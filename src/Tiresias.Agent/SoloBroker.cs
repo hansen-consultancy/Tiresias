@@ -161,8 +161,13 @@ public sealed class SoloBroker : IAsyncDisposable
                 return;
             }
             vaultStamp = stamp;
-            var missing = state.ReplaceVault(vault);
-            Volatile.Write(ref unleased, missing);
+            var reload = state.ReplaceVault(vault);
+            if (reload.Refused)
+            {
+                Log?.Invoke($"The vault changed the services of {string.Join(", ", reload.Unapproved)} without your approval. The solo broker keeps the services it had; undo the change in {vaultPath}.");
+                return;
+            }
+            Volatile.Write(ref unleased, reload.Unleased);
             Log?.Invoke($"Vault reloaded: {vault.Services.Count} service(s), {vault.Secrets.Count} secret(s).");
         }
     }

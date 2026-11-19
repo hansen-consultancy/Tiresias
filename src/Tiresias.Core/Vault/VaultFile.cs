@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Tiresias.Policy;
 
@@ -29,19 +30,20 @@ public static class VaultFile
         using var stream = File.OpenRead(path);
         var dto = JsonSerializer.Deserialize<VaultDto>(stream, Json)
             ?? throw new InvalidDataException($"Vault file '{path}' is empty.");
-        if (dto.Version != 1)
+        if (dto.Version is not (1 or 2))
             throw new InvalidDataException($"Vault file '{path}' has unsupported version {dto.Version}.");
 
         return new(
-            dto.Secrets.Select(s => new SealedSecret(s.Slug, s.Version, s.WrappedDeks, s.Nonce, s.Ciphertext)).ToArray(),
+            dto.Secrets.Select(s => new SealedSecret(s.Slug, s.Version, s.WrappedDeks, s.Nonce, s.Ciphertext, s.BoundToPolicy)).ToArray(),
             dto.Services.Select(ToService).ToArray());
     }
 
     public static void Save(string path, VaultDocument vault)
     {
+        // Version 2 only once a secret is bound, so a vault without one stays readable by older builds.
         var dto = new VaultDto(
-            1,
-            vault.Secrets.Select(s => new SecretDto(s.Slug, s.Version, new Dictionary<string, byte[]>(s.WrappedDeks), s.Nonce, s.Ciphertext)).ToArray(),
+            vault.Secrets.Any(s => s.BoundToPolicy) ? 2 : 1,
+            vault.Secrets.Select(s => new SecretDto(s.Slug, s.Version, new Dictionary<string, byte[]>(s.WrappedDeks), s.Nonce, s.Ciphertext, s.BoundToPolicy)).ToArray(),
             vault.Services.Select(ToDto).ToArray());
 
         var full = Path.GetFullPath(path);
@@ -92,7 +94,9 @@ public static class VaultFile
 
     sealed record VaultDto(int Version, SecretDto[] Secrets, ServiceDto[] Services);
 
-    sealed record SecretDto(string Slug, int Version, Dictionary<string, byte[]> WrappedDeks, byte[] Nonce, byte[] Ciphertext);
+    /// <param name="BoundToPolicy">Version 2 only; absent reads as <c>false</c>.</param>
+    sealed record SecretDto(string Slug, int Version, Dictionary<string, byte[]> WrappedDeks, byte[] Nonce, byte[] Ciphertext,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool BoundToPolicy = false);
 
     sealed record ServiceDto(string Slug, Uri Upstream, GrantDto[] Grants);
 

@@ -21,17 +21,24 @@ public interface IKeyWrapper
 /// One secret at rest: the value encrypted under its own DEK, and that DEK wrapped once per
 /// <see cref="IKeyWrapper"/>. Holds no plaintext and no usable key.
 /// </summary>
+/// <param name="BoundToPolicy">
+/// The value's associated data also carries the hash of the policy it may be used under
+/// (<see cref="PolicyBinding"/>). Clearing the flag on disk doesn't help a tamperer: the value then
+/// fails to open under the unbound associated data.
+/// </param>
 public sealed record SealedSecret(
     string Slug,
     int Version,
     IReadOnlyDictionary<string, byte[]> WrappedDeks,
     byte[] Nonce,
-    byte[] Ciphertext);
+    byte[] Ciphertext,
+    bool BoundToPolicy = false);
 
 /// <summary>
 /// Envelope encryption for vault secrets. The slug and version are bound into both the value's AAD
 /// and the DEK wrap context, so neither a ciphertext nor a wrapped DEK can be moved onto another
-/// secret, or rolled back to an older version, without failing to open.
+/// secret, or rolled back to an older version, without failing to open. A secret sealed with a
+/// policy hash also opens only when given that same hash.
 /// </summary>
 public static class SecretEnvelope
 {
@@ -39,21 +46,22 @@ public static class SecretEnvelope
 
     public const int DekSize = 32;
 
-    public static SealedSecret Seal(string slug, int version, ReadOnlySpan<byte> value, IEnumerable<IKeyWrapper> wrappers)
+    /// <param name="policyHash"><see cref="PolicyBinding.Hash"/> to bind a vault secret to its policy; <c>null</c> for an unbound secret.</param>
+    public static SealedSecret Seal(string slug, int version, ReadOnlySpan<byte> value, IEnumerable<IKeyWrapper> wrappers, byte[]? policyHash = null)
     {
         var dek = System.Security.Cryptography.RandomNumberGenerator.GetBytes(DekSize);
         try
         {
             using var key = Key.Import(Aead, dek, KeyBlobFormat.RawSymmetricKey);
             var nonce = System.Security.Cryptography.RandomNumberGenerator.GetBytes(Aead.NonceSize);
-            var ciphertext = Aead.Encrypt(key, nonce, ValueContext(slug, version), value);
+            var ciphertext = Aead.Encrypt(key, nonce, ValueContext(slug, version, policyHash), value);
 
             var context = DekContext(slug, version);
             var wrapped = wrappers.ToDictionary(w => w.Id, w => w.Wrap(dek, context));
             if (wrapped.Count == 0)
                 throw new ArgumentException("A secret needs at least one key wrapper, or nothing can ever open it.", nameof(wrappers));
 
-            return new(slug, version, wrapped, nonce, ciphertext);
+            return new(slug, version, wrapped, nonce, ciphertext, policyHash is not null);
         }
         finally
         {
@@ -68,15 +76,20 @@ public static class SecretEnvelope
             : null;
 
     /// <returns>The value, or <c>null</c> when the DEK is wrong or the secret was tampered with.</returns>
-    public static byte[]? Open(SealedSecret secret, ReadOnlySpan<byte> dek)
+    public static byte[]? Open(SealedSecret secret, ReadOnlySpan<byte> dek) => Open(secret, dek, policyHash: null);
+
+    /// <param name="policyHash">The current <see cref="PolicyBinding.Hash"/> of the secret; ignored for an unbound one.</param>
+    /// <returns>The value, or <c>null</c> when the DEK is wrong, the secret was tampered with, or a bound secret's policy changed.</returns>
+    public static byte[]? Open(SealedSecret secret, ReadOnlySpan<byte> dek, byte[]? policyHash)
     {
-        if (dek.Length != DekSize)
+        if (dek.Length != DekSize || (secret.BoundToPolicy && policyHash is null))
             return null;
         using var key = Key.Import(Aead, dek, KeyBlobFormat.RawSymmetricKey);
         if (secret.Ciphertext.Length < Aead.TagSize)
             return null;
         var value = new byte[secret.Ciphertext.Length - Aead.TagSize];
-        return Aead.Decrypt(key, secret.Nonce, ValueContext(secret.Slug, secret.Version), secret.Ciphertext, value) ? value : null;
+        var context = ValueContext(secret.Slug, secret.Version, secret.BoundToPolicy ? policyHash : null);
+        return Aead.Decrypt(key, secret.Nonce, context, secret.Ciphertext, value) ? value : null;
     }
 
     /// <summary>Adds (or replaces) one wrapper's copy of the DEK, e.g. re-wrapping to a new TPM key from the recovery key.</summary>
@@ -91,5 +104,7 @@ public static class SecretEnvelope
 
     internal static string DekContext(string slug, int version) => $"dek\n{slug}\n{version}";
 
-    static byte[] ValueContext(string slug, int version) => System.Text.Encoding.UTF8.GetBytes($"tiresias/v1/value\n{slug}\n{version}");
+    static byte[] ValueContext(string slug, int version, byte[]? policyHash) => System.Text.Encoding.UTF8.GetBytes(policyHash is null
+        ? $"tiresias/v1/value\n{slug}\n{version}"
+        : $"tiresias/v2/value\n{slug}\n{version}\n{Convert.ToHexStringLower(policyHash)}");
 }

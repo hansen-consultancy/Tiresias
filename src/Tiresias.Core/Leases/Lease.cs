@@ -104,6 +104,13 @@ public sealed class Lease
         return expires;
     }
 
+    /// <summary>Ends every elevation of a service, e.g. when its policy changed after it was approved.</summary>
+    public void DropElevations(string service)
+    {
+        foreach (var key in elevations.Keys.Where(k => k.Service == service).ToArray())
+            elevations.Remove(key);
+    }
+
     public IReadOnlySet<string> ActiveElevations(string service, DateTimeOffset now) =>
         Evaluate(now) != LeaseEnd.None
             ? new HashSet<string>()
