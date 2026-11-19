@@ -1862,4 +1862,10 @@ Store them in clear?</value>
   <data name="Finding_RecycleFailed" xml:space="preserve">
     <value>{0} couldn't be moved; it may be open in another program.</value>
   </data>
+  <data name="Finding_DismissAll" xml:space="preserve">
+    <value>Dismiss all</value>
+  </data>
+  <data name="Finding_ShowMembers" xml:space="preserve">
+    <value>Show all {0}</value>
+  </data>
 </root>

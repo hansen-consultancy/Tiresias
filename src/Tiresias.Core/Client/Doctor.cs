@@ -14,15 +14,18 @@ public enum DoctorStatus
 }
 
 /// <summary>
-/// One line of <c>tir doctor</c>. A line about how a credential is delivered is a <b>finding</b>:
-/// it says where that delivery sits on the two axes now, where its fix takes it, and the fix.
+/// One line of <c>tir doctor</c>. A line with a fix, or about how a credential is delivered, is a
+/// <b>finding</b>: something the user can act on. A delivery finding also says where it sits on the
+/// two axes now and where its fix takes it.
 /// </summary>
 /// <param name="Fix">What raises it, for a UI to open filled in or the CLI to print.</param>
 /// <param name="Now">The delivery's position today; <c>null</c> on a line about Tiresias's own health.</param>
 /// <param name="Better">The position <paramref name="Fix"/> reaches.</param>
-public sealed record DoctorCheck(string Name, DoctorStatus Status, string Detail, DoctorFix? Fix = null, Position? Now = null, Position? Better = null)
+/// <param name="Kind">For a finding a check can raise many times, what its findings are, as a plural noun phrase
+/// ("projects that ..."), so a UI can show them as one line with a count. <c>null</c> for a one-off line.</param>
+public sealed record DoctorCheck(string Name, DoctorStatus Status, string Detail, DoctorFix? Fix = null, Position? Now = null, Position? Better = null, string? Kind = null)
 {
-    public bool IsFinding => Now is not null;
+    public bool IsFinding => Fix is not null || Now is not null;
 }
 
 /// <summary>What the vault file says about recoverability: which secrets lack a Hello or a recovery wrap.</summary>
@@ -160,9 +163,9 @@ public static partial class Doctor
                 return keys == 0
                     ? null
                     : new(name, DoctorStatus.Warn, $"in plain text: {Keys(keys)} any program running as you can read. Seal it once the project uses Tiresias.Extensions.Configuration: run the app once, or use Seal now in the secrets editor",
-                        new ReviewUserSecrets(id), Position.Plaintext, Position.SealedApproved);
+                        new ReviewUserSecrets(id), Position.Plaintext, Position.SealedApproved, "user secrets files in plain text");
             case SecretsFileKind.Invalid:
-                return new(name, DoctorStatus.Fail, "not valid JSON; apps reading it will fail at startup", new ReviewUserSecrets(id));
+                return new(name, DoctorStatus.Fail, "not valid JSON; apps reading it will fail at startup", new ReviewUserSecrets(id), Kind: "user secrets files that aren't valid JSON");
             case SecretsFileKind.Sealed:
                 JsonObject? plain;
                 try
@@ -171,12 +174,12 @@ public static partial class Doctor
                 }
                 catch (Exception e) when (e is InvalidDataException or FormatException or JsonException or InvalidOperationException)
                 {
-                    return new(name, DoctorStatus.Fail, $"sealed envelope unreadable ({e.Message})", new ReviewUserSecrets(id));
+                    return new(name, DoctorStatus.Fail, $"sealed envelope unreadable ({e.Message})", new ReviewUserSecrets(id), Kind: "sealed user secrets files that can't be read");
                 }
                 return plain is null
                     ? null
                     : new(name, DoctorStatus.Warn, $"sealed, but {UserSecretsVault.FlattenKeys(plain).Count} plaintext key(s) were added beside it; they are sealed on the next run",
-                        new ReviewUserSecrets(id), Position.Plaintext, Position.SealedApproved);
+                        new ReviewUserSecrets(id), Position.Plaintext, Position.SealedApproved, "sealed user secrets files with plaintext keys added beside them");
             default:
                 return null;
         }
@@ -189,7 +192,8 @@ public static partial class Doctor
         return file.Text.Contains(ReferenceConfigurationPackage.Package, StringComparison.Ordinal)
             ? null
             : new($"project {file.Path}", DoctorStatus.Warn, "sets <UserSecretsId> but doesn't reference Tiresias.Extensions.Configuration, so its secrets.json stays plaintext",
-                new ReferenceConfigurationPackage(file.Path), Position.Plaintext, Position.SealedApproved);
+                new ReferenceConfigurationPackage(file.Path), Position.Plaintext, Position.SealedApproved,
+                "projects that set <UserSecretsId> but don't reference Tiresias.Extensions.Configuration");
     }
 
     static string Keys(int count) => count == 1 ? "1 key" : $"{count} keys";

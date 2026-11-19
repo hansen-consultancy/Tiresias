@@ -10,6 +10,11 @@ its section below.
 
 ### Added
 
+- The status page shows findings of one kind as one line with their count, for example
+  "230 projects that set <UserSecretsId> but don't reference Tiresias.Extensions.Configuration". The
+  line opens to each finding with its own fix, and **Dismiss all** sets them aside with one reason.
+  Any check with a fix now counts as a finding too, such as a user secrets file that isn't valid JSON.
+
 - The status page lists **findings** first: each says where a credential's delivery stands, where
   its fix takes it, and has a button that opens the fix filled in (Set up SQL Server with the
   server and database, Set up RavenDB with the certificate file and then an offer to move the file

@@ -51,8 +51,8 @@ public static partial class Doctor
     }
 
     static DoctorCheck KeyFile(string name, string detail, string path, bool raven) => raven
-        ? new(name, DoctorStatus.Warn, $"{detail}. Let the broker present it instead, so the program never holds the key", new SetUpRaven(path), Position.Plaintext, Brokered)
-        : new(name, DoctorStatus.Warn, $"{detail}. If it is a RavenDB client certificate, set up a RavenDB with it; otherwise import it into the Windows certificate store as non-exportable and delete the file", Now: Position.Plaintext);
+        ? new(name, DoctorStatus.Warn, $"{detail}. Let the broker present it instead, so the program never holds the key", new SetUpRaven(path), Position.Plaintext, Brokered, "RavenDB certificates kept in files")
+        : new(name, DoctorStatus.Warn, $"{detail}. If it is a RavenDB client certificate, set up a RavenDB with it; otherwise import it into the Windows certificate store as non-exportable and delete the file", Now: Position.Plaintext, Kind: "certificate files holding a private key");
 
     /// <summary>Server-like keys, in the order their value names the host best.</summary>
     static readonly string[] ServerKeys = ["server", "data source", "address", "addr", "network address", "host"];
@@ -98,11 +98,11 @@ public static partial class Doctor
         return (server is null ? SqlServerMatch.No : IsSqlServer(builder, server)) switch
         {
             SqlServerMatch.Yes => new(name, DoctorStatus.Warn, $"holds a password{target} {plaintext} Tiresias can issue a SQL login per lease instead, dropped when the lease ends",
-                new SetUpSqlServer(server!, database), Position.Plaintext, LoginPerLease),
+                new SetUpSqlServer(server!, database), Position.Plaintext, LoginPerLease, "connection strings holding a SQL Server password"),
             SqlServerMatch.Maybe => new(name, DoctorStatus.Warn, $"holds a password{target} {plaintext} If this is SQL Server, Tiresias can issue a SQL login per lease instead; otherwise keep the connection string in sealed user secrets",
-                new SetUpSqlServer(server!, database), Position.Plaintext, LoginPerLease),
+                new SetUpSqlServer(server!, database), Position.Plaintext, LoginPerLease, "connection strings holding a password, perhaps for SQL Server"),
             _ => new(name, DoctorStatus.Warn, $"holds a password{target} in plain text, which any program running as you can read. Tiresias issues logins for SQL Server only; for this one, keep the connection string in sealed user secrets",
-                Now: Position.Plaintext, Better: Position.SealedApproved),
+                Now: Position.Plaintext, Better: Position.SealedApproved, Kind: "connection strings holding a password"),
         };
     }
 

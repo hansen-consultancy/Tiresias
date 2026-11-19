@@ -98,7 +98,7 @@ public class FindingViewTests
     {
         var split = FindingView.Of([Health, Variables, Secrets], Dismissals.Empty);
 
-        Assert.That(split.Open, Is.EqualTo(new[] { Secrets, Variables }));
+        Assert.That(split.Open.Select(g => g.Single()), Is.EqualTo(new[] { Secrets, Variables }));
         Assert.That(split.Others, Is.EqualTo(new[] { Health }));
         Assert.That(split.Dismissed, Is.Empty);
     }
@@ -110,8 +110,63 @@ public class FindingViewTests
 
         var split = FindingView.Of([Health, Variables, Secrets], dismissals);
 
-        Assert.That(split.Open, Is.EqualTo(new[] { Secrets }));
-        Assert.That(split.Dismissed.Select(d => (d.Check, d.Dismissal.Reason)), Is.EqualTo(new[] { (Variables, "test machine") }));
+        Assert.That(split.Open.Select(g => g.Single()), Is.EqualTo(new[] { Secrets }));
+        Assert.That(split.Dismissed, Is.EqualTo(new[] { new FindingView.DismissedGroup(Variables.Name, "test machine", [Dismissals.KeyOf(Variables)]) })
+            .Using<FindingView.DismissedGroup>((a, b) => a.Title == b.Title && a.Reason == b.Reason && a.Keys.SequenceEqual(b.Keys)));
+    }
+
+    const string ProjectKind = "projects that set <UserSecretsId> but don't reference Tiresias.Extensions.Configuration";
+
+    static DoctorCheck Project(string path) => new($"project {path}", DoctorStatus.Warn, "no package",
+        new ReferenceConfigurationPackage(path), Position.Plaintext, Position.SealedApproved, ProjectKind);
+
+    [Test]
+    public void Findings_of_one_kind_are_one_group_with_their_count_largest_first()
+    {
+        var split = FindingView.Of([Variables, Project("a.csproj"), Project("b.csproj"), Project("c.csproj")], Dismissals.Empty);
+
+        Assert.That(split.Open.Select(FindingView.Title), Is.EqualTo(new[] { $"3 {ProjectKind}", Variables.Name }));
+        Assert.That(split.Open[0].Select(c => c.Name), Is.EqualTo(new[] { "project a.csproj", "project b.csproj", "project c.csproj" }));
+    }
+
+    [Test]
+    public void A_kind_found_once_reads_as_the_line_itself()
+    {
+        Assert.That(FindingView.Title([Project("a.csproj")]), Is.EqualTo("project a.csproj"));
+    }
+
+    [Test]
+    public void A_failure_stays_ahead_of_a_larger_group_of_warnings()
+    {
+        var split = FindingView.Of([Project("a.csproj"), Project("b.csproj"), Secrets], Dismissals.Empty);
+
+        Assert.That(split.Open[0], Is.EqualTo(new[] { Secrets }));
+    }
+
+    [Test]
+    public void A_group_says_its_detail_only_when_every_line_says_the_same()
+    {
+        Assert.That(FindingView.Detail([Project("a"), Project("b")]), Is.EqualTo("no package"));
+        Assert.That(FindingView.Detail([Project("a"), Project("b") with { Detail = "other" }]), Is.Empty);
+    }
+
+    [Test]
+    public void Findings_dismissed_together_come_back_together()
+    {
+        var dismissals = new[] { Project("a"), Project("b") }.Aggregate(Dismissals.Empty, (d, c) => d.Dismiss(c, "worktree copies", DateTimeOffset.UnixEpoch));
+
+        var group = FindingView.Of([Project("a"), Project("b"), Project("c")], dismissals).Dismissed.Single();
+
+        Assert.That(group.Title, Is.EqualTo($"2 {ProjectKind}"));
+        Assert.That(group.Keys, Is.EqualTo(new[] { Dismissals.KeyOf(Project("a")), Dismissals.KeyOf(Project("b")) }));
+    }
+
+    [Test]
+    public void Any_check_with_a_fix_is_a_finding_and_so_is_a_delivery_without_one()
+    {
+        Assert.That(new DoctorCheck("user secrets x", DoctorStatus.Fail, "not valid JSON", new ReviewUserSecrets("x")).IsFinding);
+        Assert.That(new DoctorCheck("certificate a.pfx", DoctorStatus.Warn, "holds a key", Now: Position.Plaintext).IsFinding);
+        Assert.That(Health.IsFinding, Is.False);
     }
 
     [Test]
