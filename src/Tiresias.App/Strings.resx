@@ -1868,4 +1868,7 @@ Store them in clear?</value>
   <data name="Finding_ShowMembers" xml:space="preserve">
     <value>Show all {0}</value>
   </data>
+  <data name="Finding_FixPlaceholder" xml:space="preserve">
+    <value>Use a placeholder...</value>
+  </data>
 </root>

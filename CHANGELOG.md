@@ -10,6 +10,10 @@ its section below.
 
 ### Added
 
+- The status page finds sealed API keys handed out as their value where a placeholder would do
+  (an OpenAI-style key, or one with a matching vault service), and **Use a placeholder...** opens
+  Environment variables with the key checked. It needs Tiresias unlocked; `tir doctor` skips it.
+
 - The status page shows findings of one kind as one line with their count, for example
   "230 projects that set <UserSecretsId> but don't reference Tiresias.Extensions.Configuration". The
   line opens to each finding with its own fix, and **Dismiss all** sets them aside with one reason.

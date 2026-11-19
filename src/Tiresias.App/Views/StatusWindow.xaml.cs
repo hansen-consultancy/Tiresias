@@ -55,11 +55,12 @@ public partial class StatusWindow : Window
     void OnEnvironment(object sender, RoutedEventArgs e) => ShowEnvironment();
 
     /// <summary>The environment variables window; its changes can clear the exposed-variables check, so closing it re-runs the checks.</summary>
-    void ShowEnvironment()
+    EnvironmentWindow ShowEnvironment()
     {
         var window = App.Current.ShowWindow<EnvironmentWindow>();
         window.Closed -= OnRecoveryClosed;
         window.Closed += OnRecoveryClosed;
+        return window;
     }
 
     void OnAbout(object sender, RoutedEventArgs e) => App.Current.ShowWindow<AboutWindow>();
@@ -99,6 +100,9 @@ public partial class StatusWindow : Window
                 break;
             case ReferenceConfigurationPackage package:
                 model.CopyFix(package.Instruction);
+                break;
+            case UsePlaceholder { Variable: var variable, Service: var service }:
+                ShowEnvironment().PickForPlaceholder(variable, service);
                 break;
         }
     }
@@ -361,7 +365,7 @@ public sealed partial class StatusViewModel : ObservableObject
         {
             // The project folders the secrets editor scans are where appsettings and certificates live.
             var clock = System.Diagnostics.Stopwatch.StartNew();
-            var probe = new MachineProbe(ProjectIndexStore.Load().Folders);
+            var probe = new MachineProbe(ProjectIndexStore.Load().Folders) { Hello = App.Current.Host.Keys.Hello };
             last = await Task.Run(() => Doctor.RunAsync(probe));
             var checks = clock.Elapsed;
             Show();
