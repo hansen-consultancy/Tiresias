@@ -7,8 +7,25 @@ using Microsoft.Extensions.Configuration.UserSecrets;
 namespace Tiresias.Agent;
 
 /// <summary>The facts <see cref="Doctor"/> judges, read from this machine for the selected tenant. <c>tir doctor</c> and the app's status page both use it.</summary>
-public sealed class MachineProbe(string? projectsRoot = null) : IDoctorProbe
+/// <param name="projectRoots">Folders whose projects are checked too: <c>tir doctor --projects</c>, or the folders the secrets editor scans.</param>
+public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDoctorProbe
 {
+    public MachineProbe(string? projectsRoot)
+        : this(projectsRoot is null ? null : [projectsRoot])
+    {
+    }
+
+    /// <summary>The roots as full paths, without those gone or inside another, so no file is reported twice.</summary>
+    readonly string[] roots = Roots(projectRoots ?? []);
+
+    static string[] Roots(IEnumerable<string> folders)
+    {
+        var full = folders.Select(f => Path.TrimEndingDirectorySeparator(Path.GetFullPath(f))).Where(Directory.Exists)
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        return [.. full.Where(f => !full.Any(o => !string.Equals(o, f, StringComparison.OrdinalIgnoreCase)
+            && f.StartsWith(o + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)))];
+    }
+
     public bool Enrolled => KeyringStore.Broker is not null;
     public bool Solo => KeyringStore.Tenant is { Solo: true };
     public bool HasDeviceKey => KeyringStore.HasDeviceKey;
@@ -78,11 +95,10 @@ public sealed class MachineProbe(string? projectsRoot = null) : IDoctorProbe
     public IEnumerable<string> KeyFiles() =>
         Under("*.pfx").Concat(Under("*.p12")).Concat(Under("*.pem").Concat(Under("*.key")).Where(HoldsPemPrivateKey));
 
-    /// <summary>Files under the projects root, skipping build output and packages, which only copy what is already found.</summary>
-    IEnumerable<string> Under(string pattern) => projectsRoot is null
-        ? []
-        : Directory.EnumerateFiles(Path.GetFullPath(projectsRoot), pattern, new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true })
-            .Where(p => !p.Split(Path.DirectorySeparatorChar).Any(d => d is "bin" or "obj" or "node_modules" or ".git"));
+    /// <summary>Files under the project roots, skipping build output and packages, which only copy what is already found.</summary>
+    IEnumerable<string> Under(string pattern) => roots.SelectMany(root =>
+        Directory.EnumerateFiles(root, pattern, new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true })
+            .Where(p => !p.Split(Path.DirectorySeparatorChar).Any(d => d is "bin" or "obj" or "node_modules" or ".git")));
 
     /// <summary>Whether a PEM file holds a private key: only its header lines are looked at, and nothing is kept.</summary>
     static bool HoldsPemPrivateKey(string path)

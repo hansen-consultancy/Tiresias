@@ -255,13 +255,19 @@ static class Commands
 
     public static async Task<int> DoctorAsync(CommandLine args)
     {
-        var checks = await Tiresias.Client.Doctor.RunAsync(new MachineProbe(args.Option("--projects")));
+        var projects = args.Option("--projects");
+        if (projects is not null && !Directory.Exists(projects))
+            throw new UsageException($"No folder {projects}.");
+        var checks = await Tiresias.Client.Doctor.RunAsync(new MachineProbe(projects));
+        var dismissals = DismissalStore.Load();
         foreach (var check in checks)
         {
             var moves = check is { Now: { } now } ? $" [{now}{(check.Better is { } better ? $" -> {better}" : "")}]" : "";
             Console.WriteLine($"{check.Status switch { Tiresias.Client.DoctorStatus.Ok => "ok  ", Tiresias.Client.DoctorStatus.Warn => "WARN", _ => "FAIL" }}  {check.Name}: {check.Detail}{moves}");
             if (check.Fix is { } fix)
                 Console.WriteLine($"      fix: {fix.Instruction}");
+            if (check.IsFinding && dismissals.For(check) is { } dismissal)
+                Console.WriteLine($"      dismissed {dismissal.At.ToLocalTime():d}: {dismissal.Reason}");
         }
         return checks.Any(c => c.Status == Tiresias.Client.DoctorStatus.Fail) ? 1 : 0;
     }

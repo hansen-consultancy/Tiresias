@@ -88,7 +88,78 @@
     </StackPanel>
 
     <Grid Grid.Row="3">
-      <ListView x:Name="Checks" ItemsSource="{Binding Checks}" AutomationProperties.Name="{l:S Status_ChecksName}"
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
+      </Grid.RowDefinitions>
+
+      <!-- Findings: deliveries weaker than they could be, each with its fix and Dismiss with a reason. -->
+      <ScrollViewer Grid.Row="0" MaxHeight="300" VerticalScrollBarVisibility="Auto" Focusable="False" Margin="0,0,0,12"
+                    Visibility="{Binding FindingsVisibility}">
+        <Border Style="{StaticResource Card}" Margin="0">
+          <StackPanel>
+            <TextBlock x:Name="FindingsTitle" Text="{l:S Finding_Title}" Style="{StaticResource SubtitleText}" AutomationProperties.HeadingLevel="Level2" />
+            <TextBlock Text="{l:S Finding_Intro}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,0,0,4" />
+            <ItemsControl ItemsSource="{Binding Findings}" Focusable="False" AutomationProperties.LabeledBy="{Binding ElementName=FindingsTitle}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Grid Margin="0,6" AutomationProperties.Name="{Binding Spoken}">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="28" />
+                      <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding Glyph}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16"
+                               Foreground="{Binding Brush}" VerticalAlignment="Top" Margin="0,2,0,0" />
+                    <StackPanel Grid.Column="1">
+                      <TextBlock Text="{Binding Name}" Style="{StaticResource BodyText}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                      <TextBlock Text="{Binding Detail}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
+                      <TextBlock Text="{Binding Moves}" Style="{StaticResource CaptionText}" />
+                      <StackPanel Orientation="Horizontal" Margin="0,6,0,0" Visibility="{Binding ActionsVisibility}">
+                        <Button Padding="12,4" Content="{Binding FixLabel}" AutomationProperties.Name="{Binding FixName}"
+                                Visibility="{Binding FixVisibility}" Click="OnReview" Margin="0,0,8,0" />
+                        <Button Padding="12,4" Content="{l:S Finding_Dismiss}" AutomationProperties.Name="{Binding DismissName}" Click="OnDismiss" />
+                      </StackPanel>
+                      <StackPanel Margin="0,6,0,0" Visibility="{Binding DismissingVisibility}">
+                        <TextBlock x:Name="ReasonLabel" Text="{l:S Finding_ReasonLabel}" Style="{StaticResource CaptionText}" />
+                        <TextBox Text="{Binding Reason, UpdateSourceTrigger=PropertyChanged}" MaxLength="200" Margin="0,4,0,0"
+                                 AutomationProperties.Name="{l:S Finding_ReasonName}" />
+                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                          <Button Padding="12,4" Content="{l:S Finding_ConfirmDismiss}" IsEnabled="{Binding CanDismiss}" Click="OnConfirmDismiss" />
+                          <Button Padding="12,4" Margin="8,0,0,0" Content="{l:S Common_Cancel}" Click="OnCancelDismiss" />
+                        </StackPanel>
+                      </StackPanel>
+                    </StackPanel>
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBox Text="{Binding FindingMessage, Mode=OneWay}" Style="{StaticResource SelectableText}" TextWrapping="Wrap"
+                     Visibility="{Binding FindingMessageVisibility}" Margin="0,6,0,0" />
+            <Expander Header="{Binding DismissedHeader}" Visibility="{Binding DismissedVisibility}" Margin="0,8,0,0">
+              <ItemsControl ItemsSource="{Binding Dismissed}" Focusable="False">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Grid Margin="0,4">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                      </Grid.ColumnDefinitions>
+                      <StackPanel>
+                        <TextBlock Text="{Binding Name}" Style="{StaticResource BodyText}" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding Reason}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
+                      </StackPanel>
+                      <Button Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0" Padding="12,4"
+                              Content="{l:S Finding_ShowAgain}" AutomationProperties.Name="{Binding RestoreName}" Click="OnRestoreFinding" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </Expander>
+          </StackPanel>
+        </Border>
+      </ScrollViewer>
+
+      <ListView x:Name="Checks" Grid.Row="1" ItemsSource="{Binding Checks}" AutomationProperties.Name="{l:S Status_ChecksName}"
                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
         <ListView.ItemTemplate>
           <DataTemplate>
@@ -113,7 +184,7 @@
           </DataTemplate>
         </ListView.ItemTemplate>
       </ListView>
-      <TextBlock Text="{l:S Status_Running}" HorizontalAlignment="Center" VerticalAlignment="Center">
+      <TextBlock Grid.Row="1" Text="{l:S Status_Running}" HorizontalAlignment="Center" VerticalAlignment="Center">
         <TextBlock.Style>
           <Style TargetType="TextBlock" BasedOn="{StaticResource BodyText}">
             <Setter Property="Visibility" Value="Collapsed" />

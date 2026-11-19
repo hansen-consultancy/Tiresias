@@ -1790,4 +1790,76 @@ Store them in clear?</value>
   <data name="Usage_PlaceholderHint" xml:space="preserve">
     <value>Or in the Environment variables window: check the sealed key, pick {0} under Hand out a placeholder instead, then Use a placeholder. Name the variable after the key the tool reads; the base URL variable points the tool at Tiresias.</value>
   </data>
+  <data name="Finding_Title" xml:space="preserve">
+    <value>Findings</value>
+  </data>
+  <data name="Finding_Intro" xml:space="preserve">
+    <value>Credentials delivered more weakly than they could be. Each says where it is now and where its fix takes it.</value>
+  </data>
+  <data name="Finding_FixSecrets" xml:space="preserve">
+    <value>Open in the secrets editor</value>
+  </data>
+  <data name="Finding_FixVariables" xml:space="preserve">
+    <value>Seal variables...</value>
+  </data>
+  <data name="Finding_FixSql" xml:space="preserve">
+    <value>Set up SQL Server...</value>
+  </data>
+  <data name="Finding_FixRaven" xml:space="preserve">
+    <value>Set up RavenDB...</value>
+  </data>
+  <data name="Finding_FixCopy" xml:space="preserve">
+    <value>Copy command</value>
+  </data>
+  <data name="Finding_FixName" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
+  <data name="Finding_Dismiss" xml:space="preserve">
+    <value>Dismiss</value>
+  </data>
+  <data name="Finding_DismissName" xml:space="preserve">
+    <value>Dismiss {0}</value>
+  </data>
+  <data name="Finding_ReasonLabel" xml:space="preserve">
+    <value>Why? It stays dismissed until it changes.</value>
+  </data>
+  <data name="Finding_ReasonName" xml:space="preserve">
+    <value>Reason for dismissing</value>
+  </data>
+  <data name="Finding_ConfirmDismiss" xml:space="preserve">
+    <value>Dismiss</value>
+  </data>
+  <data name="Finding_DismissedHeader" xml:space="preserve">
+    <value>Dismissed ({0})</value>
+  </data>
+  <data name="Finding_ShowAgain" xml:space="preserve">
+    <value>Show again</value>
+  </data>
+  <data name="Finding_RestoreName" xml:space="preserve">
+    <value>Show {0} again</value>
+  </data>
+  <data name="Finding_DismissFailed" xml:space="preserve">
+    <value>The dismissal couldn't be saved: {0}</value>
+  </data>
+  <data name="Finding_Copied" xml:space="preserve">
+    <value>Copied: {0}</value>
+  </data>
+  <data name="Finding_CopyFailed" xml:space="preserve">
+    <value>The clipboard is busy. Run this yourself: {0}</value>
+  </data>
+  <data name="Finding_RecycleHeading" xml:space="preserve">
+    <value>Move the certificate file to the Recycle Bin?</value>
+  </data>
+  <data name="Finding_RecycleBody" xml:space="preserve">
+    <value>The certificate is sealed in Tiresias now, and the broker presents it. The copy at {0} can still be read by any program running as you. Programs that read the file need to use tiresias:raven first.</value>
+  </data>
+  <data name="Finding_Recycle" xml:space="preserve">
+    <value>Move to Recycle Bin</value>
+  </data>
+  <data name="Finding_Keep" xml:space="preserve">
+    <value>Keep it</value>
+  </data>
+  <data name="Finding_RecycleFailed" xml:space="preserve">
+    <value>{0} couldn't be moved; it may be open in another program.</value>
+  </data>
 </root>

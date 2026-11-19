@@ -1,6 +1,6 @@
 # Guided setup: the strongest option first
 
-Status: **phase 1 built** (#32): the axes and findings in `tir doctor`; the rest is design. This page designs how Tiresias steers people toward the safest way to
+Status: **phases 1 and 2 built** (#32): the axes and findings in `tir doctor`, and findings in the app; the rest is design. This page designs how Tiresias steers people toward the safest way to
 hold each credential, finds the weaker setups already on the machine, and keeps a growing feature
 set reachable without a row of buttons per feature.
 
@@ -172,8 +172,10 @@ Existing windows remain the places where the work happens; this changes how peop
 
 1. **Built. The axes and findings in `tir doctor`**: the planner in Core, the existing checks rewritten as
    findings with positions and fixes, plus the connection-string and certificate-on-disk checks.
-2. **Findings in the app**: a findings section on Home, one-click fixes opening today's windows filled
-   in, dismissals.
+2. **Built. Findings in the app**: a findings section on Home, one-click fixes opening today's windows filled
+   in, dismissals. The app checks the project folders the secrets editor scans. A dismissal is keyed
+   by the line, its fix's inputs and its position, hashed (`Dismissals.KeyOf`), so a changed finding
+   comes back; `dismissals.json` beside the keyring is shared with `tir doctor`.
 3. **What do you need?**: the catalogue, the ranked options, the free-text match; Add, Set up a SQL
    Server and Set up a RavenDB move behind it.
 4. **Show what is in use**: the home screen keeps only the areas that apply; the rest live in the catalogue.
