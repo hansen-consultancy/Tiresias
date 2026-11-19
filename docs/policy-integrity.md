@@ -1,6 +1,7 @@
 # Policy integrity
 
-Status: **design, nothing built.** Tracks issue #24. This page designs how the broker refuses a
+Status: **phase 1 built** (binding, bound envelope, broker checks); nothing seals bound secrets
+yet (see *Phases*). Tracks issue #24. This page designs how the broker refuses a
 service policy the user didn't approve: upstreams, grant rules and which secret each grant uses.
 
 ## The problem
@@ -55,20 +56,20 @@ B wins on the point that matters: it adds no root of trust and doesn't wait for 
 ### The binding
 
 For each secret, `PolicyBinding.For(vault, slug)` returns canonical bytes, built from every grant
-whose `secretSlug` is that secret, in vault order:
+whose `secretSlug` is that secret, in vault order. It is compact JSON, so a pattern holding a space
+or a newline can't be read two ways:
 
-```
-tiresias/v2/policy-binding
-service <slug> <upstream>
-grant <index> <name> methods=<sorted> allow=<patterns> deny=<patterns> maxBody=<n|-> elevation=<0|1> logins=<0|1>
-...
+```json
+["tiresias/v1/policy-binding",
+ ["<service>","<upstream>",<index>,"<grant>","<secret>",["<methods, sorted>"],["<allow>"],["<deny>"],<maxBody|null>,<elevation>,<logins>]]
 ```
 
 The grant's index within its service is included because ceilings are positional (least to most
 privileged). A secret no grant uses binds to the empty list, so it can't be used until a policy is
 approved for it.
 
-`SecretEnvelope` v2 adds `SHA-256(binding)` to the value AAD next to the slug and version.
+A bound secret (`boundToPolicy` in vault file version 2) adds `SHA-256(binding)` to the value AAD
+next to the slug and version. A vault with no bound secret is still written as version 1.
 Rebinding keeps the DEK: it re-encrypts the value and re-wraps the DEK for the new version, so the
 broker's leased DEK still opens it and no new lease seal is needed.
 
@@ -89,12 +90,15 @@ README's setup step 5 becomes `tir service add`/`edit`.
 - `GrantSelector` is unchanged. Before a chosen grant's secret is opened, the broker computes the
   binding from its **current** vault and opens with it. A mismatch is audited as
   `policy-not-approved` and refused with 403. No secret reaches the upstream.
-- `ReplaceVault` checks every leased DEK against the new vault's bindings. If any no longer opens,
-  the reload is refused, the old vault kept, and the agent told (tray error, activity entry). Today
-  that case silently drops the DEK.
-- A minted placeholder and an elevation record `SHA-256` of the bindings of the service's grants
-  at mint time. A request whose service hash differs is refused `policy-changed`; the consumer asks
-  again and the user sees the new policy in the consent dialog.
+- `ReplaceVault` checks every leased DEK against the new vault's bindings. A bound secret whose
+  ciphertext is unchanged but no longer opens means an unapproved policy change: the reload is
+  refused, the old vault kept, and the solo broker logs it. A re-sealed secret (approved) loses its
+  old DEK as before, until the agent seals the new one.
+- Placeholders and elevations retire when their service's policy changes: the reload compares each
+  service's hash (`PolicyBinding.ServiceHash`) and revokes the placeholders (audited
+  `PlaceholderRevoked`, reason `policy-changed`) and elevations of every service that differs or
+  is gone. The vault only changes there, so nothing needs storing at mint. The consumer asks again
+  and the user sees the new policy in the consent dialog.
 
 ### Rollback
 
@@ -132,7 +136,8 @@ admin's machine as today, after `tir vault migrate` there.
 
 ## Phases
 
-1. Binding, envelope v2, broker fail-closed on open and on reload, placeholder policy hash.
+1. **Built.** Binding, bound envelope, broker fail-closed on open and on reload, placeholders and
+   elevations retired on a policy change.
 2. Approval dialog and `VaultEditor.Approve`, wired into the Services window, both setups and
    `tir service add`.
 3. Migration on unlock, `tir vault migrate`, doctor line, broker README and CHANGELOG.
