@@ -15,7 +15,8 @@ its section below.
   names the entry and the file, never the token. Feeds move to Tiresias as before; npm and PyPI
   tokens are sealed with the new `tir env import` (or **Seal token...**), which leaves `${NAME}`
   in the `.npmrc`. For nuget.org, npmjs.org and pypi.org the finding also points to trusted
-  publishing from CI, which needs no key at all.- The status page and `tir doctor` point out code that can reach your credentials and has a reason
+  publishing from CI, which needs no key at all.
+- The status page and `tir doctor` point out code that can reach your credentials and has a reason
   to be doubted: an extension from an unknown publisher, or unchanged for two years, inside an
   editor that used a credential through Tiresias in the last 90 days (**Remove...** uninstalls it
   after you approve), a program that starts at log-on without a signature, and a program you
