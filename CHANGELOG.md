@@ -10,6 +10,13 @@ its section below.
 
 ### Added
 
+- `tir doctor` and the status page find publishing keys: NuGet feed tokens in plain text or in a
+  user environment variable, NuGet push keys, npm tokens and PyPI passwords in plain text. Each
+  names the entry and the file, never the token. Feeds move to Tiresias as before; npm and PyPI
+  tokens are sealed with the new `tir env import` (or **Seal token...**), which leaves `${NAME}`
+  in the `.npmrc`. For nuget.org, npmjs.org and pypi.org the finding also points to trusted
+  publishing from CI, which needs no key at all.
+
 - The status page shows findings of one kind as one line with their count, for example
   "230 projects that set <UserSecretsId> but don't reference Tiresias.Extensions.Configuration". The
   line opens to each finding with its own fix, and **Dismiss all** sets them aside with one reason.

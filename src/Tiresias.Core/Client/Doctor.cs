@@ -71,6 +71,12 @@ public interface IDoctorProbe
 
     /// <summary>Paths of files holding a private key (<c>.pfx</c>, <c>.p12</c>, or a PEM with one); empty unless asked for. Never their contents.</summary>
     IEnumerable<string> KeyFiles() => [];
+
+    /// <summary>The package tools' credential files, the user's own and those in the project folders; see <see cref="Doctor.PublishingKeys"/>.</summary>
+    IEnumerable<DoctorToolFile> ToolFiles() => [];
+
+    /// <summary>Names of the user's Windows environment variables, whatever they hold. Never values.</summary>
+    IReadOnlyCollection<string> UserVariableNames => [];
 }
 
 /// <summary>
@@ -117,6 +123,7 @@ public static partial class Doctor
                 new ProtectVariables(names), Position.Plaintext, Position.SealedApproved),
         });
         checks.AddRange(ConfigChecks(probe.UserSecretsFiles(), probe.ConfigFiles(), probe.KeyFiles()));
+        checks.AddRange(PublishingKeys(probe.ToolFiles(), probe.UserVariableNames));
         return checks;
     }
 

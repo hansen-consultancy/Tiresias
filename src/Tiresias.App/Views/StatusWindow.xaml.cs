@@ -97,10 +97,35 @@ public partial class StatusWindow : Window
             case SetUpRaven { CertificatePath: var path }:
                 SetUpRaven(path);
                 break;
-            case ReferenceConfigurationPackage package:
-                model.CopyFix(package.Instruction);
+            case ReferenceConfigurationPackage or ImportNuGetCredentials { InProfile: false }:
+                model.CopyFix(fix.Instruction);
+                break;
+            case ImportNuGetCredentials:
+                ShowEnvironment();
+                break;
+            case SealRegistryToken token:
+                SealToken(token);
                 break;
         }
+    }
+
+    /// <summary>Seal a registry token out of its file, once the user agreed to Tiresias reading it once.</summary>
+    async void SealToken(SealRegistryToken token)
+    {
+        if (AskWindow.Show(this, Text.Get("Finding_TokenHeading"), Text.Format("Finding_TokenBody", token.File, token.Variable),
+                Text.Get("Finding_TokenSeal"), cancel: Text.Get("Common_Cancel")) != true)
+            return;
+        if (!App.Current.Host.Keys.IsUnlocked && !(await App.Current.UnlockAsync(interactive: true)).Ok || App.Current.Host.Keys.Hello is not { } hello)
+            return;
+        try
+        {
+            RegistryTokenImporter.Import(token.File, token.Entry, token.Variable, hello);
+        }
+        catch (Exception e) when (e is InvalidOperationException or IOException or UnauthorizedAccessException)
+        {
+            AskWindow.Show(this, null, e.Message, Text.Get("Common_OK"));
+        }
+        model.Refresh();
     }
 
     /// <summary>Set up a RavenDB with the file found; once it is sealed, offer to move the file to the Recycle Bin.</summary>

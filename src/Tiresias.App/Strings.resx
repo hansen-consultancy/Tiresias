@@ -1868,4 +1868,19 @@ Store them in clear?</value>
   <data name="Finding_ShowMembers" xml:space="preserve">
     <value>Show all {0}</value>
   </data>
+  <data name="Finding_FixNuGet" xml:space="preserve">
+    <value>Move to Tiresias...</value>
+  </data>
+  <data name="Finding_FixToken" xml:space="preserve">
+    <value>Seal token...</value>
+  </data>
+  <data name="Finding_TokenHeading" xml:space="preserve">
+    <value>Seal this token?</value>
+  </data>
+  <data name="Finding_TokenBody" xml:space="preserve">
+    <value>Tiresias reads the token in {0} once, seals it as {1}, and takes it out of the file. Programs then get it only through tir run or a terminal with the hook, after you allow them.</value>
+  </data>
+  <data name="Finding_TokenSeal" xml:space="preserve">
+    <value>Seal it</value>
+  </data>
 </root>

@@ -126,6 +126,14 @@ service's grants, and the activity log records each request.
   way: the OpenAI SDKs and most OpenAI-compatible clients do. A tool sending the key in another
   header (Anthropic's `x-api-key`) gets refused by the broker: keep that one as a value.
 
+- **npm and PyPI:** `tir env import <file> <entry> <NAME>` seals a token an `.npmrc` (the entry
+  is its key, `//registry.npmjs.org/:_authToken`) or a `.pypirc` (the entry is its section) holds
+  in plain text, then takes it out of the file. An `.npmrc` is left with `${NAME}`, which npm fills
+  in from the environment `tir run` and the terminal hook give it; a `.pypirc` loses its
+  `password`, and twine reads `TWINE_PASSWORD` instead (for the `pypi` section, which `tir doctor`
+  offers to seal). The token is read once to seal it and never shown. `tir doctor` and the status
+  page find these, and the status page's **Seal token...** does the same after a yes.
+
 ### Programs started outside a shell
 
 - **NuGet:** `nuget-plugin-tiresias.exe`, installed next to `tir`, speaks NuGet's

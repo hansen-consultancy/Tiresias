@@ -82,6 +82,12 @@ public static class NuGetConfig
         }).OfType<NuGetConfigCredential>()];
     }
 
+    /// <summary>The sources with a push key under <c>apikeys</c>, which NuGet encrypts for the Windows account. Never the keys.</summary>
+    public static IReadOnlyList<string> ApiKeySources(string xml) =>
+        [.. Parse(xml, LoadOptions.None)?.Root?.Element("apikeys")?.Elements("add")
+            .Where(e => !string.IsNullOrEmpty((string?)e.Attribute("value")))
+            .Select(e => (string?)e.Attribute("key")).OfType<string>() ?? []];
+
     /// <summary>
     /// <paramref name="xml"/> without the credentials for <paramref name="keys"/>, and without an
     /// emptied <c>packageSourceCredentials</c>. Everything else, layout included, stays as it was.

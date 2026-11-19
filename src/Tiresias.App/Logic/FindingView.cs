@@ -11,6 +11,8 @@ public enum FixAction
     SetUpRaven,
     /// <summary>A step outside the app (a package to reference): the command goes to the clipboard.</summary>
     CopyCommand,
+    /// <summary>Seal a registry token from its file, after a yes that says the token is read once.</summary>
+    SealToken,
 }
 
 /// <summary>
@@ -60,6 +62,9 @@ public static class FindingView
         SetUpSqlServer => (FixAction.SetUpSqlServer, "Finding_FixSql"),
         SetUpRaven => (FixAction.SetUpRaven, "Finding_FixRaven"),
         ReferenceConfigurationPackage => (FixAction.CopyCommand, "Finding_FixCopy"),
+        ImportNuGetCredentials { InProfile: true } => (FixAction.OpenEnvironment, "Finding_FixNuGet"),
+        ImportNuGetCredentials => (FixAction.CopyCommand, "Finding_FixCopy"),
+        SealRegistryToken => (FixAction.SealToken, "Finding_FixToken"),
         _ => null,
     };
 

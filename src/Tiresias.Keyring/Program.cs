@@ -62,6 +62,10 @@ const string Usage = """
         Studio and Rider ask the app for the token, and you allow each program once. import
         finds the sources NuGet.Config gives a token (as %NAME% or in plain text), seals it and
         takes it out of the file.
+    tir env import <file> <entry> <NAME>
+        Seal the token an .npmrc (entry: its key, //registry.npmjs.org/:_authToken) or a .pypirc
+        (entry: its section) holds in plain text as NAME, and take it out of the file. An .npmrc
+        then says ${NAME}, which npm fills in from the environment tir run gives it.
     tir env placeholder add <NAME> <service> [--base-url <VARIABLE>]
     tir env placeholder list
     tir env placeholder remove <NAME>

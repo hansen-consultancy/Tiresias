@@ -104,7 +104,7 @@ First checks, by what they find and what they offer:
 | Broad RavenDB clearance | A RavenDB service whose certificate is Cluster Admin or Operator, or has access to databases the app doesn't use (asked through the broker; the endpoint is to be confirmed) | Issue a certificate scoped to the databases the app uses, and swap it in with **Edit...** |
 | Certificate expiry | A sealed certificate expiring within 30 days | Renew it before programs start failing |
 | Sealed key handed out as a value | An API key whose service accepts `Authorization: Bearer`, delivered as its value | Placeholder delivery (E4 → E3) |
-| Publishing key | A NuGet or npm API key, sealed or plaintext | Trusted publishing in CI (→ E1); keep a short-lived key for local pushes only |
+| Publishing key | Built: a NuGet feed token in plain text or in a user variable, a NuGet push key under `apikeys`, an npm `_authToken`/`_password`/`_auth` in plain text, a `.pypirc` password; the entry, registry and file, never the value | Feeds: `tir env nuget import` (E5 → E4/C1). npm, PyPI's `pypi`: `tir env import` seals it and leaves `${NAME}` (E5 → E4/C1). Push keys: a sealed variable through `tir run`. For the public registries, trusted publishing in CI (→ E1) |
 | Git token in a remote URL | `https://user:token@…` in a project's `.git/config` | Out of the URL first (E5 → E4), then through the broker (→ C1) |
 | A CLI acting as the user, unseen | `gh` signed in with a stored token, the Azure CLI with a cached Entra session (asked through each tool's own status command, never the token) | Run it through `tir exec` with a token minted per run after consent (C3 → C1); keep the tool's own sign-in only for interactive use, or sign it out |
 
