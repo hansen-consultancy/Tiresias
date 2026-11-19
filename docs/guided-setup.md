@@ -175,8 +175,9 @@ Existing windows remain the places where the work happens; this changes how peop
 2. **Findings in the app**: a findings section on Home, one-click fixes opening today's windows filled
    in, dismissals.
 3. **What do you need?**: the catalogue, the ranked options, the free-text match; Add, Set up a SQL
-   Server and Set up a RavenDB move behind it.
-4. **Show what is in use**: the home screen keeps only the areas that apply; the rest live in the catalogue.
+   Server and Set up a RavenDB move behind it ([design](what-do-you-need.md)).
+4. **Show what is in use**: the home screen keeps only the areas that apply; the rest live in the catalogue
+   ([design](what-do-you-need.md#phase-4-what-is-in-use)).
 5. **Attack surface**: installed software and extensions as findings, ranked by what uses
    credentials ([attack surface](attack-surface.md)).
 6. **More checks**: RavenDB clearance and expiry, sealed keys handed out as values, publishing keys,
