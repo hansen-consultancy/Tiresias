@@ -85,6 +85,8 @@ its section below.
 
 ### Fixed
 
+- A placeholder limited to a grant that was later renamed or removed from its service is
+  refused. Before, it could use every grant of the service, write and admin included.
 - **Show** in the secrets editor reveals the value; it did nothing before.
 - A selected row in the secrets, services and activity lists is a subtle highlight instead of dark
   blue under black text.
