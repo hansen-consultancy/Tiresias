@@ -11,6 +11,8 @@ public enum FixAction
     SetUpRaven,
     /// <summary>A step outside the app (a package to reference): the command goes to the clipboard.</summary>
     CopyCommand,
+    /// <summary>Seal a registry token from its file, after a yes that says the token is read once.</summary>
+    SealToken,
     /// <summary>Edit... on a RavenDB service, to pick a new certificate.</summary>
     ReplaceRaven,
     /// <summary>Environment variables, with the variable checked and the placeholder section in view.</summary>
@@ -69,6 +71,9 @@ public static class FindingView
         SetUpRaven => (FixAction.SetUpRaven, "Finding_FixRaven"),
         ReferenceConfigurationPackage => (FixAction.CopyCommand, "Finding_FixCopy"),
         RemoveTokenFromRemote => (FixAction.CopyCommand, "Finding_FixCopy"),
+        ImportNuGetCredentials { InProfile: true } => (FixAction.OpenEnvironment, "Finding_FixNuGet"),
+        ImportNuGetCredentials => (FixAction.CopyCommand, "Finding_FixCopy"),
+        SealRegistryToken => (FixAction.SealToken, "Finding_FixToken"),
         ReplaceRavenCertificate => (FixAction.ReplaceRaven, "Finding_FixRavenReplace"),
         UsePlaceholder => (FixAction.UsePlaceholder, "Finding_FixPlaceholder"),
         RemoveExtension => (FixAction.RemoveExtension, "Finding_FixRemoveExtension"),
