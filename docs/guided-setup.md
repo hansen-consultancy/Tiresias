@@ -112,8 +112,8 @@ changed (a new key, another server) is a new finding.
 
 ## "What do you need?"
 
-The app's one way to add anything. It asks for the need, then lists the options for it from the
-top rung down, the recommended one first with why, the others below with what they give up.
+The app's one way to add anything. It asks for the need, then lists the options for it strongest
+first on both axes, the recommended one first with why, the others below with what they give up.
 
 | Need | Options, strongest first |
 |---|---|
@@ -126,7 +126,7 @@ top rung down, the recommended one first with why, the others below with what th
 | Sign in to git | Git Credential Manager or an SSH key in an agent; else a token sealed for the NuGet/credential plugin |
 
 Each option starts the flow that exists today (Set up a SQL Server, Set up a RavenDB, Add a service,
-Environment variables), or, for rung 1, a short guide: Tiresias holds nothing, so there is nothing
+Environment variables), or, for an E1 option, a short guide: Tiresias holds nothing, so there is nothing
 to set up in the app, only steps to follow elsewhere.
 
 A free-text box at the top matches what the user types against the needs and known services ("my
@@ -149,7 +149,7 @@ Existing windows remain the places where the work happens; this changes how peop
 - **Checks gather facts**, as `DoctorProbe` does today: read-only, no prompts. They run in the agent,
   on the app's open and on a timer, and in `tir doctor`.
 - **One pure planner in Core** turns facts into findings and a need into ranked options: the
-  ladder, the per-service knowledge (which upstreams accept Bearer, which servers take integrated
+  two axes, the per-service knowledge (which upstreams accept Bearer, which servers take integrated
   sign-in) and the dismissals. Tested like `ServicePlanner`; the app, `tir doctor` and a future
   `tir advise` give the same advice because they ask the same planner.
 - **A finding names its fix as a flow and its inputs** (`SetUpRaven(pfxPath)`,
@@ -165,7 +165,7 @@ Existing windows remain the places where the work happens; this changes how peop
 - **Scan scope.** Project folders the user added, user secrets and sealed services only, or also
   common places such as `%USERPROFILE%\.nuget\NuGet\NuGet.Config` and `.git/config` under those
   folders? Start with the first; each extra place is its own check.
-- **Team policy.** With a remote broker, may an administrator require a minimum rung for a kind
+- **Team policy.** With a remote broker, may an administrator require a minimum position for a kind
   of secret? Out of scope until the broker has a policy model for it.
 
 ## Phases
