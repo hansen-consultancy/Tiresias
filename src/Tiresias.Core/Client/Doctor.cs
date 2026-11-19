@@ -72,6 +72,9 @@ public interface IDoctorProbe
     /// <summary>Paths of files holding a private key (<c>.pfx</c>, <c>.p12</c>, or a PEM with one); empty unless asked for. Never their contents.</summary>
     IEnumerable<string> KeyFiles() => [];
 
+    /// <summary>The sealed environment's deliveries, by name; <c>null</c> while locked. See <see cref="Doctor.KeysAsValues"/>.</summary>
+    DoctorEnvironment? SealedEnvironment => null;
+
     /// <summary>Extensions installed for the user in programs that host them, from their metadata.</summary>
     IEnumerable<InstalledExtension> Extensions() => [];
 
@@ -129,6 +132,7 @@ public static partial class Doctor
                 new ProtectVariables(names), Position.Plaintext, Position.SealedApproved),
         });
         checks.AddRange(ConfigChecks(probe.UserSecretsFiles(), probe.ConfigFiles(), probe.KeyFiles()));
+        checks.AddRange(KeysAsValues(probe.SealedEnvironment));
         checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), probe.CredentialUses(), probe.BlockedPrograms(), DateTimeOffset.UtcNow));
         return checks;
     }

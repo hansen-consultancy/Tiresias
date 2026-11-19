@@ -10,6 +10,9 @@ its section below.
 
 ### Added
 
+- The status page finds sealed API keys handed out as their value where a placeholder would do
+  (an OpenAI-style key, or one with a matching vault service), and **Use a placeholder...** opens
+  Environment variables with the key checked. It needs Tiresias unlocked; `tir doctor` skips it.
 - The status page and `tir doctor` point out code that can reach your credentials and has a reason
   to be doubted: an extension from an unknown publisher, or unchanged for two years, inside an
   editor that used a credential through Tiresias in the last 90 days (**Remove...** uninstalls it
