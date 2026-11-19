@@ -334,7 +334,12 @@ public sealed partial class StatusViewModel : ObservableObject
         try
         {
             // The project folders the secrets editor scans are where appsettings and certificates live.
-            last = await Task.Run(() => Doctor.RunAsync(new MachineProbe(ProjectIndexStore.Load().Folders)));
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            var probe = new MachineProbe(ProjectIndexStore.Load().Folders);
+            last = await Task.Run(() => Doctor.RunAsync(probe));
+            AppLog.Info(probe.Scan is { } scan
+                ? $"status checks took {clock.Elapsed.TotalSeconds:0.0}s, {scan.Elapsed.TotalSeconds:0.0}s of it walking {scan.Folders} folders for {scan.Files} files"
+                : $"status checks took {clock.Elapsed.TotalSeconds:0.0}s");
             Show();
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidDataException)

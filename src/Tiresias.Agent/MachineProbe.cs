@@ -1,3 +1,4 @@
+using System.IO.Enumeration;
 using System.Net.Sockets;
 using Tiresias.Client;
 using Tiresias.Protocol;
@@ -88,17 +89,67 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     public IReadOnlyList<string> ExposedVariables =>
         [.. EnvironmentStore.UserVariables().Where(v => v.LooksSecret).Select(v => v.Name)];
 
-    public IEnumerable<DoctorFile> Projects() => Under("*.csproj").Select(Read);
+    public IEnumerable<DoctorFile> Projects() => Found.Projects.Select(Read);
 
-    public IEnumerable<DoctorFile> ConfigFiles() => Under("appsettings*.json").Select(Read);
+    public IEnumerable<DoctorFile> ConfigFiles() => Found.Configs.Select(Read);
 
-    public IEnumerable<string> KeyFiles() =>
-        Under("*.pfx").Concat(Under("*.p12")).Concat(Under("*.pem").Concat(Under("*.key")).Where(HoldsPemPrivateKey));
+    public IEnumerable<string> KeyFiles() => Found.Keys.Concat(Found.Pems.Where(HoldsPemPrivateKey));
 
-    /// <summary>Files under the project roots, skipping build output and packages, which only copy what is already found.</summary>
-    IEnumerable<string> Under(string pattern) => roots.SelectMany(root =>
-        Directory.EnumerateFiles(root, pattern, new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true })
-            .Where(p => !p.Split(Path.DirectorySeparatorChar).Any(d => d is "bin" or "obj" or "node_modules" or ".git")));
+    /// <summary>How long the walk of the project roots took and what it covered; <c>null</c> until a check needed it.</summary>
+    public ScanStats? Scan => found?.Stats;
+
+    public sealed record ScanStats(TimeSpan Elapsed, int Folders, int Files);
+
+    sealed record FoundFiles(List<string> Projects, List<string> Configs, List<string> Keys, List<string> Pems, ScanStats Stats);
+
+    FoundFiles? found;
+    FoundFiles Found => found ??= Walk();
+
+    static readonly string[] Patterns = ["*.csproj", "appsettings*.json", "*.pfx", "*.p12", "*.pem", "*.key"];
+
+    /// <summary>
+    /// One walk of the project roots for every file a check reads. Build output, packages and git
+    /// internals are never entered: they only copy what is found elsewhere, and on a drive full of
+    /// repositories they are half the folders.
+    /// </summary>
+    FoundFiles Walk()
+    {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        List<string> projects = [], configs = [], keys = [], pems = [];
+        var folders = roots.Length;
+        var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true };
+        foreach (var root in roots)
+        {
+            var files = new FileSystemEnumerable<string>(root, (ref FileSystemEntry entry) => entry.ToFullPath(), options)
+            {
+                ShouldRecursePredicate = (ref FileSystemEntry entry) =>
+                {
+                    if (entry.FileName is "bin" or "obj" or "node_modules" or ".git")
+                        return false;
+                    folders++;
+                    return true;
+                },
+                ShouldIncludePredicate = (ref FileSystemEntry entry) => !entry.IsDirectory && Wanted(entry.FileName.ToString()),
+            };
+            foreach (var path in files)
+            {
+                var name = Path.GetFileName(path);
+                if (Matches("*.csproj", name))
+                    projects.Add(path);
+                else if (Matches("appsettings*.json", name))
+                    configs.Add(path);
+                else if (Matches("*.pfx", name) || Matches("*.p12", name))
+                    keys.Add(path);
+                else
+                    pems.Add(path);
+            }
+        }
+        return new(projects, configs, keys, pems, new(clock.Elapsed, folders, projects.Count + configs.Count + keys.Count + pems.Count));
+    }
+
+    static bool Wanted(string name) => Patterns.Any(p => Matches(p, name));
+
+    static bool Matches(string pattern, string name) => FileSystemName.MatchesSimpleExpression(pattern, name, ignoreCase: true);
 
     /// <summary>Whether a PEM file holds a private key: only its header lines are looked at, and nothing is kept.</summary>
     static bool HoldsPemPrivateKey(string path)
