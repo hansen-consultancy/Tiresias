@@ -271,7 +271,9 @@ public static class SqlServerSetup
             return null;
         try
         {
-            return PolicyBinding.Allows(vault, secret) && SecretEnvelope.Open(secret, dek) is { } value ? Encoding.UTF8.GetString(value) : null;
+            // An unbound secret is read too: setting the service up again is what binds it.
+            return (secret.PolicyHash is null || PolicyBinding.Allows(vault, secret)) && SecretEnvelope.Open(secret, dek) is { } value
+                ? Encoding.UTF8.GetString(value) : null;
         }
         finally
         {

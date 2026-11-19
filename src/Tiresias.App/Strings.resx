@@ -1434,6 +1434,14 @@ Store them in clear?</value>
 
 {0}</value>
   </data>
+  <data name="Policy_MigrateTitle" xml:space="preserve">
+    <value>Protect your services' settings?</value>
+  </data>
+  <data name="Policy_MigrateBody" xml:space="preserve">
+    <value>Tiresias will now refuse changes to these settings unless you approve them, so a program that edits the vault file can't send your secrets elsewhere. Until you approve, these services don't work. Windows Hello asks next.
+
+{0}</value>
+  </data>
   <data name="Policy_Approve" xml:space="preserve">
     <value>Approve</value>
   </data>

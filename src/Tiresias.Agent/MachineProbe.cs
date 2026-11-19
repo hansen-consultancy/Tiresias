@@ -24,7 +24,8 @@ public sealed class MachineProbe(string? projectsRoot = null) : IDoctorProbe
             var secrets = VaultFile.Load(path).Secrets;
             return new(secrets.Count,
                 secrets.Where(s => !s.WrappedDeks.ContainsKey("hello")).Select(s => s.Slug).ToArray(),
-                secrets.Where(s => !s.WrappedDeks.ContainsKey("recovery")).Select(s => s.Slug).ToArray());
+                secrets.Where(s => !s.WrappedDeks.ContainsKey("recovery")).Select(s => s.Slug).ToArray(),
+                secrets.Where(s => s.PolicyHash is null).Select(s => s.Slug).ToArray());
         }
     }
 

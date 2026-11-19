@@ -271,7 +271,7 @@ public class BrokerStateTests
     {
         var offer = OpenLease();
         var token = Mint();
-        var resealed = SecretEnvelope.Seal("llm-read", 2, "Bearer sk-read-2"u8, [vault.Tpm]);
+        var resealed = SecretEnvelope.Seal("llm-read", 2, "Bearer sk-read-2"u8, [vault.Tpm], PolicyBinding.Hash(vault.Document, "llm-read"));
         var reloaded = vault.Document with { Secrets = [.. vault.Document.Secrets.Where(s => s.Slug != "llm-read"), resealed] };
 
         Assert.That(state.ReplaceVault(reloaded).Unleased, Is.EqualTo(new[] { "llm-read" }));
@@ -291,7 +291,10 @@ public class BrokerStateTests
         OpenLease();
         var token = Mint();
 
-        state.ReplaceVault(vault.Document with { Services = [] });
+        // Removed as the app removes it: each secret rebound to what is left (no service).
+        var removed = vault.Document with { Services = [] };
+        state.ReplaceVault(removed with { Secrets = [.. removed.Secrets.Select(s =>
+            SecretEnvelope.Rebind(s, SecretEnvelope.UnwrapDek(s, vault.Tpm)!, PolicyBinding.Hash(removed, s.Slug), [vault.Tpm])!)] });
 
         Assert.That(state.Authorize($"Bearer {token}", "llm", Get("/v1/models")).Refusal?.Reason, Is.EqualTo("unknown-placeholder"));
         Assert.That(AuditLines(), Has.Exactly(1).Contains("\"kind\":\"PlaceholderRevoked\"").And.Contains("policy-changed"));

@@ -10,7 +10,7 @@ public class PolicyChangePlannerTests
     [Test]
     public void Saving_an_approved_service_unchanged_is_empty()
     {
-        using var vault = TestVault.CreateBound();
+        using var vault = TestVault.Create();
         var change = PolicyChangePlanner.Plan(vault.Document, [Llm(vault.Document)], []);
         Assert.That(change.IsEmpty, Is.True);
     }
@@ -18,7 +18,7 @@ public class PolicyChangePlannerTests
     [Test]
     public void A_new_upstream_shows_both_and_rebinds_every_secret_of_the_service()
     {
-        using var vault = TestVault.CreateBound();
+        using var vault = TestVault.Create();
         var moved = Llm(vault.Document) with { Upstream = new Uri("https://llm2.example/") };
 
         var change = PolicyChangePlanner.Plan(vault.Document, [moved], []);
@@ -36,7 +36,7 @@ public class PolicyChangePlannerTests
     [Test]
     public void Reordered_grants_are_a_change_because_ceilings_are_positional()
     {
-        using var vault = TestVault.CreateBound();
+        using var vault = TestVault.Create();
         var llm = Llm(vault.Document);
         var reordered = llm with { Grants = [llm.Grants[1], llm.Grants[0], llm.Grants[2]] };
 
@@ -49,7 +49,7 @@ public class PolicyChangePlannerTests
     [Test]
     public void A_new_service_on_a_shared_secret_rebinds_only_that_secret()
     {
-        using var vault = TestVault.CreateBound();
+        using var vault = TestVault.Create();
         var mirror = new Service("mirror", new Uri("https://mirror.example/"),
             [new Grant("read", "llm-read", new RequestRule(new HashSet<string> { "GET" }, [VaultFile.Compile("^/")], [], null))]);
 
@@ -67,7 +67,7 @@ public class PolicyChangePlannerTests
     [Test]
     public void Removing_a_service_rebinds_its_secrets_to_what_is_left()
     {
-        using var vault = TestVault.CreateBound();
+        using var vault = TestVault.Create();
         var change = PolicyChangePlanner.Plan(vault.Document, [], ["llm"]);
 
         Assert.That(change.Lines[0], Is.EqualTo("Remove service llm"));
@@ -79,14 +79,14 @@ public class PolicyChangePlannerTests
     [Test]
     public void Removing_a_service_that_is_not_there_is_empty()
     {
-        using var vault = TestVault.CreateBound();
+        using var vault = TestVault.Create();
         Assert.That(PolicyChangePlanner.Plan(vault.Document, [], ["nope"]).IsEmpty, Is.True);
     }
 
     [Test]
     public void Saving_a_service_whose_secrets_are_unbound_approves_it_as_it_is()
     {
-        using var vault = TestVault.Create();
+        using var vault = TestVault.CreateUnbound();
         var change = PolicyChangePlanner.Plan(vault.Document, [Llm(vault.Document)], []);
 
         Assert.That(change.Lines[0], Is.EqualTo("Approve service llm as it is"));
@@ -96,7 +96,7 @@ public class PolicyChangePlannerTests
     [Test]
     public void Saving_a_service_after_an_unapproved_edit_approves_what_is_on_disk()
     {
-        using var vault = TestVault.CreateBound();
+        using var vault = TestVault.Create();
         var edited = vault.Document with { Services = [Llm(vault.Document) with { Upstream = new Uri("https://attacker.example/") }] };
 
         var change = PolicyChangePlanner.Plan(edited, [Llm(edited)], []);
@@ -108,7 +108,7 @@ public class PolicyChangePlannerTests
     [Test]
     public void Unbound_secrets_the_change_does_not_touch_stay_unbound()
     {
-        using var vault = TestVault.Create();
+        using var vault = TestVault.CreateUnbound();
         var mirror = new Service("mirror", new Uri("https://mirror.example/"),
             [new Grant("read", "llm-read", new RequestRule(new HashSet<string> { "GET" }, [VaultFile.Compile("^/")], [], null))]);
 
@@ -133,5 +133,27 @@ public class PolicyChangePlannerTests
             [new Grant("read", "nope", new RequestRule(new HashSet<string> { "GET" }, [VaultFile.Compile("^/")], [], null))]);
         Assert.That(() => PolicyChangePlanner.Plan(vault.Document, [orphan], []),
             Throws.InvalidOperationException.With.Message.Contains("nope"));
+    }
+
+    [Test]
+    public void Migration_binds_every_unbound_secret_as_it_is_and_changes_no_service()
+    {
+        using var vault = TestVault.CreateWith(tpm => ([SecretEnvelope.Seal("spare", 1, "x"u8, [tpm])], []));
+        var unbound = vault.Document with { Secrets = [.. vault.Document.Secrets.Select(s => s.Slug == "llm-read" ? s : s with { PolicyHash = null })] };
+
+        var change = PolicyChangePlanner.Migrate(unbound);
+
+        Assert.That(change.Rebind, Is.EquivalentTo(new[] { "llm-write", "llm-admin", "spare" }));
+        Assert.That(change.Lines[0], Is.EqualTo("Approve service llm as it is"));
+        Assert.That(change.Lines[^1], Is.EqualTo("Keep secret spare for later: no service uses it"));
+        Assert.That(change.Next.Services, Is.EqualTo(unbound.Services));
+        Assert.That(PolicyChangePlanner.Replan(unbound, change).Rebind, Is.EqualTo(change.Rebind), "Approve plans it the same way again");
+    }
+
+    [Test]
+    public void Migrating_a_bound_vault_is_empty()
+    {
+        using var vault = TestVault.Create();
+        Assert.That(PolicyChangePlanner.Migrate(vault.Document).IsEmpty, Is.True);
     }
 }

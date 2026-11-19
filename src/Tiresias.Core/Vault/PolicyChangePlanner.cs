@@ -14,7 +14,9 @@ namespace Tiresias.Vault;
 /// the change alters, and those of the services set that aren't approved for it yet (unbound, or
 /// left behind by an unapproved edit).
 /// </param>
-public sealed record PolicyChange(IReadOnlyList<Service> Set, IReadOnlyList<string> Remove, VaultDocument Next, IReadOnlyList<string> Lines, IReadOnlyList<string> Rebind)
+/// <param name="Migration">Made by <see cref="PolicyChangePlanner.Migrate"/>, so planned again the same way.</param>
+public sealed record PolicyChange(IReadOnlyList<Service> Set, IReadOnlyList<string> Remove, VaultDocument Next, IReadOnlyList<string> Lines, IReadOnlyList<string> Rebind,
+    bool Migration = false)
 {
     /// <summary>Nothing to approve: saving would write the vault as it is.</summary>
     public bool IsEmpty => Lines.Count == 0 && Rebind.Count == 0;
@@ -79,6 +81,28 @@ public static class PolicyChangePlanner
         }
         return new(set, remove, next, lines, rebind);
     }
+
+    /// <summary>
+    /// Binds every unbound secret to its policy as it is now: each service using one, shown as it
+    /// is, and each secret no service uses, bound to the empty policy. Changes no service.
+    /// </summary>
+    public static PolicyChange Migrate(VaultDocument current)
+    {
+        var rebind = current.Secrets.Where(s => s.PolicyHash is null).Select(s => s.Slug).ToArray();
+        var lines = new List<string>();
+        foreach (var service in current.Services.Where(s => s.Grants.Any(g => rebind.Contains(g.SecretSlug))))
+        {
+            lines.Add($"Approve service {service.Slug} as it is");
+            lines.AddRange(Describe(service).Select(line => $"    {line}"));
+        }
+        var used = current.Services.SelectMany(s => s.Grants).Select(g => g.SecretSlug).ToHashSet(StringComparer.Ordinal);
+        lines.AddRange(rebind.Where(slug => !used.Contains(slug)).Select(slug => $"Keep secret {slug} for later: no service uses it"));
+        return new([], [], current, lines, rebind, Migration: true);
+    }
+
+    /// <summary>Plans <paramref name="change"/> again against <paramref name="current"/>, to see whether the vault moved since the user looked.</summary>
+    public static PolicyChange Replan(VaultDocument current, PolicyChange change) =>
+        change.Migration ? Migrate(current) : Plan(current, change.Set, change.Remove);
 
     static bool Approved(SealedSecret secret, byte[] policy) =>
         secret.PolicyHash is { } approved && approved.AsSpan().SequenceEqual(policy);
