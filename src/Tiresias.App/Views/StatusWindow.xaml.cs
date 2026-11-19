@@ -137,36 +137,62 @@ public partial class StatusWindow : Window
     void OnConfirmDismiss(object sender, RoutedEventArgs e)
     {
         if (((FrameworkElement)sender).DataContext is FindingRow { CanDismiss: true } row)
-            model.Dismiss(row.Check, row.Reason);
+            model.Dismiss(row.Checks, row.Reason);
     }
 
     void OnRestoreFinding(object sender, RoutedEventArgs e)
     {
         if (((FrameworkElement)sender).DataContext is DismissedRow row)
-            model.RestoreFinding(row.Key);
+            model.RestoreFindings(row.Keys);
     }
 }
 
-/// <summary>A finding: where the delivery sits, where its fix takes it, the fix, and Dismiss with a reason.</summary>
-public sealed partial class FindingRow(DoctorCheck check) : ObservableObject
+/// <summary>
+/// A finding, or findings of one kind shown as one line with their count: where the delivery sits,
+/// where its fix takes it, the fix (for one), its members (for a group), and Dismiss with a reason.
+/// </summary>
+public sealed partial class FindingRow(IReadOnlyList<DoctorCheck> checks) : ObservableObject
 {
-    public DoctorCheck Check { get; } = check;
+    public FindingRow(DoctorCheck check)
+        : this([check])
+    {
+    }
 
-    public string Name => Check.Name;
+    public IReadOnlyList<DoctorCheck> Checks { get; } = checks;
 
-    public string Detail => Check.Detail;
+    /// <summary>The finding when there is one; for a group, the first, which speaks for the kind.</summary>
+    public DoctorCheck Check => Checks[0];
 
-    public string Moves { get; } = FindingView.Moves(check);
+    public bool IsGroup => Checks.Count > 1;
+
+    /// <summary>A group's findings, each with its own fix and Dismiss; built when first shown.</summary>
+    public IReadOnlyList<FindingRow> Members => members ??= IsGroup ? [.. Checks.Select(c => new FindingRow(c))] : [];
+
+    IReadOnlyList<FindingRow>? members;
+
+    public Visibility MembersVisibility => IsGroup ? Visibility.Visible : Visibility.Collapsed;
+
+    public string MembersHeader => Text.Format("Finding_ShowMembers", Checks.Count);
+
+    public string Name { get; } = FindingView.Title(checks);
+
+    public string Detail { get; } = FindingView.Detail(checks);
+
+    public Visibility DetailVisibility => Detail.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+
+    public string Moves { get; } = FindingView.Moves(checks[0]);
 
     public string Glyph => Check.Status == DoctorStatus.Fail ? "\uEA39" : "\uE7BA";
 
     public Brush? Brush => Application.Current.TryFindResource(Check.Status == DoctorStatus.Fail ? "SystemFillColorCriticalBrush" : "SystemFillColorCautionBrush") as Brush;
 
-    public string FixLabel { get; } = FindingView.Button(check.Fix) is { } button ? Text.Get(button.Label) : "";
+    public string FixLabel { get; } = checks.Count == 1 && FindingView.Button(checks[0].Fix) is { } button ? Text.Get(button.Label) : "";
 
     public Visibility FixVisibility => FixLabel.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
 
     public string FixName => Text.Format("Finding_FixName", FixLabel, Name);
+
+    public string DismissLabel => Text.Get(IsGroup ? "Finding_DismissAll" : "Finding_Dismiss");
 
     public string DismissName => Text.Format("Finding_DismissName", Name);
 
@@ -187,8 +213,8 @@ public sealed partial class FindingRow(DoctorCheck check) : ObservableObject
     public Visibility ActionsVisibility => IsDismissing ? Visibility.Collapsed : Visibility.Visible;
 }
 
-/// <summary>A finding set aside, with the reason given and Show again.</summary>
-public sealed record DismissedRow(string Key, string Name, string Reason)
+/// <summary>Findings set aside together, with the reason given and Show again.</summary>
+public sealed record DismissedRow(IReadOnlyList<string> Keys, string Name, string Reason)
 {
     public string RestoreName => Text.Format("Finding_RestoreName", Name);
 }
@@ -366,11 +392,11 @@ public sealed partial class StatusViewModel : ObservableObject
     {
         var split = FindingView.Of(last, DismissalStore.Load());
         Findings.Clear();
-        foreach (var check in split.Open)
-            Findings.Add(new(check));
+        foreach (var group in split.Open)
+            Findings.Add(new(group));
         Dismissed.Clear();
-        foreach (var (check, dismissal) in split.Dismissed)
-            Dismissed.Add(new(dismissal.Key, check.Name, dismissal.Reason));
+        foreach (var group in split.Dismissed)
+            Dismissed.Add(new(group.Keys, group.Title, group.Reason));
         Checks.Clear();
         foreach (var check in split.Others)
             Checks.Add(Row(check));
@@ -379,9 +405,10 @@ public sealed partial class StatusViewModel : ObservableObject
         OnPropertyChanged(nameof(DismissedHeader));
     }
 
-    public void Dismiss(DoctorCheck check, string reason) => ChangeDismissals(d => d.Dismiss(check, reason, DateTimeOffset.Now));
+    public void Dismiss(IEnumerable<DoctorCheck> checks, string reason) =>
+        ChangeDismissals(d => checks.Aggregate(d, (all, check) => all.Dismiss(check, reason, DateTimeOffset.Now)));
 
-    public void RestoreFinding(string key) => ChangeDismissals(d => d.Restore(key));
+    public void RestoreFindings(IEnumerable<string> keys) => ChangeDismissals(d => keys.Aggregate(d, (all, key) => all.Restore(key)));
 
     void ChangeDismissals(Func<Dismissals, Dismissals> change)
     {
@@ -434,8 +461,8 @@ public sealed partial class StatusViewModel : ObservableObject
     void Copy()
     {
         var sb = new StringBuilder().AppendLine(Headline).AppendLine(Mode).AppendLine(Build);
-        foreach (var row in Findings)
-            sb.AppendLine(CultureInfo.CurrentCulture, $"{row.Check.Status}  {row.Name}: {row.Detail} [{row.Moves}]");
+        foreach (var check in Findings.SelectMany(row => row.Checks))
+            sb.AppendLine(CultureInfo.CurrentCulture, $"{check.Status}  {check.Name}: {check.Detail} [{FindingView.Moves(check)}]");
         foreach (var row in Checks)
             sb.AppendLine(CultureInfo.CurrentCulture, $"{row.StatusText}  {row.Name}: {row.Detail}");
         try
