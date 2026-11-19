@@ -1937,4 +1937,7 @@ Store them in clear?</value>
   <data name="Finding_TokenSeal" xml:space="preserve">
     <value>Seal it</value>
   </data>
+  <data name="Finding_FixPlaceholder" xml:space="preserve">
+    <value>Use a placeholder...</value>
+  </data>
 </root>

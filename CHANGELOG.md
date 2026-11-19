@@ -16,6 +16,9 @@ its section below.
   tokens are sealed with the new `tir env import` (or **Seal token...**), which leaves `${NAME}`
   in the `.npmrc`. For nuget.org, npmjs.org and pypi.org the finding also points to trusted
   publishing from CI, which needs no key at all.
+- The status page finds sealed API keys handed out as their value where a placeholder would do
+  (an OpenAI-style key, or one with a matching vault service), and **Use a placeholder...** opens
+  Environment variables with the key checked. It needs Tiresias unlocked; `tir doctor` skips it.
 - The status page and `tir doctor` point out code that can reach your credentials and has a reason
   to be doubted: an extension from an unknown publisher, or unchanged for two years, inside an
   editor that used a credential through Tiresias in the last 90 days (**Remove...** uninstalls it
