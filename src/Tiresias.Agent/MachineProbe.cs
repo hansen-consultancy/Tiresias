@@ -95,6 +95,8 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public IEnumerable<string> KeyFiles() => Found.Keys.Concat(Found.Pems.Where(HoldsPemPrivateKey));
 
+    public IEnumerable<DoctorRavenCertificate> RavenCertificates() => RavenCertificateStore.ForVault();
+
     /// <summary>The unlocked key, for the checks that need the sealed environment's names; <c>null</c> skips them. Never prompts.</summary>
     public IKeyWrapper? Hello { get; init; }
 

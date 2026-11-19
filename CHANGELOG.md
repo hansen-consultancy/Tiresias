@@ -10,6 +10,10 @@ its section below.
 
 ### Added
 
+- `tir doctor` and the status page warn when a RavenDB service's certificate expires within 30
+  days, and fail once it has, with **Replace certificate...** opening **Edit...** on the service.
+  The expiry is recorded when a RavenDB is set up or edited; one set up earlier says "expiry
+  unknown" until it is edited and saved once.
 - The status page finds sealed API keys handed out as their value where a placeholder would do
   (an OpenAI-style key, or one with a matching vault service), and **Use a placeholder...** opens
   Environment variables with the key checked. It needs Tiresias unlocked; `tir doctor` skips it.
