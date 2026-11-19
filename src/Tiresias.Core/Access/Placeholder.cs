@@ -100,6 +100,19 @@ public sealed class PlaceholderRegistry(TimeProvider time)
             return byHash.Remove(Convert.ToHexString(PlaceholderToken.Hash(token)), out var removed) ? removed : null;
     }
 
+    /// <summary>Drops every placeholder issued for a service, e.g. when its policy changed under them.</summary>
+    /// <returns>The placeholders dropped, for the audit log.</returns>
+    public IReadOnlyList<Placeholder> RevokeService(string serviceSlug)
+    {
+        lock (gate)
+        {
+            var doomed = byHash.Where(p => p.Value.Request.ServiceSlug == serviceSlug).ToArray();
+            foreach (var (key, _) in doomed)
+                byHash.Remove(key);
+            return doomed.Select(p => p.Value).ToArray();
+        }
+    }
+
     /// <summary>Drops every placeholder of a lease. Called when the lease ends.</summary>
     public int RevokeLease(string leaseId)
     {

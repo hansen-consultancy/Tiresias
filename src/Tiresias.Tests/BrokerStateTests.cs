@@ -257,9 +257,9 @@ public class BrokerStateTests
             Services = [.. vault.Document.Services, new Service("httpbin", new Uri("https://httpbin.example/"), [])],
         };
 
-        var unleased = state.ReplaceVault(reloaded);
+        var reload = state.ReplaceVault(reloaded);
 
-        Assert.That(unleased, Is.EqualTo(new[] { "httpbin" }));
+        Assert.That(reload.Unleased, Is.EqualTo(new[] { "httpbin" }));
         Assert.That(state.LeasedDeks(), Has.Count.EqualTo(2), "the removed secret's DEK is gone");
         Assert.That(dropped.Count(d => d.All(b => b == 0)), Is.EqualTo(1), "and zeroed");
         using var allowed = state.Authorize($"Bearer {token}", "llm", Get("/v1/models")).Allowed;
@@ -274,7 +274,7 @@ public class BrokerStateTests
         var resealed = SecretEnvelope.Seal("llm-read", 2, "Bearer sk-read-2"u8, [vault.Tpm]);
         var reloaded = vault.Document with { Secrets = [.. vault.Document.Secrets.Where(s => s.Slug != "llm-read"), resealed] };
 
-        Assert.That(state.ReplaceVault(reloaded), Is.EqualTo(new[] { "llm-read" }));
+        Assert.That(state.ReplaceVault(reloaded).Unleased, Is.EqualTo(new[] { "llm-read" }));
         Assert.That(state.Authorize($"Bearer {token}", "llm", Get("/v1/models")).Refusal?.Reason, Is.EqualTo("secret-not-leased"));
 
         var dek = SecretEnvelope.UnwrapDek(resealed, vault.Tpm)!;
@@ -286,17 +286,18 @@ public class BrokerStateTests
     }
 
     [Test]
-    public void A_removed_service_refuses_its_placeholders()
+    public void A_removed_service_revokes_its_placeholders()
     {
         OpenLease();
         var token = Mint();
 
         state.ReplaceVault(vault.Document with { Services = [] });
 
-        Assert.That(state.Authorize($"Bearer {token}", "llm", Get("/v1/models")).Refusal?.Reason, Is.EqualTo("unknown-service"));
+        Assert.That(state.Authorize($"Bearer {token}", "llm", Get("/v1/models")).Refusal?.Reason, Is.EqualTo("unknown-placeholder"));
+        Assert.That(AuditLines(), Has.Exactly(1).Contains("\"kind\":\"PlaceholderRevoked\"").And.Contains("policy-changed"));
     }
 
     [Test]
     public void Without_a_lease_a_reload_has_nothing_to_seal() =>
-        Assert.That(state.ReplaceVault(vault.Document), Is.Empty);
+        Assert.That(state.ReplaceVault(vault.Document).Unleased, Is.Empty);
 }

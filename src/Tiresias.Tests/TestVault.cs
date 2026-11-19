@@ -17,32 +17,40 @@ sealed class TestVault : IDisposable
 {
     readonly Key tpmKey = Key.Create(KeyAgreementAlgorithm.X25519);
 
-    TestVault(Func<X25519KeyWrapper, (SealedSecret[] Secrets, Service[] Services)>? extra = null)
+    TestVault(Func<X25519KeyWrapper, (SealedSecret[] Secrets, Service[] Services)>? extra = null, bool bound = false)
     {
         Tpm = X25519KeyWrapper.ForKey("tpm", tpmKey);
         var (extraSecrets, extraServices) = extra?.Invoke(Tpm) ?? ([], []);
+        Service[] services =
+        [
+            new Service("llm", new Uri("https://llm.example/"),
+            [
+                new Grant("read", "llm-read", Rule("GET", "^/v1/models")),
+                new Grant("write", "llm-write", Rule("POST", "^/v1/")),
+                new Grant("admin", "llm-admin", Rule("DELETE", "^/v1/"), RequiresElevation: true),
+            ]),
+            .. extraServices,
+        ];
+        var policy = new VaultDocument([], services);
+        SealedSecret Seal(string slug, ReadOnlySpan<byte> value) =>
+            SecretEnvelope.Seal(slug, 1, value, [Tpm], bound ? PolicyBinding.Hash(policy, slug) : null);
         Document = new(
             [
-                SecretEnvelope.Seal("llm-read", 1, "Bearer sk-read"u8, [Tpm]),
-                SecretEnvelope.Seal("llm-write", 1, "Bearer sk-write"u8, [Tpm]),
-                SecretEnvelope.Seal("llm-admin", 1, "Bearer sk-admin"u8, [Tpm]),
+                Seal("llm-read", "Bearer sk-read"u8),
+                Seal("llm-write", "Bearer sk-write"u8),
+                Seal("llm-admin", "Bearer sk-admin"u8),
                 .. extraSecrets,
             ],
-            [
-                new Service("llm", new Uri("https://llm.example/"),
-                [
-                    new Grant("read", "llm-read", Rule("GET", "^/v1/models")),
-                    new Grant("write", "llm-write", Rule("POST", "^/v1/")),
-                    new Grant("admin", "llm-admin", Rule("DELETE", "^/v1/"), RequiresElevation: true),
-                ]),
-                .. extraServices,
-            ]);
+            services);
     }
 
     public X25519KeyWrapper Tpm { get; }
     public VaultDocument Document { get; }
 
     public static TestVault Create() => new();
+
+    /// <summary>The <c>llm</c> vault with its secrets bound to their policy (<see cref="PolicyBinding"/>).</summary>
+    public static TestVault CreateBound() => new(bound: true);
 
     /// <summary>The <c>llm</c> vault plus whatever <paramref name="extra"/> seals with the stand-in TPM.</summary>
     public static TestVault CreateWith(Func<X25519KeyWrapper, (SealedSecret[] Secrets, Service[] Services)> extra) => new(extra);

@@ -22,6 +22,17 @@ public sealed record SealResult(IReadOnlyList<string> Accepted, IReadOnlyList<st
 
 public sealed record MintedPlaceholder(string Token, DateTimeOffset ExpiresAt);
 
+/// <summary>What <see cref="BrokerState.ReplaceVault"/> did with a vault that changed on disk.</summary>
+/// <param name="Unleased">Secrets of the open lease that have no DEK now, for the Keyring to seal; empty without a lease.</param>
+/// <param name="Unapproved">
+/// Leased secrets bound to their policy whose policy the new vault changes without a re-seal. When
+/// there are any, the new vault was refused and the previous one kept.
+/// </param>
+public sealed record VaultReload(IReadOnlyList<string> Unleased, IReadOnlyList<string> Unapproved)
+{
+    public bool Refused => Unapproved.Count > 0;
+}
+
 /// <summary>
 /// A SQL Server service is one whose upstream is <c>mssql://host/database</c> (shown, never dialled:
 /// the grant's connection string says where to connect). Its grants must be named <c>read</c> and
@@ -116,7 +127,7 @@ public sealed class BrokerState : IDisposable
             {
                 var secret = vault.FindSecret(slug);
                 var dek = secret is null ? null : SealedBox.Open(leaseKey!, box, LeaseOffer.DekContext(leaseId, slug));
-                if (dek is null || !Opens(secret!, dek))
+                if (dek is null || !Opens(secret!, dek, vault))
                 {
                     if (dek is not null)
                         Array.Clear(dek);
@@ -142,22 +153,55 @@ public sealed class BrokerState : IDisposable
     /// <summary>
     /// Swaps in a vault that changed on disk, keeping the lease. A leased DEK stays only while it
     /// still opens its secret: a removed or re-sealed secret loses it (zeroed) until the Keyring
-    /// seals the new one. Placeholders keep working for services that are still there.
+    /// seals the new one. A secret bound to its policy that is unchanged on disk but no longer opens
+    /// means its policy changed without approval: the whole vault is refused and the previous one
+    /// kept. A service whose policy changed loses its placeholders and elevations, which were
+    /// approved for the old one.
     /// </summary>
-    /// <returns>The secrets of the open lease that have no DEK now, for the Keyring to seal; empty without a lease.</returns>
-    public IReadOnlyList<string> ReplaceVault(VaultDocument next)
+    public VaultReload ReplaceVault(VaultDocument next)
     {
         lock (gate)
         {
+            var unapproved = deks
+                .Where(d => vault.FindSecret(d.Key) is { BoundToPolicy: true } current
+                    && next.FindSecret(d.Key) is { } incoming
+                    && SameCiphertext(current, incoming)
+                    && Opens(current, d.Value, vault)
+                    && !Opens(incoming, d.Value, next))
+                .Select(d => d.Key)
+                .ToArray();
+            if (unapproved.Length > 0)
+            {
+                foreach (var slug in unapproved)
+                    audit.Append(new(AuditKind.Deny, lease?.Id, Reason: $"policy-not-approved: {slug}; vault reload refused"));
+                return new([], unapproved);
+            }
+
             foreach (var (slug, dek) in deks.ToArray())
             {
-                if (next.FindSecret(slug) is { } secret && Opens(secret, dek))
+                if (next.FindSecret(slug) is { } secret && Opens(secret, dek, next))
                     continue;
                 Array.Clear(dek);
                 deks.Remove(slug);
             }
+            RetireChangedServices(next);
             vault = next;
-            return CurrentLease(time.GetUtcNow()) is null ? [] : next.Secrets.Where(s => !deks.ContainsKey(s.Slug)).Select(s => s.Slug).ToArray();
+            return new(CurrentLease(time.GetUtcNow()) is null ? [] : next.Secrets.Where(s => !deks.ContainsKey(s.Slug)).Select(s => s.Slug).ToArray(), []);
+        }
+    }
+
+    /// <summary>Ends the placeholders and elevations of every service whose policy differs in <paramref name="next"/>. Call under <see cref="gate"/>.</summary>
+    void RetireChangedServices(VaultDocument next)
+    {
+        foreach (var service in vault.Services)
+        {
+            if (next.FindService(service.Slug) is { } incoming
+                && PolicyBinding.ServiceHash(incoming).AsSpan().SequenceEqual(PolicyBinding.ServiceHash(service)))
+                continue;
+            foreach (var revoked in placeholders.RevokeService(service.Slug))
+                audit.Append(new(AuditKind.PlaceholderRevoked, revoked.LeaseId, revoked.Request.Consumer, service.Slug,
+                    Token: AuditLog.TokenRef(revoked.TokenHash), Reason: "policy-changed"));
+            lease?.DropElevations(service.Slug);
         }
     }
 
@@ -254,8 +298,8 @@ public sealed class BrokerState : IDisposable
             var secret = vault.FindSecret(grant.SecretSlug);
             if (secret is null || !deks.TryGetValue(grant.SecretSlug, out var dek))
                 return (null, Refuse(record, 503, "secret-not-leased"));
-            if (SecretEnvelope.Open(secret, dek) is not { } value)
-                return (null, Refuse(record, 500, "secret-unreadable"));
+            if (Open(secret, dek, vault) is not { } value)
+                return (null, secret.BoundToPolicy ? Refuse(record, 403, "policy-not-approved") : Refuse(record, 500, "secret-unreadable"));
             return (new AllowedRequest(audit, record with { Kind = AuditKind.Token }, service, grant, value, current.HardCapAt), null);
         }
     }
@@ -322,8 +366,8 @@ public sealed class BrokerState : IDisposable
             var secret = vault.FindSecret(grant.SecretSlug);
             if (secret is null || !deks.TryGetValue(grant.SecretSlug, out var dek))
                 return Deny(503, "secret-not-leased");
-            if (SecretEnvelope.Open(secret, dek) is not { } value)
-                return Deny(500, "secret-unreadable");
+            if (Open(secret, dek, vault) is not { } value)
+                return secret.BoundToPolicy ? Deny(403, "policy-not-approved") : Deny(500, "secret-unreadable");
 
             return (new AllowedRequest(audit, record with { Kind = AuditKind.Allow }, service, grant, value, current.HardCapAt), null);
         }
@@ -380,8 +424,8 @@ public sealed class BrokerState : IDisposable
             var secret = vault.FindSecret(grant.SecretSlug);
             if (secret is null || !deks.TryGetValue(grant.SecretSlug, out var dek))
                 return Deny(503, "secret-not-leased");
-            if (SecretEnvelope.Open(secret, dek) is not { } value)
-                return Deny(500, "secret-unreadable");
+            if (Open(secret, dek, vault) is not { } value)
+                return secret.BoundToPolicy ? Deny(403, "policy-not-approved") : Deny(500, "secret-unreadable");
 
             var allow = record with { Kind = AuditKind.Allow, Reason = classification is null ? "login" : classification.IsRead ? "select" : "statement" };
             return (new AllowedRequest(audit, allow, service, grant, value, current.HardCapAt), null);
@@ -484,9 +528,16 @@ public sealed class BrokerState : IDisposable
             ThreadPool.QueueUserWorkItem(_ => handlers(id));
     }
 
-    static bool Opens(SealedSecret secret, byte[] dek)
+    /// <summary>Opens a vault secret as used from <paramref name="policy"/>: a bound secret opens only under the policy it was sealed for.</summary>
+    static byte[]? Open(SealedSecret secret, byte[] dek, VaultDocument policy) =>
+        SecretEnvelope.Open(secret, dek, secret.BoundToPolicy ? PolicyBinding.Hash(policy, secret.Slug) : null);
+
+    static bool SameCiphertext(SealedSecret a, SealedSecret b) =>
+        a.Version == b.Version && a.Nonce.AsSpan().SequenceEqual(b.Nonce) && a.Ciphertext.AsSpan().SequenceEqual(b.Ciphertext);
+
+    static bool Opens(SealedSecret secret, byte[] dek, VaultDocument policy)
     {
-        var value = SecretEnvelope.Open(secret, dek);
+        var value = Open(secret, dek, policy);
         if (value is null)
             return false;
         Array.Clear(value);
