@@ -13,6 +13,7 @@ that could leak from a file, an environment variable or a log.
 | Cloud credentials in CI (Azure, AWS, Google) | **Workload identity federation** / OIDC from GitHub Actions | No client secret to rotate; access is bound to the repository and branch |
 | A password for a website or an account | **Passkeys** | Phishing-resistant, and nothing reusable to steal from a database or a paste |
 | A personal access token for git | **Git Credential Manager** with browser sign-in, or SSH keys held by an agent (Windows Hello, a hardware key) | No token in a file or a remote URL |
+| A CLI signed in as you (`gh`, `az`) that scripts and agents also run | **Its own sign-in for interactive use only**; scripts and agents through `tir exec` with a token per run | Anything running as you can use a signed-in CLI unseen; a token per run is asked for and recorded |
 | A GitHub token for automation | A **GitHub App** installation token (minted per run, valid one hour; `tir exec` does this) | Scoped to chosen repositories, short-lived |
 | A SQL password in a connection string | **Integrated / Entra ID authentication** where the server supports it | The connection string holds no secret |
 | An API key for a service on the same cloud | **Managed identity** | The platform hands the app a token; nothing to configure |

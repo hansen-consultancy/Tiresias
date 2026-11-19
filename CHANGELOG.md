@@ -10,6 +10,13 @@ its section below.
 
 ### Added
 
+- **What do you need?** (**Add...** in the tray and the Services window) is the one way to add
+  anything: pick or type what you need ("OpenAI key for a script") and see every way to meet it,
+  strongest first, each saying what it gives up. Set up a SQL Server, Set up a RavenDB and the
+  Services add form now open from there. What you type is matched on your PC and never sent.
+  `tir advise "<words>"` prints the same list. The tray menu is shorter: Status, Add..., Activity.
+  A dismissed SQL Server or RavenDB finding shows once more, as its fix now names Add....
+
 - The status page lists **findings** first: each says where a credential's delivery stands, where
   its fix takes it, and has a button that opens the fix filled in (Set up SQL Server with the
   server and database, Set up RavenDB with the certificate file and then an offer to move the file
