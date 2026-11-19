@@ -1,6 +1,6 @@
 # What do you need?
 
-Status: **phase 3 built** (*What do you need?*, `tir advise`); phase 4 is design. Phases 3 and 4 of [guided setup](guided-setup.md) (#32). This page
+Status: **built** (*What do you need?*, `tir advise`, Home showing what is in use). Phases 3 and 4 of [guided setup](guided-setup.md) (#32). This page
 designs the one way to add anything to Tiresias, and how Home shows only what this machine uses.
 
 ## The problem
@@ -144,6 +144,11 @@ code settled what this page left open:
 - **Search:** an exact word scores 3, a start of a word (three letters or more) 1. The first need
   found opens; a named service marks its option "Matches what you typed" unless it is already
   recommended.
+- **Home** (`HomeAreas.Plan`, facts read by `Home`): **Add...** always, then User secrets,
+  Services, Environment variables and Activity when in use, and About. A finding keeps its area
+  when any line of the last run has a fix that opens it, dismissed or not. Home re-reads the facts
+  when it is activated, so an area added elsewhere shows on return. The tray asks the same planner
+  when its menu opens; of the areas only Activity is still in it.
 - **Findings badge** in the tray: not built.
 
 ## Tests
@@ -173,5 +178,5 @@ code settled what this page left open:
    the ranked options and their commands.
 2. **Built. The window:** *What do you need?* in the app; Add, Set up a SQL Server and Set up a RavenDB move
    behind it; the tray menu shortens.
-3. **Home shows what is in use** (guided setup phase 4): `HomeAreas.Plan`, Home and the tray built
+3. **Built. Home shows what is in use** (guided setup phase 4): `HomeAreas.Plan`, Home and the tray built
    from it.

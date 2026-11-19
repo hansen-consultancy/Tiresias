@@ -1,6 +1,6 @@
 # Guided setup: the strongest option first
 
-Status: **phases 1 to 3 built** (#32): the axes and findings in `tir doctor`, findings in the app, and *What do you need?*; the rest is design. This page designs how Tiresias steers people toward the safest way to
+Status: **phases 1 to 4 built** (#32): the axes and findings in `tir doctor`, findings in the app, *What do you need?*, and Home showing what is in use; the rest is design. This page designs how Tiresias steers people toward the safest way to
 hold each credential, finds the weaker setups already on the machine, and keeps a growing feature
 set reachable without a row of buttons per feature.
 
@@ -178,7 +178,7 @@ Existing windows remain the places where the work happens; this changes how peop
    comes back; `dismissals.json` beside the keyring is shared with `tir doctor`.
 3. **Built. What do you need?**: the catalogue, the ranked options, the free-text match; Add, Set up a SQL
    Server and Set up a RavenDB move behind it ([design](what-do-you-need.md)). `tir advise` prints the same list.
-4. **Show what is in use**: the home screen keeps only the areas that apply; the rest live in the catalogue
+4. **Built. Show what is in use**: the home screen keeps only the areas that apply; the rest live in the catalogue
    ([design](what-do-you-need.md#phase-4-what-is-in-use)).
 5. **Attack surface**: installed software and extensions as findings, ranked by what uses
    credentials ([attack surface](attack-surface.md)).
