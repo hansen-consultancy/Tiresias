@@ -7,3 +7,8 @@ reporting instead ("Report a vulnerability" on the Security tab of this reposito
 
 Expect an acknowledgement within a few days. Fixes ship as a new preview release, with credit
 unless you ask otherwise. Only the latest release is supported while the project is in 0.x.
+
+## Threat model
+
+Known threats, their scores and what holds each back live in [docs/threats](docs/threats/README.md),
+one file per finding.
