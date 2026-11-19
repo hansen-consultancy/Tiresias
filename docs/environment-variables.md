@@ -122,6 +122,9 @@ service's grants, and the activity log records each request.
   The environment variables window does both: check a sealed key, pick the service under **Hand
   out a placeholder instead**, then **Use a placeholder**; **Hand out the value** undoes it.
   The sealed value stays, so **Put back** and `remove` lose nothing.
+- The status page finds sealed keys handed out as values where a placeholder would do, and its
+  **Use a placeholder...** opens this window with the key checked. It needs Tiresias unlocked,
+  since the names are sealed too; `tir doctor` says it skipped the check.
 - Only tools that send the key as `Authorization: Bearer` and read a base-URL variable work this
   way: the OpenAI SDKs and most OpenAI-compatible clients do. A tool sending the key in another
   header (Anthropic's `x-api-key`) gets refused by the broker: keep that one as a value.
