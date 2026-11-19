@@ -1,0 +1,86 @@
+<Window x:Class="Tiresias.App.Views.NeedsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:Tiresias.App"
+        Title="{l:S Needs_WindowTitle}"
+        Width="720" Height="640" MinWidth="520" MinHeight="420"
+        WindowStartupLocation="CenterScreen"
+        FocusManager.FocusedElement="{Binding ElementName=SearchBox}"
+        Icon="pack://application:,,,/Assets/tiresias.ico">
+  <Window.Resources>
+    <Style x:Key="Optional" TargetType="TextBlock" BasedOn="{StaticResource CaptionText}">
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Margin" Value="0,4,0,0" />
+      <Style.Triggers>
+        <Trigger Property="Text" Value="">
+          <Setter Property="Visibility" Value="Collapsed" />
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+  </Window.Resources>
+  <Grid Margin="{StaticResource PagePadding}">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <TextBlock Grid.Row="0" Text="{l:S Needs_Heading}" Style="{StaticResource TitleText}" AutomationProperties.HeadingLevel="Level1" />
+
+    <StackPanel Grid.Row="1" Margin="0,0,0,12">
+      <Label x:Name="SearchLabel" Content="{l:S Needs_Search}" Target="{Binding ElementName=SearchBox}" Padding="0,0,0,4" />
+      <TextBox x:Name="SearchBox" Text="{Binding Search, UpdateSourceTrigger=PropertyChanged, Delay=150}"
+               AutomationProperties.LabeledBy="{Binding ElementName=SearchLabel}" />
+      <TextBlock Text="{l:S Needs_SearchHint}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,4,0,0" />
+    </StackPanel>
+
+    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+      <ItemsControl ItemsSource="{Binding Needs}" Focusable="False">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <Expander IsExpanded="{Binding IsExpanded, Mode=TwoWay}" Margin="0,0,0,8" HorizontalAlignment="Stretch"
+                      AutomationProperties.Name="{Binding Title}">
+              <Expander.Header>
+                <TextBlock Text="{Binding Title}" Style="{StaticResource SubtitleText}" AutomationProperties.HeadingLevel="Level2" />
+              </Expander.Header>
+              <ItemsControl ItemsSource="{Binding Options}" Focusable="False">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Border Style="{StaticResource Card}" Margin="0,8,0,0" AutomationProperties.Name="{Binding Spoken}">
+                      <Grid>
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="*" />
+                          <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                          <WrapPanel>
+                            <TextBlock Text="{Binding Title}" Style="{StaticResource BodyText}" FontWeight="SemiBold" Margin="0,0,8,0" />
+                            <TextBlock Text="{Binding Position}" Style="{StaticResource CaptionText}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <TextBlock Text="{Binding Badge}" Style="{StaticResource CaptionText}" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" FontWeight="SemiBold" />
+                          </WrapPanel>
+                          <TextBlock Text="{Binding Summary}" Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                          <TextBlock Text="{Binding GivesUp}" Style="{StaticResource Optional}" />
+                          <TextBlock Text="{Binding Unavailable}" Style="{StaticResource Optional}"
+                                     Foreground="{DynamicResource SystemFillColorCautionBrush}" />
+                        </StackPanel>
+                        <Button Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0" Padding="12,4" MinWidth="96"
+                                Content="{Binding ActionLabel}" AutomationProperties.Name="{Binding ActionName}"
+                                IsEnabled="{Binding IsAvailable}" Click="OnChoose" />
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </Expander>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+
+    <StackPanel Grid.Row="3" Style="{StaticResource ButtonRow}">
+      <Button Style="{StaticResource RowButton}" Content="{l:S Common_Close}" IsCancel="True" Click="OnClose" />
+    </StackPanel>
+  </Grid>
+</Window>

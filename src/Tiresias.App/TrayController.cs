@@ -11,8 +11,8 @@ using Tiresias.App.Views;
 namespace Tiresias.App;
 
 /// <summary>
-/// The notification-area icon and its menu: the lock state (plus "Solo"), Unlock or Lock, and the
-/// app's windows. The icon follows the taskbar's light or dark theme, and a development build's
+/// The notification-area icon and its menu: the lock state (plus "Solo"), Unlock or Lock, Home,
+/// Add... (<i>What do you need?</i>) and Activity; every other window is reached from those. The icon follows the taskbar's light or dark theme, and a development build's
 /// icon has an orange corner and a menu line saying which build it is.
 /// </summary>
 sealed class TrayController : IDisposable
@@ -34,12 +34,9 @@ sealed class TrayController : IDisposable
         unlock.Click += async (_, _) => await app.UnlockAsync(interactive: true);
         lockItem.Click += async (_, _) => await app.LockAsync();
         setup.Click += (_, _) => app.ShowWindow<FirstRunWindow>();
-        var secrets = Item("Tray_Secrets", () => app.ShowWindow<SecretsWindow>());
-        var environment = Item("Tray_Environment", () => app.ShowWindow<EnvironmentWindow>());
-        var services = Item("Tray_Services", () => app.ShowWindow<ServicesWindow>());
-        var activity = Item("Tray_Activity", () => app.ShowWindow<ActivityWindow>());
         var status = Item("Tray_Status", () => app.ShowWindow<StatusWindow>());
-        var about = Item("Tray_About", () => app.ShowWindow<AboutWindow>());
+        var add = Item("Tray_Add", () => app.ShowWindow<NeedsWindow>());
+        var activity = Item("Tray_Activity", () => app.ShowWindow<ActivityWindow>());
         var quit = Item("Tray_Quit", app.Quit);
 
         icon = new TaskbarIcon
@@ -57,12 +54,9 @@ sealed class TrayController : IDisposable
         foreach (var item in new Control[] { headline, mode, unlock, lockItem, setup })
             icon.ContextMenu.Items.Add(item);
         icon.ContextMenu.Items.Add(new Separator());
-        icon.ContextMenu.Items.Add(secrets);
-        icon.ContextMenu.Items.Add(environment);
-        icon.ContextMenu.Items.Add(services);
-        icon.ContextMenu.Items.Add(activity);
         icon.ContextMenu.Items.Add(status);
-        icon.ContextMenu.Items.Add(about);
+        icon.ContextMenu.Items.Add(add);
+        icon.ContextMenu.Items.Add(activity);
         icon.ContextMenu.Items.Add(updateSeparator);
         icon.ContextMenu.Items.Add(update);
         icon.ContextMenu.Items.Add(new Separator());

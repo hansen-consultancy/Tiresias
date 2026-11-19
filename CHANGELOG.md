@@ -15,6 +15,13 @@ its section below.
   The expiry is recorded when a RavenDB is set up or edited; one set up earlier says "expiry
   unknown" until it is edited and saved once.
 
+- **What do you need?** (**Add...** in the tray and the Services window) is the one way to add
+  anything: pick or type what you need ("OpenAI key for a script") and see every way to meet it,
+  strongest first, each saying what it gives up. Set up a SQL Server, Set up a RavenDB and the
+  Services add form now open from there. What you type is matched on your PC and never sent.
+  `tir advise "<words>"` prints the same list. The tray menu is shorter: Status, Add..., Activity.
+  A dismissed SQL Server or RavenDB finding shows once more, as its fix now names Add....
+
 - The status page shows findings of one kind as one line with their count, for example
   "230 projects that set <UserSecretsId> but don't reference Tiresias.Extensions.Configuration". The
   line opens to each finding with its own fix, and **Dismiss all** sets them aside with one reason.
