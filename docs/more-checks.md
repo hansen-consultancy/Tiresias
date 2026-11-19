@@ -17,10 +17,12 @@ check below adds probe facts, planner cases and at most one fix type, and ships 
 - **Only where the user pointed.** The project folders given with `--projects` (in the app, the
   secrets editor's project folders) and the user's own config files that the tools read by
   default. No crawl of the disk.
-- **A finding is anything with a fix.** Some checks don't move a delivery on either axis: a
-  certificate that will expire, or one cleared for more than the app uses. They still have a fix.
-  So `DoctorCheck.IsFinding` becomes `Fix is not null`, and `Now` and `Better` stay optional,
-  present when the fix raises the position.
+- **A finding is any check with a fix, plus any delivery with a position**
+  (`DoctorCheck.IsFinding => Fix is not null || Now is not null`, as built in phase 2). Some checks
+  don't move a delivery on either axis: a certificate that will expire, or one cleared for more
+  than the app uses. They are findings through their fix, and carry no `Now` or `Better`. A weak
+  delivery with no fix yet (a NuGet push key) is a finding through its `Now`. A check that only
+  informs carries neither, and stays among the passing checks.
 
 ## RavenDB clearance and certificate expiry
 
@@ -150,9 +152,9 @@ it has. Never its contents beyond the hosts.
   file, and also in `git remote -v`, in logs, and in every copy of the folder.
 - **The `store` helper with `.git-credentials`**: Warn, "*n* tokens in plain text for *hosts*".
   E5/C3.
-- **Git Credential Manager** is reported as information, not a finding. It keeps tokens in Windows
-  Credential Manager, which any program running as the user can read (E5/C3), but there is
-  nothing better to offer until the helper below exists.
+- **Git Credential Manager** is reported as information, not a finding: it has no fix and is given
+  no `Now`. It keeps tokens in Windows Credential Manager, which any program running as the user
+  can read (E5/C3), but there is nothing better to offer until the helper below exists.
 
 **Fix.** `RemoveTokenFromRemote(repository, remote)`: the instruction is `git -C "<repository>"
 remote set-url <remote> <url without user info>`, and the token then lives wherever the user's
@@ -183,7 +185,7 @@ E1/C3. Any program running as the user can act as them, unseen.
 **Fix.** For `gh`, `RunThroughExec("gh")`: set up a GitHub App service and run `tir exec gh …`,
 which mints a token per run after consent (E2/C1). Keep `gh`'s own sign-in only for interactive
 use, or sign it out with `gh auth logout`. For `az`, no fix yet: Tiresias has no broker-held Entra
-identity. The finding says so and is informational.
+identity. It still carries its `Now` (E1/C3), so it is a finding without a fix, which says so.
 
 **Tests.** The planner gets each tool's exit code and a parsed account summary. Signed in, signed
 out, not installed, timed out.
