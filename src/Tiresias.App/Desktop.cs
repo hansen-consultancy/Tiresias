@@ -59,8 +59,8 @@ static partial class Desktop
         _ => ProblemKind.Unexpected,
     };
 
-    /// <summary>Moves a folder to the Recycle Bin, quietly: the caller has asked already.</summary>
-    /// <returns>Whether it went; a folder open in another program stays where it is.</returns>
+    /// <summary>Moves a folder or a file to the Recycle Bin, quietly: the caller has asked already.</summary>
+    /// <returns>Whether it went; one open in another program stays where it is.</returns>
     public static unsafe bool Recycle(string directory)
     {
         const uint Delete = 3;

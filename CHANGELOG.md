@@ -10,6 +10,14 @@ its section below.
 
 ### Added
 
+- The status page lists **findings** first: each says where a credential's delivery stands, where
+  its fix takes it, and has a button that opens the fix filled in (Set up SQL Server with the
+  server and database, Set up RavenDB with the certificate file and then an offer to move the file
+  to the Recycle Bin, the secrets editor, Environment variables), or copies the command for a step
+  outside the app. A finding can be dismissed with a reason; it stays dismissed until it changes,
+  and `tir doctor` shows the reason too. The checks cover the project folders the secrets editor
+  scans.
+
 - **SQL Server logins in user secrets.** A `secrets.json` value `tiresias:sql/<service>/<grant>`
   becomes a temporary login for the lease when the app loads its configuration, and the app gets a
   new one before it expires (the reload token fires). No password stays in the file. A renewal

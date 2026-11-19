@@ -35,6 +35,14 @@ public partial class RavenServerWindow : Window
         Closed += (_, _) => model.Dispose();
     }
 
+    /// <summary>Filled in from a finding: the certificate file found on disk, read as if picked with Browse.</summary>
+    public static RavenServerWindow ForFile(string path)
+    {
+        var window = new RavenServerWindow();
+        window.model.UseFile(path);
+        return window;
+    }
+
     void OnClose(object sender, RoutedEventArgs e) => Close();
 }
 
@@ -183,19 +191,23 @@ public sealed partial class RavenServerViewModel : ObservableObject, IDisposable
     void Browse()
     {
         var dialog = new OpenFileDialog { Filter = Text.Get("Raven_FileFilter"), Title = Text.Get("Raven_Browse") };
-        if (dialog.ShowDialog() != true)
-            return;
+        if (dialog.ShowDialog() == true)
+            UseFile(dialog.FileName);
+    }
+
+    public void UseFile(string path)
+    {
         Forget();
         try
         {
-            pfx = File.ReadAllBytes(dialog.FileName);
+            pfx = File.ReadAllBytes(path);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             CertificateError = Text.Format("Raven_FileUnreadable", e.Message);
             return;
         }
-        FileName = dialog.FileName;
+        FileName = path;
         Inspect(quiet: true);
     }
 
