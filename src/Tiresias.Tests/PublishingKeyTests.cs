@@ -8,6 +8,11 @@ namespace Tiresias.Tests;
 public class PublishingKeyTests
 {
     const string Secret = "s3cr3t-value-never-shown";
+    static readonly string Profile = Path.Combine("C:", "Users", "alice");
+    static readonly string UserNuGet = Path.Combine(Profile, "AppData", "Roaming", "NuGet", "NuGet.Config");
+    static readonly string Npmrc = Path.Combine(Profile, ".npmrc");
+    static readonly string Pypirc = Path.Combine(Profile, ".pypirc");
+    static readonly string App = Path.Combine("C:", "src", "app");
 
     static DoctorCheck[] Checks(string path, string text, bool inProfile = true, params string[] userVariables) =>
         [.. Doctor.PublishingKeys([new DoctorToolFile(path, text, inProfile)], userVariables)];
@@ -38,9 +43,9 @@ public class PublishingKeyTests
     [Test]
     public void A_NuGet_feed_token_in_plain_text_is_moved_to_Tiresias()
     {
-        var check = Checks(@"C:\Users\alice\AppData\Roaming\NuGet\NuGet.Config", NuGetFeed).Single();
+        var check = Checks(UserNuGet, NuGetFeed).Single();
 
-        Assert.That(check.Fix, Is.EqualTo(new ImportNuGetCredentials(@"C:\Users\alice\AppData\Roaming\NuGet\NuGet.Config", true)));
+        Assert.That(check.Fix, Is.EqualTo(new ImportNuGetCredentials(UserNuGet, true)));
         Assert.That((check.Now, check.Better), Is.EqualTo((Position.Plaintext, Position.SealedApproved)));
         Assert.That(FindingView.Button(check.Fix)?.Action, Is.EqualTo(FixAction.OpenEnvironment));
         AssertNoValue([check]);
@@ -49,9 +54,9 @@ public class PublishingKeyTests
     [Test]
     public void A_project_NuGet_config_copies_the_import_command_for_its_folder()
     {
-        var check = Checks(@"C:\src\app\nuget.config", NuGetFeed, inProfile: false).Single();
+        var check = Checks(Path.Combine(App, "nuget.config"), NuGetFeed, inProfile: false).Single();
 
-        Assert.That(check.Fix!.Instruction, Is.EqualTo(@"tir env nuget import, run in C:\src\app"));
+        Assert.That(check.Fix!.Instruction, Is.EqualTo($"tir env nuget import, run in {App}"));
         Assert.That(FindingView.Button(check.Fix)?.Action, Is.EqualTo(FixAction.CopyCommand));
     }
 
@@ -95,12 +100,12 @@ public class PublishingKeyTests
     {
         var npmrc = $"registry=https://registry.npmjs.org/\n//registry.npmjs.org/:_authToken={Secret}\n//npm.pkg.github.com/:_authToken=\"{Secret}\"\n";
 
-        var checks = Checks(@"C:\Users\alice\.npmrc", npmrc);
+        var checks = Checks(Npmrc, npmrc);
 
         Assert.That(checks.Select(c => c.Fix), Is.EqualTo(new DoctorFix[]
         {
-            new SealRegistryToken(@"C:\Users\alice\.npmrc", "//registry.npmjs.org/:_authToken", "NPM_TOKEN"),
-            new SealRegistryToken(@"C:\Users\alice\.npmrc", "//npm.pkg.github.com/:_authToken", "NPM_NPM_PKG_GITHUB_COM_TOKEN"),
+            new SealRegistryToken(Npmrc, "//registry.npmjs.org/:_authToken", "NPM_TOKEN"),
+            new SealRegistryToken(Npmrc, "//npm.pkg.github.com/:_authToken", "NPM_NPM_PKG_GITHUB_COM_TOKEN"),
         }));
         Assert.That(checks[0].Detail, Does.Contain("trusted publishing"));
         Assert.That(checks[1].Detail, Does.Not.Contain("trusted publishing"));
@@ -151,10 +156,10 @@ public class PublishingKeyTests
     [Test]
     public void A_PyPI_password_is_sealed_as_TWINE_PASSWORD_for_pypi_only()
     {
-        var checks = Checks(@"C:\Users\alice\.pypirc", PyPiRcText);
+        var checks = Checks(Pypirc, PyPiRcText);
 
-        Assert.That(checks.Select(c => c.Name), Is.EqualTo(new[] { @"PyPI password for pypi in C:\Users\alice\.pypirc", @"PyPI password for testpypi in C:\Users\alice\.pypirc" }));
-        Assert.That(checks[0].Fix, Is.EqualTo(new SealRegistryToken(@"C:\Users\alice\.pypirc", "pypi", "TWINE_PASSWORD")));
+        Assert.That(checks.Select(c => c.Name), Is.EqualTo(new[] { $"PyPI password for pypi in {Pypirc}", $"PyPI password for testpypi in {Pypirc}" }));
+        Assert.That(checks[0].Fix, Is.EqualTo(new SealRegistryToken(Pypirc, "pypi", "TWINE_PASSWORD")));
         Assert.That(checks[1].Fix, Is.Null);
         Assert.That(checks[1].Now, Is.EqualTo(Position.Plaintext));
         AssertNoValue(checks);
