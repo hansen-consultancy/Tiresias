@@ -36,6 +36,15 @@ public partial class ServicesWindow : Window
 
     void OnAgentStateChanged() => Dispatcher.BeginInvoke(model.RefreshLockState);
 
+    /// <summary>The add form, from <i>What do you need?</i>; <paramref name="upstream"/> fills in the address.</summary>
+    public void Add(string? upstream) => model.Add(upstream);
+
+    /// <summary>Set up a SQL Server, from <i>What do you need?</i>.</summary>
+    public void SetUpSqlServer() => model.SetUpSql();
+
+    /// <summary>Set up a RavenDB, from <i>What do you need?</i>.</summary>
+    public void SetUpRaven() => model.SetUpRaven(null);
+
     void OnClose(object sender, RoutedEventArgs e) => Close();
 }
 
@@ -153,8 +162,15 @@ public sealed partial class ServicesViewModel : ObservableObject
         RefreshLockState();
     }
 
+    /// <summary>Adding starts from <i>What do you need?</i>, which leads back here for the kinds this window sets up.</summary>
     [RelayCommand]
-    void Add() => Open(null);
+    void ChooseNeed() => App.Current.ShowWindow<NeedsWindow>();
+
+    public void Add(string? upstream)
+    {
+        Open(null);
+        Upstream = upstream ?? "";
+    }
 
     /// <summary>Opens the form empty to add a service, or filled in to edit <paramref name="existing"/>.</summary>
     void Open(ServiceInput? existing)
@@ -220,8 +236,7 @@ public sealed partial class ServicesViewModel : ObservableObject
             new UsageWindow(service) { Owner = Owner() }.ShowDialog();
     }
 
-    [RelayCommand]
-    void SetUpSql()
+    public void SetUpSql()
     {
         var window = new SqlServerWindow { Owner = Owner() };
         window.Saved += slug =>
@@ -272,10 +287,7 @@ public sealed partial class ServicesViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
-    void SetUpRaven() => SetUpRaven(null);
-
-    void SetUpRaven(RavenSetupInput? existing)
+    public void SetUpRaven(RavenSetupInput? existing)
     {
         var window = new RavenServerWindow(existing) { Owner = Owner() };
         window.Saved += slug =>

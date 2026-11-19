@@ -1,6 +1,6 @@
 # Guided setup: the strongest option first
 
-Status: **phases 1 and 2 built** (#32): the axes and findings in `tir doctor`, and findings in the app; the rest is design. This page designs how Tiresias steers people toward the safest way to
+Status: **phases 1 to 3 built** (#32): the axes and findings in `tir doctor`, findings in the app, and *What do you need?*; the rest is design. This page designs how Tiresias steers people toward the safest way to
 hold each credential, finds the weaker setups already on the machine, and keeps a growing feature
 set reachable without a row of buttons per feature.
 
@@ -184,9 +184,10 @@ Existing windows remain the places where the work happens; this changes how peop
    in, dismissals. The app checks the project folders the secrets editor scans. A dismissal is keyed
    by the line, its fix's inputs and its position, hashed (`Dismissals.KeyOf`), so a changed finding
    comes back; `dismissals.json` beside the keyring is shared with `tir doctor`.
-3. **What do you need?**: the catalogue, the ranked options, the free-text match; Add, Set up a SQL
-   Server and Set up a RavenDB move behind it.
-4. **Show what is in use**: the home screen keeps only the areas that apply; the rest live in the catalogue.
+3. **Built. What do you need?**: the catalogue, the ranked options, the free-text match; Add, Set up a SQL
+   Server and Set up a RavenDB move behind it ([design](what-do-you-need.md)). `tir advise` prints the same list.
+4. **Show what is in use**: the home screen keeps only the areas that apply; the rest live in the catalogue
+   ([design](what-do-you-need.md#phase-4-what-is-in-use)).
 5. **Attack surface**: installed software and extensions as findings, ranked by what uses
    credentials ([attack surface](attack-surface.md)).
 6. **More checks**: RavenDB clearance and expiry, sealed keys handed out as values, publishing keys,
