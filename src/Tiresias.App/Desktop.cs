@@ -42,6 +42,48 @@ static partial class Desktop
         }
     }
 
+    /// <summary>Opens Explorer with the file selected. Windows paths can't hold a quote, so quoting it is enough.</summary>
+    public static void Reveal(string path)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{path}\"") { UseShellExecute = false })?.Dispose();
+        }
+        catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            AppLog.Error(e, $"could not show {path}");
+        }
+    }
+
+    /// <summary>
+    /// Runs the host's own <c>--uninstall-extension</c>. Its command is a batch file on <c>PATH</c>, so it
+    /// goes through <c>cmd</c>; the id is checked to be a plain <c>publisher.name</c> first, because it
+    /// comes from a file any program can write and <c>cmd</c> would act on metacharacters in it.
+    /// </summary>
+    /// <returns>Whether the command ran and reported success within a minute.</returns>
+    public static async Task<bool> RemoveExtensionAsync(Tiresias.Client.RemoveExtension remove)
+    {
+        if (!Tiresias.Client.RemoveExtension.IsSafeId(remove.Id))
+            return false;
+        var start = new ProcessStartInfo("cmd.exe") { UseShellExecute = false, CreateNoWindow = true };
+        foreach (var argument in new[] { "/d", "/c", remove.Host.Cli, "--uninstall-extension", remove.Id })
+            start.ArgumentList.Add(argument);
+        try
+        {
+            using var process = Process.Start(start);
+            if (process is null)
+                return false;
+            using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+            await process.WaitForExitAsync(timeout.Token);
+            return process.ExitCode == 0;
+        }
+        catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException or OperationCanceledException)
+        {
+            AppLog.Error(e, $"could not run {remove.Instruction}");
+            return false;
+        }
+    }
+
     public static void OpenHelloSettings() => Open("ms-settings:signinoptions");
 
     public static void OpenDataFolder() => Open(KeyringStore.Directory);

@@ -108,6 +108,14 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public IReadOnlyCollection<string> UserVariableNames => [.. EnvironmentStore.UserVariables().Select(v => v.Name)];
 
+    public IEnumerable<InstalledExtension> Extensions() => SurfaceProbe.Extensions();
+
+    public IEnumerable<StartupEntry> StartupEntries() => SurfaceProbe.StartupEntries();
+
+    public IEnumerable<CredentialUse> CredentialUses() => SurfaceProbe.CredentialUses();
+
+    public IEnumerable<string> BlockedPrograms() => SurfaceProbe.BlockedPrograms();
+
     /// <summary>How long the walk of the project roots took and what it covered; <c>null</c> until a check needed it.</summary>
     public ScanStats? Scan => found?.Stats;
 

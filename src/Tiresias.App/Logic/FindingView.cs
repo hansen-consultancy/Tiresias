@@ -13,6 +13,11 @@ public enum FixAction
     CopyCommand,
     /// <summary>Seal a registry token from its file, after a yes that says the token is read once.</summary>
     SealToken,
+
+    /// <summary>Remove an extension with its host's command, after the user approves.</summary>
+    RemoveExtension,
+    /// <summary>Show a file in Explorer.</summary>
+    RevealFile,
 }
 
 /// <summary>
@@ -65,6 +70,9 @@ public static class FindingView
         ImportNuGetCredentials { InProfile: true } => (FixAction.OpenEnvironment, "Finding_FixNuGet"),
         ImportNuGetCredentials => (FixAction.CopyCommand, "Finding_FixCopy"),
         SealRegistryToken => (FixAction.SealToken, "Finding_FixToken"),
+
+        RemoveExtension => (FixAction.RemoveExtension, "Finding_FixRemoveExtension"),
+        RevealFile => (FixAction.RevealFile, "Finding_FixReveal"),
         _ => null,
     };
 

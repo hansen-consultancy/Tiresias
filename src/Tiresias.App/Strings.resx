@@ -1782,7 +1782,7 @@ Store them in clear?</value>
     <value>Findings</value>
   </data>
   <data name="Finding_Intro" xml:space="preserve">
-    <value>Credentials delivered more weakly than they could be. Each says where it is now and where its fix takes it.</value>
+    <value>Credentials delivered more weakly than they could be, each saying where it is now and where its fix takes it, and programs that can reach them with a reason to doubt them.</value>
   </data>
   <data name="Finding_FixSecrets" xml:space="preserve">
     <value>Open in the secrets editor</value>
@@ -1849,6 +1849,27 @@ Store them in clear?</value>
   </data>
   <data name="Finding_RecycleFailed" xml:space="preserve">
     <value>{0} couldn't be moved; it may be open in another program.</value>
+  </data>
+  <data name="Finding_FixRemoveExtension" xml:space="preserve">
+    <value>Remove...</value>
+  </data>
+  <data name="Finding_FixReveal" xml:space="preserve">
+    <value>Show file</value>
+  </data>
+  <data name="Finding_RemoveExtensionHeading" xml:space="preserve">
+    <value>Remove {0} from {1}?</value>
+  </data>
+  <data name="Finding_RemoveExtensionBody" xml:space="preserve">
+    <value>Tiresias runs {0}. You can install the extension again from {1} later.</value>
+  </data>
+  <data name="Finding_Remove" xml:space="preserve">
+    <value>Remove</value>
+  </data>
+  <data name="Finding_Removed" xml:space="preserve">
+    <value>Removed {0} from {1}.</value>
+  </data>
+  <data name="Finding_RemoveFailed" xml:space="preserve">
+    <value>{0} couldn't be removed. Run this yourself: {1}</value>
   </data>
   <data name="Tray_Add" xml:space="preserve">
     <value>Add...</value>

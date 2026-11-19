@@ -112,6 +112,12 @@ public partial class StatusWindow : Window
             case SealRegistryToken token:
                 SealToken(token);
                 break;
+            case RemoveExtension remove:
+                _ = RemoveExtensionAsync(remove);
+                break;
+            case RevealFile { Path: var path }:
+                Desktop.Reveal(path);
+                break;
         }
     }
 
@@ -132,6 +138,20 @@ public partial class StatusWindow : Window
             AskWindow.Show(this, null, e.Message, Text.Get("Common_OK"));
         }
         model.Refresh();
+    }
+
+    /// <summary>Runs the host's own uninstall command once the user approves, then checks again.</summary>
+    async Task RemoveExtensionAsync(RemoveExtension remove)
+    {
+        if (!AskWindow.Confirm(this, Text.Format("Finding_RemoveExtensionHeading", remove.Id, remove.Host.Name),
+                Text.Format("Finding_RemoveExtensionBody", remove.Instruction, remove.Host.Name), Text.Get("Finding_Remove")))
+            return;
+        var removed = await Desktop.RemoveExtensionAsync(remove);
+        model.FindingMessage = removed
+            ? Text.Format("Finding_Removed", remove.Id, remove.Host.Name)
+            : Text.Format("Finding_RemoveFailed", remove.Id, remove.Instruction);
+        if (removed)
+            model.Refresh();
     }
 
     /// <summary>Set up a RavenDB with the file found; once it is sealed, offer to move the file to the Recycle Bin.</summary>
