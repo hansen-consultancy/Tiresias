@@ -39,7 +39,7 @@ public static partial class Doctor
                     yield return new($"git remote {remote} in {repository}", DoctorStatus.Warn,
                         $"its URL holds a token for {bare.Host} in plain text, which any program running as you can read, and which git remote -v, logs and every copy of the folder show. "
                         + "Take it out of the URL: the token then lives wherever your credential helper keeps it, which stops it spreading but doesn't make it safer",
-                        new RemoveTokenFromRemote(repository, remote, bare.Url, key == "pushurl"), Position.Plaintext, Kind: "git remotes with a token in their URL");
+                        RemoveTokenFromRemote.For(repository, remote, bare.Url, key == "pushurl"), Position.Plaintext, Kind: "git remotes with a token in their URL");
                 else if (section == "url" && key is "insteadof" or "pushinsteadof")
                     yield return new($"git URL rewrite to {bare.Url} in {repository}", DoctorStatus.Warn,
                         $"a [url] section's name holds a token for {bare.Host} in plain text, which any program running as you can read. Remove the user info from the section name in {file.Path}",
@@ -103,7 +103,15 @@ public static partial class Doctor
 /// <param name="Url">The URL without its user info.</param>
 public sealed record RemoveTokenFromRemote(string Repository, string Remote, string Url, bool Push = false) : DoctorFix
 {
-    public override string Instruction => $"git -C \"{Repository}\" remote set-url {(Push ? "--push " : "")}{Remote} {Url}";
+    public override string Instruction => $"git -C \"{Repository}\" remote set-url {(Push ? "--push " : "")}\"{Remote}\" \"{Url}\"";
+
+    /// <summary>
+    /// The fix, or none when the remote's name or URL holds what a double-quoted argument doesn't
+    /// keep literal in cmd or PowerShell: the command is pasted into a shell, and a .git/config is
+    /// anyone's to write.
+    /// </summary>
+    internal static RemoveTokenFromRemote? For(string repository, string remote, string url, bool push) =>
+        $"{remote}{url}".IndexOfAny(['"', '%', '$', '`']) < 0 ? new(repository, remote, url, push) : null;
 }
 
 /// <summary>Reads <c>.git-credentials</c>, git's <c>store</c> helper file, for its hosts alone.</summary>

@@ -128,7 +128,8 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
         var clock = System.Diagnostics.Stopwatch.StartNew();
         List<string> projects = [], configs = [], keys = [], pems = [], repositories = [];
         var folders = roots.Length;
-        var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true };
+        // Not Hidden: Git for Windows hides .git. ReparsePoint: a junction can't loop the walk.
+        var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = FileAttributes.ReparsePoint | FileAttributes.System };
         foreach (var root in roots)
         {
             var files = new FileSystemEnumerable<string>(root, (ref FileSystemEntry entry) => entry.ToFullPath(), options)

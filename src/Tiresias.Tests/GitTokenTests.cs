@@ -27,7 +27,7 @@ public class GitTokenTests
         var check = checks.Single();
         Assert.That(check.Name, Is.EqualTo($"git remote origin in {Repo}"));
         Assert.That(check.Fix, Is.EqualTo(new RemoveTokenFromRemote(Repo, "origin", "https://github.com/example/app.git")));
-        Assert.That(check.Fix!.Instruction, Is.EqualTo($"git -C \"{Repo}\" remote set-url origin https://github.com/example/app.git"));
+        Assert.That(check.Fix!.Instruction, Is.EqualTo($"git -C \"{Repo}\" remote set-url \"origin\" \"https://github.com/example/app.git\""));
         Assert.That((check.Now, check.Better), Is.EqualTo((Position.Plaintext, (Position?)null)));
         Assert.That(FindingView.Button(check.Fix)?.Action, Is.EqualTo(FixAction.CopyCommand));
         AssertNoToken(checks);
@@ -38,7 +38,23 @@ public class GitTokenTests
     {
         var check = Checks($"[remote \"origin\"]\r\n  url = https://github.com/example/app.git\r\n  pushurl = \"https://x-access-token:{Token}@github.com/example/app.git\"\r\n").Single();
 
-        Assert.That(check.Fix!.Instruction, Does.Contain("remote set-url --push origin https://github.com/example/app.git"));
+        Assert.That(check.Fix!.Instruction, Does.Contain("remote set-url --push \"origin\" \"https://github.com/example/app.git\""));
+    }
+
+    [Test]
+    public void Shell_separators_in_a_url_stay_inside_quotes() =>
+        Assert.That(Checks($"[remote \"origin\"]\n\turl = https://alice:{Token}@example.com/app?a=1&calc|x\n").Single().Fix!.Instruction,
+            Does.EndWith("\"https://example.com/app?a=1&calc|x\""));
+
+    [TestCase("origin$(calc)", "https://alice:" + Token + "@example.com/app.git")]
+    [TestCase("origin`calc`", "https://alice:" + Token + "@example.com/app.git")]
+    [TestCase("origin", "https://alice:" + Token + "@example.com/%PATH%")]
+    public void A_remote_a_quoted_argument_cannot_hold_is_a_finding_without_a_fix(string remote, string url)
+    {
+        var check = Checks($"[remote \"{remote}\"]\n\turl = {url}\n").Single();
+
+        Assert.That(check.Fix, Is.Null);
+        Assert.That(check.IsFinding);
     }
 
     [TestCase("https://alice@github.com/example/app.git")]
