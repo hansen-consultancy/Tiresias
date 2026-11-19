@@ -205,6 +205,7 @@ Existing windows remain the places where the work happens; this changes how peop
    PC; the **Installed** list and the "*n* programs unused" line; trusting a publisher; separate
    *How credentials are held* and *What can reach them* groups; `tir doctor --surface` and a daily
    inventory instead of one per run.
-6. **Built, except RavenDB clearance. More checks**: RavenDB certificate expiry, sealed keys handed
-   out as values, publishing keys, git tokens, each landing with its own fix ([more checks](more-checks.md)). RavenDB
-   clearance waits for `/certificates/whoami` to be confirmed against a real server.
+6. **Partly built. More checks**: RavenDB certificate expiry, sealed keys handed out as values and
+   publishing keys are built, each with its own fix; git tokens and a CLI acting as the user are
+   design ([more checks](more-checks.md)). RavenDB clearance waits for `/certificates/whoami` to be
+   confirmed against a real server.
