@@ -1,6 +1,6 @@
 # Attack surface: less software, less to trust
 
-Status: **design, not built** (#34). [Guided setup](guided-setup.md) phase 5: it builds on the
+Status: **first slice built** (#34, #55); the rest is design. [Guided setup](guided-setup.md) phase 5: it builds on the
 findings `tir doctor` reports since phase 1 and the findings section, fixes and dismissals the app
 gets in phase 2.
 
@@ -221,7 +221,11 @@ The first version of this page predates the two axes and phase 1's findings. Thr
 
 ## Phases
 
-All of this is guided setup phase 5, built in this order:
+All of this is guided setup phase 5, built in this order. **The first slice is built** (#55):
+offline only, it reads extensions of VS Code and its forks, the Run keys and Startup folder with an
+offline Authenticode check, the blocklist, and reach from the activity and audit logs, and raises
+the extension, unsigned-at-startup and blocked-program findings with **Remove...** and **Show
+file**. [Guided setup](guided-setup.md#phases) lists what is still design.
 
 1. **Inventory**: applications, extensions, global tools and startup entries, with last use where
    known, as `tir doctor --surface` facts and the app's **Installed** list. No online lookups.
