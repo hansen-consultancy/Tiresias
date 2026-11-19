@@ -1426,11 +1426,25 @@ Store them in clear?</value>
   <data name="Services_Remove" xml:space="preserve">
     <value>Remove</value>
   </data>
+  <data name="Policy_Title" xml:space="preserve">
+    <value>Approve these service settings?</value>
+  </data>
+  <data name="Policy_Body" xml:space="preserve">
+    <value>Tiresias uses your secrets only as you approve here, so a program that edits the vault file can't send them elsewhere. Windows Hello asks next.
+
+{0}</value>
+  </data>
+  <data name="Policy_Approve" xml:space="preserve">
+    <value>Approve</value>
+  </data>
+  <data name="Policy_Declined" xml:space="preserve">
+    <value>Not saved: you didn't approve the change.</value>
+  </data>
   <data name="Services_RemoveConfirmTitle" xml:space="preserve">
     <value>Remove the service?</value>
   </data>
   <data name="Services_RemoveConfirmBody" xml:space="preserve">
-    <value>Remove {0}? Programs can no longer reach it through Tiresias. Its secret stays in the vault, so you can add the service again without typing it.</value>
+    <value>Remove {0}? Programs can no longer reach it through Tiresias. Its secret stays in the vault, so you can add the service again without typing it. Windows Hello asks next.</value>
   </data>
   <data name="Services_Removed" xml:space="preserve">
     <value>Removed {0}. Its secret is still in the vault.</value>

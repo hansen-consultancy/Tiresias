@@ -31,7 +31,8 @@ public static class RavenSetup
 
     /// <param name="pfx">The picked file, or <c>null</c> to keep the certificate the vault holds for this service (editing it).</param>
     /// <param name="hello">The agent's open Windows Hello wrapper: the vault is sealed to it.</param>
-    /// <exception cref="InvalidOperationException">A step failed; the message says what to do. Nothing is saved unless the server accepted the certificate.</exception>
+    /// <returns>The service to save, which the caller has the user approve (<see cref="VaultEditor.Approve"/>); a new certificate is sealed already.</returns>
+    /// <exception cref="InvalidOperationException">A step failed; the message says what to do. Nothing is sealed unless the server accepted the certificate.</exception>
     public static async Task<Service> RunAsync(RavenSetupPlan plan, byte[]? pfx, string? password, HelloKeyWrapper hello,
         IProgress<string> progress, CancellationToken ct, RavenHandlerFactory? handlers = null)
     {
@@ -46,10 +47,7 @@ public static class RavenSetup
         await CheckAsync(service.Upstream, plan.Database, certificate, handlers ?? RavenClients.DefaultHandler, ct);
 
         if (keep)
-        {
-            VaultEditor.SetService(service);
             return service;
-        }
 
         progress.Report("Sealing the certificate in the vault");
         var passwordless = certificate.Export(X509ContentType.Pkcs12);
@@ -63,7 +61,6 @@ public static class RavenSetup
             CryptographicOperations.ZeroMemory(passwordless);
             CryptographicOperations.ZeroMemory(encoded);
         }
-        VaultEditor.SetService(service);
         return service;
     }
 

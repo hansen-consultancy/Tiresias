@@ -9,13 +9,13 @@ static class ServiceCommand
 {
     public static int Run(CommandLine args) => args.At(1) switch
     {
-        "add" => Add(args),
+        "add" => Add(args).GetAwaiter().GetResult(),
         "list" => List(),
-        "remove" => Remove(args),
+        "remove" => Remove(args).GetAwaiter().GetResult(),
         _ => throw new UsageException("Use tir service add, tir service list or tir service remove."),
     };
 
-    static int Add(CommandLine args)
+    static async Task<int> Add(CommandLine args)
     {
         var input = new ServiceInput(
             args.Require(2, "slug"),
@@ -43,7 +43,8 @@ static class ServiceCommand
         else
             Console.WriteLine($"Using secret {plan.SecretSlug}, already in the vault.");
 
-        VaultEditor.AddService(service);
+        if (!await ApproveAsync($"tir service add {service.Slug}", [service], []))
+            return 1;
         var grant = service.Grants[0];
         Console.WriteLine($"Added service {service.Slug} -> {service.Upstream}: grant {grant.Name}, {Describe(grant)}.");
         if (plan.AllowsEveryPath)
@@ -70,13 +71,36 @@ static class ServiceCommand
         return 0;
     }
 
-    static int Remove(CommandLine args)
+    static async Task<int> Remove(CommandLine args)
     {
         var slug = args.Require(2, "slug");
-        if (!VaultEditor.RemoveService(slug))
+        if (VaultEditor.Load().FindService(slug) is null)
             throw new InvalidOperationException($"No service named {slug}. tir service list shows them.");
+        if (!await ApproveAsync($"tir service remove {slug}", [], [slug]))
+            return 1;
         Console.WriteLine($"Removed service {slug}. Its secret stays in the vault, so adding the service again reuses it. {Commands.PickedUp()}");
         return 0;
+    }
+
+    /// <summary>
+    /// Shows the change, asks for approval (in the app when it runs) and then for Windows Hello,
+    /// which rebinds the secrets it touches (<see cref="VaultEditor.Approve"/>).
+    /// </summary>
+    static async Task<bool> ApproveAsync(string title, IReadOnlyList<Service> set, IReadOnlyList<string> remove)
+    {
+        var change = VaultEditor.Plan(set, remove);
+        if (change.IsEmpty)
+            return true;
+        foreach (var line in change.Lines)
+            Console.WriteLine(line);
+        if (!await AppLink.ApproveAsync(title, change.Lines))
+        {
+            Console.Error.WriteLine("Not approved; the vault is unchanged.");
+            return false;
+        }
+        using var fresh = HelloKeyWrapper.Open(create: false);
+        VaultEditor.Approve(change, fresh);
+        return true;
     }
 
     static string Describe(Grant grant) =>

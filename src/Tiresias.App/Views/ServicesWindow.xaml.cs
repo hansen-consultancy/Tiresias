@@ -186,7 +186,7 @@ public sealed partial class ServicesViewModel : ObservableObject
     }
 
     [RelayCommand(CanExecute = nameof(CanRemove))]
-    void Remove()
+    async Task Remove()
     {
         if (SelectedRow is not { } row)
             return;
@@ -194,12 +194,18 @@ public sealed partial class ServicesViewModel : ObservableObject
             return;
         try
         {
-            VaultEditor.RemoveService(row.Slug);
+            if (!await PolicyApproval.ApplyAsync(Owner(), [], [row.Slug], confirmed: true))
+                return;
             AppLog.Info($"service {row.Slug} removed");
             Reload();
             Message = Text.Format("Services_Removed", row.Slug);
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or System.Text.Json.JsonException)
+        catch (InvalidOperationException e)
+        {
+            Message = e.Message;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or System.Text.Json.JsonException
+            or System.Security.Cryptography.CryptographicException)
         {
             ProblemWindow.Show(e, "removing a service");
         }
@@ -282,7 +288,7 @@ public sealed partial class ServicesViewModel : ObservableObject
     }
 
     [RelayCommand]
-    void Save()
+    async Task Save()
     {
         attempted = true;
         VaultDocument vault;
@@ -330,13 +336,19 @@ public sealed partial class ServicesViewModel : ObservableObject
         var edited = editing is not null;
         try
         {
-            if (edited)
-                VaultEditor.SetService(service);
-            else
-                VaultEditor.AddService(service);
+            if (!await PolicyApproval.ApplyAsync(Owner(), [service], []))
+            {
+                Message = Text.Get("Policy_Declined");
+                return;
+            }
         }
-        catch (Exception e) when (e is InvalidOperationException or IOException or UnauthorizedAccessException
-            or InvalidDataException or System.Text.Json.JsonException)
+        catch (InvalidOperationException e)
+        {
+            Message = e.Message;
+            return;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or System.Text.Json.JsonException
+            or System.Security.Cryptography.CryptographicException)
         {
             ProblemWindow.Show(e, edited ? "saving a service" : "adding a service");
             return;

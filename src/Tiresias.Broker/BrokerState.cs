@@ -163,7 +163,7 @@ public sealed class BrokerState : IDisposable
         lock (gate)
         {
             var unapproved = deks
-                .Where(d => vault.FindSecret(d.Key) is { BoundToPolicy: true } current
+                .Where(d => vault.FindSecret(d.Key) is { PolicyHash: not null } current
                     && next.FindSecret(d.Key) is { } incoming
                     && SameCiphertext(current, incoming)
                     && Opens(current, d.Value, vault)
@@ -299,7 +299,7 @@ public sealed class BrokerState : IDisposable
             if (secret is null || !deks.TryGetValue(grant.SecretSlug, out var dek))
                 return (null, Refuse(record, 503, "secret-not-leased"));
             if (Open(secret, dek, vault) is not { } value)
-                return (null, secret.BoundToPolicy ? Refuse(record, 403, "policy-not-approved") : Refuse(record, 500, "secret-unreadable"));
+                return (null, secret.PolicyHash is not null ? Refuse(record, 403, "policy-not-approved") : Refuse(record, 500, "secret-unreadable"));
             return (new AllowedRequest(audit, record with { Kind = AuditKind.Token }, service, grant, value, current.HardCapAt), null);
         }
     }
@@ -367,7 +367,7 @@ public sealed class BrokerState : IDisposable
             if (secret is null || !deks.TryGetValue(grant.SecretSlug, out var dek))
                 return Deny(503, "secret-not-leased");
             if (Open(secret, dek, vault) is not { } value)
-                return secret.BoundToPolicy ? Deny(403, "policy-not-approved") : Deny(500, "secret-unreadable");
+                return secret.PolicyHash is not null ? Deny(403, "policy-not-approved") : Deny(500, "secret-unreadable");
 
             return (new AllowedRequest(audit, record with { Kind = AuditKind.Allow }, service, grant, value, current.HardCapAt), null);
         }
@@ -425,7 +425,7 @@ public sealed class BrokerState : IDisposable
             if (secret is null || !deks.TryGetValue(grant.SecretSlug, out var dek))
                 return Deny(503, "secret-not-leased");
             if (Open(secret, dek, vault) is not { } value)
-                return secret.BoundToPolicy ? Deny(403, "policy-not-approved") : Deny(500, "secret-unreadable");
+                return secret.PolicyHash is not null ? Deny(403, "policy-not-approved") : Deny(500, "secret-unreadable");
 
             var allow = record with { Kind = AuditKind.Allow, Reason = classification is null ? "login" : classification.IsRead ? "select" : "statement" };
             return (new AllowedRequest(audit, allow, service, grant, value, current.HardCapAt), null);
@@ -528,9 +528,9 @@ public sealed class BrokerState : IDisposable
             ThreadPool.QueueUserWorkItem(_ => handlers(id));
     }
 
-    /// <summary>Opens a vault secret as used from <paramref name="policy"/>: a bound secret opens only under the policy it was sealed for.</summary>
+    /// <summary>Opens a vault secret as used from <paramref name="policy"/>: a bound secret opens only under the policy approved for it.</summary>
     static byte[]? Open(SealedSecret secret, byte[] dek, VaultDocument policy) =>
-        SecretEnvelope.Open(secret, dek, secret.BoundToPolicy ? PolicyBinding.Hash(policy, secret.Slug) : null);
+        PolicyBinding.Allows(policy, secret) ? SecretEnvelope.Open(secret, dek) : null;
 
     static bool SameCiphertext(SealedSecret a, SealedSecret b) =>
         a.Version == b.Version && a.Nonce.AsSpan().SequenceEqual(b.Nonce) && a.Ciphertext.AsSpan().SequenceEqual(b.Ciphertext);
