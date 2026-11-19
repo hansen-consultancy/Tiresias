@@ -94,13 +94,26 @@
       </Grid.RowDefinitions>
 
       <!-- Findings: deliveries weaker than they could be, each with its fix and Dismiss with a reason. -->
-      <ScrollViewer Grid.Row="0" MaxHeight="300" VerticalScrollBarVisibility="Auto" Focusable="False" Margin="0,0,0,12"
-                    Visibility="{Binding FindingsVisibility}">
-        <Border Style="{StaticResource Card}" Margin="0">
+      <!-- The list scrolls by itself and builds only the rows in view: a drive of repositories has hundreds of findings. -->
+      <Border Grid.Row="0" Style="{StaticResource Card}" Margin="0,0,0,12" Visibility="{Binding FindingsVisibility}">
           <StackPanel>
             <TextBlock x:Name="FindingsTitle" Text="{l:S Finding_Title}" Style="{StaticResource SubtitleText}" AutomationProperties.HeadingLevel="Level2" />
             <TextBlock Text="{l:S Finding_Intro}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,0,0,4" />
-            <ItemsControl ItemsSource="{Binding Findings}" Focusable="False" AutomationProperties.LabeledBy="{Binding ElementName=FindingsTitle}">
+            <ItemsControl ItemsSource="{Binding Findings}" Focusable="False" AutomationProperties.LabeledBy="{Binding ElementName=FindingsTitle}"
+                          MaxHeight="300" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                          VirtualizingPanel.ScrollUnit="Pixel" ScrollViewer.CanContentScroll="True">
+              <ItemsControl.Template>
+                <ControlTemplate TargetType="ItemsControl">
+                  <ScrollViewer Focusable="False" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" CanContentScroll="True">
+                    <ItemsPresenter />
+                  </ScrollViewer>
+                </ControlTemplate>
+              </ItemsControl.Template>
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <VirtualizingStackPanel />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
                   <Grid Margin="0,6" AutomationProperties.Name="{Binding Spoken}">
@@ -136,6 +149,7 @@
             <TextBox Text="{Binding FindingMessage, Mode=OneWay}" Style="{StaticResource SelectableText}" TextWrapping="Wrap"
                      Visibility="{Binding FindingMessageVisibility}" Margin="0,6,0,0" />
             <Expander Header="{Binding DismissedHeader}" Visibility="{Binding DismissedVisibility}" Margin="0,8,0,0">
+              <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto" Focusable="False">
               <ItemsControl ItemsSource="{Binding Dismissed}" Focusable="False">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
@@ -154,10 +168,10 @@
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
+              </ScrollViewer>
             </Expander>
           </StackPanel>
-        </Border>
-      </ScrollViewer>
+      </Border>
 
       <ListView x:Name="Checks" Grid.Row="1" ItemsSource="{Binding Checks}" AutomationProperties.Name="{l:S Status_ChecksName}"
                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">

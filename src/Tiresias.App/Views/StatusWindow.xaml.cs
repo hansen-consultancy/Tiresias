@@ -337,10 +337,12 @@ public sealed partial class StatusViewModel : ObservableObject
             var clock = System.Diagnostics.Stopwatch.StartNew();
             var probe = new MachineProbe(ProjectIndexStore.Load().Folders);
             last = await Task.Run(() => Doctor.RunAsync(probe));
-            AppLog.Info(probe.Scan is { } scan
-                ? $"status checks took {clock.Elapsed.TotalSeconds:0.0}s, {scan.Elapsed.TotalSeconds:0.0}s of it walking {scan.Folders} folders for {scan.Files} files"
-                : $"status checks took {clock.Elapsed.TotalSeconds:0.0}s");
+            var checks = clock.Elapsed;
             Show();
+            // Measured until the page has been laid out and drawn, which is what the wait looks like.
+            await Application.Current.Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
+            var walk = probe.Scan is { } scan ? $", {scan.Elapsed.TotalSeconds:0.0}s walking {scan.Folders} folders for {scan.Files} files" : "";
+            AppLog.Info($"status checks took {checks.TotalSeconds:0.0}s{walk}; showing {last.Count} lines took {(clock.Elapsed - checks).TotalSeconds:0.0}s more");
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidDataException)
         {
