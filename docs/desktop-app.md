@@ -95,7 +95,7 @@ hosts:
 | Concern | Today | In the app |
 |---|---|---|
 | Lease heartbeat, end on lock/sleep | `tir agent` | background service |
-| User-secrets pipe server and consent | not built | consent dialog: executable, keys only |
+| User-secrets pipe server and consent | not built | consent dialog: executable, keys, and what each `tiresias:` value asks for |
 | Placeholder consent (`tir grant`, `tir exec`) | terminal y/N | dialog; the CLI asks the agent |
 | Unlock / lock | `tir unlock`, `tir lock` | tray menu, plus the Hello prompt |
 | Secrets editing | `tir vault add` | capture-excluded editor: the full JSON view, like App Service |

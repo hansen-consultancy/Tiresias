@@ -470,6 +470,7 @@ public class UserSecretsServiceTests
         var references = new FakeReferences(_ => new("Server=db;User ID=tir_l_read;Password=temp", time.Now.AddHours(10)));
         using var resolving = new UserSecretsService(root, keys, screen, time, references: references);
         File.WriteAllText(FilePath, WithReference);
+        screen.Answers.Enqueue(ConsentAnswer.AllowOnce);
 
         var reply = await resolving.HandleAsync(new(AgentRequest.LoadUserSecrets, Id, folder), Exe, CancellationToken.None);
 
@@ -487,6 +488,7 @@ public class UserSecretsServiceTests
         var references = new FakeReferences(_ => throw new InvalidOperationException("the broker refused (403 not-covered)"));
         using var resolving = new UserSecretsService(root, keys, screen, time, references: references);
         File.WriteAllText(FilePath, WithReference);
+        screen.Answers.Enqueue(ConsentAnswer.AllowOnce);
 
         var reply = await resolving.HandleAsync(new(AgentRequest.LoadUserSecrets, Id, folder), Exe, CancellationToken.None);
 
@@ -495,9 +497,30 @@ public class UserSecretsServiceTests
     }
 
     [Test]
+    public async Task Session_approval_is_limited_to_the_reference_shown()
+    {
+        var references = new FakeReferences(_ => new("temporary", null));
+        using var resolving = new UserSecretsService(root, keys, screen, time, references: references);
+        Task<AgentReply> Request() => resolving.HandleAsync(new(AgentRequest.LoadUserSecrets, Id, folder), Exe, CancellationToken.None);
+        File.WriteAllText(FilePath, WithReference);
+        screen.Answers.Enqueue(ConsentAnswer.AllowForSession);
+
+        Assert.That((await Request()).Status, Is.EqualTo(AgentStatus.Ok));
+        Assert.That((await Request()).Status, Is.EqualTo(AgentStatus.Ok));
+        Assert.That(screen.Shown, Has.Count.EqualTo(1));
+        Assert.That(screen.Shown[0].Keys, Is.EquivalentTo(new[] { "Other", "ConnectionStrings:Db → tiresias:sql/appdb/read" }));
+
+        File.WriteAllText(FilePath, WithReference.Replace("/read", "/write", StringComparison.Ordinal));
+        screen.Answers.Enqueue(ConsentAnswer.Deny);
+        Assert.That((await Request()).Status, Is.EqualTo(AgentStatus.Denied));
+        Assert.That(references.Asked, Has.Count.EqualTo(2));
+    }
+
+    [Test]
     public async Task Without_a_resolver_a_reference_fails_the_load()
     {
         File.WriteAllText(FilePath, WithReference);
+        screen.Answers.Enqueue(ConsentAnswer.AllowOnce);
         var reply = await Load();
         Assert.That(reply.Status, Is.EqualTo(AgentStatus.Error));
         Assert.That(reply.Message, Does.Contain("only the Tiresias app can fetch it"));
