@@ -57,14 +57,20 @@ public static partial class Doctor
     /// <summary>Server-like keys, in the order their value names the host best.</summary>
     static readonly string[] ServerKeys = ["server", "data source", "address", "addr", "network address", "host"];
 
-    /// <summary>Keywords only SQL Server's client accepts among the common providers.</summary>
-    static readonly string[] SqlServerKeys = ["initial catalog", "trustservercertificate", "trust server certificate", "multipleactiveresultsets", "multiple active result sets", "trusted_connection", "encrypt", "applicationintent", "application intent", "multisubnetfailover", "multi subnet failover"];
+    /// <summary>Keywords no other common provider (Npgsql, MySQL, SQLite, Oracle) accepts.</summary>
+    static readonly string[] SqlServerOnlyKeys = ["multipleactiveresultsets", "multiple active result sets", "trusted_connection", "applicationintent", "application intent", "multisubnetfailover", "multi subnet failover"];
 
     /// <summary>
-    /// Keywords that mark another provider: MySQL, PostgreSQL and the like. SQL Server also takes
-    /// <c>Uid</c> and <c>User</c>, as MySQL does, so only a literal <c>User ID</c> counts for it.
+    /// Keywords SQL Server uses that some other provider also takes: MySQL's <c>User Id</c> and
+    /// <c>Initial Catalog</c>, Npgsql's <c>Trust Server Certificate</c>, SQLite's <c>Encrypt</c>. Each
+    /// inner array is one signal however it is spelled; two signals together are taken as SQL Server.
     /// </summary>
-    static readonly string[] OtherProviderKeys = ["port", "username", "host", "sslmode"];
+    static readonly string[][] SqlServerHints = [["user id"], ["initial catalog"], ["encrypt"], ["trustservercertificate", "trust server certificate"]];
+
+    /// <summary>Keywords that mark another provider; any of them means the string isn't SQL Server's.</summary>
+    static readonly string[] OtherProviderKeys = ["port", "username", "host", "sslmode", "ssl mode", "search path", "searchpath", "charset", "characterset", "character set", "allowuservariables", "allow user variables", "convertzerodatetime", "convert zero datetime", "allowpublickeyretrieval", "treattinyasboolean"];
+
+    enum SqlServerMatch { No, Maybe, Yes }
 
     static DoctorCheck? ConnectionString(string where, string key, string value)
     {
@@ -86,21 +92,33 @@ public static partial class Doctor
         var database = Get(builder, "database", "initial catalog");
         var target = server is null ? "" : $" for {server}{(database is null ? "" : $"/{database}")}";
         var name = $"connection string {key} in {where}";
-        return server is not null && IsSqlServer(builder, server)
-            ? new(name, DoctorStatus.Warn, $"holds a password{target} in plain text, which any program running as you can read. Tiresias can issue a SQL login per lease instead, dropped when the lease ends",
-                new SetUpSqlServer(server, database), Position.Plaintext, LoginPerLease)
-            : new(name, DoctorStatus.Warn, $"holds a password{target} in plain text, which any program running as you can read. Tiresias issues logins for SQL Server only; for this one, keep the connection string in sealed user secrets",
-                Now: Position.Plaintext, Better: Position.SealedApproved);
+        const string plaintext = "in plain text, which any program running as you can read.";
+        return (server is null ? SqlServerMatch.No : IsSqlServer(builder, server)) switch
+        {
+            SqlServerMatch.Yes => new(name, DoctorStatus.Warn, $"holds a password{target} {plaintext} Tiresias can issue a SQL login per lease instead, dropped when the lease ends",
+                new SetUpSqlServer(server!, database), Position.Plaintext, LoginPerLease),
+            SqlServerMatch.Maybe => new(name, DoctorStatus.Warn, $"holds a password{target} {plaintext} If this is SQL Server, Tiresias can issue a SQL login per lease instead; otherwise keep the connection string in sealed user secrets",
+                new SetUpSqlServer(server!, database), Position.Plaintext, LoginPerLease),
+            _ => new(name, DoctorStatus.Warn, $"holds a password{target} in plain text, which any program running as you can read. Tiresias issues logins for SQL Server only; for this one, keep the connection string in sealed user secrets",
+                Now: Position.Plaintext, Better: Position.SealedApproved),
+        };
     }
 
-    static bool IsSqlServer(DbConnectionStringBuilder builder, string server)
+    static SqlServerMatch IsSqlServer(DbConnectionStringBuilder builder, string server)
     {
-        if (SqlServerKeys.Any(builder.ContainsKey))
-            return true;
         // Oracle's Data Source is an EZConnect path or a TNS descriptor; SQLite's is a file.
         var notAHost = server.Contains('/', StringComparison.Ordinal) || server.Contains("DESCRIPTION", StringComparison.OrdinalIgnoreCase)
             || server.EndsWith(".db", StringComparison.OrdinalIgnoreCase) || server.EndsWith(".sqlite", StringComparison.OrdinalIgnoreCase);
-        return builder.ContainsKey("user id") && !notAHost && !OtherProviderKeys.Any(builder.ContainsKey);
+        if (notAHost || OtherProviderKeys.Any(builder.ContainsKey))
+            return SqlServerMatch.No;
+        if (SqlServerOnlyKeys.Any(builder.ContainsKey))
+            return SqlServerMatch.Yes;
+        return SqlServerHints.Count(spellings => spellings.Any(builder.ContainsKey)) switch
+        {
+            0 => SqlServerMatch.No,
+            1 => SqlServerMatch.Maybe,
+            _ => SqlServerMatch.Yes,
+        };
     }
 
     static string? Get(DbConnectionStringBuilder builder, params string[] keys) =>

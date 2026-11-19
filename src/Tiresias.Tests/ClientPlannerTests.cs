@@ -275,11 +275,12 @@ public class DoctorTests
 
     static DoctorFile AppSettings(string json) => new(Path.Combine(Root, "Api", "appsettings.json"), json);
 
-    [TestCase("Server=db.example.com;Database=Orders;User Id=app;Password=hunter2", "db.example.com")]
-    [TestCase("Data Source=tcp:db.example.com,1433;Initial Catalog=Orders;User ID=app;Password=hunter2;TrustServerCertificate=True", "tcp:db.example.com,1433")]
-    [TestCase("server=db.example.com;database=Orders;uid=app;pwd=hunter2;MultipleActiveResultSets=true", "db.example.com")]
-    [TestCase("Server=db.example.com;Database=Orders;User=app;Password=hunter2;Application Name=Jobs;Encrypt=False", "db.example.com")]
-    public async Task A_sql_server_password_in_appsettings_is_a_finding_offering_a_login_per_lease(string connectionString, string server)
+    [TestCase("Data Source=tcp:db.example.com,1433;Initial Catalog=Orders;User ID=app;Password=hunter2;TrustServerCertificate=True", "tcp:db.example.com,1433", true)]
+    [TestCase("server=db.example.com;database=Orders;uid=app;pwd=hunter2;MultipleActiveResultSets=true", "db.example.com", true)]
+    [TestCase("Server=db.example.com;Database=Orders;User Id=app;Password=hunter2;Encrypt=True", "db.example.com", true)]
+    [TestCase("Server=db.example.com;Database=Orders;User Id=app;Password=hunter2", "db.example.com", false)]
+    [TestCase("Server=db.example.com;Database=Orders;User=app;Password=hunter2;Application Name=Jobs;Encrypt=False", "db.example.com", false)]
+    public async Task A_sql_server_password_in_appsettings_is_a_finding_offering_a_login_per_lease(string connectionString, string server, bool certain)
     {
         var probe = new FakeProbe();
         probe.Config.Add(AppSettings($$$"""{"ConnectionStrings":{"Default":"{{{connectionString}}}"}}"""));
@@ -290,9 +291,15 @@ public class DoctorTests
         Assert.That(check.Fix, Is.EqualTo(new SetUpSqlServer(server, "Orders")));
         Assert.That((check.Now, check.Better), Is.EqualTo((Plaintext, new Position(Exposure.ShortLived, Control.Approved))));
         Assert.That(check.Detail + check.Fix!.Instruction, Does.Not.Contain("hunter2"));
+        // MySQL takes User Id too, so one keyword SQL Server shares with others isn't enough to say so.
+        Assert.That(check.Detail.Contains("If this is SQL Server", StringComparison.Ordinal), Is.EqualTo(!certain));
     }
 
     [TestCase("Host=pg.example.com;Database=Orders;Username=app;Password=hunter2")]
+    [TestCase("Host=pg.example.com;Username=app;Password=hunter2;Trust Server Certificate=true")]
+    [TestCase("Server=my.example.com;Database=Orders;User Id=app;Password=hunter2;SslMode=Required")]
+    [TestCase("Server=my.example.com;Database=Orders;User Id=app;Password=hunter2;CharSet=utf8mb4")]
+    [TestCase("Data Source=app.db;Encrypt=True;Password=hunter2")]
     [TestCase("Server=my.example.com;Port=3306;Database=Orders;Uid=app;Pwd=hunter2")]
     [TestCase("Data Source=db.example.com/ORCL;User Id=app;Password=hunter2")]
     [TestCase("Password=hunter2")]
