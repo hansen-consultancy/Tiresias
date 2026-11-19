@@ -1895,4 +1895,10 @@ Store them in clear?</value>
   <data name="Needs_OpenGuide" xml:space="preserve">
     <value>Read the guide</value>
   </data>
+  <data name="Finding_DismissAll" xml:space="preserve">
+    <value>Dismiss all</value>
+  </data>
+  <data name="Finding_ShowMembers" xml:space="preserve">
+    <value>Show all {0}</value>
+  </data>
 </root>

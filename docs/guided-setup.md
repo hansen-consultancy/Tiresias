@@ -87,7 +87,9 @@ a placeholder and E4 for a program that gets the value. The finding is about the
 
 ## Findings
 
-A **finding** is a delivery weaker, on either axis, than it could be, with the fix that raises it. Findings come from **checks**: small, read-only probes over files and services the user
+A **finding** is something the user can act on: any check with a fix, and any delivery weaker, on
+either axis, than it could be (a delivery finding says where it sits and where its fix takes it,
+even when the app has no fix for it yet, like a certificate file that isn't RavenDB's). Findings come from **checks**: small, read-only probes over files and services the user
 already pointed Tiresias at (user-secrets folders, project folders, sealed services), never a
 crawl of the whole disk.
 
@@ -109,6 +111,12 @@ First checks, by what they find and what they offer:
 A finding can be **dismissed** with a reason ("this server only takes SQL logins", "not mine").
 The dismissal is kept per finding, so the same thing isn't raised again; one that comes back
 changed (a new key, another server) is a new finding.
+
+A check that can raise the same finding many times names its **kind** ("projects that set
+`<UserSecretsId>` but don't reference the package"). The findings of one kind show as one line with
+their count, ahead of single findings only when they fail; the line opens to its members, each with
+its own fix, and **Dismiss all** sets them aside with one reason. A drive of repositories raises
+hundreds of findings, mostly copies in worktrees; one line per kind keeps them readable.
 
 ## "What do you need?"
 

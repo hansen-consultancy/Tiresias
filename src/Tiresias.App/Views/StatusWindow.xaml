@@ -6,6 +6,68 @@
         Width="720" Height="600" MinWidth="560" MinHeight="400"
         WindowStartupLocation="CenterScreen"
         Icon="pack://application:,,,/Assets/tiresias.ico">
+  <Window.Resources>
+    <!-- A list that scrolls by itself and builds only the rows in view: a drive of repositories has hundreds of findings. -->
+    <Style x:Key="FindingList" TargetType="ItemsControl">
+      <Setter Property="Focusable" Value="False" />
+      <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True" />
+      <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling" />
+      <Setter Property="VirtualizingPanel.ScrollUnit" Value="Pixel" />
+      <Setter Property="ScrollViewer.CanContentScroll" Value="True" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ItemsControl">
+            <ScrollViewer Focusable="False" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" CanContentScroll="True">
+              <ItemsPresenter />
+            </ScrollViewer>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+      <Setter Property="ItemsPanel">
+        <Setter.Value>
+          <ItemsPanelTemplate>
+            <VirtualizingStackPanel />
+          </ItemsPanelTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <DataTemplate x:Key="FindingTemplate">
+      <Grid Margin="0,6" AutomationProperties.Name="{Binding Spoken}">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="28" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <TextBlock Text="{Binding Glyph}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16"
+                   Foreground="{Binding Brush}" VerticalAlignment="Top" Margin="0,2,0,0" />
+        <StackPanel Grid.Column="1">
+          <TextBlock Text="{Binding Name}" Style="{StaticResource BodyText}" FontWeight="SemiBold" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding Detail}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Visibility="{Binding DetailVisibility}" />
+          <TextBlock Text="{Binding Moves}" Style="{StaticResource CaptionText}" />
+          <StackPanel Orientation="Horizontal" Margin="0,6,0,0" Visibility="{Binding ActionsVisibility}">
+            <Button Padding="12,4" Content="{Binding FixLabel}" AutomationProperties.Name="{Binding FixName}"
+                    Visibility="{Binding FixVisibility}" Click="OnReview" Margin="0,0,8,0" />
+            <Button Padding="12,4" Content="{Binding DismissLabel}" AutomationProperties.Name="{Binding DismissName}" Click="OnDismiss" />
+          </StackPanel>
+          <StackPanel Margin="0,6,0,0" Visibility="{Binding DismissingVisibility}">
+            <TextBlock x:Name="ReasonLabel" Text="{l:S Finding_ReasonLabel}" Style="{StaticResource CaptionText}" />
+            <TextBox Text="{Binding Reason, UpdateSourceTrigger=PropertyChanged}" MaxLength="200" Margin="0,4,0,0"
+                     AutomationProperties.Name="{l:S Finding_ReasonName}" />
+            <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+              <Button Padding="12,4" Content="{l:S Finding_ConfirmDismiss}" IsEnabled="{Binding CanDismiss}" Click="OnConfirmDismiss" />
+              <Button Padding="12,4" Margin="8,0,0,0" Content="{l:S Common_Cancel}" Click="OnCancelDismiss" />
+            </StackPanel>
+          </StackPanel>
+          <!-- A group's members, each with its own fix; DynamicResource because this template is still being read. -->
+          <Expander Header="{Binding MembersHeader}" Visibility="{Binding MembersVisibility}" Margin="0,6,0,0">
+            <ItemsControl ItemsSource="{Binding Members}" Style="{StaticResource FindingList}" MaxHeight="240"
+                          ItemTemplate="{DynamicResource FindingTemplate}" />
+          </Expander>
+        </StackPanel>
+      </Grid>
+    </DataTemplate>
+  </Window.Resources>
+
   <Grid Margin="{StaticResource PagePadding}">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
@@ -94,58 +156,12 @@
       </Grid.RowDefinitions>
 
       <!-- Findings: deliveries weaker than they could be, each with its fix and Dismiss with a reason. -->
-      <!-- The list scrolls by itself and builds only the rows in view: a drive of repositories has hundreds of findings. -->
       <Border Grid.Row="0" Style="{StaticResource Card}" Margin="0,0,0,12" Visibility="{Binding FindingsVisibility}">
           <StackPanel>
             <TextBlock x:Name="FindingsTitle" Text="{l:S Finding_Title}" Style="{StaticResource SubtitleText}" AutomationProperties.HeadingLevel="Level2" />
             <TextBlock Text="{l:S Finding_Intro}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,0,0,4" />
-            <ItemsControl ItemsSource="{Binding Findings}" Focusable="False" AutomationProperties.LabeledBy="{Binding ElementName=FindingsTitle}"
-                          MaxHeight="300" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
-                          VirtualizingPanel.ScrollUnit="Pixel" ScrollViewer.CanContentScroll="True">
-              <ItemsControl.Template>
-                <ControlTemplate TargetType="ItemsControl">
-                  <ScrollViewer Focusable="False" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" CanContentScroll="True">
-                    <ItemsPresenter />
-                  </ScrollViewer>
-                </ControlTemplate>
-              </ItemsControl.Template>
-              <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate>
-                  <VirtualizingStackPanel />
-                </ItemsPanelTemplate>
-              </ItemsControl.ItemsPanel>
-              <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                  <Grid Margin="0,6" AutomationProperties.Name="{Binding Spoken}">
-                    <Grid.ColumnDefinitions>
-                      <ColumnDefinition Width="28" />
-                      <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Text="{Binding Glyph}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16"
-                               Foreground="{Binding Brush}" VerticalAlignment="Top" Margin="0,2,0,0" />
-                    <StackPanel Grid.Column="1">
-                      <TextBlock Text="{Binding Name}" Style="{StaticResource BodyText}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                      <TextBlock Text="{Binding Detail}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
-                      <TextBlock Text="{Binding Moves}" Style="{StaticResource CaptionText}" />
-                      <StackPanel Orientation="Horizontal" Margin="0,6,0,0" Visibility="{Binding ActionsVisibility}">
-                        <Button Padding="12,4" Content="{Binding FixLabel}" AutomationProperties.Name="{Binding FixName}"
-                                Visibility="{Binding FixVisibility}" Click="OnReview" Margin="0,0,8,0" />
-                        <Button Padding="12,4" Content="{l:S Finding_Dismiss}" AutomationProperties.Name="{Binding DismissName}" Click="OnDismiss" />
-                      </StackPanel>
-                      <StackPanel Margin="0,6,0,0" Visibility="{Binding DismissingVisibility}">
-                        <TextBlock x:Name="ReasonLabel" Text="{l:S Finding_ReasonLabel}" Style="{StaticResource CaptionText}" />
-                        <TextBox Text="{Binding Reason, UpdateSourceTrigger=PropertyChanged}" MaxLength="200" Margin="0,4,0,0"
-                                 AutomationProperties.Name="{l:S Finding_ReasonName}" />
-                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                          <Button Padding="12,4" Content="{l:S Finding_ConfirmDismiss}" IsEnabled="{Binding CanDismiss}" Click="OnConfirmDismiss" />
-                          <Button Padding="12,4" Margin="8,0,0,0" Content="{l:S Common_Cancel}" Click="OnCancelDismiss" />
-                        </StackPanel>
-                      </StackPanel>
-                    </StackPanel>
-                  </Grid>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
+            <ItemsControl ItemsSource="{Binding Findings}" Style="{StaticResource FindingList}" MaxHeight="300"
+                          ItemTemplate="{StaticResource FindingTemplate}" AutomationProperties.LabeledBy="{Binding ElementName=FindingsTitle}" />
             <TextBox Text="{Binding FindingMessage, Mode=OneWay}" Style="{StaticResource SelectableText}" TextWrapping="Wrap"
                      Visibility="{Binding FindingMessageVisibility}" Margin="0,6,0,0" />
             <Expander Header="{Binding DismissedHeader}" Visibility="{Binding DismissedVisibility}" Margin="0,8,0,0">
