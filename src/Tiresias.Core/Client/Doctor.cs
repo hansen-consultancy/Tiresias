@@ -17,7 +17,8 @@ public enum DoctorStatus
 public sealed record DoctorCheck(string Name, DoctorStatus Status, string Detail, string? UserSecretsId = null);
 
 /// <summary>What the vault file says about recoverability: which secrets lack a Hello or a recovery wrap.</summary>
-public sealed record DoctorVault(int Secrets, IReadOnlyList<string> WithoutHello, IReadOnlyList<string> WithoutRecovery);
+/// <param name="Unbound">Secrets not yet bound to their policy, which the broker refuses until migrated.</param>
+public sealed record DoctorVault(int Secrets, IReadOnlyList<string> WithoutHello, IReadOnlyList<string> WithoutRecovery, IReadOnlyList<string>? Unbound = null);
 
 /// <summary>A file the doctor read: its path and text (<c>null</c> when unreadable).</summary>
 public sealed record DoctorFile(string Path, string? Text);
@@ -120,7 +121,10 @@ public static partial class Doctor
             return new(name, DoctorStatus.Fail, $"{vault.WithoutRecovery.Count} of {vault.Secrets} secrets have no recovery wrap: {string.Join(", ", vault.WithoutRecovery)}");
         if (vault.WithoutHello.Count > 0)
             return new(name, DoctorStatus.Warn, $"{vault.WithoutHello.Count} of {vault.Secrets} secrets can't be unlocked with Hello: {string.Join(", ", vault.WithoutHello)}");
-        return new(name, DoctorStatus.Ok, $"{vault.Secrets} secrets, all with Hello and recovery wraps");
+        if (vault.Unbound is { Count: > 0 } unbound)
+            return new(name, DoctorStatus.Fail, $"{unbound.Count} of {vault.Secrets} secrets aren't bound to their services' settings yet, so the broker refuses them: "
+                + $"{string.Join(", ", unbound)}. Unlock in the Tiresias app and approve, or run tir vault migrate");
+        return new(name, DoctorStatus.Ok, $"{vault.Secrets} secrets, all with Hello and recovery wraps, bound to their services' settings");
     }
 
     /// <returns><c>null</c> for an empty file, one without keys, or one that is sealed and clean: nothing to report.</returns>

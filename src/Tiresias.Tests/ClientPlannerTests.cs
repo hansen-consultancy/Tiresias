@@ -165,6 +165,14 @@ public class DoctorTests
         Assert.That((await Check(new FakeProbe { Vault = new(3, ["old"], []) }, "vault")).Status, Is.EqualTo(DoctorStatus.Warn));
     }
 
+    [Test]
+    public async Task Unbound_secrets_fail_and_name_the_migration()
+    {
+        var vault = await Check(new FakeProbe { Vault = new(3, [], [], ["llm-read"]) }, "vault");
+        Assert.That(vault.Status, Is.EqualTo(DoctorStatus.Fail));
+        Assert.That(vault.Detail, Does.Contain("llm-read").And.Contain("tir vault migrate"));
+    }
+
     [TestCase(null, DoctorStatus.Fail)]
     [TestCase(401, DoctorStatus.Ok)]
     [TestCase(200, DoctorStatus.Warn)]

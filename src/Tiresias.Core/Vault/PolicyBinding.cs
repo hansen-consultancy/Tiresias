@@ -20,11 +20,12 @@ public static class PolicyBinding
         SHA256.HashData(Canonical(vault.Services, grant => grant.SecretSlug == secretSlug));
 
     /// <summary>
-    /// Whether <paramref name="secret"/> may be used under <paramref name="vault"/>'s policy: it is
-    /// unbound, or the policy approved for it is the one in force.
+    /// Whether <paramref name="secret"/> may be used under <paramref name="vault"/>'s policy: the
+    /// policy approved for it is the one in force. An unbound secret never is, until it is migrated
+    /// (<see cref="PolicyChangePlanner.Migrate"/>).
     /// </summary>
     public static bool Allows(VaultDocument vault, SealedSecret secret) =>
-        secret.PolicyHash is not { } approved || approved.AsSpan().SequenceEqual(Hash(vault, secret.Slug));
+        secret.PolicyHash is { } approved && approved.AsSpan().SequenceEqual(Hash(vault, secret.Slug));
 
     /// <summary>SHA-256 of one service's whole policy, for noticing that it changed.</summary>
     public static byte[] ServiceHash(Service service) =>

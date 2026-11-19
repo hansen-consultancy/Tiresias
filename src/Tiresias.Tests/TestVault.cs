@@ -17,7 +17,7 @@ sealed class TestVault : IDisposable
 {
     readonly Key tpmKey = Key.Create(KeyAgreementAlgorithm.X25519);
 
-    TestVault(Func<X25519KeyWrapper, (SealedSecret[] Secrets, Service[] Services)>? extra = null, bool bound = false)
+    TestVault(Func<X25519KeyWrapper, (SealedSecret[] Secrets, Service[] Services)>? extra = null, bool bound = true)
     {
         Tpm = X25519KeyWrapper.ForKey("tpm", tpmKey);
         var (extraSecrets, extraServices) = extra?.Invoke(Tpm) ?? ([], []);
@@ -39,7 +39,7 @@ sealed class TestVault : IDisposable
                 Seal("llm-read", "Bearer sk-read"u8),
                 Seal("llm-write", "Bearer sk-write"u8),
                 Seal("llm-admin", "Bearer sk-admin"u8),
-                .. extraSecrets,
+                .. extraSecrets.Select(s => bound ? Bind(s, policy) : s),
             ],
             services);
     }
@@ -47,10 +47,27 @@ sealed class TestVault : IDisposable
     public X25519KeyWrapper Tpm { get; }
     public VaultDocument Document { get; }
 
+    /// <summary>The <c>llm</c> vault, its secrets (extras too) bound to their policy (<see cref="PolicyBinding"/>), as the app saves them.</summary>
     public static TestVault Create() => new();
 
-    /// <summary>The <c>llm</c> vault with its secrets bound to their policy (<see cref="PolicyBinding"/>).</summary>
-    public static TestVault CreateBound() => new(bound: true);
+    /// <summary>The <c>llm</c> vault as saved before policy binding: the broker refuses its secrets until migrated.</summary>
+    public static TestVault CreateUnbound() => new(bound: false);
+
+    /// <summary>The same value and version, sealed again bound to <paramref name="policy"/>.</summary>
+    SealedSecret Bind(SealedSecret secret, VaultDocument policy)
+    {
+        var dek = SecretEnvelope.UnwrapDek(secret, Tpm)!;
+        var value = SecretEnvelope.Open(secret, dek)!;
+        try
+        {
+            return SecretEnvelope.Seal(secret.Slug, secret.Version, value, [Tpm], PolicyBinding.Hash(policy, secret.Slug));
+        }
+        finally
+        {
+            Array.Clear(dek);
+            Array.Clear(value);
+        }
+    }
 
     /// <summary>The <c>llm</c> vault plus whatever <paramref name="extra"/> seals with the stand-in TPM.</summary>
     public static TestVault CreateWith(Func<X25519KeyWrapper, (SealedSecret[] Secrets, Service[] Services)> extra) => new(extra);

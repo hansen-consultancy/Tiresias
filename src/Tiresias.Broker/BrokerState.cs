@@ -299,7 +299,7 @@ public sealed class BrokerState : IDisposable
             if (secret is null || !deks.TryGetValue(grant.SecretSlug, out var dek))
                 return (null, Refuse(record, 503, "secret-not-leased"));
             if (Open(secret, dek, vault) is not { } value)
-                return (null, secret.PolicyHash is not null ? Refuse(record, 403, "policy-not-approved") : Refuse(record, 500, "secret-unreadable"));
+                return (null, !PolicyBinding.Allows(vault, secret) ? Refuse(record, 403, "policy-not-approved") : Refuse(record, 500, "secret-unreadable"));
             return (new AllowedRequest(audit, record with { Kind = AuditKind.Token }, service, grant, value, current.HardCapAt), null);
         }
     }
@@ -367,7 +367,7 @@ public sealed class BrokerState : IDisposable
             if (secret is null || !deks.TryGetValue(grant.SecretSlug, out var dek))
                 return Deny(503, "secret-not-leased");
             if (Open(secret, dek, vault) is not { } value)
-                return secret.PolicyHash is not null ? Deny(403, "policy-not-approved") : Deny(500, "secret-unreadable");
+                return !PolicyBinding.Allows(vault, secret) ? Deny(403, "policy-not-approved") : Deny(500, "secret-unreadable");
 
             return (new AllowedRequest(audit, record with { Kind = AuditKind.Allow }, service, grant, value, current.HardCapAt), null);
         }
@@ -425,7 +425,7 @@ public sealed class BrokerState : IDisposable
             if (secret is null || !deks.TryGetValue(grant.SecretSlug, out var dek))
                 return Deny(503, "secret-not-leased");
             if (Open(secret, dek, vault) is not { } value)
-                return secret.PolicyHash is not null ? Deny(403, "policy-not-approved") : Deny(500, "secret-unreadable");
+                return !PolicyBinding.Allows(vault, secret) ? Deny(403, "policy-not-approved") : Deny(500, "secret-unreadable");
 
             var allow = record with { Kind = AuditKind.Allow, Reason = classification is null ? "login" : classification.IsRead ? "select" : "statement" };
             return (new AllowedRequest(audit, allow, service, grant, value, current.HardCapAt), null);
@@ -535,9 +535,16 @@ public sealed class BrokerState : IDisposable
     static bool SameCiphertext(SealedSecret a, SealedSecret b) =>
         a.Version == b.Version && a.Nonce.AsSpan().SequenceEqual(b.Nonce) && a.Ciphertext.AsSpan().SequenceEqual(b.Ciphertext);
 
+    /// <summary>
+    /// Whether a leased DEK is worth keeping: it opens its secret, and the secret isn't bound to a
+    /// policy other than <paramref name="policy"/>. An unbound secret's DEK is kept, so the secret
+    /// serves as soon as migration binds it (same DEK); using it is refused until then.
+    /// </summary>
     static bool Opens(SealedSecret secret, byte[] dek, VaultDocument policy)
     {
-        var value = Open(secret, dek, policy);
+        if (secret.PolicyHash is not null && !PolicyBinding.Allows(policy, secret))
+            return false;
+        var value = SecretEnvelope.Open(secret, dek);
         if (value is null)
             return false;
         Array.Clear(value);

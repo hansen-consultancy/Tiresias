@@ -245,6 +245,21 @@ public partial class App : Application
             ShowWindow<StatusWindow>();
     }
 
+    /// <summary>Secrets saved before policy binding are refused by the broker until the user approves binding them.</summary>
+    static async Task OfferMigrationAsync()
+    {
+        try
+        {
+            if (!await PolicyApproval.MigrateAsync(null))
+                AppLog.Info("policy migration declined");
+        }
+        catch (Exception e) when (e is InvalidOperationException or IOException or UnauthorizedAccessException or InvalidDataException
+            or System.Text.Json.JsonException or System.Security.Cryptography.CryptographicException)
+        {
+            AppLog.Info($"policy migration failed: {e.Message}");
+        }
+    }
+
     /// <summary>The Windows Hello prompt, then the lease. Interactive: problems get a window with a way forward.</summary>
     /// <returns>Whether the agent ended up unlocked, and what to tell <c>tir</c>.</returns>
     internal async Task<(bool Ok, string Message)> UnlockAsync(bool interactive)
@@ -264,6 +279,8 @@ public partial class App : Application
                         retry: () => _ = UnlockAsync(true), openStatus: () => ShowWindow<StatusWindow>());
                 return (true, Text.Format("Unlock_NoLease", result.Message));
             }
+            if (interactive)
+                await OfferMigrationAsync();
             return (true, result is null ? Text.Get("Unlock_Done") : Text.Format("Unlock_DoneLease", result.Message));
         }
         catch (Exception e) when (e is InvalidOperationException or HttpRequestException or TaskCanceledException or IOException

@@ -85,7 +85,8 @@ its section below.
   showing what changes (upstream, grants, paths), in the Services window, both setups and
   `tir service add`/`remove`. Its secrets are then bound to those settings: if a program edits the
   vault file to send them elsewhere, Tiresias refuses to use them until you approve the change.
-  Services saved before stay unbound until you save them again.
+  Secrets saved before this are refused until you approve them once: the app offers it after
+  you unlock, `tir vault migrate` does it from a terminal, and `tir doctor` reports it.
 - A development build no longer adds its `tir` to PATH, so it can't shadow the installed one.
 
 ### Fixed

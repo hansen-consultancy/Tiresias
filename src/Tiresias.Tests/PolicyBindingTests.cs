@@ -101,14 +101,14 @@ public class BoundSecretEnvelopeTests
     [Test]
     public void Allows_compares_the_approved_policy_with_the_one_in_force()
     {
-        using var vault = TestVault.CreateBound();
-        using var plain = TestVault.Create();
+        using var vault = TestVault.Create();
+        using var plain = TestVault.CreateUnbound();
         var secret = vault.Document.FindSecret("llm-read")!;
         var widened = vault.Document with { Services = [.. vault.Document.Services.Select(s => s with { Upstream = new Uri("https://attacker.example/") })] };
 
         Assert.That(PolicyBinding.Allows(vault.Document, secret), Is.True);
         Assert.That(PolicyBinding.Allows(widened, secret), Is.False);
-        Assert.That(PolicyBinding.Allows(widened, plain.Document.FindSecret("llm-read")!), Is.True, "an unbound secret");
+        Assert.That(PolicyBinding.Allows(plain.Document, plain.Document.FindSecret("llm-read")!), Is.False, "an unbound secret, until migrated");
     }
 
     [Test]
@@ -143,8 +143,8 @@ public class BoundSecretEnvelopeTests
     [Test]
     public void The_vault_file_keeps_the_policy_hash_and_stays_version_1_without_one()
     {
-        using var vault = TestVault.CreateBound();
-        using var plain = TestVault.Create();
+        using var vault = TestVault.Create();
+        using var plain = TestVault.CreateUnbound();
         var dir = Directory.CreateTempSubdirectory("tir-bound-").FullName;
         try
         {
@@ -177,7 +177,7 @@ public class BrokerPolicyTests
     [SetUp]
     public void SetUp()
     {
-        vault = TestVault.CreateBound();
+        vault = TestVault.Create();
         identity = Key.Create(SignatureAlgorithm.Ed25519);
         time = new ManualTime(T0);
         auditPath = Path.Combine(Path.GetTempPath(), $"tir-policy-{Guid.NewGuid():N}.jsonl");
@@ -300,17 +300,14 @@ public class BrokerPolicyTests
     [Test]
     public void A_policy_change_retires_the_services_placeholders_and_elevations()
     {
-        // Unbound secrets: the change itself is accepted, as for every vault before binding.
-        state.Dispose();
-        vault.Dispose();
-        vault = TestVault.Create();
-        state = new BrokerState(vault.Document, LeaseTerms.Workday(TimeZoneInfo.FindSystemTimeZoneById("Europe/Brussels")),
-            new AuditLog(auditPath, time), Key.Create(SignatureAlgorithm.Ed25519), time);
         OpenLease();
         var token = Mint();
         state.Elevate("llm", "admin", TimeSpan.FromMinutes(15));
+        var changed = Tampered(s => s with { Upstream = new Uri("https://llm2.example/") });
+        var approved = changed with { Secrets = [.. changed.Secrets.Select(old =>
+            SecretEnvelope.Rebind(old, SecretEnvelope.UnwrapDek(old, vault.Tpm)!, PolicyBinding.Hash(changed, old.Slug), [vault.Tpm])!)] };
 
-        var reload = state.ReplaceVault(Tampered(s => s with { Upstream = new Uri("https://llm2.example/") }));
+        var reload = state.ReplaceVault(approved);
 
         Assert.That(reload.Refused, Is.False);
         Assert.That(Get(token)?.Reason, Is.EqualTo("unknown-placeholder"));
@@ -325,5 +322,25 @@ public class BrokerPolicyTests
         var token = Mint();
         Assert.That(state.ReplaceVault(vault.Document with { }).Refused, Is.False);
         Assert.That(Get(token), Is.Null);
+    }
+
+    [Test]
+    public void An_unbound_secret_is_refused_until_migration_binds_it_and_then_serves_with_the_same_DEK()
+    {
+        state.Dispose();
+        vault.Dispose();
+        vault = TestVault.CreateUnbound();
+        state = new BrokerState(vault.Document, LeaseTerms.Workday(TimeZoneInfo.FindSystemTimeZoneById("Europe/Brussels")),
+            new AuditLog(auditPath, time), Key.Create(SignatureAlgorithm.Ed25519), time);
+        OpenLease();
+
+        Assert.That(Get(Mint())?.Reason, Is.EqualTo("policy-not-approved"));
+
+        var migrated = vault.Document with { Secrets = [.. vault.Document.Secrets.Select(old =>
+            SecretEnvelope.Rebind(old, SecretEnvelope.UnwrapDek(old, vault.Tpm)!, PolicyBinding.Hash(vault.Document, old.Slug), [vault.Tpm])!)] };
+        var reload = state.ReplaceVault(migrated);
+
+        Assert.That(reload.Unleased, Is.Empty, "the lease kept the unbound secrets' DEKs");
+        Assert.That(Get(Mint()), Is.Null);
     }
 }

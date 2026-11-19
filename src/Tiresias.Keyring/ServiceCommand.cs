@@ -86,9 +86,27 @@ static class ServiceCommand
     /// Shows the change, asks for approval (in the app when it runs) and then for Windows Hello,
     /// which rebinds the secrets it touches (<see cref="VaultEditor.Approve"/>).
     /// </summary>
-    static async Task<bool> ApproveAsync(string title, IReadOnlyList<Service> set, IReadOnlyList<string> remove)
+    static Task<bool> ApproveAsync(string title, IReadOnlyList<Service> set, IReadOnlyList<string> remove) =>
+        ApproveAsync(title, VaultEditor.Plan(set, remove));
+
+    /// <summary><c>tir vault migrate</c>: binds every secret saved before policy binding to its services' settings as they are now.</summary>
+    public static async Task<int> MigrateAsync()
     {
-        var change = VaultEditor.Plan(set, remove);
+        var change = VaultEditor.Migration();
+        if (change.IsEmpty)
+        {
+            Console.WriteLine("Every secret is bound to its services' settings already.");
+            return 0;
+        }
+        Console.WriteLine("From now on Tiresias refuses changes to these settings unless you approve them:");
+        if (!await ApproveAsync("tir vault migrate", change))
+            return 1;
+        Console.WriteLine($"Bound {change.Rebind.Count} secret(s). {Commands.PickedUp()}");
+        return 0;
+    }
+
+    static async Task<bool> ApproveAsync(string title, PolicyChange change)
+    {
         if (change.IsEmpty)
             return true;
         foreach (var line in change.Lines)

@@ -1,7 +1,7 @@
 # Policy integrity
 
-Status: **phases 1 and 2 built** (binding, broker checks, approval); secrets saved before them
-stay unbound until migration (see *Phases*). Tracks issue #24. This page designs how the broker refuses a
+Status: **phases 1 to 3 built** (binding, broker checks, approval, migration); the rollback
+high-water mark waits for the Windows service (see *Phases*). Tracks issue #24. This page designs how the broker refuses a
 service policy the user didn't approve: upstreams, grant rules and which secret each grant uses.
 
 ## The problem
@@ -134,11 +134,14 @@ policy before unlock is an honest limit, written as such.
 
 ### Migration
 
-Vault file `version: 2`. On the first unlock after the upgrade the app shows the services as they
-are now ("Tiresias will now refuse changes to these settings unless you approve them"), and one
-Hello prompt rebinds every secret. Until then the broker refuses v1 secrets with
-`policy-not-approved`, and `tir doctor` names the step. A hosted broker gets its vault from the
-admin's machine as today, after `tir vault migrate` there.
+Vault file `version: 2`. After each unlock in the app that finds unbound secrets, the app shows
+the services as they are now ("Tiresias will now refuse changes to these settings unless you
+approve them"), and one Hello prompt rebinds every secret (`PolicyChangePlanner.Migrate`: each
+service using one shown as it is; a secret no service uses is bound to the empty policy). `tir
+vault migrate` does the same from a terminal. Until then the broker refuses unbound secrets with
+403 `policy-not-approved` but keeps their leased DEKs, so they serve as soon as migration binds
+them (same DEK), and `tir doctor` fails the vault check, naming the step. A hosted broker gets its
+vault from the admin's machine as today, after `tir vault migrate` there.
 
 ## Tests
 
@@ -164,5 +167,6 @@ admin's machine as today, after `tir vault migrate` there.
    elevations retired on a policy change.
 2. **Built.** Approval dialog and `VaultEditor.Approve`, wired into the Services window, both
    setups and `tir service add`/`remove`; the approved hash stored with each bound secret.
-3. Migration on unlock, `tir vault migrate`, doctor line, broker README and CHANGELOG.
+3. **Built.** Migration on unlock, `tir vault migrate`, doctor line; the broker refuses unbound
+   secrets.
 4. Rollback high-water mark, persisted once the Windows service exists.

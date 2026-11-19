@@ -58,6 +58,9 @@ public static class VaultEditor
     /// <exception cref="InvalidOperationException">A service set uses a secret that isn't in the vault.</exception>
     public static PolicyChange Plan(IReadOnlyList<Service> set, IReadOnlyList<string> remove) => PolicyChangePlanner.Plan(Load(), set, remove);
 
+    /// <summary>Binds every unbound secret to its policy as it is now (<see cref="PolicyChangePlanner.Migrate"/>), once the user approves.</summary>
+    public static PolicyChange Migration() => PolicyChangePlanner.Migrate(Load());
+
     /// <summary>
     /// Writes a change the user approved, rebinding each secret it touches to its new policy. The
     /// DEKs are opened with <paramref name="fresh"/>, so approving costs a Windows Hello prompt
@@ -68,7 +71,7 @@ public static class VaultEditor
     public static void Approve(PolicyChange change, HelloKeyWrapper fresh)
     {
         var vault = Load();
-        var again = PolicyChangePlanner.Plan(vault, change.Set, change.Remove);
+        var again = PolicyChangePlanner.Replan(vault, change);
         if (!again.Lines.SequenceEqual(change.Lines) || !again.Rebind.SequenceEqual(change.Rebind))
             throw new InvalidOperationException("The vault changed while you were deciding. Look at the change again.");
         if (again.Rebind.Count == 0)
