@@ -75,6 +75,9 @@ public interface IDoctorProbe
     /// <summary>The vault's RavenDB services with their certificates as recorded at setup. Never the certificate.</summary>
     IEnumerable<DoctorRavenCertificate> RavenCertificates() => [];
 
+    /// <summary>The sealed environment's deliveries, by name; <c>null</c> while locked. See <see cref="Doctor.KeysAsValues"/>.</summary>
+    DoctorEnvironment? SealedEnvironment => null;
+
     /// <summary>Extensions installed for the user in programs that host them, from their metadata.</summary>
     IEnumerable<InstalledExtension> Extensions() => [];
 
@@ -133,6 +136,7 @@ public static partial class Doctor
         });
         checks.AddRange(ConfigChecks(probe.UserSecretsFiles(), probe.ConfigFiles(), probe.KeyFiles()));
         checks.AddRange(RavenExpiry(probe.RavenCertificates(), DateTimeOffset.UtcNow));
+        checks.AddRange(KeysAsValues(probe.SealedEnvironment));
         checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), probe.CredentialUses(), probe.BlockedPrograms(), DateTimeOffset.UtcNow));
         return checks;
     }

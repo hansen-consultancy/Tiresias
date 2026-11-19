@@ -1925,4 +1925,7 @@ Store them in clear?</value>
   <data name="Finding_FixRavenReplace" xml:space="preserve">
     <value>Replace certificate...</value>
   </data>
+  <data name="Finding_FixPlaceholder" xml:space="preserve">
+    <value>Use a placeholder...</value>
+  </data>
 </root>

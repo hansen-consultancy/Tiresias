@@ -97,6 +97,22 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public IEnumerable<DoctorRavenCertificate> RavenCertificates() => RavenCertificateStore.ForVault();
 
+    /// <summary>The unlocked key, for the checks that need the sealed environment's names; <c>null</c> skips them. Never prompts.</summary>
+    public IKeyWrapper? Hello { get; init; }
+
+    /// <summary>Opening the environment decrypts its values too; only names leave this property.</summary>
+    public DoctorEnvironment? SealedEnvironment
+    {
+        get
+        {
+            if (Hello is null)
+                return null;
+            var environment = EnvironmentStore.Open(Hello).Environment;
+            var services = VaultEditor.Load().Services.Where(PlaceholderMinter.CanStandIn).Select(s => new DoctorService(s.Slug, s.Upstream.Host)).ToArray();
+            return new([.. environment.Global.Select(v => v.Name).Where(n => environment.PlaceholderFor(n) is null)], services);
+        }
+    }
+
     public IEnumerable<InstalledExtension> Extensions() => SurfaceProbe.Extensions();
 
     public IEnumerable<StartupEntry> StartupEntries() => SurfaceProbe.StartupEntries();

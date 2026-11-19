@@ -135,7 +135,7 @@ public class DoctorTests
     {
         var checks = await Doctor.RunAsync(new FakeProbe());
         Assert.That(checks.Select(c => c.Status), Is.All.EqualTo(DoctorStatus.Ok));
-        Assert.That(checks.Select(c => c.Name), Is.EqualTo(new[] { "broker pinned", "device key", "recovery key", "vault", "broker reachable", "forwarder", "environment variables" }));
+        Assert.That(checks.Select(c => c.Name), Is.EqualTo(new[] { "broker pinned", "device key", "recovery key", "vault", "broker reachable", "forwarder", "environment variables", Doctor.KeysAsValuesCheck }));
     }
 
     [Test]
