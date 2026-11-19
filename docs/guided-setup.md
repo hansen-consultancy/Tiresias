@@ -180,4 +180,4 @@ Existing windows remain the places where the work happens; this changes how peop
 5. **Attack surface**: installed software and extensions as findings, ranked by what uses
    credentials ([attack surface](attack-surface.md)).
 6. **More checks**: RavenDB clearance and expiry, sealed keys handed out as values, publishing keys,
-   git tokens, each landing with its own fix.
+   git tokens, each landing with its own fix ([more checks](more-checks.md)).
