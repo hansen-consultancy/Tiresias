@@ -8,6 +8,7 @@ using CommunityToolkit.Mvvm.Input;
 using Tiresias.Agent;
 using Tiresias.App.Logic;
 using Tiresias.Client;
+using Tiresias.Vault;
 
 namespace Tiresias.App.Views;
 
@@ -109,6 +110,11 @@ public partial class StatusWindow : Window
                 break;
             case RemoveTokenFromRemote remote:
                 model.CopyFix(remote.Instruction);
+                break;
+            case ReplaceRavenCertificate { Service: var slug }
+                when VaultEditor.Load().FindService(slug) is { } service && RavenSetupPlanner.Recognize(service) is { } existing:
+                new RavenServerWindow(existing) { Owner = this }.ShowDialog();
+                model.Refresh();
                 break;
             case UsePlaceholder { Variable: var variable, Service: var service }:
                 ShowEnvironment().PickForPlaceholder(variable, service);

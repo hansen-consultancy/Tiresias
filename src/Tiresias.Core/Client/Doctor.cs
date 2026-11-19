@@ -78,6 +78,9 @@ public interface IDoctorProbe
     /// <summary>The user's git credential helper and stored hosts; <c>null</c> when unknown. Never a token.</summary>
     DoctorGitCredentials? GitCredentials => null;
 
+    /// <summary>The vault's RavenDB services with their certificates as recorded at setup. Never the certificate.</summary>
+    IEnumerable<DoctorRavenCertificate> RavenCertificates() => [];
+
     /// <summary>The sealed environment's deliveries, by name; <c>null</c> while locked. See <see cref="Doctor.KeysAsValues"/>.</summary>
     DoctorEnvironment? SealedEnvironment => null;
 
@@ -139,6 +142,7 @@ public static partial class Doctor
         });
         checks.AddRange(ConfigChecks(probe.UserSecretsFiles(), probe.ConfigFiles(), probe.KeyFiles()));
         checks.AddRange(GitTokens(probe.GitConfigs(), probe.GitCredentials));
+        checks.AddRange(RavenExpiry(probe.RavenCertificates(), DateTimeOffset.UtcNow));
         checks.AddRange(KeysAsValues(probe.SealedEnvironment));
         checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), probe.CredentialUses(), probe.BlockedPrograms(), DateTimeOffset.UtcNow));
         return checks;

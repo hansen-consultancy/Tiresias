@@ -11,6 +11,8 @@ public enum FixAction
     SetUpRaven,
     /// <summary>A step outside the app (a package to reference): the command goes to the clipboard.</summary>
     CopyCommand,
+    /// <summary>Edit... on a RavenDB service, to pick a new certificate.</summary>
+    ReplaceRaven,
     /// <summary>Environment variables, with the variable checked and the placeholder section in view.</summary>
     UsePlaceholder,
     /// <summary>Remove an extension with its host's command, after the user approves.</summary>
@@ -67,6 +69,7 @@ public static class FindingView
         SetUpRaven => (FixAction.SetUpRaven, "Finding_FixRaven"),
         ReferenceConfigurationPackage => (FixAction.CopyCommand, "Finding_FixCopy"),
         RemoveTokenFromRemote => (FixAction.CopyCommand, "Finding_FixCopy"),
+        ReplaceRavenCertificate => (FixAction.ReplaceRaven, "Finding_FixRavenReplace"),
         UsePlaceholder => (FixAction.UsePlaceholder, "Finding_FixPlaceholder"),
         RemoveExtension => (FixAction.RemoveExtension, "Finding_FixRemoveExtension"),
         RevealFile => (FixAction.RevealFile, "Finding_FixReveal"),
