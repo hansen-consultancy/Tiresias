@@ -127,6 +127,7 @@ public class PublishingKeyTests
     [TestCase("`calc`")]
     [TestCase("%PATH%")]
     [TestCase("x\"y")]
+    [TestCase("x!y")]
     public void A_file_in_a_folder_a_quoted_argument_cannot_hold_is_a_finding_without_a_fix(string folder)
     {
         var checks = Checks(Path.Combine(App, folder, ".npmrc"), $"//registry.npmjs.org/:_authToken={Secret}\n", inProfile: false)

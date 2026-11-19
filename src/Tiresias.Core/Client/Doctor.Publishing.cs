@@ -84,7 +84,7 @@ public static partial class Doctor
     /// Whether <paramref name="text"/> stays literal inside double quotes in cmd, PowerShell and
     /// bash. A fix's command is copied into a shell, and a cloned project names its own folders.
     /// </summary>
-    internal static bool Quotable(string text) => text.IndexOfAny(['"', '%', '$', '`']) < 0;
+    internal static bool Quotable(string text) => text.IndexOfAny(['"', '%', '$', '`', '!']) < 0;
 
     static bool IsNuGetOrg(string source) =>
         Uri.TryCreate(source, UriKind.Absolute, out var uri) && (uri.Host.Equals("api.nuget.org", StringComparison.OrdinalIgnoreCase) || uri.Host.Equals("www.nuget.org", StringComparison.OrdinalIgnoreCase));
