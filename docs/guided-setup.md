@@ -105,7 +105,7 @@ First checks, by what they find and what they offer:
 | Certificate expiry | A sealed certificate expiring within 30 days | Renew it before programs start failing |
 | Sealed key handed out as a value | An API key whose service accepts `Authorization: Bearer`, delivered as its value | Placeholder delivery (E4 → E3) |
 | Publishing key | A NuGet or npm API key, sealed or plaintext | Trusted publishing in CI (→ E1); keep a short-lived key for local pushes only |
-| Git token in a remote URL | `https://user:token@…` in a project's `.git/config` | Out of the URL first (E5 → E4), then through the broker (→ C1) |
+| Git token in a remote URL | Built: `https://user:token@…` in a remote's `url`/`pushurl` or a `[url]` rewrite in a project's `.git/config`, printed without the user info; entries in `~/.git-credentials`, by host | `git remote set-url` without the user info, which stops it spreading (still E5/C3); later, a `git-credential-tiresias` helper (→ E4/C1) |
 | A CLI acting as the user, unseen | `gh` signed in with a stored token, the Azure CLI with a cached Entra session (asked through each tool's own status command, never the token) | Run it through `tir exec` with a token minted per run after consent (C3 → C1); keep the tool's own sign-in only for interactive use, or sign it out |
 
 A finding can be **dismissed** with a reason ("this server only takes SQL logins", "not mine").

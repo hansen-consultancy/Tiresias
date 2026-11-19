@@ -60,6 +60,7 @@ public static class FindingView
         SetUpSqlServer => (FixAction.SetUpSqlServer, "Finding_FixSql"),
         SetUpRaven => (FixAction.SetUpRaven, "Finding_FixRaven"),
         ReferenceConfigurationPackage => (FixAction.CopyCommand, "Finding_FixCopy"),
+        RemoveTokenFromRemote => (FixAction.CopyCommand, "Finding_FixCopy"),
         _ => null,
     };
 

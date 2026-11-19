@@ -100,6 +100,9 @@ public partial class StatusWindow : Window
             case ReferenceConfigurationPackage package:
                 model.CopyFix(package.Instruction);
                 break;
+            case RemoveTokenFromRemote remote:
+                model.CopyFix(remote.Instruction);
+                break;
         }
     }
 

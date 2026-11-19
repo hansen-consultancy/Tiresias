@@ -10,6 +10,10 @@ its section below.
 
 ### Added
 
+- `tir doctor` and the status page find git tokens in plain text: in a project's remote URL
+  (`https://user:token@host`, with **Copy command** for the `git remote set-url` that takes it
+  out) and in `~/.git-credentials`, counted by host. URLs are shown without the token.
+
 - The status page shows findings of one kind as one line with their count, for example
   "230 projects that set <UserSecretsId> but don't reference Tiresias.Extensions.Configuration". The
   line opens to each finding with its own fix, and **Dismiss all** sets them aside with one reason.

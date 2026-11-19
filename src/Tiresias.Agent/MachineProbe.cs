@@ -95,12 +95,23 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public IEnumerable<string> KeyFiles() => Found.Keys.Concat(Found.Pems.Where(HoldsPemPrivateKey));
 
+    public IEnumerable<DoctorFile> GitConfigs() => Found.Repositories.Select(Read).Where(f => f.Text is not null);
+
+    public DoctorGitCredentials? GitCredentials
+    {
+        get
+        {
+            var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            return DoctorGitCredentials.From(Read(Path.Combine(profile, ".gitconfig")).Text, Read(Path.Combine(profile, ".git-credentials")).Text);
+        }
+    }
+
     /// <summary>How long the walk of the project roots took and what it covered; <c>null</c> until a check needed it.</summary>
     public ScanStats? Scan => found?.Stats;
 
     public sealed record ScanStats(TimeSpan Elapsed, int Folders, int Files);
 
-    sealed record FoundFiles(List<string> Projects, List<string> Configs, List<string> Keys, List<string> Pems, ScanStats Stats);
+    sealed record FoundFiles(List<string> Projects, List<string> Configs, List<string> Keys, List<string> Pems, List<string> Repositories, ScanStats Stats);
 
     FoundFiles? found;
     FoundFiles Found => found ??= Walk();
@@ -115,7 +126,7 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     FoundFiles Walk()
     {
         var clock = System.Diagnostics.Stopwatch.StartNew();
-        List<string> projects = [], configs = [], keys = [], pems = [];
+        List<string> projects = [], configs = [], keys = [], pems = [], repositories = [];
         var folders = roots.Length;
         var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true };
         foreach (var root in roots)
@@ -124,6 +135,8 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
             {
                 ShouldRecursePredicate = (ref FileSystemEntry entry) =>
                 {
+                    if (entry.FileName is ".git")
+                        repositories.Add(Path.Combine(entry.ToFullPath(), "config"));
                     if (entry.FileName is "bin" or "obj" or "node_modules" or ".git")
                         return false;
                     folders++;
@@ -144,7 +157,7 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
                     pems.Add(path);
             }
         }
-        return new(projects, configs, keys, pems, new(clock.Elapsed, folders, projects.Count + configs.Count + keys.Count + pems.Count));
+        return new(projects, configs, keys, pems, repositories, new(clock.Elapsed, folders, projects.Count + configs.Count + keys.Count + pems.Count));
     }
 
     static bool Wanted(string name) => Patterns.Any(p => Matches(p, name));

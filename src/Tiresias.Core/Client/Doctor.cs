@@ -71,6 +71,12 @@ public interface IDoctorProbe
 
     /// <summary>Paths of files holding a private key (<c>.pfx</c>, <c>.p12</c>, or a PEM with one); empty unless asked for. Never their contents.</summary>
     IEnumerable<string> KeyFiles() => [];
+
+    /// <summary>The <c>.git/config</c> of every repository in the project folders; empty unless asked for.</summary>
+    IEnumerable<DoctorFile> GitConfigs() => [];
+
+    /// <summary>The user's git credential helper and stored hosts; <c>null</c> when unknown. Never a token.</summary>
+    DoctorGitCredentials? GitCredentials => null;
 }
 
 /// <summary>
@@ -117,6 +123,7 @@ public static partial class Doctor
                 new ProtectVariables(names), Position.Plaintext, Position.SealedApproved),
         });
         checks.AddRange(ConfigChecks(probe.UserSecretsFiles(), probe.ConfigFiles(), probe.KeyFiles()));
+        checks.AddRange(GitTokens(probe.GitConfigs(), probe.GitCredentials));
         return checks;
     }
 
