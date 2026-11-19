@@ -123,9 +123,8 @@ dialog. That is the user's standing decision, made in the app. The broker now kn
 - **Denial of service with the device key.** A program running as you can still begin a lease
   (ending yours), end it, or revoke placeholders. Each takes access away, never gives it.
 - **Trust-chain links.** They are signed with the same DPAPI device key, so a program running as
-  you on an admin's device can sign an `AddDevice`. That is the same flaw on another route and
-  needs its own issue: links that add a key should need the paper key, or a Hello-derived
-  signature like this one.
+  you on an admin's device can sign an `AddDevice`. That is the same flaw on another route:
+  [trust-chain links that add a key](trust-links.md) (#41).
 - **Reading the app's memory.** The wrap key, and so the approval key, are in the unlocked agent's
   memory. That is the Windows service's job (desktop-app.md).
 - **Driving the app's consent dialog with synthetic input.** A program at the same integrity level
