@@ -177,5 +177,7 @@ Existing windows remain the places where the work happens; this changes how peop
 3. **What do you need?**: the catalogue, the ranked options, the free-text match; Add, Set up a SQL
    Server and Set up a RavenDB move behind it.
 4. **Show what is in use**: the home screen keeps only the areas that apply; the rest live in the catalogue.
-5. **More checks**: RavenDB clearance and expiry, sealed keys handed out as values, publishing keys,
+5. **Attack surface**: installed software and extensions as findings, ranked by what uses
+   credentials ([attack surface](attack-surface.md)).
+6. **More checks**: RavenDB clearance and expiry, sealed keys handed out as values, publishing keys,
    git tokens, each landing with its own fix.
