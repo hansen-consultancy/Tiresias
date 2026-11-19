@@ -10,6 +10,12 @@ its section below.
 
 ### Added
 
+- `tir doctor` and the status page find publishing keys: NuGet feed tokens in plain text or in a
+  user environment variable, NuGet push keys, npm tokens and PyPI passwords in plain text. Each
+  names the entry and the file, never the token. Feeds move to Tiresias as before; npm and PyPI
+  tokens are sealed with the new `tir env import` (or **Seal token...**), which leaves `${NAME}`
+  in the `.npmrc`. For nuget.org, npmjs.org and pypi.org the finding also points to trusted
+  publishing from CI, which needs no key at all.
 - `tir doctor` and the status page warn when a RavenDB service's certificate expires within 30
   days, and fail once it has, with **Replace certificate...** opening **Edit...** on the service.
   The expiry is recorded when a RavenDB is set up or edited; one set up earlier says "expiry
