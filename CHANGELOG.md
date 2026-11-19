@@ -107,7 +107,8 @@ its section below.
 
 - The status page and `tir doctor --projects` look through the project folders once instead of six
   times, and skip build output, packages and git internals: on a drive of repositories the checks
-  take seconds rather than half a minute. The app logs how long they took.
+  take seconds rather than half a minute. The findings list builds only the rows in view, so hundreds
+  of findings show at once. The app logs how long the checks and showing them took.
 
 - A placeholder limited to a grant that was later renamed or removed from its service is
   refused. Before, it could use every grant of the service, write and admin included.
