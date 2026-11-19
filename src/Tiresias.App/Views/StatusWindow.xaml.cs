@@ -24,6 +24,8 @@ public partial class StatusWindow : Window
         InitializeComponent();
         DataContext = model;
         Loaded += (_, _) => model.Refresh();
+        // Back from a window opened here, Home may have a new area in use.
+        Activated += (_, _) => model.ShowAreas();
         App.Current.Host.StateChanged += OnAgentStateChanged;
         App.Current.Guard.Changed += OnGuardChanged;
         Closed += (_, _) =>
@@ -64,6 +66,10 @@ public partial class StatusWindow : Window
 
     void OnAbout(object sender, RoutedEventArgs e) => App.Current.ShowWindow<AboutWindow>();
 
+    void OnAdd(object sender, RoutedEventArgs e) => App.Current.ShowWindow<NeedsWindow>();
+
+    void OnActivity(object sender, RoutedEventArgs e) => App.Current.ShowWindow<ActivityWindow>();
+
     void OnRestore(object sender, RoutedEventArgs e)
     {
         var window = App.Current.ShowWindow<RecoveryWindow>();
@@ -103,7 +109,27 @@ public partial class StatusWindow : Window
             case RemoveTokenFromRemote remote:
                 model.CopyFix(remote.Instruction);
                 break;
+            case RemoveExtension remove:
+                _ = RemoveExtensionAsync(remove);
+                break;
+            case RevealFile { Path: var path }:
+                Desktop.Reveal(path);
+                break;
         }
+    }
+
+    /// <summary>Runs the host's own uninstall command once the user approves, then checks again.</summary>
+    async Task RemoveExtensionAsync(RemoveExtension remove)
+    {
+        if (!AskWindow.Confirm(this, Text.Format("Finding_RemoveExtensionHeading", remove.Id, remove.Host.Name),
+                Text.Format("Finding_RemoveExtensionBody", remove.Instruction, remove.Host.Name), Text.Get("Finding_Remove")))
+            return;
+        var removed = await Desktop.RemoveExtensionAsync(remove);
+        model.FindingMessage = removed
+            ? Text.Format("Finding_Removed", remove.Id, remove.Host.Name)
+            : Text.Format("Finding_RemoveFailed", remove.Id, remove.Instruction);
+        if (removed)
+            model.Refresh();
     }
 
     /// <summary>Set up a RavenDB with the file found; once it is sealed, offer to move the file to the Recycle Bin.</summary>
@@ -351,7 +377,30 @@ public sealed partial class StatusViewModel : ObservableObject
         Headline = Text.Of(view.Headline);
         Mode = view.Mode is null ? Text.Get("Status_ModeNone") : Text.Get("Status_ModeSolo");
         LockLabel = Text.Get(App.Current.Host.Keys.IsUnlocked ? "Tray_Lock" : "Tray_Unlock");
+        ShowAreas();
     }
+
+    /// <summary>Home's areas: those in use, plus any a fix from the last run opens.</summary>
+    public void ShowAreas()
+    {
+        areas = Home.Areas(last.Select(c => c.Fix).OfType<DoctorFix>());
+        OnPropertyChanged(nameof(SecretsVisibility));
+        OnPropertyChanged(nameof(ServicesVisibility));
+        OnPropertyChanged(nameof(EnvironmentVisibility));
+        OnPropertyChanged(nameof(ActivityVisibility));
+    }
+
+    IReadOnlySet<HomeArea> areas = new HashSet<HomeArea>();
+
+    Visibility AreaVisibility(HomeArea area) => areas.Contains(area) ? Visibility.Visible : Visibility.Collapsed;
+
+    public Visibility SecretsVisibility => AreaVisibility(HomeArea.UserSecrets);
+
+    public Visibility ServicesVisibility => AreaVisibility(HomeArea.Services);
+
+    public Visibility EnvironmentVisibility => AreaVisibility(HomeArea.EnvironmentVariables);
+
+    public Visibility ActivityVisibility => AreaVisibility(HomeArea.Activity);
 
     [RelayCommand]
     async Task RunAsync()
@@ -406,6 +455,7 @@ public sealed partial class StatusViewModel : ObservableObject
         OnPropertyChanged(nameof(FindingsVisibility));
         OnPropertyChanged(nameof(DismissedVisibility));
         OnPropertyChanged(nameof(DismissedHeader));
+        ShowAreas();
     }
 
     public void Dismiss(IEnumerable<DoctorCheck> checks, string reason) =>

@@ -1,6 +1,6 @@
 # Guided setup: the strongest option first
 
-Status: **phases 1 to 3 built** (#32): the axes and findings in `tir doctor`, findings in the app, and *What do you need?*; the rest is design. This page designs how Tiresias steers people toward the safest way to
+Status: **phases 1 to 4 built** (#32): the axes and findings in `tir doctor`, findings in the app, *What do you need?*, and Home showing what is in use; **phase 5's first slice built**; the rest is design. This page designs how Tiresias steers people toward the safest way to
 hold each credential, finds the weaker setups already on the machine, and keeps a growing feature
 set reachable without a row of buttons per feature.
 
@@ -186,9 +186,24 @@ Existing windows remain the places where the work happens; this changes how peop
    comes back; `dismissals.json` beside the keyring is shared with `tir doctor`.
 3. **Built. What do you need?**: the catalogue, the ranked options, the free-text match; Add, Set up a SQL
    Server and Set up a RavenDB move behind it ([design](what-do-you-need.md)). `tir advise` prints the same list.
-4. **Show what is in use**: the home screen keeps only the areas that apply; the rest live in the catalogue
+4. **Built. Show what is in use**: the home screen keeps only the areas that apply; the rest live in the catalogue
    ([design](what-do-you-need.md#phase-4-what-is-in-use)).
-5. **Attack surface**: installed software and extensions as findings, ranked by what uses
-   credentials ([attack surface](attack-surface.md)).
+5. **Built, first slice. Attack surface**: installed software and extensions as findings, ranked
+   by what uses credentials ([attack surface](attack-surface.md)). Offline only: it reads the
+   extension metadata of VS Code, VS Code Insiders, Cursor and Windsurf, the user and machine Run
+   keys and the Startup folder (with an offline Authenticode check of each program; Windows' and
+   Store apps' own files count as unchecked), the blocklist, and which program got which credential
+   in the last 90 days from the activity and audit logs. It raises three kinds of findings, none
+   with a position: an extension with an unknown publisher or unchanged for two years inside a
+   program that used a credential (**Remove...** runs the host's `--uninstall-extension` after
+   approval), an unsigned program that starts at log-on, and a blocked program still on the PC
+   (both **Show file**). A finding's reasons are in its name, so a dismissal survives a version
+   update and a new reason brings it back. Still design: the opt-in trust lookups (OSV,
+   deps.dev, marketplaces, winget-pkgs) and the vulnerability and unverified-publisher findings
+   they raise; **Update** and `winget`/`dotnet tool`/`npm` uninstalls; "not used in 90 days" with
+   UserAssist, and **DisableStartup**; global tools and other hosts' extensions; scope on a managed
+   PC; the **Installed** list and the "*n* programs unused" line; trusting a publisher; separate
+   *How credentials are held* and *What can reach them* groups; `tir doctor --surface` and a daily
+   inventory instead of one per run.
 6. **More checks**: RavenDB clearance and expiry, sealed keys handed out as values, publishing keys,
    git tokens, each landing with its own fix.
