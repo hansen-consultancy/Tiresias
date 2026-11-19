@@ -78,6 +78,12 @@ its section below.
 - The secrets editor names projects instead of listing ids: add the folder you keep your code in
   under **Project folders**, use **Find a project**, or just run the project. Ids no project uses
   are grouped apart and can be moved to the Recycle Bin.
+- **`tir doctor` findings.** A line about how a credential is delivered shows where it sits on the
+  two axes, what can escape and who may use it unseen (`E5/C3` is readable and used silently), and
+  where its fix takes it, with the fix as a command or a place in the app. New checks: a
+  connection string with a password, in user secrets or (with `--projects`) `appsettings*.json`,
+  offers per-lease SQL logins; a private key in a file, or a certificate path in configuration,
+  offers having the broker present a RavenDB certificate. Passwords are never shown.
 
 ### Changed
 
