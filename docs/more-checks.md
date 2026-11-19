@@ -8,7 +8,8 @@ check below adds probe facts, planner cases and at most one fix type, and ships 
 ## Rules every check keeps
 
 - **Read names, shapes and metadata.** Where a check has to read a file holding a secret (an
-  `.npmrc`, a `.pypirc`), the planner reads it, and a check names the file, the key and the
+  `.npmrc`, a `.pypirc`), the probe reads it and hands the planner its text, as it does a user
+  secrets file today; the planner stays pure, and a check names the file, the key and the
   registry or host, never the value. A connection string is only ever parsed with
   `DbConnectionStringBuilder` and read by keyword; it is never split to print its parts.
 - **No admin rights, no unlock.** The doctor never asks for Hello. A fact that needs a sealed value
