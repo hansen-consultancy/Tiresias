@@ -24,6 +24,8 @@ public partial class StatusWindow : Window
         InitializeComponent();
         DataContext = model;
         Loaded += (_, _) => model.Refresh();
+        // Back from a window opened here, Home may have a new area in use.
+        Activated += (_, _) => model.ShowAreas();
         App.Current.Host.StateChanged += OnAgentStateChanged;
         App.Current.Guard.Changed += OnGuardChanged;
         Closed += (_, _) =>
@@ -63,6 +65,10 @@ public partial class StatusWindow : Window
     }
 
     void OnAbout(object sender, RoutedEventArgs e) => App.Current.ShowWindow<AboutWindow>();
+
+    void OnAdd(object sender, RoutedEventArgs e) => App.Current.ShowWindow<NeedsWindow>();
+
+    void OnActivity(object sender, RoutedEventArgs e) => App.Current.ShowWindow<ActivityWindow>();
 
     void OnRestore(object sender, RoutedEventArgs e)
     {
@@ -348,7 +354,30 @@ public sealed partial class StatusViewModel : ObservableObject
         Headline = Text.Of(view.Headline);
         Mode = view.Mode is null ? Text.Get("Status_ModeNone") : Text.Get("Status_ModeSolo");
         LockLabel = Text.Get(App.Current.Host.Keys.IsUnlocked ? "Tray_Lock" : "Tray_Unlock");
+        ShowAreas();
     }
+
+    /// <summary>Home's areas: those in use, plus any a fix from the last run opens.</summary>
+    public void ShowAreas()
+    {
+        areas = Home.Areas(last.Select(c => c.Fix).OfType<DoctorFix>());
+        OnPropertyChanged(nameof(SecretsVisibility));
+        OnPropertyChanged(nameof(ServicesVisibility));
+        OnPropertyChanged(nameof(EnvironmentVisibility));
+        OnPropertyChanged(nameof(ActivityVisibility));
+    }
+
+    IReadOnlySet<HomeArea> areas = new HashSet<HomeArea>();
+
+    Visibility AreaVisibility(HomeArea area) => areas.Contains(area) ? Visibility.Visible : Visibility.Collapsed;
+
+    public Visibility SecretsVisibility => AreaVisibility(HomeArea.UserSecrets);
+
+    public Visibility ServicesVisibility => AreaVisibility(HomeArea.Services);
+
+    public Visibility EnvironmentVisibility => AreaVisibility(HomeArea.EnvironmentVariables);
+
+    public Visibility ActivityVisibility => AreaVisibility(HomeArea.Activity);
 
     [RelayCommand]
     async Task RunAsync()
@@ -403,6 +432,7 @@ public sealed partial class StatusViewModel : ObservableObject
         OnPropertyChanged(nameof(FindingsVisibility));
         OnPropertyChanged(nameof(DismissedVisibility));
         OnPropertyChanged(nameof(DismissedHeader));
+        ShowAreas();
     }
 
     public void Dismiss(IEnumerable<DoctorCheck> checks, string reason) =>

@@ -12,7 +12,7 @@ namespace Tiresias.App;
 
 /// <summary>
 /// The notification-area icon and its menu: the lock state (plus "Solo"), Unlock or Lock, Home,
-/// Add... (<i>What do you need?</i>) and Activity; every other window is reached from those. The icon follows the taskbar's light or dark theme, and a development build's
+/// Add... (<i>What do you need?</i>) and Activity once anything is recorded; every other window is reached from those. The icon follows the taskbar's light or dark theme, and a development build's
 /// icon has an orange corner and a menu line saying which build it is.
 /// </summary>
 sealed class TrayController : IDisposable
@@ -62,6 +62,9 @@ sealed class TrayController : IDisposable
         icon.ContextMenu.Items.Add(new Separator());
         icon.ContextMenu.Items.Add(quit);
         AutomationName(icon.ContextMenu, "App_Name");
+        // Asked when the menu opens, not on every state change: it reads the vault and the logs.
+        icon.ContextMenu.Opened += (_, _) =>
+            activity.Visibility = Home.Areas([]).Contains(HomeArea.Activity) ? Visibility.Visible : Visibility.Collapsed;
 
         UpdateIcon();
         SystemEvents.UserPreferenceChanged += OnPreferenceChanged;
