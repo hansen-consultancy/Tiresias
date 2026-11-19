@@ -20,6 +20,8 @@ public.
       need?" flow ([design](guided-setup.md), #32)
 - [ ] Attack surface: installed software, extensions and global tools, ranked by what uses
       credentials ([design](attack-surface.md), #34)
+- [ ] Decoys: canary credentials that point home, and tripwires on decoy files
+      ([design](decoys.md), #39)
 - [x] Velopack installer and auto-update from GitHub Releases (`app-release.yml`)
 - [ ] Signed with Azure Artifact Signing (the workflow is ready; it needs the Azure setup in
       [releasing.md](releasing.md))
