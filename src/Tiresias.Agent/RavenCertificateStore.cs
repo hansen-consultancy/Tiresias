@@ -13,7 +13,8 @@ public static class RavenCertificateStore
     /// <summary>The file format; a change bumps it.</summary>
     public const int Version = 1;
 
-    public static string FilePath => Path.Combine(KeyringStore.Directory, "raven-certificates.json");
+    /// <summary>Per tenant, like the vault it mirrors: services in two tenants may share a slug.</summary>
+    public static string FilePath => KeyringStore.TenantFile("raven-certificates");
 
     static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
