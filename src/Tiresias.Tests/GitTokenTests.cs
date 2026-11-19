@@ -57,6 +57,17 @@ public class GitTokenTests
         Assert.That(check.IsFinding);
     }
 
+    [TestCase("$(calc)")]
+    [TestCase("%PATH%")]
+    public void A_repository_in_a_folder_a_quoted_argument_cannot_hold_is_a_finding_without_a_fix(string folder)
+    {
+        var config = Path.Combine("C:", "src", folder, ".git", "config");
+        var check = Doctor.GitTokens([new DoctorFile(config, $"[remote \"origin\"]\n\turl = https://alice:{Token}@example.com/app.git\n")], null).Single();
+
+        Assert.That(check.Fix, Is.Null);
+        Assert.That(check.IsFinding);
+    }
+
     [TestCase("https://alice@github.com/example/app.git")]
     [TestCase("git@github.com:example/app.git")]
     [TestCase("ssh://git@github.com/example/app.git")]
