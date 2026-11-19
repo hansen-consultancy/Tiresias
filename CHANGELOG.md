@@ -10,6 +10,13 @@ its section below.
 
 ### Added
 
+- The status page and `tir doctor` point out code that can reach your credentials and has a reason
+  to be doubted: an extension from an unknown publisher, or unchanged for two years, inside an
+  editor that used a credential through Tiresias in the last 90 days (**Remove...** uninstalls it
+  after you approve), a program that starts at log-on without a signature, and a program you
+  blocked with **This wasn't me** that is still on the PC (**Show file**). Nothing leaves the
+  machine, and only names and metadata are read.
+
 - The status page shows findings of one kind as one line with their count, for example
   "230 projects that set <UserSecretsId> but don't reference Tiresias.Extensions.Configuration". The
   line opens to each finding with its own fix, and **Dismiss all** sets them aside with one reason.
