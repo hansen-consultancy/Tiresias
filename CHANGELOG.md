@@ -10,6 +10,12 @@ its section below.
 
 ### Added
 
+- The status page and `tir doctor` point out code that can reach your credentials and has a reason
+  to be doubted: an extension from an unknown publisher, or unchanged for two years, inside an
+  editor that used a credential through Tiresias in the last 90 days (**Remove...** uninstalls it
+  after you approve), a program that starts at log-on without a signature, and a program you
+  blocked with **This wasn't me** that is still on the PC (**Show file**). Nothing leaves the
+  machine, and only names and metadata are read.
 - **What do you need?** (**Add...** in the tray and the Services window) is the one way to add
   anything: pick or type what you need ("OpenAI key for a script") and see every way to meet it,
   strongest first, each saying what it gives up. Set up a SQL Server, Set up a RavenDB and the

@@ -71,6 +71,18 @@ public interface IDoctorProbe
 
     /// <summary>Paths of files holding a private key (<c>.pfx</c>, <c>.p12</c>, or a PEM with one); empty unless asked for. Never their contents.</summary>
     IEnumerable<string> KeyFiles() => [];
+
+    /// <summary>Extensions installed for the user in programs that host them, from their metadata.</summary>
+    IEnumerable<InstalledExtension> Extensions() => [];
+
+    /// <summary>Programs Windows starts at log-on, with whether each is signed.</summary>
+    IEnumerable<StartupEntry> StartupEntries() => [];
+
+    /// <summary>Which program got which credential, and when, from the local activity and audit logs.</summary>
+    IEnumerable<CredentialUse> CredentialUses() => [];
+
+    /// <summary>Paths of blocked programs whose file still exists.</summary>
+    IEnumerable<string> BlockedPrograms() => [];
 }
 
 /// <summary>
@@ -117,6 +129,7 @@ public static partial class Doctor
                 new ProtectVariables(names), Position.Plaintext, Position.SealedApproved),
         });
         checks.AddRange(ConfigChecks(probe.UserSecretsFiles(), probe.ConfigFiles(), probe.KeyFiles()));
+        checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), probe.CredentialUses(), probe.BlockedPrograms(), DateTimeOffset.UtcNow));
         return checks;
     }
 
