@@ -164,6 +164,15 @@ public class AttackSurfaceTests
         Assert.That(Doctor.Extensions(Code, "{broken"), Is.Empty);
     }
 
+    [TestCase("-99999999999999999")]
+    [TestCase("99999999999999999")]
+    public void A_timestamp_out_of_range_reads_as_unknown(string stamp)
+    {
+        var json = $$$"""[{"identifier":{"id":"acme.x"},"metadata":{"installedTimestamp":{{{stamp}}},"publisherId":"p"}}]""";
+
+        Assert.That(Doctor.Extensions(Code, json).Single().Updated, Is.Null);
+    }
+
     [TestCase("\"C:\\Program Files\\App\\app.exe\" --tray", @"C:\Program Files\App\app.exe")]
     [TestCase(@"C:\Tools\sync.exe /background", @"C:\Tools\sync.exe")]
     [TestCase(@"C:\Program Files\App\app.EXE", @"C:\Program Files\App\app.EXE")]

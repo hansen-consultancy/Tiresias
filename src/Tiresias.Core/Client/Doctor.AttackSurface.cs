@@ -191,7 +191,8 @@ public static partial class Doctor
                     publisher = Text(metadata, "source") == "vsix" || Text(metadata, "publisherId") is not { Length: > 0 }
                         ? null
                         : Text(metadata, "publisherDisplayName") ?? publisher;
-                    if (metadata.TryGetProperty("installedTimestamp", out var stamp) && stamp.TryGetInt64(out var ms))
+                    if (metadata.TryGetProperty("installedTimestamp", out var stamp) && stamp.TryGetInt64(out var ms)
+                        && ms >= 0 && ms <= DateTimeOffset.MaxValue.ToUnixTimeMilliseconds())
                         updated = DateTimeOffset.FromUnixTimeMilliseconds(ms);
                 }
                 found.Add(new(host, id, Text(item, "version"), publisher, updated));
