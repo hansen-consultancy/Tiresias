@@ -81,7 +81,7 @@ public sealed class MachineProbe(string? projectsRoot = null) : IDoctorProbe
     /// <summary>Files under the projects root, skipping build output and packages, which only copy what is already found.</summary>
     IEnumerable<string> Under(string pattern) => projectsRoot is null
         ? []
-        : Directory.EnumerateFiles(projectsRoot, pattern, new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true })
+        : Directory.EnumerateFiles(Path.GetFullPath(projectsRoot), pattern, new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true })
             .Where(p => !p.Split(Path.DirectorySeparatorChar).Any(d => d is "bin" or "obj" or "node_modules" or ".git"));
 
     /// <summary>Whether a PEM file holds a private key: only its header lines are looked at, and nothing is kept.</summary>

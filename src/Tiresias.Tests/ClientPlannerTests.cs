@@ -369,6 +369,18 @@ public class DoctorTests
     }
 
     [Test]
+    public async Task A_key_file_found_under_a_relative_root_still_matches_the_configuration_naming_it()
+    {
+        var probe = new FakeProbe();
+        probe.Config.Add(new(Path.Combine("Api", "appsettings.json"), """{"RavenDb":{"CertificatePath":"certs/client.pfx"}}"""));
+        probe.Keys.Add(Path.Combine(".", "Api", "certs", "client.pfx"));
+        var check = await Check(probe, "certificate");
+
+        Assert.That(check.Fix, Is.InstanceOf<SetUpRaven>());
+        Assert.That(check.Detail, Does.Contain("RavenDb:CertificatePath"));
+    }
+
+    [Test]
     public async Task A_certificate_configuration_names_outside_the_scanned_folder_is_still_a_finding()
     {
         var elsewhere = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "elsewhere", "cluster.pfx"));

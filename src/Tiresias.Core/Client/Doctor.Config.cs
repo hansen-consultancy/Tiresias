@@ -37,7 +37,9 @@ public static partial class Doctor
 
         foreach (var path in keyFiles)
         {
-            var named = references.Where(r => string.Equals(r.Path, path, StringComparison.OrdinalIgnoreCase)).ToArray();
+            // References are resolved to full paths; a probe may hand over relative ones.
+            var full = Path.GetFullPath(path);
+            var named = references.Where(r => string.Equals(r.Path, full, StringComparison.OrdinalIgnoreCase)).ToArray();
             references.RemoveAll(named.Contains);
             var raven = named.Any(r => r.Raven) || Path.GetFileName(path).Contains("raven", StringComparison.OrdinalIgnoreCase);
             var namedBy = named.Length == 0 ? "" : $" ({string.Join(", ", named.Select(r => $"{r.Key} in {r.Where}"))} points at it)";
