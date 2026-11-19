@@ -27,20 +27,22 @@ touching them names the program that did.
 
 A stolen key is only seen if its use reaches Tiresias. A decoy OpenAI key in a `.env` would be sent
 to the real API and Tiresias would never know. So every decoy carries **its own endpoint, on
-loopback, owned by Tiresias**, in the same place as the credential:
+loopback, owned by Tiresias**, in the same place as the credential. The agent hosts these
+listeners, as it hosts the solo broker, so they work in solo mode, where no forwarder runs, and
+whether or not the app is in front:
 
 | Decoy | Where it lives | What uses it |
 |---|---|---|
 | A connection string with a password | `passwords.txt`, a decoy `appsettings.Production.json` in a decoy project folder | Connects to a SQL listener on `127.0.0.1` that Tiresias runs |
-| An admin URL with a token | `passwords.txt`, a decoy `.env` (`ADMIN_API_URL`, `ADMIN_API_TOKEN`) | An HTTPS request to the forwarder's port, on a decoy path |
-| An API key with its base URL | A decoy `.env` (`OPENAI_API_KEY` beside `OPENAI_BASE_URL` on loopback) | A request through the forwarder |
+| An admin URL with a token | `passwords.txt`, a decoy `.env` (`ADMIN_API_URL`, `ADMIN_API_TOKEN`) | An HTTPS request to the agent's decoy HTTP listener |
+| An API key with its base URL | A decoy `.env` (`OPENAI_API_KEY` beside `OPENAI_BASE_URL` on loopback) | A request to the same listener, on the path the SDK uses |
 | A RavenDB URL | A decoy configuration file | A connection to a loopback port Tiresias listens on |
 
 The values look like the real kind (a GitHub token's prefix and checksum, a key's length and
 alphabet), never like a Tiresias placeholder (`tirph_`), which would give them away.
 
-**On a hit**, the listener finds the connecting process from the TCP table, as the forwarder already
-does, and Tiresias:
+**On a hit**, the listener finds the connecting process from the TCP table, as the solo broker and
+the forwarder already do, and Tiresias:
 
 - records it in the activity log, with the decoy, the process path and its signer;
 - shows a notification and badges the tray;
@@ -93,7 +95,10 @@ have it, and a reason the wording must stay factual.
 ## Open questions
 
 - **Loopback ports.** A fixed port per decoy kind is simpler but recognisable; a random port per
-  install is less so. The forwarder's own port (7781) can carry the HTTP decoys on decoy paths.
+  install is less so. Where a forwarder runs (with a remote broker), its port could carry the HTTP
+  decoys on decoy paths instead of a listener of their own; in solo mode there is none.
+- **Agent not running.** With the app and `tir agent` both closed, nothing listens and a use goes
+  unseen. The doctor says so while decoys are placed.
 - **Agents in containers.** A container or WSL distribution reaches the host's loopback only when
   configured to. Decoys inside the container need their own endpoint there.
 - **Sync.** Decoy files in a synced Documents folder reach other devices, where no listener runs.
