@@ -144,6 +144,6 @@ methods list `WEBSOCKET`, next to `GET`, `POST` and the rest:
 2. **RavenDB placeholder path and Changes** (built): path-carried placeholder, WebSocket relay
    behind the `WEBSOCKET` method.
 3. **RavenDB TCP relay**, after the spike (not started). Guide: *RavenDB through the broker*.
-4. **Agent side** (app built): *Set up a SQL Server* and *Set up a RavenDB* in the desktop app's
-   Services window, with **Edit...** and **How to use...**. Still to do: the same in `tir`, and
+4. **Agent side** (app built): *Set up a SQL Server* and *Set up a RavenDB* in the desktop app
+   (**Add...**, *An app needs a database*), and in the Services window with **Edit...** and **How to use...**. Still to do: the same in `tir`, and
    schema discovery on `/sql`.

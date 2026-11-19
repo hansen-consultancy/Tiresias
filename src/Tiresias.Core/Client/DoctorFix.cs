@@ -38,12 +38,61 @@ public sealed record ReferenceConfigurationPackage(string Project) : DoctorFix
 public sealed record SetUpSqlServer(string Server, string? Database) : DoctorFix
 {
     public override string Instruction =>
-        $"in the Tiresias app: Services, Set up a SQL Server for {Server}{(Database is null ? "" : $" ({Database})")}; then replace the connection string with the tiresias:sql reference it shows";
+        $"in the Tiresias app: Add..., Set up a SQL Server for {Server}{(Database is null ? "" : $" ({Database})")}; then replace the connection string with the tiresias:sql reference it shows";
 }
 
 /// <summary>Seal the certificate as a RavenDB service the broker presents, then delete the file.</summary>
 public sealed record SetUpRaven(string CertificatePath) : DoctorFix
 {
     public override string Instruction =>
-        $"in the Tiresias app: Services, Set up a RavenDB with {CertificatePath}; then delete the file and point the app at tiresias:raven";
+        $"in the Tiresias app: Add..., Set up a RavenDB with {CertificatePath}; then delete the file and point the app at tiresias:raven";
+}
+
+/// <summary>The kinds of vault service the app has a setup window for.</summary>
+public enum ServiceKind
+{
+    /// <summary>An HTTP API: the Services window's add form.</summary>
+    Http,
+
+    /// <summary>A SQL Server whose logins the broker issues per lease.</summary>
+    SqlServer,
+
+    /// <summary>A RavenDB the broker presents a client certificate to.</summary>
+    RavenDb,
+}
+
+/// <summary>Add a vault service of a known kind; <paramref name="Upstream"/> fills in an HTTP service's address.</summary>
+public sealed record AddService(ServiceKind Kind, string? Upstream = null) : DoctorFix
+{
+    public override string Instruction => Kind switch
+    {
+        ServiceKind.SqlServer => "in the Tiresias app: Add..., Set up a SQL Server",
+        ServiceKind.RavenDb => "in the Tiresias app: Add..., Set up a RavenDB",
+        _ => $"tir service add <slug> --upstream {Upstream ?? "<https-url>"}",
+    };
+}
+
+/// <summary>Seal an environment variable, to hand to programs as its value or as a placeholder.</summary>
+public sealed record SealVariable : DoctorFix
+{
+    public override string Instruction => "tir env set <NAME>, or Environment variables in the Tiresias app";
+}
+
+/// <summary>Seal a project's user secrets: the app's secrets editor, or <c>tir secrets</c> in the project's folder.</summary>
+public sealed record SealUserSecrets : DoctorFix
+{
+    public override string Instruction => "tir secrets set <key> in the project's folder, or Secrets in the Tiresias app";
+}
+
+/// <summary>
+/// Steps to follow outside Tiresias, for an option that needs no secret (E1): Tiresias holds
+/// nothing, so there is nothing to set up. <paramref name="Topic"/> is the row of
+/// <see cref="Page"/> that says how.
+/// </summary>
+public sealed record FollowGuide(string Topic) : DoctorFix
+{
+    /// <summary>The guide, relative to the repository: <i>Need no secret at all</i>.</summary>
+    public const string Page = "docs/avoid-secrets.md";
+
+    public override string Instruction => $"no secret to keep: see \"{Topic}\" in {Page}";
 }
