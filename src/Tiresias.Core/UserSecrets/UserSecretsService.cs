@@ -150,7 +150,9 @@ public sealed class UserSecretsService : IDisposable
         string reason;
         if (plan.Action == UserSecretsAction.AskConsent || requested.Count > 0)
         {
-            var entries = load.Keys.Concat(requested.Select(item => $"{item.Key} → {item.Reference}")).ToArray();
+            var referenced = requested.Select(item => item.Key).ToHashSet(StringComparer.Ordinal);
+            var entries = load.Keys.Where(key => !referenced.Contains(key))
+                .Concat(requested.Select(item => $"{item.Key} → {item.Reference}")).ToArray();
             var (answer, why) = await AskAsync(new(caller, request.UserSecretsId, entries), scope, ct);
             if (answer == ConsentAnswer.Deny)
             {

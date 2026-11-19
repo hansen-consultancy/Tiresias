@@ -508,7 +508,7 @@ public class UserSecretsServiceTests
         Assert.That((await Request()).Status, Is.EqualTo(AgentStatus.Ok));
         Assert.That((await Request()).Status, Is.EqualTo(AgentStatus.Ok));
         Assert.That(screen.Shown, Has.Count.EqualTo(1));
-        Assert.That(string.Join(" ", screen.Shown[0].Keys), Does.Contain("tiresias:sql/appdb/read"));
+        Assert.That(screen.Shown[0].Keys, Is.EquivalentTo(new[] { "Other", "ConnectionStrings:Db → tiresias:sql/appdb/read" }));
 
         File.WriteAllText(FilePath, WithReference.Replace("/read", "/write", StringComparison.Ordinal));
         screen.Answers.Enqueue(ConsentAnswer.Deny);

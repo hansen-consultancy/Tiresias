@@ -89,6 +89,10 @@ its section below.
 - A selected row in the secrets, services and activity lists is a subtle highlight instead of dark
   blue under black text.
 - The **Show** button in the secrets editor is wide enough for its text when the window opens.
+- A `tiresias:` value in user secrets is fetched only after the consent screen, which shows each
+  key with what it asks for (e.g. `ConnectionStrings:Db → tiresias:sql/appdb/read`). Before, the
+  first load fetched it without asking, and Allow for this session also covered values changed
+  later.
 
 ## [0.1.0-preview.4] - 2026-11-18
 
