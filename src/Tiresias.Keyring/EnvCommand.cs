@@ -30,8 +30,28 @@ static class EnvCommand
         "hook" => Hook(args.At(2)),
         "nuget" => NuGet(args),
         "placeholder" => Placeholder(args),
-        _ => throw new UsageException("tir env takes list, protect, put-back, set, remove, hook, shell, nuget or placeholder."),
+        "import" => Import(args.Require(2, "file"), args.Require(3, "entry"), args.Require(4, "NAME")),
+        _ => throw new UsageException("tir env takes list, protect, put-back, set, remove, hook, shell, nuget, placeholder or import."),
     };
+
+    /// <summary><c>tir env import</c>: a registry token in an <c>.npmrc</c> or <c>.pypirc</c> sealed, and taken out of the file.</summary>
+    static int Import(string file, string entry, string name)
+    {
+        if (!File.Exists(file))
+            throw new UsageException($"{file} doesn't exist.");
+        using var hello = HelloKeyWrapper.Open(create: false);
+        try
+        {
+            RegistryTokenImporter.Import(Path.GetFullPath(file), entry, name, hello);
+        }
+        catch (InvalidOperationException e)
+        {
+            Console.Error.WriteLine(e.Message);
+            return 1;
+        }
+        Console.WriteLine($"Sealed {name} from {file}, and took it out of the file. Give it to a command with tir run -- <command>; terminals with the hook get it at their next folder change.");
+        return 0;
+    }
 
     /// <summary>
     /// <c>tir env placeholder add|list|remove</c>: variables handed out as a broker placeholder,

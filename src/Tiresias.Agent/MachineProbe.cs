@@ -1,6 +1,7 @@
 using System.IO.Enumeration;
 using System.Net.Sockets;
 using Tiresias.Client;
+using Tiresias.EnvironmentVariables;
 using Tiresias.Protocol;
 using Tiresias.Vault;
 using Microsoft.Extensions.Configuration.UserSecrets;
@@ -95,6 +96,18 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public IEnumerable<string> KeyFiles() => Found.Keys.Concat(Found.Pems.Where(HoldsPemPrivateKey));
 
+    public IEnumerable<DoctorToolFile> ToolFiles()
+    {
+        var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var own = NuGetConfig.Files(null, Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData))
+            .Append(Path.Combine(profile, ".npmrc")).Append(Path.Combine(profile, ".pypirc")).Where(File.Exists).ToArray();
+        return own.Select(path => (Path: path, InProfile: true))
+            .Concat(Found.Tools.Where(path => !own.Contains(path, StringComparer.OrdinalIgnoreCase)).Select(path => (Path: path, InProfile: false)))
+            .Select(f => new DoctorToolFile(f.Path, Read(f.Path).Text, f.InProfile));
+    }
+
+    public IReadOnlyCollection<string> UserVariableNames => [.. EnvironmentStore.UserVariables().Select(v => v.Name)];
+
     public IEnumerable<DoctorRavenCertificate> RavenCertificates() => RavenCertificateStore.ForVault();
 
     /// <summary>The unlocked key, for the checks that need the sealed environment's names; <c>null</c> skips them. Never prompts.</summary>
@@ -126,12 +139,12 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public sealed record ScanStats(TimeSpan Elapsed, int Folders, int Files);
 
-    sealed record FoundFiles(List<string> Projects, List<string> Configs, List<string> Keys, List<string> Pems, ScanStats Stats);
+    sealed record FoundFiles(List<string> Projects, List<string> Configs, List<string> Keys, List<string> Pems, List<string> Tools, ScanStats Stats);
 
     FoundFiles? found;
     FoundFiles Found => found ??= Walk();
 
-    static readonly string[] Patterns = ["*.csproj", "appsettings*.json", "*.pfx", "*.p12", "*.pem", "*.key"];
+    static readonly string[] Patterns = ["*.csproj", "appsettings*.json", "*.pfx", "*.p12", "*.pem", "*.key", "nuget.config", ".npmrc"];
 
     /// <summary>
     /// One walk of the project roots for every file a check reads. Build output, packages and git
@@ -141,7 +154,7 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     FoundFiles Walk()
     {
         var clock = System.Diagnostics.Stopwatch.StartNew();
-        List<string> projects = [], configs = [], keys = [], pems = [];
+        List<string> projects = [], configs = [], keys = [], pems = [], tools = [];
         var folders = roots.Length;
         var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true };
         foreach (var root in roots)
@@ -166,11 +179,13 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
                     configs.Add(path);
                 else if (Matches("*.pfx", name) || Matches("*.p12", name))
                     keys.Add(path);
+                else if (Matches("nuget.config", name) || Matches(".npmrc", name))
+                    tools.Add(path);
                 else
                     pems.Add(path);
             }
         }
-        return new(projects, configs, keys, pems, new(clock.Elapsed, folders, projects.Count + configs.Count + keys.Count + pems.Count));
+        return new(projects, configs, keys, pems, tools, new(clock.Elapsed, folders, projects.Count + configs.Count + keys.Count + pems.Count + tools.Count));
     }
 
     static bool Wanted(string name) => Patterns.Any(p => Matches(p, name));

@@ -105,8 +105,14 @@ public partial class StatusWindow : Window
             case SetUpRaven { CertificatePath: var path }:
                 SetUpRaven(path);
                 break;
-            case ReferenceConfigurationPackage package:
-                model.CopyFix(package.Instruction);
+            case ReferenceConfigurationPackage or ImportNuGetCredentials { InProfile: false }:
+                model.CopyFix(fix.Instruction);
+                break;
+            case ImportNuGetCredentials:
+                ShowEnvironment();
+                break;
+            case SealRegistryToken token:
+                SealToken(token);
                 break;
             case ReplaceRavenCertificate { Service: var slug }
                 when VaultEditor.Load().FindService(slug) is { } service && RavenSetupPlanner.Recognize(service) is { } existing:
@@ -123,6 +129,25 @@ public partial class StatusWindow : Window
                 Desktop.Reveal(path);
                 break;
         }
+    }
+
+    /// <summary>Seal a registry token out of its file, once the user agreed to Tiresias reading it once.</summary>
+    async void SealToken(SealRegistryToken token)
+    {
+        if (AskWindow.Show(this, Text.Get("Finding_TokenHeading"), Text.Format("Finding_TokenBody", token.File, token.Variable),
+                Text.Get("Finding_TokenSeal"), cancel: Text.Get("Common_Cancel")) != true)
+            return;
+        if (!App.Current.Host.Keys.IsUnlocked && !(await App.Current.UnlockAsync(interactive: true)).Ok || App.Current.Host.Keys.Hello is not { } hello)
+            return;
+        try
+        {
+            RegistryTokenImporter.Import(token.File, token.Entry, token.Variable, hello);
+        }
+        catch (Exception e) when (e is InvalidOperationException or IOException or UnauthorizedAccessException)
+        {
+            AskWindow.Show(this, null, e.Message, Text.Get("Common_OK"));
+        }
+        model.Refresh();
     }
 
     /// <summary>Runs the host's own uninstall command once the user approves, then checks again.</summary>
