@@ -67,19 +67,19 @@ the checks still report what is installed, unused and unsigned.
 
 ## Findings
 
-Guided setup defines a finding as a delivery weaker than it could be, placed on the two axes. An
-installed program isn't a delivery. It is code that can **reach** deliveries, so this page widens
-the definition: a finding is also a program or extension that can reach a credential and has a
-reason to be doubted, with the fix that removes or contains it.
+Guided setup's rule needs no widening: a finding is any check with a fix, plus any delivery with a
+position (`DoctorCheck.IsFinding`). An installed program isn't a delivery, but every surface
+finding below comes with a fix, so each is a finding on the first count.
 
 **Surface findings carry no position.** Removing an extension changes who can reach a credential,
 not how the credential is held: the placeholder the editor gets is still E3/C1 afterwards. Putting
 a position on it would claim a move along an axis that didn't happen. Instead a surface finding
-carries what it can reach, the host program's services from the activity log, and its reasons.
-`DoctorCheck` gains that as an optional part, and a line is a finding when it has a position or a
-reach. The one surface fix that does move a delivery, taking a credential's use out of a host
-program, raises the delivery finding guided setup already has for it, with that finding's
-position.
+says in its detail what it can reach, the host program's services from the activity log, and its
+reasons; reach orders the findings (*Ranking*) but doesn't decide whether a line is one. Each
+check sets a `Kind` ("extensions from unverified publishers in programs that use credentials"), so
+many findings of one kind show as one line, as phase 2 groups them. The one surface fix that does
+move a delivery, taking a credential's use out of a host program, raises the delivery finding
+guided setup already has for it, with that finding's position.
 
 | Finding | Raised when | Fix |
 |---|---|---|
@@ -118,7 +118,7 @@ The activity log already decides what matters, so Home lists surface findings by
 2. **What reaches the most**: hosts ordered by the credentials they used in the last 90 days, an
    admin or elevation grant counting above a read grant. Within a host, a vulnerability comes
    before an unknown publisher, which comes before an old one or a missing signature.
-3. **What reaches nothing but has a vulnerability or no signature at startup**.
+3. **What reaches nothing but has a vulnerability or no signature** (on `PATH` or at startup).
 4. **The rest**: unused software reaching nothing. It isn't listed one by one on Home; it is one
    line, "*n* programs unused for 90 days", opening the **Installed** list. That list is
    hygiene, not a warning, and doesn't count toward the tray badge.
@@ -210,8 +210,9 @@ asking for credentials.
 
 The first version of this page predates the two axes and phase 1's findings. Three things moved:
 
-- **Findings without positions.** Guided setup's findings were all deliveries; surface findings
-  are about reach, so `DoctorCheck` counts a line with a reach as a finding too.
+- **Findings without positions.** Guided setup's findings were all deliveries until its rule
+  became "a check with a fix, or a delivery with a position"; surface findings are findings by
+  their fix, and reach only ranks them.
 - **Scope on a managed PC** was an open question and is now decided: list machine-wide software,
   raise findings only for what the user installed.
 - **Isolation leaves guided setup phase 5.** Placeholder environments for containers and WSL are a
