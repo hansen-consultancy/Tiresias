@@ -123,6 +123,21 @@ public class PublishingKeyTests
     public void An_npm_reference_comment_or_empty_entry_or_shell_syntax_is_no_finding(string npmrc) =>
         Assert.That(Checks(".npmrc", npmrc), Is.Empty);
 
+    [TestCase("$(calc)")]
+    [TestCase("`calc`")]
+    [TestCase("%PATH%")]
+    [TestCase("x\"y")]
+    public void A_file_in_a_folder_a_quoted_argument_cannot_hold_is_a_finding_without_a_fix(string folder)
+    {
+        var checks = Checks(Path.Combine(App, folder, ".npmrc"), $"//registry.npmjs.org/:_authToken={Secret}\n", inProfile: false)
+            .Concat(Checks(Path.Combine(App, folder, ".pypirc"), $"[pypi]\npassword = {Secret}\n", inProfile: false))
+            .Concat(Checks(Path.Combine(App, folder, "nuget.config"), NuGetFeed, inProfile: false)).ToArray();
+
+        Assert.That(checks, Has.Length.EqualTo(3));
+        Assert.That(checks.Select(c => c.Fix), Is.All.Null);
+        AssertNoValue(checks);
+    }
+
     [Test]
     public void A_pypirc_section_with_shell_syntax_is_passed_over() =>
         Assert.That(Checks(Pypirc, $"[pypi]\nusername = a\n[x\"$(calc)]\npassword = {Secret}\n"), Is.Empty);
