@@ -11,6 +11,8 @@ public enum FixAction
     SetUpRaven,
     /// <summary>A step outside the app (a package to reference): the command goes to the clipboard.</summary>
     CopyCommand,
+    /// <summary>Edit... on a RavenDB service, to pick a new certificate.</summary>
+    ReplaceRaven,
 }
 
 /// <summary>
@@ -60,6 +62,7 @@ public static class FindingView
         SetUpSqlServer => (FixAction.SetUpSqlServer, "Finding_FixSql"),
         SetUpRaven => (FixAction.SetUpRaven, "Finding_FixRaven"),
         ReferenceConfigurationPackage => (FixAction.CopyCommand, "Finding_FixCopy"),
+        ReplaceRavenCertificate => (FixAction.ReplaceRaven, "Finding_FixRavenReplace"),
         _ => null,
     };
 

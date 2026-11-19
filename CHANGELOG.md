@@ -10,6 +10,11 @@ its section below.
 
 ### Added
 
+- `tir doctor` and the status page warn when a RavenDB service's certificate expires within 30
+  days, and fail once it has, with **Replace certificate...** opening **Edit...** on the service.
+  The expiry is recorded when a RavenDB is set up or edited; one set up earlier says "expiry
+  unknown" until it is edited and saved once.
+
 - The status page shows findings of one kind as one line with their count, for example
   "230 projects that set <UserSecretsId> but don't reference Tiresias.Extensions.Configuration". The
   line opens to each finding with its own fix, and **Dismiss all** sets them aside with one reason.

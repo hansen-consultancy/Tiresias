@@ -101,8 +101,8 @@ First checks, by what they find and what they offer:
 | Secret-looking environment variables | Unsealed user variables (already in `tir doctor`) | Seal them; for an API key, placeholder delivery (→ E3/C1) |
 | Connection string with a password | `Password=`/`Pwd=` in `appsettings*.json`, user secrets or a sealed value; the key name and the server, not the password | *An app needs a database*: a `tiresias:sql/…` reference (→ E2/C1), or Windows / Entra sign-in where the server takes it (→ E1) |
 | RavenDB certificate on disk | A `.pfx`/`.pem` in a project folder, or a `Certificate` path in RavenDB configuration | *Set up a RavenDB* with that file (→ E3/C1), then offer to delete it |
-| Broad RavenDB clearance | A RavenDB service whose certificate is Cluster Admin or Operator, or has access to databases the app doesn't use (asked through the broker; the endpoint is to be confirmed) | Issue a certificate scoped to the databases the app uses, and swap it in with **Edit...** |
-| Certificate expiry | A sealed certificate expiring within 30 days | Renew it before programs start failing |
+| Broad RavenDB clearance | A RavenDB service whose certificate is Cluster Admin or Operator, or has access to databases the app doesn't use (asked through the broker; not built: RavenDB's `/certificates/whoami` isn't confirmed against a real server yet) | Issue a certificate scoped to the databases the app uses, and swap it in with **Edit...** |
+| Certificate expiry | Built: a RavenDB service's certificate expiring within 30 days, or expired, from the subject, thumbprint and expiry recorded at setup (`raven-certificates.json`, beside the vault) | **Edit...** on the service with a new `.pfx` |
 | Sealed key handed out as a value | An API key whose service accepts `Authorization: Bearer`, delivered as its value | Placeholder delivery (E4 → E3) |
 | Publishing key | A NuGet or npm API key, sealed or plaintext | Trusted publishing in CI (→ E1); keep a short-lived key for local pushes only |
 | Git token in a remote URL | `https://user:token@…` in a project's `.git/config` | Out of the URL first (E5 → E4), then through the broker (→ C1) |
@@ -189,5 +189,6 @@ Existing windows remain the places where the work happens; this changes how peop
 4. **Show what is in use**: the home screen keeps only the areas that apply; the rest live in the catalogue.
 5. **Attack surface**: installed software and extensions as findings, ranked by what uses
    credentials ([attack surface](attack-surface.md)).
-6. **More checks**: RavenDB clearance and expiry, sealed keys handed out as values, publishing keys,
-   git tokens, each landing with its own fix.
+6. **Built, except RavenDB clearance. More checks**: RavenDB certificate expiry, sealed keys handed
+   out as values, publishing keys, git tokens, each landing with its own fix. RavenDB clearance
+   waits for `/certificates/whoami` to be confirmed against a real server.
