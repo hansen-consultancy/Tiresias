@@ -280,6 +280,7 @@ public class DoctorTests
     [TestCase("Server=db.example.com;Database=Orders;User Id=app;Password=hunter2;Encrypt=True", "db.example.com", true)]
     [TestCase("Server=db.example.com;Database=Orders;User Id=app;Password=hunter2", "db.example.com", false)]
     [TestCase("Server=db.example.com;Database=Orders;User=app;Password=hunter2;Application Name=Jobs;Encrypt=False", "db.example.com", false)]
+    [TestCase("Server = db.example.com; Database = Orders; User Id = app; Password = hunter2; Encrypt = True", "db.example.com", true)]
     public async Task A_sql_server_password_in_appsettings_is_a_finding_offering_a_login_per_lease(string connectionString, string server, bool certain)
     {
         var probe = new FakeProbe();

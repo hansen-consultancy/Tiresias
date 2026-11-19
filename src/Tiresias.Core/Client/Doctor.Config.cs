@@ -74,7 +74,9 @@ public static partial class Doctor
 
     static DoctorCheck? ConnectionString(string where, string key, string value)
     {
-        if (!value.Contains("password=", StringComparison.OrdinalIgnoreCase) && !value.Contains("pwd=", StringComparison.OrdinalIgnoreCase))
+        // A cheap reject before parsing; the parse decides. A connection string may space its '='.
+        if (!value.Contains('=', StringComparison.Ordinal)
+            || (!value.Contains("password", StringComparison.OrdinalIgnoreCase) && !value.Contains("pwd", StringComparison.OrdinalIgnoreCase)))
             return null;
         var builder = new DbConnectionStringBuilder();
         try
