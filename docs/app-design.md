@@ -78,8 +78,8 @@ short phrases taken from the axis definitions (`Position.cs`), and a tooltip wit
 | C3 | Unchecked | Any program running as you can use it, unrecorded. |
 
 A finding reads **"Readable, unchecked → Stays in Tiresias, asks you"**; an Add option shows its
-pair the same way. Tone carries the strength (caution colour for E5 and C3, the accent for E1–E3
-with C1), never colour alone.
+pair the same way. Pointing at the words shows what each one means; the introduction above the
+findings says so.
 
 ## 5. A compact banner
 
@@ -98,7 +98,7 @@ in what is stored; the combo box lists one row per id as today, with the count i
 
 1. `WindowFit` and the size rule applied to every window; "(dev)" in titles; compact Home banner.
 2. One scroll region: Home's lists, Consent, Incident, Secrets' detail; worktree grouping.
-3. Plain-language ratings (`Position` phrases in Core so `tir advise` can share them).
+3. Plain-language ratings (`PositionWords` in the app; `tir` keeps the codes).
 4. Cards with Details on Home, Services and Environment.
 
 Each slice is a PR with its CHANGELOG line and `/argus review`.

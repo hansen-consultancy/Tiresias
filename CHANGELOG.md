@@ -136,6 +136,9 @@ its section below.
   longer scroll inside it. The first 20 findings show with **Show all**, and the checks that passed
   fold into one line. In the secrets editor, a project used by many worktrees is one line, such as
   "Shop (28 checkouts)", with the full list under **Show all**.
+- **Ratings read as words**: findings and *What do you need?* show "Readable, unchecked → Stays in
+  Tiresias, asks you" instead of `E5/C3 → E3/C1`, and pointing at them says what each word means.
+  `tir` and Copy details keep the codes.
 - **Saving, changing or removing a service asks you to approve it with Windows Hello**, after
   showing what changes (upstream, grants, paths), in the Services window, both setups and
   `tir service add`/`remove`. Its secrets are then bound to those settings: if a program edits the
