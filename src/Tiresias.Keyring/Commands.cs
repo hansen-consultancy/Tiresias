@@ -274,13 +274,13 @@ static class Commands
 
     /// <summary>
     /// <c>tir ai</c>: the agent guide; <c>--snippet</c> the block for CLAUDE.md / AGENTS.md;
-    /// <c>--install &lt;file&gt;</c> writes that block into the file, replacing an earlier copy.
+    /// <c>--install [&lt;file&gt;]</c> writes that block into the file (Claude Code's user-wide one by default), replacing an earlier copy.
     /// </summary>
     public static int Ai(CommandLine args)
     {
         if (args.Flag("--install"))
         {
-            var path = ExpandHome(args.Require("--install"));
+            var path = ExpandHome(args.Option("--install") ?? "~/.claude/CLAUDE.md");
             var existing = File.Exists(path) ? File.ReadAllText(path) : null;
             var updated = AiGuide.Install(existing);
             if (updated == existing)

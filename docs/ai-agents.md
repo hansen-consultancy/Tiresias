@@ -10,8 +10,8 @@ agent only uses that if it knows Tiresias is there.
 ## Tell every session once
 
 ```powershell
-tir ai --install ~/.claude/CLAUDE.md
-tir ai --install ~/.codex/AGENTS.md
+tir ai --install                        # Claude Code: ~/.claude/CLAUDE.md
+tir ai --install ~/.codex/AGENTS.md     # Codex, or any other file
 ```
 
 writes a few lines into the file your agent reads (user-wide, as here, or a repository's

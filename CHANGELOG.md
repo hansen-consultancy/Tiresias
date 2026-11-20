@@ -12,9 +12,9 @@ its section below.
 
 - `tir ai` prints instructions for AI coding agents (Claude Code, Codex, Copilot...): how to
   get credentials through `tir exec` and `tir run` without seeing them, and what never to do with a
-  secret. `tir ai --install <file>` writes a few lines into your `CLAUDE.md` or `AGENTS.md` so
-  every agent session knows Tiresias is installed (again: replaced in place); `--snippet` prints
-  them to paste by hand.
+  secret. `tir ai --install` writes a few lines into `~/.claude/CLAUDE.md` (or the file named,
+  such as an `AGENTS.md`) so every agent session knows Tiresias is installed; installing again
+  replaces them in place. `--snippet` prints them to paste by hand.
 - `tir doctor` and the status page find git tokens in plain text: in a project's remote URL
   (`https://user:token@host`, with **Copy command** for the `git remote set-url` that takes it
   out) and in `~/.git-credentials`, counted by host. URLs are shown without the token.

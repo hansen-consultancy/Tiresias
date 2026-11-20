@@ -44,11 +44,11 @@ static class CliUsage
             The ways to meet a need, strongest first on both axes, and what each gives up: "OpenAI key
             for a script", "my EF Core app talks to Azure SQL". With no words, every need. The words are
             matched on this machine; nothing is sent anywhere.
-        tir ai [--snippet | --install <file>]
+        tir ai [--snippet | --install [<file>]]
             How AI coding agents (Claude Code, Codex, Copilot...) get credentials through Tiresias
             without seeing them. --snippet prints a few lines for your CLAUDE.md or AGENTS.md, so
             every agent session knows Tiresias is here and runs tir ai. --install writes them into
-            the file (~/.claude/CLAUDE.md, ~/.codex/AGENTS.md...), replacing an earlier copy.
+            ~/.claude/CLAUDE.md, or the file named (~/.codex/AGENTS.md...), replacing an earlier copy.
 
         tir secrets list [--project <path> | --id <UserSecretsId>]
         tir secrets set <key> [--from-stdin] [--project <path> | --id <UserSecretsId>]

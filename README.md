@@ -83,9 +83,10 @@ unlock.
 
 ## AI coding agents
 
-`tir ai --install ~/.claude/CLAUDE.md` (or your agent's `AGENTS.md`) writes a few lines that tell
-every agent session Tiresias is installed and to run `tir ai` before it needs a credential. `tir ai` prints how:
-`tir exec` and `tir run`, what to look at first, and never to read, print or ask for a secret value.
+`tir ai --install` writes a few lines into `~/.claude/CLAUDE.md` (`--install <file>`: your agent's
+`AGENTS.md`) that tell every agent session Tiresias is installed and to run `tir ai` before it
+needs a credential. `tir ai` prints how: `tir exec` and `tir run`, what to look at first, and never
+to read, print or ask for a secret value.
 See [docs/ai-agents.md](docs/ai-agents.md).
 
 ## Trust model in one paragraph
