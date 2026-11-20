@@ -39,6 +39,7 @@
         <ItemsControl.ItemTemplate>
           <DataTemplate>
             <Expander IsExpanded="{Binding IsExpanded, Mode=TwoWay}" Margin="0,0,0,8" HorizontalAlignment="Stretch"
+                      Expanded="OnExpanded" SizeChanged="OnExpanderSizeChanged"
                       AutomationProperties.Name="{Binding Title}">
               <Expander.Header>
                 <TextBlock Text="{Binding Title}" Style="{StaticResource SubtitleText}" AutomationProperties.HeadingLevel="Level2" />

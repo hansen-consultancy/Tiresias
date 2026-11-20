@@ -8,6 +8,8 @@ its section below.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-20
+
 ### Added
 
 - `tir ai` prints instructions for AI coding agents (Claude Code, Codex, Copilot...): how to
@@ -78,7 +80,7 @@ its section below.
 - **Edit...** in the Services window also changes an HTTP service added there: its upstream,
   secret, methods, paths and Windows Hello requirement. The name stays. Placeholders handed out
   for the old settings stop working, so programs using the service ask again.
-- **How to use...** in the Services window shows again what to paste for a saved service: the
+- **How to use...** on the Services page shows again what to paste for a saved service: the
   user secrets line for a SQL Server or RavenDB, or a placeholder for an API key.
 - RavenDB's Changes API works through the broker and the forwarder, for grants that list the
   `WEBSOCKET` method. Each tunnel is audited when it opens and when it closes, and closes with the
@@ -182,6 +184,10 @@ its section below.
 
 ### Fixed
 
+- In *What do you need?*, opening the last group scrolls it into view instead of showing a sliver
+  of it at the bottom.
+- After **Copy details** in the problem dialog, the "Details copied" line no longer pushes the
+  buttons out of the window.
 - NuGet credential requests now show in Activity, with the program, the feed and the variable name
   (never the token): allowed, denied, handed over under an earlier allow for this session, a retry
   that wasn't answered, or a mapped variable that isn't sealed. The **App** source filter covers
@@ -270,7 +276,8 @@ its section below.
   - `Tiresias.Core` is the vault, the trust chain, grants, leases and the audit log.
   - `Tiresias.Protocol` holds the wire formats.
 
-[Unreleased]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.1.0-preview.4...HEAD
+[Unreleased]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.2.0...HEAD
+[0.2.0]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.1.0-preview.4...app-v0.2.0
 [0.1.0-preview.4]: https://github.com/hansen-consultancy/Tiresias/compare/v0.1.0-preview.2...app-v0.1.0-preview.4
 [0.1.0-preview.2]: https://github.com/hansen-consultancy/Tiresias/compare/v0.1.0-preview.1...v0.1.0-preview.2
 [0.1.0-preview.1]: https://github.com/hansen-consultancy/Tiresias/releases/tag/v0.1.0-preview.1
