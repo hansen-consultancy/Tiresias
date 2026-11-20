@@ -142,6 +142,10 @@ its section below.
 
 ### Fixed
 
+- NuGet credential requests now show in Activity, with the program, the feed and the variable name
+  (never the token): allowed, denied, handed over under an earlier allow for this session, a retry
+  that wasn't answered, or a mapped variable that isn't sealed. The **App** source filter covers
+  them, with user secrets and `tir run`.
 - Windows Hello and consent prompts for `tir`, terminals and NuGet (Visual Studio) come to the
   front instead of opening behind your windows; when Windows keeps one back, it flashes in the
   taskbar. Several programs asking to unlock at once share one Hello prompt rather than stacking
