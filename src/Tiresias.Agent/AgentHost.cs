@@ -1,4 +1,5 @@
 using Tiresias.Audit;
+using Tiresias.EnvironmentVariables;
 using Tiresias.Protocol;
 using Tiresias.UserSecrets;
 
@@ -42,6 +43,10 @@ public sealed class AgentHost : IAsyncDisposable
     /// <summary>The activity record for an environment hand-over, for <c>tir</c> to write itself when the app isn't running.</summary>
     public static AuditRecord EnvironmentRecord(bool allowed, string program, IEnumerable<string> names, string? process) =>
         new(allowed ? AuditKind.Allow : AuditKind.Deny, Consumer: "environment", Service: program, Reason: string.Join(", ", names), Process: process);
+
+    /// <summary>Records how a NuGet credential request for a mapped feed was answered: program, feed and variable, never the token.</summary>
+    public void RecordNuGet(NuGetOutcome outcome, string program, int processId, string source, string variable) =>
+        activity.Append(NuGetActivity.Record(outcome, program, processId, source, variable));
 
     /// <summary>
     /// Records "This wasn't me" in the activity log: what was asked, the program and the processes

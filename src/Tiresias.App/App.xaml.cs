@@ -501,18 +501,32 @@ public partial class App : Application
         if (environment.NuGetSourceFor(uri) is not { } source)
             return new(true, Approved: false);
         if (environment.Global.FirstOrDefault(v => string.Equals(v.Name, source.Variable, StringComparison.OrdinalIgnoreCase)) is not { } variable)
+        {
+            host.RecordNuGet(NuGetOutcome.NotSealed, program.Program, program.ProcessId, source.Source, source.Variable);
             return new(true, Text.Format("NuGet_VariableMissing", source.Variable, source.Source), Approved: false);
+        }
         if (request.AskAgain)
+        {
+            host.RecordNuGet(NuGetOutcome.RetryRefused, program.Program, program.ProcessId, source.Source, variable.Name);
             return new(true, Text.Format("NuGet_Refused", source.Variable, source.Source), Approved: false);
+        }
 
         var key = (program.Program, variable.Name);
         bool known;
         lock (nugetAllowed)
             known = nugetAllowed.Contains(key);
-        if (!known)
+        if (known)
+            host.RecordNuGet(NuGetOutcome.CoveredBySession, program.Program, program.ProcessId, source.Source, variable.Name);
+        else
         {
             var answer = await consent!.AskNuGetAsync(program.Program, program.ProcessId, source.Source, variable.Name, ct);
             AppLog.Info($"nuget {System.IO.Path.GetFileName(program.Program)} {source.Source}: {answer} {variable.Name}");
+            host.RecordNuGet(answer switch
+            {
+                ConsentAnswer.AllowOnce => NuGetOutcome.AllowedOnce,
+                ConsentAnswer.AllowForSession => NuGetOutcome.AllowedForSession,
+                _ => NuGetOutcome.Denied,
+            }, program.Program, program.ProcessId, source.Source, variable.Name);
             if (answer == ConsentAnswer.Deny)
                 return new(true, Approved: false);
             if (answer == ConsentAnswer.AllowForSession)

@@ -138,6 +138,10 @@ its section below.
 
 ### Fixed
 
+- NuGet credential requests now show in Activity, with the program, the feed and the variable name
+  (never the token): allowed, denied, handed over under an earlier allow for this session, a retry
+  that wasn't answered, or a mapped variable that isn't sealed. The **App** source filter covers
+  them, with user secrets and `tir run`.
 - The status page and `tir doctor --projects` look through the project folders once instead of six
   times, and skip build output, packages and git internals: on a drive of repositories the checks
   take seconds rather than half a minute. The findings list builds only the rows in view, so hundreds
