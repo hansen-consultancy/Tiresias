@@ -89,13 +89,28 @@ public static partial class Doctor
                 yield return (section, subsection, entry.Groups["key"].Value.ToLowerInvariant(), Unquote(entry.Groups["value"].Value));
         }
 
-        static string Unquote(string value) => value.Length >= 2 && value[0] == '"' && value[^1] == '"' ? value[1..^1] : value;
+        // As git reads a value: quotes may wrap any part of it, and a backslash escapes the next character.
+        static string Unquote(string value)
+        {
+            var text = new System.Text.StringBuilder(value.Length);
+            for (var i = 0; i < value.Length; i++)
+            {
+                if (value[i] == '"')
+                    continue;
+                if (value[i] == '\\' && i + 1 < value.Length)
+                    text.Append(value[++i] switch { 'n' => '\n', 't' => '\t', 'b' => '\b', var c => c });
+                else
+                    text.Append(value[i]);
+            }
+            return text.ToString();
+        }
     }
 
     [GeneratedRegex(@"^\s*\[\s*(?<section>[A-Za-z0-9.-]+)(?:\s+""(?<sub>(?:[^""\\]|\\.)*)"")?\s*\]")]
     private static partial Regex GitSection();
 
-    [GeneratedRegex(@"^\s*(?<key>[A-Za-z][A-Za-z0-9-]*)\s*=\s*(?<value>[^\r\n#;]*?)\s*(?:[#;].*)?\r?$")]
+    // # and ; start a comment only outside quotes.
+    [GeneratedRegex(@"^\s*(?<key>[A-Za-z][A-Za-z0-9-]*)\s*=\s*(?<value>(?:""(?:[^""\\\r\n]|\\.)*""|\\.|[^\r\n#;""\\])*?)\s*(?:[#;].*)?\r?$")]
     private static partial Regex GitEntry();
 }
 

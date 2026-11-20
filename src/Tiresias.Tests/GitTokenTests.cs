@@ -45,6 +45,17 @@ public class GitTokenTests
         Doctor.GitTokens([new DoctorFile(Path.Combine("C:", "src", folder, ".git", "config"),
             $"[remote \"{remote}\"]\n\turl = https://alice:{Token}@example.com/{path}\n")], null).Single();
 
+    [TestCase("\"https://alice:pa;ss@example.com/app.git\"")]
+    [TestCase("\"https://alice:pa;ss@example.com/app.git\" ; a comment")]
+    [TestCase("https://alice:\"pa;ss\"@example.com/app.git # a comment")]
+    public void A_comment_character_inside_quotes_is_part_of_the_value(string value)
+    {
+        var check = Checks($"[remote \"origin\"]\n\turl = {value}\n").Single();
+
+        Assert.That(check.Name, Is.EqualTo($"git remote origin in {Repo}"));
+        Assert.That(check.Detail, Does.Not.Contain("pa;ss").And.Not.Contain("pa#ss"));
+    }
+
     [Test]
     public void Plain_values_get_a_command() =>
         Assert.That(Remote("my-app_2.0", "up+stream.x", "team/my-app_2.0.git").Fix, Is.Not.Null);
