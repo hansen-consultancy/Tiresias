@@ -182,12 +182,12 @@ Already listed in guided setup's checks, and small enough to ship here.
 who is signed in but not the token. Run only when the tool is on PATH, with a short timeout.
 
 **Reports.** `gh` signed in with a stored token: E5/C3. The Azure CLI with a cached session:
-E1/C3. Any program running as the user can act as them, unseen.
+E5/C3, its refresh token as reusable as `gh`'s. Any program running as the user can act as them, unseen.
 
 **Fix.** For `gh`, `RunThroughExec("gh")`: set up a GitHub App service and run `tir exec gh …`,
 which mints a token per run after consent (E2/C1). Keep `gh`'s own sign-in only for interactive
 use, or sign it out with `gh auth logout`. For `az`, no fix yet: Tiresias has no broker-held Entra
-identity. It still carries its `Now` (E1/C3), so it is a finding without a fix, which says so.
+identity. It still carries its `Now` (E5/C3), so it is a finding without a fix, which says so.
 
 **Tests.** The planner gets each tool's exit code and a parsed account summary. Signed in, signed
 out, not installed, timed out.
