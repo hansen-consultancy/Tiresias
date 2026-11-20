@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Interop;
 using System.Windows.Threading;
 
 namespace Tiresias.App.Views;
@@ -70,6 +71,8 @@ public partial class ConsentWindow : Window
         window.answer.Task.ContinueWith(_ => registration.Dispose(), TaskScheduler.Default);
         window.Show();
         window.Activate();
+        // Asked by a program in the background, Activate alone may leave the dialog behind the window the user is in.
+        Tiresias.Agent.Foreground.Bring(new WindowInteropHelper(window).Handle);
         window.DenyButton.Focus();
         return window.answer.Task;
     }

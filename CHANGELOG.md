@@ -138,6 +138,11 @@ its section below.
 
 ### Fixed
 
+- Windows Hello and consent prompts for `tir`, terminals and NuGet (Visual Studio) come to the
+  front instead of opening behind your windows; when Windows keeps one back, it flashes in the
+  taskbar. Several programs asking to unlock at once share one Hello prompt rather than stacking
+  one each, and a Hello prompt answered too late says it expired instead of "Windows Hello failed
+  (0x80098044)".
 - The status page and `tir doctor --projects` look through the project folders once instead of six
   times, and skip build output, packages and git internals: on a drive of repositories the checks
   take seconds rather than half a minute. The findings list builds only the rows in view, so hundreds

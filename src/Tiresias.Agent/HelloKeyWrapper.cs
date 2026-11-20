@@ -88,8 +88,10 @@ public sealed partial class HelloKeyWrapper : IKeyWrapper, IDisposable
     /// <summary>
     /// Runs a call that shows the Hello prompt. Windows opens that prompt behind or beside a desktop
     /// app's windows (a known Windows bug, also worked around by Chromium and KeePassXC), so this
-    /// brings it to the front while the call runs. Windows sometimes fails the call with a bare
-    /// HRESULT instead of a status; that becomes a <see cref="HelloException"/> the app can explain.
+    /// brings it to the front while the call runs, or flashes it in the taskbar when Windows won't
+    /// let this process take the foreground (see <see cref="Foreground"/>). Windows sometimes fails
+    /// the call with a bare HRESULT instead of a status; that becomes a <see cref="HelloException"/>
+    /// the app can explain.
     /// </summary>
     static T Prompt<T>(Func<IAsyncOperation<T>> start)
     {
@@ -98,6 +100,10 @@ public sealed partial class HelloKeyWrapper : IKeyWrapper, IDisposable
         try
         {
             return start().AsTask().GetAwaiter().GetResult();
+        }
+        catch (COMException e) when (e.HResult == InvalidTicket)
+        {
+            throw new HelloException(HelloProblem.Expired, "The Windows Hello prompt expired before it was answered.", e);
         }
         catch (COMException e)
         {
@@ -110,28 +116,31 @@ public sealed partial class HelloKeyWrapper : IKeyWrapper, IDisposable
         }
     }
 
+    /// <summary>
+    /// <c>WINBIO_E_INVALID_TICKET</c>: the gesture's ticket expired before the key used it, which is
+    /// what happens when a prompt waits out of sight for minutes and is answered late.
+    /// </summary>
+    const int InvalidTicket = unchecked((int)0x80098044);
+
     static void KeepPromptInFront(CancellationToken done)
     {
         // Poll fast until the prompt first appears (up to 4 s), then slowly: a wrong PIN re-shows it.
-        var found = false;
-        for (var i = 0; !done.IsCancellationRequested && (found || i < 40); i++)
+        // Each prompt window is brought forward once; one Windows keeps back flashes until it is looked at.
+        nint shown = 0;
+        for (var i = 0; !done.IsCancellationRequested && (shown != 0 || i < 40); i++)
         {
             var hwnd = FindWindowW("Credential Dialog Xaml Host", null);
-            if (hwnd != 0)
+            if (hwnd != 0 && hwnd != shown)
             {
-                SetForegroundWindow(hwnd);
-                found = true;
+                Foreground.Bring(hwnd);
+                shown = hwnd;
             }
-            done.WaitHandle.WaitOne(found ? 500 : 100);
+            done.WaitHandle.WaitOne(shown != 0 ? 500 : 100);
         }
     }
 
     [LibraryImport("user32.dll", StringMarshalling = StringMarshalling.Utf16)]
     private static partial nint FindWindowW(string className, string? windowName);
-
-    [LibraryImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool SetForegroundWindow(nint hwnd);
 
     static HelloProblem Problem(KeyCredentialStatus status) => status switch
     {
@@ -148,6 +157,8 @@ public enum HelloProblem
     NotSetUp,
     /// <summary>The user closed the Hello prompt.</summary>
     Cancelled,
+    /// <summary>The prompt was answered too late, typically after waiting unseen behind other windows.</summary>
+    Expired,
     /// <summary>The Tiresias credential is gone (Hello reset, new PC): the recovery key re-wraps.</summary>
     CredentialMissing,
     /// <summary>Anything else Windows reported, e.g. the TPM is busy or locked out.</summary>
