@@ -33,7 +33,8 @@ content, so S. resizes most of them.
 - **Three widths**, chosen per window: **narrow 480** (short questions: Ask, Problem),
   **standard 720** (everything with cards, and the Consent and Incident prompts, which show paths), **wide 960** (grids: Activity, Secrets, Services).
 - **Top-level windows open centred on the monitor holding the mouse** (where the tray was clicked);
-  **windows opened from another window centre on it** and are owned by it. One helper
+  **windows opened from another window centre on it**: on their owner, or, for the peers Home
+  opens (Secrets, Services, Environment, Activity, About), on the window that was active. One helper
   (`WindowFit`) applies this from `App.ShowWindow` and for owned windows, so no window sets
   `Width`/`Height`/`WindowStartupLocation` itself.
 - After it opens the window keeps its size: content changing later (a list arriving, a card

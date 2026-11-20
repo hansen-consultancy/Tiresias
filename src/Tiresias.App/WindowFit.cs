@@ -24,8 +24,8 @@ public enum WindowSize
 
 /// <summary>
 /// One placement and size rule for every window, set in XAML as <c>l:WindowFit.Size="Standard"</c>.
-/// A window opens at its final size, centred on its owner, or on the monitor the mouse is on (where
-/// the tray was clicked), and keeps that size: content that arrives later scrolls in the window's
+/// A window opens at its final size, centred on its owner or the window it was opened from, or on
+/// the monitor the mouse is on (where the tray was clicked), and keeps that size: content that arrives later scrolls in the window's
 /// one scroll region rather than growing it. Its height is its content's, up to most of the work
 /// area; a window whose list loads after it opens says <c>l:WindowFit.Tall="True"</c> and opens at a
 /// fixed share of the work area instead, since its content's height is not known yet. A
@@ -76,7 +76,10 @@ public static partial class WindowFit
             window.Title = Text.Format("Window_DevTitle", window.Title);
 
         var hwnd = new WindowInteropHelper(window).Handle;
-        var owner = window.Owner is { } o ? new WindowInteropHelper(o).Handle : 0;
+        // A window opened from another (Home's buttons open peers, not owned windows) centres on
+        // the one that was active when it opened; from the tray none is, and the mouse decides.
+        var opener = window.Owner ?? Application.Current?.Windows.OfType<Window>().FirstOrDefault(w => w != window && w.IsActive);
+        var owner = opener is not null ? new WindowInteropHelper(opener).Handle : 0;
         var monitor = owner != 0 ? MonitorFromWindow(owner, MonitorDefaultToNearest) : MonitorUnderMouse();
         if (Work(monitor) is not { } work)
             return;
