@@ -179,6 +179,7 @@ its section below.
 
 ### Fixed
 
+- **Usage...** on a service opens again; it failed with "something went wrong".
 - After **Copy details** in the problem dialog, the "Details copied" line no longer pushes the
   buttons out of the window.
 - NuGet credential requests now show in Activity, with the program, the feed and the variable name

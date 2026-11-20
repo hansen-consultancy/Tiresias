@@ -13,7 +13,7 @@
         <TextBox x:Name="Snippet" IsReadOnly="True" FontFamily="Cascadia Mono, Consolas" Margin="0,8,0,8" TextWrapping="Wrap"
                  AutomationProperties.Name="{l:S Usage_SnippetName}" />
         <Button HorizontalAlignment="Left" Padding="12,6" Content="{l:S Sql_Copy}" Click="OnCopy" />
-        <TextBlock x:Name="Hint" Style="{StaticResource Hint}" Margin="0,12,0,0" TextWrapping="Wrap" />
+        <TextBlock x:Name="Hint" Style="{StaticResource CaptionText}" Margin="0,12,0,0" TextWrapping="Wrap" />
       </StackPanel>
     </Border>
     <StackPanel Style="{StaticResource ButtonRow}">
