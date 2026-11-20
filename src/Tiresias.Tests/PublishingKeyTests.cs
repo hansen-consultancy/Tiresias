@@ -128,7 +128,11 @@ public class PublishingKeyTests
     [TestCase("%PATH%")]
     [TestCase("x\"y")]
     [TestCase("x!y")]
-    public void A_file_in_a_folder_a_quoted_argument_cannot_hold_is_a_finding_without_a_fix(string folder)
+    [TestCase("x\ncalc")]
+    [TestCase("x&calc")]
+    [TestCase("x|calc")]
+    [TestCase("café")]
+    public void A_file_in_a_folder_outside_the_allowlist_is_a_finding_without_a_fix(string folder)
     {
         var checks = Checks(Path.Combine(App, folder, ".npmrc"), $"//registry.npmjs.org/:_authToken={Secret}\n", inProfile: false)
             .Concat(Checks(Path.Combine(App, folder, ".pypirc"), $"[pypi]\npassword = {Secret}\n", inProfile: false))
@@ -137,6 +141,26 @@ public class PublishingKeyTests
         Assert.That(checks, Has.Length.EqualTo(3));
         Assert.That(checks.Select(c => c.Fix), Is.All.Null);
         AssertNoValue(checks);
+    }
+
+    [Test]
+    public void A_space_in_the_folder_stays_inside_the_quotes()
+    {
+        var file = Path.Combine("C:", "src", "my app", ".npmrc");
+
+        Assert.That(Checks(file, $"//registry.npmjs.org/:_authToken={Secret}\n", inProfile: false).Single().Fix!.Instruction,
+            Does.StartWith($"tir env import \"{file}\" \"//registry.npmjs.org/:_authToken\" "));
+    }
+
+    [TestCase("//npm.example.com/a|calc/:_authToken")]
+    [TestCase("//npm.example.com/a&calc/:_authToken")]
+    [TestCase("//npm.example.com/a calc/:_authToken")]
+    public void An_npm_key_outside_the_allowlist_is_a_finding_without_a_fix(string key)
+    {
+        var check = Checks(Npmrc, $"{key}={Secret}\n").Single();
+
+        Assert.That(check.Fix, Is.Null);
+        AssertNoValue([check]);
     }
 
     [Test]

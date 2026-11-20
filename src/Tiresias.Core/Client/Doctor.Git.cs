@@ -120,17 +120,9 @@ public sealed record RemoveTokenFromRemote(string Repository, string Remote, str
 {
     public override string Instruction => $"git -C \"{Repository}\" remote set-url {(Push ? "--push " : "")}\"{Remote}\" \"{Url}\"";
 
-    /// <summary>
-    /// The fix, or none unless every value is made of characters no shell treats specially: the
-    /// command is pasted into cmd, PowerShell or bash, and a .git/config is anyone's to write. Only
-    /// the repository's path may hold a backslash (not as its last character, where it would escape
-    /// bash's closing quote) and a space, which its quotes keep.
-    /// </summary>
+    /// <summary>The fix, or none unless the repository's path, the remote's name and its URL are all <see cref="Doctor.Pastable"/>.</summary>
     internal static RemoveTokenFromRemote? For(string repository, string remote, string url, bool push) =>
-        Plain(repository, path: true) && Plain(remote) && Plain(url) ? new(repository, remote, url, push) : null;
-
-    static bool Plain(string value, bool path = false) =>
-        value.Length > 0 && !value.EndsWith('\\') && value.All(c => char.IsAsciiLetterOrDigit(c) || "/:._@+-".Contains(c) || (path && c is '\\' or ' '));
+        Doctor.Pastable(repository, path: true) && Doctor.Pastable(remote) && Doctor.Pastable(url) ? new(repository, remote, url, push) : null;
 }
 
 /// <summary>Reads <c>.git-credentials</c>, git's <c>store</c> helper file, for its hosts alone.</summary>
