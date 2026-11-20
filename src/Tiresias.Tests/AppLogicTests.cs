@@ -184,6 +184,22 @@ public class ActivityQueryTests
     }
 
     [Test]
+    public void Today_counts_records_since_local_midnight_and_the_approvals_among_them()
+    {
+        var midnight = new DateTimeOffset(Now.ToLocalTime().Date, Now.ToLocalTime().Offset);
+        ActivityEntry At(AuditKind kind, DateTimeOffset time) => Entry(kind) with { Time = time };
+        ActivityEntry[] all =
+        [
+            At(AuditKind.Allow, midnight.AddMinutes(1)),
+            At(AuditKind.Allow, midnight.AddMinutes(2)),
+            At(AuditKind.Deny, midnight.AddMinutes(3)),
+            At(AuditKind.Allow, midnight.AddMinutes(-1)),
+        ];
+
+        Assert.That(ActivityQuery.Today(all, Now), Is.EqualTo((3, 2)));
+    }
+
+    [Test]
     public void Lists_at_most_the_limit()
     {
         var many = Enumerable.Range(0, ActivityQuery.Limit + 5).Select(_ => Entry(AuditKind.Allow));

@@ -14,6 +14,47 @@
       <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
+    <Style x:Key="NavCount" TargetType="TextBlock" BasedOn="{StaticResource CaptionText}">
+      <Setter Property="Margin" Value="8,0,0,0" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <!-- A place on the left: a subtle fill when picked, and the accent bar that says which (docs/app-design.md, rule 10). -->
+    <Style x:Key="NavItem" TargetType="ListBoxItem">
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Padding" Value="12,8" />
+      <Setter Property="Margin" Value="0,1" />
+      <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ListBoxItem">
+            <Border x:Name="Back" Background="Transparent" CornerRadius="4" Padding="{TemplateBinding Padding}">
+              <Grid>
+                <Rectangle x:Name="Bar" Width="3" Height="16" RadiusX="1.5" RadiusY="1.5" Margin="-12,0,0,0" HorizontalAlignment="Left"
+                           Fill="{DynamicResource AccentFillColorDefaultBrush}" Visibility="Collapsed" />
+                <ContentPresenter />
+              </Grid>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Back" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+              </Trigger>
+              <Trigger Property="IsSelected" Value="True">
+                <Setter TargetName="Back" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                <Setter TargetName="Bar" Property="Visibility" Value="Visible" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="Badge" TargetType="Border">
+      <Setter Property="Width" Value="22" />
+      <Setter Property="Height" Value="22" />
+      <Setter Property="CornerRadius" Value="11" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+
     <!-- One finding as a card. One is open at a time (docs/app-design.md, rule 8): the open one says
          what it is, where it stands and its fix; the others are one line to click. -->
     <DataTemplate x:Key="FindingTemplate">
@@ -24,13 +65,17 @@
                   AutomationProperties.Name="{Binding Spoken}">
             <Grid>
               <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="28" />
+                <ColumnDefinition Width="34" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
               </Grid.ColumnDefinitions>
+              <Border Style="{StaticResource Badge}" Background="{DynamicResource SubtleFillColorTertiaryBrush}" Visibility="{Binding NumberVisibility}">
+                <TextBlock Text="{Binding Number}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+              </Border>
               <TextBlock Text="{Binding Glyph}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16"
-                         Foreground="{Binding Brush}" VerticalAlignment="Center" />
+                         Foreground="{Binding Brush}" VerticalAlignment="Center" Visibility="{Binding GlyphVisibility}" />
               <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="14" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
               <TextBlock Grid.Column="2" Text="{Binding FixLabel}" Style="{StaticResource CaptionText}" Margin="12,0,0,0" VerticalAlignment="Center" />
               <TextBlock Grid.Column="3" Text="&#xE76C;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="12"
@@ -40,28 +85,37 @@
 
           <Grid Visibility="{Binding OpenVisibility}" Margin="16">
             <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="28" />
+              <ColumnDefinition Width="34" />
               <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
+            <Border Style="{StaticResource Badge}" VerticalAlignment="Top" Background="{DynamicResource AccentFillColorDefaultBrush}"
+                    Visibility="{Binding NumberVisibility}">
+              <TextBlock Text="{Binding Number}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"
+                         Foreground="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
+            </Border>
             <TextBlock Text="{Binding Glyph}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16"
-                       Foreground="{Binding Brush}" VerticalAlignment="Top" Margin="0,2,0,0" />
+                       Foreground="{Binding Brush}" VerticalAlignment="Top" Margin="0,2,0,0" Visibility="{Binding GlyphVisibility}" />
             <StackPanel Grid.Column="1">
               <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" />
-              <TextBlock Text="{Binding Moves}" Style="{StaticResource CaptionText}" ToolTip="{Binding MovesMeaning}" Margin="0,4,0,0" />
+              <!-- What it is in plain words, then where it stands and where the fix takes it. -->
+              <TextBlock Text="{Binding Detail}" Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,4,0,0"
+                         Visibility="{Binding DetailVisibility}" />
+              <TextBlock Style="{StaticResource CaptionText}" ToolTip="{Binding MovesMeaning}" Margin="0,4,0,0" TextWrapping="Wrap">
+                <Run Text="{Binding MovesNow, Mode=OneWay}" /><Run Text="{Binding MovesArrow, Mode=OneWay}" /><Run
+                     Text="{Binding MovesBetter, Mode=OneWay}" FontWeight="SemiBold" Foreground="{DynamicResource SystemFillColorSuccessBrush}" />
+              </TextBlock>
               <!-- The fix leads; Details and Dismiss sit beside it, hidden while a reason is being typed. -->
               <WrapPanel Margin="0,10,0,0" Visibility="{Binding ActionsVisibility}">
                 <Button Style="{DynamicResource AccentButtonStyle}" Padding="12,4" Margin="0,0,8,0" Content="{Binding FixLabel}"
                         AutomationProperties.Name="{Binding FixName}" Visibility="{Binding FixVisibility}" Click="OnReview" />
                 <ToggleButton x:Name="DetailsToggle" Padding="12,4" Margin="0,0,8,0" Background="Transparent" BorderThickness="0"
-                              Content="{l:S Finding_Details}" Visibility="{Binding DetailsVisibility}" />
+                              Content="{l:S Finding_Details}" Visibility="{Binding MembersVisibility}" />
                 <Button Padding="12,4" Background="Transparent" BorderThickness="0" Content="{Binding DismissLabel}"
                         AutomationProperties.Name="{Binding DismissName}" Click="OnDismiss" />
               </WrapPanel>
               <StackPanel Margin="0,8,0,0" Visibility="{Binding IsChecked, ElementName=DetailsToggle, Converter={StaticResource Visible}}">
-                <TextBlock Text="{Binding Detail}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Visibility="{Binding DetailVisibility}" />
                 <!-- A group's members, each with its own fix; DynamicResource because this template is still being read. -->
-                <ItemsControl ItemsSource="{Binding Members}" Focusable="False" ItemTemplate="{DynamicResource FindingTemplate}"
-                              Visibility="{Binding MembersVisibility}" Margin="0,8,0,0" />
+                <ItemsControl ItemsSource="{Binding Members}" Focusable="False" ItemTemplate="{DynamicResource FindingTemplate}" />
               </StackPanel>
               <StackPanel Margin="0,8,0,0" Visibility="{Binding DismissingVisibility}">
                 <TextBlock Text="{l:S Finding_ReasonLabel}" Style="{StaticResource CaptionText}" />
@@ -100,40 +154,49 @@
     </DataTemplate>
   </Window.Resources>
 
-  <!-- One window (docs/app-design.md, rule 10): the places on the left, the page on the right. -->
+  <!-- One window (docs/app-design.md, rule 10): the places on the left, the page on a lighter panel on the right. -->
   <Grid>
     <Grid.ColumnDefinitions>
-      <ColumnDefinition Width="200" />
+      <ColumnDefinition Width="220" />
       <ColumnDefinition Width="*" />
     </Grid.ColumnDefinitions>
-    <!-- Only the areas this machine uses (HomeAreas); the rest are reached through Add.... -->
-    <ListBox x:Name="Nav" Margin="8,12,0,12" BorderThickness="0" Background="Transparent" SelectionChanged="OnNav"
+    <!-- Only the areas this machine uses (HomeAreas); the rest are reached through Add.... About sits at the bottom. -->
+    <ListBox x:Name="Nav" Margin="8,12,8,12" BorderThickness="0" Background="Transparent" SelectionChanged="OnNav"
+             ItemContainerStyle="{StaticResource NavItem}" ScrollViewer.VerticalScrollBarVisibility="Disabled" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
              AutomationProperties.Name="{l:S Nav_Name}">
-      <ListBoxItem x:Name="NavHome" Tag="Home">
-        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE80F;" Style="{StaticResource NavIcon}" /><TextBlock Text="{l:S Nav_Home}" /></StackPanel>
+      <ListBox.ItemsPanel>
+        <ItemsPanelTemplate>
+          <DockPanel LastChildFill="False" />
+        </ItemsPanelTemplate>
+      </ListBox.ItemsPanel>
+      <ListBoxItem x:Name="NavHome" Tag="Home" DockPanel.Dock="Top">
+        <DockPanel><TextBlock Text="&#xE80F;" Style="{StaticResource NavIcon}" /><TextBlock Text="{l:S Nav_Home}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" /></DockPanel>
       </ListBoxItem>
-      <ListBoxItem x:Name="NavSecrets" Tag="Secrets" Visibility="{Binding SecretsVisibility}">
-        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE72E;" Style="{StaticResource NavIcon}" /><TextBlock Text="{l:S Nav_Secrets}" /></StackPanel>
+      <ListBoxItem x:Name="NavSecrets" Tag="Secrets" DockPanel.Dock="Top" Visibility="{Binding SecretsVisibility}">
+        <DockPanel><TextBlock Text="&#xE72E;" Style="{StaticResource NavIcon}" /><TextBlock DockPanel.Dock="Right" Text="{Binding SecretsCount}" Style="{StaticResource NavCount}" /><TextBlock Text="{l:S Nav_Secrets}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" /></DockPanel>
       </ListBoxItem>
-      <ListBoxItem x:Name="NavServices" Tag="Services" Visibility="{Binding ServicesVisibility}">
-        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE968;" Style="{StaticResource NavIcon}" /><TextBlock Text="{l:S Nav_Services}" /></StackPanel>
+      <ListBoxItem x:Name="NavServices" Tag="Services" DockPanel.Dock="Top" Visibility="{Binding ServicesVisibility}">
+        <DockPanel><TextBlock Text="&#xE968;" Style="{StaticResource NavIcon}" /><TextBlock DockPanel.Dock="Right" Text="{Binding ServicesCount}" Style="{StaticResource NavCount}" /><TextBlock Text="{l:S Nav_Services}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" /></DockPanel>
       </ListBoxItem>
-      <ListBoxItem x:Name="NavEnvironment" Tag="Environment" Visibility="{Binding EnvironmentVisibility}">
-        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8A4;" Style="{StaticResource NavIcon}" /><TextBlock Text="{l:S Nav_Environment}" /></StackPanel>
+      <ListBoxItem x:Name="NavEnvironment" Tag="Environment" DockPanel.Dock="Top" Visibility="{Binding EnvironmentVisibility}">
+        <DockPanel><TextBlock Text="&#xE8A4;" Style="{StaticResource NavIcon}" /><TextBlock DockPanel.Dock="Right" Text="{Binding VariablesCount}" Style="{StaticResource NavCount}" /><TextBlock Text="{l:S Nav_Environment}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" /></DockPanel>
       </ListBoxItem>
-      <ListBoxItem x:Name="NavActivity" Tag="Activity" Visibility="{Binding ActivityVisibility}">
-        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE81C;" Style="{StaticResource NavIcon}" /><TextBlock Text="{l:S Nav_Activity}" /></StackPanel>
+      <ListBoxItem x:Name="NavActivity" Tag="Activity" DockPanel.Dock="Top" Visibility="{Binding ActivityVisibility}">
+        <DockPanel><TextBlock Text="&#xE81C;" Style="{StaticResource NavIcon}" /><TextBlock DockPanel.Dock="Right" Text="{Binding ActivityCount}" Style="{StaticResource NavCount}" /><TextBlock Text="{l:S Nav_Activity}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" /></DockPanel>
       </ListBoxItem>
-      <ListBoxItem x:Name="NavAbout" Tag="About">
-        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE946;" Style="{StaticResource NavIcon}" /><TextBlock Text="{l:S Status_About}" /></StackPanel>
+      <ListBoxItem x:Name="NavAbout" Tag="About" DockPanel.Dock="Bottom">
+        <DockPanel><TextBlock Text="&#xE946;" Style="{StaticResource NavIcon}" /><TextBlock Text="{l:S Status_About}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" /></DockPanel>
       </ListBoxItem>
     </ListBox>
 
+    <Border Grid.Column="1" Background="{DynamicResource LayerFillColorDefaultBrush}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1,1,0,0" CornerRadius="8,0,0,0">
+    <Grid>
     <!-- The other places, one at a time; each brings its own padding. -->
-    <ContentControl x:Name="PageHost" Grid.Column="1" Focusable="False" Visibility="Collapsed" />
+    <ContentControl x:Name="PageHost" Focusable="False" Visibility="Collapsed" />
 
   <!-- Header, one scrolling body, footer (docs/app-design.md, rule 2): no list in the body scrolls by itself. -->
-  <Grid x:Name="HomePage" Grid.Column="1" Margin="{StaticResource PagePadding}">
+  <Grid x:Name="HomePage" Margin="36,24,36,20">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
@@ -149,15 +212,43 @@
         </Grid.ColumnDefinitions>
         <!-- One line: mode, build and start with Windows live in About (docs/app-design.md, rule 5). -->
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-          <TextBlock Text="{Binding Headline}" FontSize="14" VerticalAlignment="Center" TextWrapping="Wrap" />
-          <Button Padding="12,4" Margin="12,0,0,0" Content="{Binding LockLabel}" Command="{Binding ToggleLockCommand}" />
+          <!-- The lock at a glance: open and green while unlocked. -->
+          <Border Width="32" Height="32" CornerRadius="16" VerticalAlignment="Center" AutomationProperties.Name="{Binding Headline}">
+            <Border.Style>
+              <Style TargetType="Border">
+                <Setter Property="Background" Value="{DynamicResource SubtleFillColorTertiaryBrush}" />
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding IsUnlocked}" Value="True">
+                    <Setter Property="Background" Value="{DynamicResource SystemFillColorSuccessBackgroundBrush}" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </Border.Style>
+            <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center">
+              <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                  <Setter Property="Text" Value="&#xE72E;" />
+                  <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsUnlocked}" Value="True">
+                      <Setter Property="Text" Value="&#xE785;" />
+                      <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </TextBlock.Style>
+            </TextBlock>
+          </Border>
+          <TextBlock Text="{Binding Headline}" FontSize="14" FontWeight="SemiBold" Margin="10,0,0,0" VerticalAlignment="Center" TextWrapping="Wrap" />
+          <Button Padding="12,4" Margin="12,0,0,0" Content="{Binding LockLabel}" Command="{Binding ToggleLockCommand}" VerticalAlignment="Center" />
         </StackPanel>
-        <Button Grid.Column="1" Padding="12,4" Margin="12,0,0,0" Content="{l:S Tray_Add}" Click="OnAdd" VerticalAlignment="Center" />
+        <Button Grid.Column="1" Style="{DynamicResource AccentButtonStyle}" Padding="12,4" Margin="12,0,0,0" Content="{l:S Tray_Add}"
+                Click="OnAdd" VerticalAlignment="Center" />
       </Grid>
-      <TextBlock Text="{Binding Summary}" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,16,0,6"
+      <TextBlock Text="{Binding Summary}" FontSize="28" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,20,0,8"
                  AutomationProperties.HeadingLevel="Level1" />
       <StackPanel Orientation="Horizontal">
-        <ProgressBar Width="200" Height="4" Minimum="0" Maximum="{Binding CheckCount, Mode=OneWay}" Value="{Binding PassCount, Mode=OneWay}"
+        <ProgressBar Width="240" Height="4" Minimum="0" Maximum="{Binding CheckCount, Mode=OneWay}" Value="{Binding PassCount, Mode=OneWay}"
                      IsIndeterminate="{Binding IsRunning}" VerticalAlignment="Center" AutomationProperties.Name="{Binding ProgressText}" />
         <TextBlock Text="{Binding ProgressText}" Style="{StaticResource CaptionText}" Margin="10,0,0,0" VerticalAlignment="Center" />
       </StackPanel>
@@ -218,10 +309,13 @@
         <!-- Checks that need a look stay in view; the passing and the dismissed fold into one line each. -->
         <ItemsControl ItemsSource="{Binding Checks}" Focusable="False" ItemTemplate="{StaticResource CheckTemplate}"
                       AutomationProperties.Name="{l:S Status_ChecksName}" />
-        <Expander Header="{Binding PassedHeader}" Visibility="{Binding PassedVisibility}" Margin="0,4,0,0">
+        <!-- The passing and the dismissed open from the links at the foot of the page. -->
+        <StackPanel Visibility="{Binding ShowPassed, Converter={StaticResource Visible}}" Margin="0,8,0,0">
+          <TextBlock Text="{Binding PassedHeader}" Style="{StaticResource SubtitleText}" AutomationProperties.HeadingLevel="Level2" />
           <ItemsControl ItemsSource="{Binding Passed}" Focusable="False" ItemTemplate="{StaticResource CheckTemplate}" />
-        </Expander>
-        <Expander Header="{Binding DismissedHeader}" Visibility="{Binding DismissedVisibility}" Margin="0,4,0,0">
+        </StackPanel>
+        <StackPanel Visibility="{Binding ShowDismissed, Converter={StaticResource Visible}}" Margin="0,8,0,0">
+          <TextBlock Text="{Binding DismissedHeader}" Style="{StaticResource SubtitleText}" AutomationProperties.HeadingLevel="Level2" />
           <ItemsControl ItemsSource="{Binding Dismissed}" Focusable="False">
             <ItemsControl.ItemTemplate>
               <DataTemplate>
@@ -240,26 +334,31 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
-        </Expander>
+        </StackPanel>
 
       </StackPanel>
     </ScrollViewer>
 
+    <!-- Links, not buttons: the page's one button row is the open finding's (docs/app-design.md, rule 11). Escape closes. -->
     <Grid Grid.Row="2" Margin="0,16,0,0">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*" />
         <ColumnDefinition Width="Auto" />
       </Grid.ColumnDefinitions>
-      <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-        <Button Content="{l:S Status_CopyDetails}" Padding="12,6" Command="{Binding CopyCommand}" />
-        <Button Content="{l:S Problem_Action_DataFolder}" Padding="12,6" Margin="8,0,0,0" Command="{Binding OpenFolderCommand}" />
+      <StackPanel Orientation="Horizontal">
+        <TextBlock Margin="0,0,20,0" Visibility="{Binding PassedVisibility}">
+          <Hyperlink Command="{Binding TogglePassedCommand}"><Run Text="{Binding PassedHeader, Mode=OneWay}" /></Hyperlink>
+        </TextBlock>
+        <TextBlock Visibility="{Binding DismissedVisibility}">
+          <Hyperlink Command="{Binding ToggleDismissedCommand}"><Run Text="{Binding DismissedHeader, Mode=OneWay}" /></Hyperlink>
+        </TextBlock>
       </StackPanel>
-      <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="16,0,0,0">
-        <Button MinWidth="96" Padding="12,6" Content="{l:S Status_RunAgain}"
-                Command="{Binding RunCommand}" />
-        <Button Style="{StaticResource RowButton}" Content="{l:S Common_Close}" IsCancel="True" Click="OnClose" />
-      </StackPanel>
+      <TextBlock Grid.Column="1">
+        <Hyperlink Command="{Binding RunCommand}"><Run Text="{l:S Status_RunAgain}" /></Hyperlink>
+      </TextBlock>
     </Grid>
   </Grid>
+  </Grid>
+  </Border>
   </Grid>
 </Window>

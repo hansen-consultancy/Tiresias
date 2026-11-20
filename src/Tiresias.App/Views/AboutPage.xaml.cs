@@ -60,6 +60,8 @@ public partial class AboutPage : UserControl
 
     void Add(string key, string value) => facts.Add(new(Text.Get(key), value));
 
+    void OnDataFolder(object sender, RoutedEventArgs e) => Desktop.OpenDataFolder();
+
     void OnGitHub(object sender, RoutedEventArgs e) => Desktop.Open(AppBuild.Repository);
 
     void OnPage(object sender, RoutedEventArgs e) => Desktop.Open(AppBuild.Current.Installed ? AppBuild.ReleasePage : AppBuild.CommitPage!);
@@ -69,6 +71,8 @@ public partial class AboutPage : UserControl
         var text = new StringBuilder().AppendLine(Heading.Text);
         foreach (var fact in facts)
             text.AppendLine(CultureInfo.CurrentCulture, $"{fact.Name}: {fact.Value}");
+        if (Window.GetWindow(this) is StatusWindow status)
+            text.AppendLine().Append(status.Details());
         try
         {
             Clipboard.SetText(text.ToString());

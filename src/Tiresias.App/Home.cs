@@ -28,6 +28,21 @@ static class Home
         [.. fixes],
         [.. Opened]));
 
+    /// <summary>
+    /// The counts beside the places on the left and in the tray, each <c>null</c> when it couldn't be
+    /// read. Reads files, the vault and the registry, so call it off the UI thread.
+    /// </summary>
+    public static NavCounts Counts()
+    {
+        var today = Read(() => ActivityQuery.Today(ActivityLog.ReadAll(), DateTimeOffset.Now), "activity today");
+        return new(
+            Read(() => UserSecretsFiles.All().Count, "user secrets folders"),
+            Read(() => VaultEditor.Load().Services.Count, "vault services"),
+            Read(() => EnvironmentStore.UserVariables().Count, "user variables"),
+            today?.Records,
+            today?.Approvals);
+    }
+
     static bool HasRecord(string path) => new FileInfo(path) is { Exists: true, Length: > 0 };
 
     static T? Read<T>(Func<T> read, string what) where T : struct
@@ -43,3 +58,6 @@ static class Home
         }
     }
 }
+
+/// <summary>What each place on the left holds; <c>null</c> where it couldn't be read.</summary>
+sealed record NavCounts(int? Secrets, int? Services, int? Variables, int? ActivityToday, int? ApprovalsToday);

@@ -85,7 +85,7 @@ public sealed partial class ActivityViewModel : ObservableObject
     [RelayCommand]
     async Task LoadAsync()
     {
-        all = await Task.Run(() => Read(AgentHost.ActivityPath, ActivitySource.UserSecrets).Concat(Read(SoloBroker.AuditPath, ActivitySource.Broker)).ToArray());
+        all = await Task.Run(ActivityLog.ReadAll);
         Apply();
     }
 
@@ -103,25 +103,5 @@ public sealed partial class ActivityViewModel : ObservableObject
         IsEmpty = shown.Count == 0;
         EmptyText = Text.Get(all.Count == 0 ? "Activity_EmptyNone" : "Activity_EmptyFiltered");
         Summary = shown.Count == ActivityQuery.Limit ? Text.Format("Activity_SummaryLimit", shown.Count) : Text.Format("Activity_Summary", shown.Count, all.Count);
-    }
-
-    /// <summary>Reads one log, skipping what isn't a record; a missing or locked file reads as empty.</summary>
-    static IEnumerable<ActivityEntry> Read(string path, ActivitySource source)
-    {
-        string[] lines;
-        try
-        {
-            if (!File.Exists(path))
-                return [];
-            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-            using var reader = new StreamReader(stream);
-            lines = reader.ReadToEnd().Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            AppLog.Error(e, $"reading {path}");
-            return [];
-        }
-        return lines.Select(l => ActivityQuery.Parse(l, source)).OfType<ActivityEntry>();
     }
 }
