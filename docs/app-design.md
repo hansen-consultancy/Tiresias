@@ -133,6 +133,18 @@ The build and Quit sit on the bottom line. The tray does not run the checks itse
 project folders and take seconds, so the bar repeats Home's last count and is absent until Home
 has checked in this session.
 
+## 10. One window
+
+Home, the secrets editor, Services, Environment variables, Activity and About are pages of one
+window, listed on the left, instead of six windows that each had a Close button. A place is in the
+list only when this machine uses it (the same rule as Home's area buttons, which the list replaces);
+the rest are reached through Add.... A page is made new each time it is opened, so it never shows
+what it held last time. Leaving the secrets editor with unsaved changes asks first, whether by the
+list, by Escape (a page's Escape goes back Home) or by closing the window. Because the secrets,
+services and environment pages show values, the whole window is excluded from screen capture.
+Coming back Home after Environment variables re-runs the checks, since a change there can clear a
+finding. Dialogs (Add..., the approval prompt, setup, the forms a page opens) stay windows.
+
 ## Slices
 
 1. `WindowFit` and the size rule applied to every window; "(dev)" in titles; compact Home banner.

@@ -42,19 +42,19 @@ public partial class NeedsWindow : Window
         switch (step)
         {
             case NeedStep.AddService:
-                App.Current.ShowWindow<ServicesWindow>().Add((row.Option.Action as AddService)?.Upstream);
+                App.Current.ShowPage<ServicesPage>()?.Add((row.Option.Action as AddService)?.Upstream);
                 break;
             case NeedStep.SetUpSqlServer:
-                App.Current.ShowWindow<ServicesWindow>().SetUpSqlServer();
+                App.Current.ShowPage<ServicesPage>()?.SetUpSqlServer();
                 break;
             case NeedStep.SetUpRaven:
-                App.Current.ShowWindow<ServicesWindow>().SetUpRaven();
+                App.Current.ShowPage<ServicesPage>()?.SetUpRaven();
                 break;
             case NeedStep.OpenEnvironment:
-                App.Current.ShowWindow<EnvironmentWindow>();
+                App.Current.ShowPage<EnvironmentPage>();
                 break;
             case NeedStep.OpenSecrets:
-                App.Current.ShowWindow<SecretsWindow>();
+                App.Current.ShowPage<SecretsPage>();
                 break;
         }
     }

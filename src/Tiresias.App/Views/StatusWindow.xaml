@@ -3,10 +3,16 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:l="clr-namespace:Tiresias.App"
         Title="{l:S Status_WindowTitle}"
-        l:WindowFit.Size="Standard" l:WindowFit.Tall="True"
+        l:WindowFit.Size="Wide" l:WindowFit.Tall="True"
         Icon="pack://application:,,,/Assets/tiresias.ico">
   <Window.Resources>
     <BooleanToVisibilityConverter x:Key="Visible" />
+    <Style x:Key="NavIcon" TargetType="TextBlock">
+      <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets" />
+      <Setter Property="FontSize" Value="16" />
+      <Setter Property="Width" Value="28" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
 
     <!-- One finding as a card. One is open at a time (docs/app-design.md, rule 8): the open one says
          what it is, where it stands and its fix; the others are one line to click. -->
@@ -94,8 +100,40 @@
     </DataTemplate>
   </Window.Resources>
 
+  <!-- One window (docs/app-design.md, rule 10): the places on the left, the page on the right. -->
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="200" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
+    <!-- Only the areas this machine uses (HomeAreas); the rest are reached through Add.... -->
+    <ListBox x:Name="Nav" Margin="8,12,0,12" BorderThickness="0" Background="Transparent" SelectionChanged="OnNav"
+             AutomationProperties.Name="{l:S Nav_Name}">
+      <ListBoxItem x:Name="NavHome" Tag="Home" IsSelected="True">
+        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE80F;" Style="{StaticResource NavIcon}" /><TextBlock Text="{l:S Nav_Home}" /></StackPanel>
+      </ListBoxItem>
+      <ListBoxItem x:Name="NavSecrets" Tag="Secrets" Visibility="{Binding SecretsVisibility}">
+        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE72E;" Style="{StaticResource NavIcon}" /><TextBlock Text="{l:S Nav_Secrets}" /></StackPanel>
+      </ListBoxItem>
+      <ListBoxItem x:Name="NavServices" Tag="Services" Visibility="{Binding ServicesVisibility}">
+        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE968;" Style="{StaticResource NavIcon}" /><TextBlock Text="{l:S Nav_Services}" /></StackPanel>
+      </ListBoxItem>
+      <ListBoxItem x:Name="NavEnvironment" Tag="Environment" Visibility="{Binding EnvironmentVisibility}">
+        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8A4;" Style="{StaticResource NavIcon}" /><TextBlock Text="{l:S Nav_Environment}" /></StackPanel>
+      </ListBoxItem>
+      <ListBoxItem x:Name="NavActivity" Tag="Activity" Visibility="{Binding ActivityVisibility}">
+        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE81C;" Style="{StaticResource NavIcon}" /><TextBlock Text="{l:S Nav_Activity}" /></StackPanel>
+      </ListBoxItem>
+      <ListBoxItem x:Name="NavAbout" Tag="About">
+        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE946;" Style="{StaticResource NavIcon}" /><TextBlock Text="{l:S Status_About}" /></StackPanel>
+      </ListBoxItem>
+    </ListBox>
+
+    <!-- The other places, one at a time; each brings its own padding. -->
+    <ContentControl x:Name="PageHost" Grid.Column="1" Focusable="False" Visibility="Collapsed" />
+
   <!-- Header, one scrolling body, footer (docs/app-design.md, rule 2): no list in the body scrolls by itself. -->
-  <Grid Margin="{StaticResource PagePadding}">
+  <Grid x:Name="HomePage" Grid.Column="1" Margin="{StaticResource PagePadding}">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
@@ -204,14 +242,6 @@
           </ItemsControl>
         </Expander>
 
-        <!-- Only the areas this machine uses (HomeAreas); the rest are reached through Add.... -->
-        <WrapPanel Margin="0,16,0,0">
-          <Button Content="{l:S Tray_Secrets}" Padding="12,6" Margin="0,0,8,8" Click="OnSecrets" Visibility="{Binding SecretsVisibility}" />
-          <Button Content="{l:S Status_Services}" Padding="12,6" Margin="0,0,8,8" Click="OnServices" Visibility="{Binding ServicesVisibility}" />
-          <Button Content="{l:S Tray_Environment}" Padding="12,6" Margin="0,0,8,8" Click="OnEnvironment" Visibility="{Binding EnvironmentVisibility}" />
-          <Button Content="{l:S Tray_Activity}" Padding="12,6" Margin="0,0,8,8" Click="OnActivity" Visibility="{Binding ActivityVisibility}" />
-          <Button Content="{l:S Status_About}" Padding="12,6" Margin="0,0,0,8" Click="OnAbout" />
-        </WrapPanel>
       </StackPanel>
     </ScrollViewer>
 
@@ -230,5 +260,6 @@
         <Button Style="{StaticResource RowButton}" Content="{l:S Common_Close}" IsCancel="True" Click="OnClose" />
       </StackPanel>
     </Grid>
+  </Grid>
   </Grid>
 </Window>

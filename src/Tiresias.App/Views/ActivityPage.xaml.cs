@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Collections.ObjectModel;
 using System.Windows;
+using System.Windows.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Tiresias.Agent;
@@ -9,9 +10,9 @@ using Tiresias.App.Logic;
 namespace Tiresias.App.Views;
 
 /// <summary>The local audit: the agent's user-secrets decisions and, in solo mode, the broker's log.</summary>
-public partial class ActivityWindow : Window
+public partial class ActivityPage : UserControl
 {
-    public ActivityWindow()
+    public ActivityPage()
     {
         InitializeComponent();
         var model = new ActivityViewModel();
@@ -19,7 +20,6 @@ public partial class ActivityWindow : Window
         Loaded += async (_, _) => await model.LoadCommand.ExecuteAsync(null);
     }
 
-    void OnClose(object sender, RoutedEventArgs e) => Close();
 }
 
 public sealed record Choice<T>(string Label, T Value);

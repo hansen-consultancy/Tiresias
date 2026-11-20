@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Collections.ObjectModel;
 using System.Text;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -23,6 +24,8 @@ public partial class StatusWindow : Window
     public StatusWindow()
     {
         InitializeComponent();
+        // Pages show secret values (Secrets, Services, Environment), so the whole window stays out of capture.
+        Desktop.ExcludeFromCapture(this);
         DataContext = model;
         Loaded += (_, _) => model.Refresh();
         // Back from a window opened here, Home may have a new area in use.
@@ -51,26 +54,102 @@ public partial class StatusWindow : Window
 
     void OnClose(object sender, RoutedEventArgs e) => Close();
 
-    void OnSecrets(object sender, RoutedEventArgs e) => App.Current.ShowWindow<SecretsWindow>();
+    /// <summary>The environment page; its changes can clear the exposed-variables check, so coming back Home re-runs the checks.</summary>
+    EnvironmentPage? ShowEnvironment() => Navigate<EnvironmentPage>();
 
-    void OnServices(object sender, RoutedEventArgs e) => App.Current.ShowWindow<ServicesWindow>();
+    bool recheckOnHome;
 
-    void OnEnvironment(object sender, RoutedEventArgs e) => ShowEnvironment();
+    bool navigating;
 
-    /// <summary>The environment variables window; its changes can clear the exposed-variables check, so closing it re-runs the checks.</summary>
-    EnvironmentWindow ShowEnvironment()
+    /// <summary>Shows page <typeparamref name="T"/>, new each time; <c>null</c> when the page open now keeps the window (unsaved secrets).</summary>
+    public T? Navigate<T>() where T : UserControl, new()
     {
-        var window = App.Current.ShowWindow<EnvironmentWindow>();
-        window.Closed -= OnRecoveryClosed;
-        window.Closed += OnRecoveryClosed;
-        return window;
+        if (!CanLeavePage())
+            return null;
+        var page = new T();
+        recheckOnHome |= page is EnvironmentPage;
+        Show(page);
+        return page;
     }
 
-    void OnAbout(object sender, RoutedEventArgs e) => App.Current.ShowWindow<AboutWindow>();
+    /// <summary>Back to Home, re-running the checks when the page left could have changed them.</summary>
+    public void ShowHome()
+    {
+        if (!CanLeavePage())
+            return;
+        Show(null);
+        if (recheckOnHome)
+        {
+            recheckOnHome = false;
+            model.Refresh();
+        }
+        else
+            model.ShowAreas();
+    }
+
+    void Show(UserControl? page)
+    {
+        PageHost.Content = page;
+        PageHost.Visibility = page is null ? Visibility.Collapsed : Visibility.Visible;
+        HomePage.Visibility = page is null ? Visibility.Visible : Visibility.Collapsed;
+        navigating = true;
+        Nav.SelectedItem = page switch
+        {
+            SecretsPage => NavSecrets,
+            ServicesPage => NavServices,
+            EnvironmentPage => NavEnvironment,
+            ActivityPage => NavActivity,
+            AboutPage => NavAbout,
+            _ => NavHome,
+        };
+        navigating = false;
+    }
+
+    bool CanLeavePage() => PageHost.Content is not SecretsPage secrets || secrets.CanLeave();
+
+    void OnNav(object sender, SelectionChangedEventArgs e)
+    {
+        if (navigating || Nav.SelectedItem is not ListBoxItem { Tag: string place })
+            return;
+        object? shown = place switch
+        {
+            "Secrets" => Navigate<SecretsPage>(),
+            "Services" => Navigate<ServicesPage>(),
+            "Environment" => ShowEnvironment(),
+            "Activity" => Navigate<ActivityPage>(),
+            "About" => Navigate<AboutPage>(),
+            _ => null,
+        };
+        if (place == "Home")
+            ShowHome();
+        else if (shown is null)
+        {
+            // The page open now kept the window: put the selection back on it.
+            navigating = true;
+            Nav.SelectedItem = e.RemovedItems.Count > 0 ? e.RemovedItems[0] : NavHome;
+            navigating = false;
+        }
+    }
+
+    /// <summary>Escape on a page goes back Home; on Home it closes the window (Close is the cancel button).</summary>
+    protected override void OnPreviewKeyDown(System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == System.Windows.Input.Key.Escape && PageHost.Content is not null && System.Windows.Input.Keyboard.FocusedElement is not TextBox)
+        {
+            ShowHome();
+            e.Handled = true;
+        }
+        base.OnPreviewKeyDown(e);
+    }
+
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        if (!CanLeavePage())
+            e.Cancel = true;
+        base.OnClosing(e);
+    }
 
     void OnAdd(object sender, RoutedEventArgs e) => App.Current.ShowWindow<NeedsWindow>();
-
-    void OnActivity(object sender, RoutedEventArgs e) => App.Current.ShowWindow<ActivityWindow>();
 
     void OnRestore(object sender, RoutedEventArgs e)
     {
@@ -93,7 +172,7 @@ public partial class StatusWindow : Window
         switch (fix)
         {
             case ReviewUserSecrets { UserSecretsId: var id }:
-                App.Current.ShowWindow<SecretsWindow>().Select(id);
+                Navigate<SecretsPage>()?.Select(id);
                 break;
             case ProtectVariables:
                 ShowEnvironment();
@@ -123,7 +202,7 @@ public partial class StatusWindow : Window
                 model.Refresh();
                 break;
             case UsePlaceholder { Variable: var variable, Service: var service }:
-                ShowEnvironment().PickForPlaceholder(variable, service);
+                ShowEnvironment()?.PickForPlaceholder(variable, service);
                 break;
             case RemoveExtension remove:
                 _ = RemoveExtensionAsync(remove);
