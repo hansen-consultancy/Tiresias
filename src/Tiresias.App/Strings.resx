@@ -920,9 +920,6 @@ Switch to this copy, {2}, from {3}? The other copy quits first, ending its lease
   <data name="Status_WindowTitle" xml:space="preserve">
     <value>Tiresias - status</value>
   </data>
-  <data name="Status_Heading" xml:space="preserve">
-    <value>Status</value>
-  </data>
   <data name="Status_ModeSolo" xml:space="preserve">
     <value>Solo mode: the broker runs inside this app on this PC.</value>
   </data>
@@ -1790,12 +1787,6 @@ Store them in clear?</value>
   <data name="Usage_PlaceholderHint" xml:space="preserve">
     <value>Or in the Environment variables window: check the sealed key, pick {0} under Hand out a placeholder instead, then Use a placeholder. Name the variable after the key the tool reads; the base URL variable points the tool at Tiresias.</value>
   </data>
-  <data name="Finding_Title" xml:space="preserve">
-    <value>Findings</value>
-  </data>
-  <data name="Finding_Intro" xml:space="preserve">
-    <value>Credentials that could be safer, and programs to doubt.</value>
-  </data>
   <data name="Finding_FixSecrets" xml:space="preserve">
     <value>Open in the secrets editor</value>
   </data>
@@ -2044,5 +2035,20 @@ Store them in clear?</value>
   </data>
   <data name="Consent_Unlock_Says" xml:space="preserve">
     <value>Then you see what it gets, and choose.</value>
+  </data>
+  <data name="Status_SummaryOne" xml:space="preserve">
+    <value>One thing could be safer</value>
+  </data>
+  <data name="Status_SummaryMany" xml:space="preserve">
+    <value>{0} things could be safer</value>
+  </data>
+  <data name="Status_SummaryChecks" xml:space="preserve">
+    <value>{0} checks need a look</value>
+  </data>
+  <data name="Status_SummaryNone" xml:space="preserve">
+    <value>Nothing needs you</value>
+  </data>
+  <data name="Status_Progress" xml:space="preserve">
+    <value>{0} of {1} checks pass</value>
   </data>
 </root>

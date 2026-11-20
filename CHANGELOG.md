@@ -134,6 +134,10 @@ its section below.
 
 ### Changed
 
+- Home leads with the next step: the lock state and **Add...** on top, then a heading that counts
+  what could be safer ("3 things could be safer") over a bar of the checks that pass. The first
+  finding is open with its fix as the main button; the others are one line each until you click
+  one.
 - The approval prompt is laid out in two columns: the question and its answers on the left, each
   answer with a line saying what it means, and what it gets, who is asking and the command line in
   a panel on the right. The usual answer is highlighted; Enter still approves nothing, and Deny

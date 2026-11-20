@@ -206,6 +206,13 @@ public partial class StatusWindow : Window
 
     void OnMoreFindings(object sender, RoutedEventArgs e) => model.ShowAllFindings();
 
+    /// <summary>Opens a finding's card; on the page, the one open before closes, so one next step shows at a time.</summary>
+    void OnOpenFinding(object sender, RoutedEventArgs e)
+    {
+        if (((FrameworkElement)sender).DataContext is FindingRow row)
+            model.Open(row);
+    }
+
     void OnRestoreFinding(object sender, RoutedEventArgs e)
     {
         if (((FrameworkElement)sender).DataContext is DismissedRow row)
@@ -232,11 +239,23 @@ public sealed partial class FindingRow(IReadOnlyList<DoctorCheck> checks) : Obse
     public bool IsGroup => Checks.Count > 1;
 
     /// <summary>A group's findings, each with its own fix and Dismiss; built when first shown.</summary>
-    public IReadOnlyList<FindingRow> Members => members ??= IsGroup ? [.. Checks.Select(c => new FindingRow(c))] : [];
+    public IReadOnlyList<FindingRow> Members => members ??= IsGroup ? [.. Checks.Select(c => new FindingRow(c) { IsOpen = true })] : [];
 
     IReadOnlyList<FindingRow>? members;
 
     public Visibility MembersVisibility => IsGroup ? Visibility.Visible : Visibility.Collapsed;
+
+    /// <summary>Open: the whole card with its fix; closed: one line to click. A group's members start open.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OpenVisibility), nameof(ClosedVisibility))]
+    public partial bool IsOpen { get; set; }
+
+    public Visibility OpenVisibility => IsOpen ? Visibility.Visible : Visibility.Collapsed;
+
+    public Visibility ClosedVisibility => IsOpen ? Visibility.Collapsed : Visibility.Visible;
+
+    /// <summary>Details has something to show: the longer text, or a group's members.</summary>
+    public Visibility DetailsVisibility => Detail.Length > 0 || IsGroup ? Visibility.Visible : Visibility.Collapsed;
 
     public string Name { get; } = FindingView.Title(checks);
 
@@ -336,6 +355,7 @@ public sealed partial class StatusViewModel : ObservableObject
     string mode = "";
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Summary))]
     public partial bool IsRunning { get; set; }
 
     [ObservableProperty]
@@ -397,9 +417,30 @@ public sealed partial class StatusViewModel : ObservableObject
         OnPropertyChanged(nameof(MoreFindingsLabel));
     }
 
+    /// <summary>Opens one finding and closes the rest on the page; a group's member opens on its own.</summary>
+    public void Open(FindingRow row)
+    {
+        if (allFindings.Contains(row))
+            foreach (var other in allFindings)
+                other.IsOpen = ReferenceEquals(other, row);
+        else
+            row.IsOpen = true;
+    }
+
     public ObservableCollection<DismissedRow> Dismissed { get; } = [];
 
-    public Visibility FindingsVisibility => Findings.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+    /// <summary>The page's heading: how many findings need you, else how many checks, else that nothing does.</summary>
+    public string Summary => IsRunning && last.Count == 0 ? Text.Get("Status_Running")
+        : allFindings.Count == 1 ? Text.Get("Status_SummaryOne")
+        : allFindings.Count > 1 ? Text.Format("Status_SummaryMany", allFindings.Count)
+        : Checks.Count > 0 ? Text.Format("Status_SummaryChecks", Checks.Count)
+        : Text.Get("Status_SummaryNone");
+
+    public int CheckCount => Math.Max(last.Count, 1);
+
+    public int PassCount => Passed.Count;
+
+    public string ProgressText => last.Count == 0 ? "" : Text.Format("Status_Progress", Passed.Count, last.Count);
 
     public Visibility DismissedVisibility => Dismissed.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
 
@@ -500,7 +541,7 @@ public sealed partial class StatusViewModel : ObservableObject
     void Show()
     {
         var split = FindingView.Of(last, DismissalStore.Load());
-        allFindings = [.. split.Open.Select(group => new FindingRow(group))];
+        allFindings = [.. split.Open.Select((group, i) => new FindingRow(group) { IsOpen = i == 0 })];
         ShowFindings();
         Dismissed.Clear();
         foreach (var group in split.Dismissed)
@@ -511,7 +552,10 @@ public sealed partial class StatusViewModel : ObservableObject
             (check.Status == DoctorStatus.Ok ? Passed : Checks).Add(Row(check));
         OnPropertyChanged(nameof(PassedVisibility));
         OnPropertyChanged(nameof(PassedHeader));
-        OnPropertyChanged(nameof(FindingsVisibility));
+        OnPropertyChanged(nameof(Summary));
+        OnPropertyChanged(nameof(CheckCount));
+        OnPropertyChanged(nameof(PassCount));
+        OnPropertyChanged(nameof(ProgressText));
         OnPropertyChanged(nameof(DismissedVisibility));
         OnPropertyChanged(nameof(DismissedHeader));
         ShowAreas();

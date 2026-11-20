@@ -17,6 +17,10 @@ CI and people who prefer it, and it talks to the same agent.
   An option opens the Services add form, Set up a SQL Server or a RavenDB, the environment
   variables or the secrets editor, or a guide when there is no secret to keep
   ([design](what-do-you-need.md)). `tir advise "<words>"` prints the same list.
+- **Home leads with the next step**: the lock state with Lock and Add..., then a heading that
+  counts what could be safer over a bar of the checks that pass. The first finding is open with
+  its fix; the others are one line each, and clicking one opens it instead
+  ([design](app-design.md#8-home-leads-with-the-next-step)).
 - **Home shows what is in use**: Secrets, Services, Environment variables and Activity appear
   once they have something in them (or a finding leads there); the rest are reached through
   **Add...**.

@@ -111,6 +111,17 @@ stay as before, since the docs name them. The right-hand card holds what it gets
 (file name first, folder under it) and the command line, so the left column stays the same height
 whatever is asked.
 
+## 8. Home leads with the next step
+
+Home opens on where things stand and what to do next, not on a list. The top line is the lock
+state with **Lock** beside it and **Add...** at the right. Under it a heading counts what needs you
+("3 things could be safer", else "2 checks need a look", else "Nothing needs you") over a bar of
+the checks that pass. The first finding is open as a card: its title, where it stands and where
+the fix takes it, the fix as the accent button, then **Details** and **Dismiss**. Every other
+finding is one line, with its fix's name and a chevron; clicking it opens that card and closes the
+open one, so one next step shows at a time. A group's members open inside its Details as before.
+The passing and the dismissed checks fold into one line each, and the areas in use follow.
+
 ## Slices
 
 1. `WindowFit` and the size rule applied to every window; "(dev)" in titles; compact Home banner.
