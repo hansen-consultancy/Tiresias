@@ -109,10 +109,13 @@ public sealed record RemoveTokenFromRemote(string Repository, string Remote, str
     /// The fix, or none when the repository's path, the remote's name or its URL holds what a
     /// double-quoted argument doesn't keep literal in cmd, PowerShell or bash: the command is pasted
     /// into a shell, and a .git/config is anyone's to write. A trailing backslash would escape bash's
-    /// closing quote.
+    /// closing quote; a control character such as a newline would end the command early.
     /// </summary>
     internal static RemoveTokenFromRemote? For(string repository, string remote, string url, bool push) =>
-        new[] { repository, remote, url }.All(v => v.IndexOfAny(['"', '%', '$', '`', '!']) < 0 && !v.EndsWith('\\')) ? new(repository, remote, url, push) : null;
+        new[] { repository, remote, url }.All(Pastable) ? new(repository, remote, url, push) : null;
+
+    static bool Pastable(string value) =>
+        value.IndexOfAny(['"', '%', '$', '`', '!']) < 0 && !value.EndsWith('\\') && !value.Any(char.IsControl);
 }
 
 /// <summary>Reads <c>.git-credentials</c>, git's <c>store</c> helper file, for its hosts alone.</summary>

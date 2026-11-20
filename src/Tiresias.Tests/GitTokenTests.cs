@@ -61,6 +61,7 @@ public class GitTokenTests
     [TestCase("$(calc)")]
     [TestCase("%PATH%")]
     [TestCase("x!y")]
+    [TestCase("x\ncalc")]
     public void A_repository_in_a_folder_a_quoted_argument_cannot_hold_is_a_finding_without_a_fix(string folder)
     {
         var config = Path.Combine("C:", "src", folder, ".git", "config");
