@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:l="clr-namespace:Tiresias.App"
         Title="{l:S Env_WindowTitle}"
-        l:WindowFit.Size="Standard"
+        l:WindowFit.Size="Standard" l:WindowFit.Tall="True"
         Icon="pack://application:,,,/Assets/tiresias.ico">
   <Grid Margin="{StaticResource PagePadding}">
     <Grid.RowDefinitions>

@@ -238,8 +238,6 @@ public sealed partial class FindingRow(IReadOnlyList<DoctorCheck> checks) : Obse
 
     public Visibility MembersVisibility => IsGroup ? Visibility.Visible : Visibility.Collapsed;
 
-    public string MembersHeader => Text.Format("Finding_ShowMembers", Checks.Count);
-
     public string Name { get; } = FindingView.Title(checks);
 
     public string Detail { get; } = FindingView.Detail(checks);

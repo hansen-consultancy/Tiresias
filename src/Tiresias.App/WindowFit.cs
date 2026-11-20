@@ -24,10 +24,13 @@ public enum WindowSize
 
 /// <summary>
 /// One placement and size rule for every window, set in XAML as <c>l:WindowFit.Size="Standard"</c>.
-/// The window takes its content's height, up to most of the work area; it opens centred on its
-/// owner, or on the monitor the mouse is on (where the tray was clicked), and stays on that
-/// screen as it grows. A development build says "(dev)" in
-/// every title. No window sets its own Width, Height or WindowStartupLocation.
+/// A window opens at its final size, centred on its owner or the window it was opened from, or on
+/// the monitor the mouse is on (where the tray was clicked), and keeps that size: content that arrives later scrolls in the window's
+/// one scroll region rather than growing it. Its height is its content's, up to most of the work
+/// area; a window whose list loads after it opens says <c>l:WindowFit.Tall="True"</c> and opens at a
+/// fixed share of the work area instead, since its content's height is not known yet. A
+/// development build says "(dev)" in every title. No window sets its own Width, Height or
+/// WindowStartupLocation.
 /// </summary>
 public static partial class WindowFit
 {
@@ -37,6 +40,13 @@ public static partial class WindowFit
     public static WindowSize GetSize(Window window) => (WindowSize)window.GetValue(SizeProperty);
 
     public static void SetSize(Window window, WindowSize value) => window.SetValue(SizeProperty, value);
+
+    public static readonly DependencyProperty TallProperty = DependencyProperty.RegisterAttached(
+        "Tall", typeof(bool), typeof(WindowFit), new PropertyMetadata(false));
+
+    public static bool GetTall(Window window) => (bool)window.GetValue(TallProperty);
+
+    public static void SetTall(Window window, bool value) => window.SetValue(TallProperty, value);
 
     const double MinWidth = 420;
     const double MinHeight = 240;
@@ -66,35 +76,47 @@ public static partial class WindowFit
             window.Title = Text.Format("Window_DevTitle", window.Title);
 
         var hwnd = new WindowInteropHelper(window).Handle;
-        var owner = window.Owner is { } o ? new WindowInteropHelper(o).Handle : 0;
+        // A window opened from another (Home's buttons open peers, not owned windows) centres on
+        // the one that was active when it opened; from the tray none is, and the mouse decides.
+        var opener = window.Owner ?? Application.Current?.Windows.OfType<Window>().FirstOrDefault(w => w != window && w.IsActive);
+        var owner = opener is not null ? new WindowInteropHelper(opener).Handle : 0;
         var monitor = owner != 0 ? MonitorFromWindow(owner, MonitorDefaultToNearest) : MonitorUnderMouse();
         if (Work(monitor) is not { } work)
             return;
         var scale = Scale(monitor);
+        var on = owner != 0 && GetWindowRect(owner, out var ownerRect) ? ownerRect.Box : work;
         window.MaxHeight = WindowPlacement.MaxHeight(work) / scale;
         window.Width = Math.Min(window.Width, work.Width / scale);
 
-        // The first size is the content's: centre then, before the window shows, on the owner's
-        // rectangle or the monitor's work area. Content that arrives later (a list still loading)
-        // grows the window downwards, and it moves up only as far as keeps it on screen. Resizing
-        // by hand ends the fitting (WPF sets SizeToContent to Manual). Physical pixels throughout,
-        // so a second monitor at another scale doesn't skew it.
-        var placed = false;
+        // Physical pixels throughout, so a second monitor at another scale doesn't skew it. The
+        // size comes from WPF, not GetWindowRect: when the first layout reports it, the native
+        // window may not have taken it yet.
+        void MoveTo(double width, double height)
+        {
+            var (left, top) = WindowPlacement.Centre(on, width * scale, height * scale, work);
+            SetWindowPos(hwnd, 0, (int)left, (int)top, 0, 0, NoSize | NoZOrder | NoActivate);
+        }
+
+        if (GetTall(window))
+        {
+            window.SizeToContent = SizeToContent.Manual;
+            window.Height = WindowPlacement.TallHeight(work) / scale;
+            MoveTo(window.Width, window.Height);
+            return;
+        }
+
+        // The content's height, measured now: WPF lays the window out only after showing it, at
+        // Windows' default place, so waiting for that layout would show it there first. The
+        // layout then only fixes the size; content that arrives later scrolls.
+        window.Measure(new Size(window.Width, window.MaxHeight));
+        var height = Math.Min(window.DesiredSize.Height, window.MaxHeight);
+        MoveTo(window.Width, height);
         void Place(object? s, SizeChangedEventArgs args)
         {
-            if (window.SizeToContent != SizeToContent.Height)
-            {
-                window.SizeChanged -= Place;
-                return;
-            }
-            if (!GetWindowRect(hwnd, out var self))
-                return;
-            var on = !placed ? owner != 0 && GetWindowRect(owner, out var ownerRect) ? ownerRect.Box : work : (ScreenBox?)null;
-            var (left, top) = on is { } box
-                ? WindowPlacement.Centre(box, self.Box.Width, self.Box.Height, work)
-                : WindowPlacement.Inside(self.Box, work);
-            placed = true;
-            SetWindowPos(hwnd, 0, (int)left, (int)top, 0, 0, NoSize | NoZOrder | NoActivate);
+            window.SizeChanged -= Place;
+            window.SizeToContent = SizeToContent.Manual;
+            if (Math.Abs(args.NewSize.Height - height) >= 1)
+                MoveTo(args.NewSize.Width, args.NewSize.Height);
         }
         window.SizeChanged += Place;
     }
