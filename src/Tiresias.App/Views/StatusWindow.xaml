@@ -51,12 +51,15 @@
           <TextBlock Text="{Binding Moves}" Style="{StaticResource CaptionText}" ToolTip="{Binding MovesMeaning}" />
           <Button HorizontalAlignment="Left" Padding="12,4" Margin="0,6,0,0" Content="{Binding FixLabel}" AutomationProperties.Name="{Binding FixName}"
                   Visibility="{Binding FixVisibility}" Click="OnReview" />
+          <!-- Hidden while dismissing, like the toggle, whatever the toggle was left at. -->
+          <StackPanel Visibility="{Binding ActionsVisibility}">
           <StackPanel Margin="0,6,0,0" Visibility="{Binding IsChecked, ElementName=DetailsToggle, Converter={StaticResource Visible}}">
             <TextBlock Text="{Binding Detail}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Visibility="{Binding DetailVisibility}" />
             <Button HorizontalAlignment="Left" Padding="12,4" Margin="0,6,0,0" Content="{Binding DismissLabel}" AutomationProperties.Name="{Binding DismissName}" Click="OnDismiss" />
             <!-- A group's members, each with its own fix; DynamicResource because this template is still being read. -->
             <ItemsControl ItemsSource="{Binding Members}" Focusable="False" ItemTemplate="{DynamicResource FindingTemplate}"
                           Visibility="{Binding MembersVisibility}" Margin="0,6,0,0" />
+          </StackPanel>
           </StackPanel>
           <StackPanel Margin="0,6,0,0" Visibility="{Binding DismissingVisibility}">
             <TextBlock x:Name="ReasonLabel" Text="{l:S Finding_ReasonLabel}" Style="{StaticResource CaptionText}" />
