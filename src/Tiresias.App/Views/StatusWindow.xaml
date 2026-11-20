@@ -162,7 +162,7 @@
     </Grid.ColumnDefinitions>
     <!-- Only the areas this machine uses (HomeAreas); the rest are reached through Add.... About sits at the bottom. -->
     <ListBox x:Name="Nav" Margin="8,12,8,12" BorderThickness="0" Background="Transparent" SelectionChanged="OnNav"
-             ItemContainerStyle="{StaticResource NavItem}" ScrollViewer.VerticalScrollBarVisibility="Disabled"
+             ItemContainerStyle="{StaticResource NavItem}" ScrollViewer.VerticalScrollBarVisibility="Disabled" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
              AutomationProperties.Name="{l:S Nav_Name}">
       <ListBox.ItemsPanel>
         <ItemsPanelTemplate>
@@ -170,22 +170,22 @@
         </ItemsPanelTemplate>
       </ListBox.ItemsPanel>
       <ListBoxItem x:Name="NavHome" Tag="Home" DockPanel.Dock="Top">
-        <DockPanel><TextBlock Text="&#xE80F;" Style="{StaticResource NavIcon}" /><TextBlock Text="{l:S Nav_Home}" VerticalAlignment="Center" /></DockPanel>
+        <DockPanel><TextBlock Text="&#xE80F;" Style="{StaticResource NavIcon}" /><TextBlock Text="{l:S Nav_Home}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" /></DockPanel>
       </ListBoxItem>
       <ListBoxItem x:Name="NavSecrets" Tag="Secrets" DockPanel.Dock="Top" Visibility="{Binding SecretsVisibility}">
-        <DockPanel><TextBlock Text="&#xE72E;" Style="{StaticResource NavIcon}" /><TextBlock DockPanel.Dock="Right" Text="{Binding SecretsCount}" Style="{StaticResource NavCount}" /><TextBlock Text="{l:S Nav_Secrets}" VerticalAlignment="Center" /></DockPanel>
+        <DockPanel><TextBlock Text="&#xE72E;" Style="{StaticResource NavIcon}" /><TextBlock DockPanel.Dock="Right" Text="{Binding SecretsCount}" Style="{StaticResource NavCount}" /><TextBlock Text="{l:S Nav_Secrets}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" /></DockPanel>
       </ListBoxItem>
       <ListBoxItem x:Name="NavServices" Tag="Services" DockPanel.Dock="Top" Visibility="{Binding ServicesVisibility}">
-        <DockPanel><TextBlock Text="&#xE968;" Style="{StaticResource NavIcon}" /><TextBlock DockPanel.Dock="Right" Text="{Binding ServicesCount}" Style="{StaticResource NavCount}" /><TextBlock Text="{l:S Nav_Services}" VerticalAlignment="Center" /></DockPanel>
+        <DockPanel><TextBlock Text="&#xE968;" Style="{StaticResource NavIcon}" /><TextBlock DockPanel.Dock="Right" Text="{Binding ServicesCount}" Style="{StaticResource NavCount}" /><TextBlock Text="{l:S Nav_Services}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" /></DockPanel>
       </ListBoxItem>
       <ListBoxItem x:Name="NavEnvironment" Tag="Environment" DockPanel.Dock="Top" Visibility="{Binding EnvironmentVisibility}">
-        <DockPanel><TextBlock Text="&#xE8A4;" Style="{StaticResource NavIcon}" /><TextBlock DockPanel.Dock="Right" Text="{Binding VariablesCount}" Style="{StaticResource NavCount}" /><TextBlock Text="{l:S Nav_Environment}" VerticalAlignment="Center" /></DockPanel>
+        <DockPanel><TextBlock Text="&#xE8A4;" Style="{StaticResource NavIcon}" /><TextBlock DockPanel.Dock="Right" Text="{Binding VariablesCount}" Style="{StaticResource NavCount}" /><TextBlock Text="{l:S Nav_Environment}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" /></DockPanel>
       </ListBoxItem>
       <ListBoxItem x:Name="NavActivity" Tag="Activity" DockPanel.Dock="Top" Visibility="{Binding ActivityVisibility}">
-        <DockPanel><TextBlock Text="&#xE81C;" Style="{StaticResource NavIcon}" /><TextBlock DockPanel.Dock="Right" Text="{Binding ActivityCount}" Style="{StaticResource NavCount}" /><TextBlock Text="{l:S Nav_Activity}" VerticalAlignment="Center" /></DockPanel>
+        <DockPanel><TextBlock Text="&#xE81C;" Style="{StaticResource NavIcon}" /><TextBlock DockPanel.Dock="Right" Text="{Binding ActivityCount}" Style="{StaticResource NavCount}" /><TextBlock Text="{l:S Nav_Activity}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" /></DockPanel>
       </ListBoxItem>
       <ListBoxItem x:Name="NavAbout" Tag="About" DockPanel.Dock="Bottom">
-        <DockPanel><TextBlock Text="&#xE946;" Style="{StaticResource NavIcon}" /><TextBlock Text="{l:S Status_About}" VerticalAlignment="Center" /></DockPanel>
+        <DockPanel><TextBlock Text="&#xE946;" Style="{StaticResource NavIcon}" /><TextBlock Text="{l:S Status_About}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" /></DockPanel>
       </ListBoxItem>
     </ListBox>
 
