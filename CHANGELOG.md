@@ -134,6 +134,11 @@ its section below.
 
 ### Changed
 
+- **Windows open where they should, at the size they keep**: each one opens centred on the
+  window it came from, or on the screen, already at its final size. Home, Activity, Secrets,
+  Services and Environment open at a fixed height instead of starting small and growing as their
+  lists load; what arrives later scrolls. A finding has one small **Details** toggle instead of
+  two full-width bars, and the findings' introduction is one short line.
 - **Every window opens centred at a size that fits its content**: on the window that opened it,
   or on the monitor with the mouse, as tall as it needs up to most of the screen, in one of three
   widths. Home's top card is one line; the mode and **Start Tiresias when I sign in** moved to

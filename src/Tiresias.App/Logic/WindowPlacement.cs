@@ -10,8 +10,9 @@ public readonly record struct ScreenBox(double Left, double Top, double Width, d
 
 /// <summary>
 /// Where every window opens (docs/app-design.md, rule 1): as tall as its content but no taller
-/// than most of the work area, centred on what it centres on (its owner, or the monitor), and
-/// never past the work area's edges.
+/// than most of the work area, or, for a window whose list loads after it opens, a fixed share of
+/// it; centred on what it centres on (its owner, or the monitor), and never past the work area's
+/// edges.
 /// </summary>
 public static class WindowPlacement
 {
@@ -20,15 +21,15 @@ public static class WindowPlacement
 
     public static double MaxHeight(ScreenBox workArea) => Math.Floor(workArea.Height * HeightShare);
 
+    /// <summary>The share a tall window opens at: room for its list without filling the screen.</summary>
+    public const double TallShare = 0.7;
+
+    public static double TallHeight(ScreenBox workArea) => Math.Floor(workArea.Height * TallShare);
+
     /// <summary>The top-left corner that centres a window of this size on <paramref name="on"/>, kept inside <paramref name="workArea"/>.</summary>
     public static (double Left, double Top) Centre(ScreenBox on, double width, double height, ScreenBox workArea) =>
         (Clamp(on.Left + (on.Width - width) / 2, workArea.Left, workArea.Right - width),
          Clamp(on.Top + (on.Height - height) / 2, workArea.Top, workArea.Bottom - height));
-
-    /// <summary>Where a window that grew goes: where it is, moved up or left only as far as keeps it in <paramref name="workArea"/>.</summary>
-    public static (double Left, double Top) Inside(ScreenBox window, ScreenBox workArea) =>
-        (Clamp(window.Left, workArea.Left, workArea.Right - window.Width),
-         Clamp(window.Top, workArea.Top, workArea.Bottom - window.Height));
 
     /// <summary>A window larger than the work area keeps its top-left corner in it.</summary>
     static double Clamp(double value, double min, double max) => Math.Round(Math.Max(min, Math.Min(value, max)));

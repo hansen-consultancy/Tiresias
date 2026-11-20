@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:l="clr-namespace:Tiresias.App"
         Title="{l:S Status_WindowTitle}"
-        l:WindowFit.Size="Standard"
+        l:WindowFit.Size="Standard" l:WindowFit.Tall="True"
         Icon="pack://application:,,,/Assets/tiresias.ico">
   <Window.Resources>
     <BooleanToVisibilityConverter x:Key="Visible" />
@@ -17,17 +17,47 @@
         <TextBlock Text="{Binding Glyph}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16"
                    Foreground="{Binding Brush}" VerticalAlignment="Top" Margin="0,2,0,0" />
         <StackPanel Grid.Column="1">
-          <!-- Summary first: what, where it stands, the fix; the rest under Details (docs/app-design.md, rule 3). -->
-          <TextBlock Text="{Binding Name}" Style="{StaticResource BodyText}" FontWeight="SemiBold" TextWrapping="Wrap" />
+          <!-- Summary first: what, where it stands, the fix. One Details toggle opens the rest (docs/app-design.md, rule 3). -->
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="{Binding Name}" Style="{StaticResource BodyText}" FontWeight="SemiBold" TextWrapping="Wrap" />
+            <ToggleButton x:Name="DetailsToggle" Grid.Column="1" VerticalAlignment="Top" Margin="8,0,0,0" Padding="6,2"
+                          Background="Transparent" BorderThickness="0" Visibility="{Binding ActionsVisibility}"
+                          AutomationProperties.Name="{l:S Finding_Details}">
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{l:S Finding_Details}" Style="{StaticResource CaptionText}" />
+                <TextBlock Text="&#xE70D;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="10" Margin="4,0,0,0"
+                           VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
+                  <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="True">
+                          <Setter Property="RenderTransform">
+                            <Setter.Value>
+                              <RotateTransform Angle="180" />
+                            </Setter.Value>
+                          </Setter>
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </TextBlock.Style>
+                </TextBlock>
+              </StackPanel>
+            </ToggleButton>
+          </Grid>
           <TextBlock Text="{Binding Moves}" Style="{StaticResource CaptionText}" ToolTip="{Binding MovesMeaning}" />
           <Button HorizontalAlignment="Left" Padding="12,4" Margin="0,6,0,0" Content="{Binding FixLabel}" AutomationProperties.Name="{Binding FixName}"
                   Visibility="{Binding FixVisibility}" Click="OnReview" />
-          <Expander Header="{l:S Finding_Details}" Margin="0,6,0,0" Visibility="{Binding ActionsVisibility}">
-            <StackPanel Margin="0,4,0,0">
-              <TextBlock Text="{Binding Detail}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Visibility="{Binding DetailVisibility}" />
-              <Button HorizontalAlignment="Left" Padding="12,4" Margin="0,6,0,0" Content="{Binding DismissLabel}" AutomationProperties.Name="{Binding DismissName}" Click="OnDismiss" />
-            </StackPanel>
-          </Expander>
+          <StackPanel Margin="0,6,0,0" Visibility="{Binding IsChecked, ElementName=DetailsToggle, Converter={StaticResource Visible}}">
+            <TextBlock Text="{Binding Detail}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Visibility="{Binding DetailVisibility}" />
+            <Button HorizontalAlignment="Left" Padding="12,4" Margin="0,6,0,0" Content="{Binding DismissLabel}" AutomationProperties.Name="{Binding DismissName}" Click="OnDismiss" />
+            <!-- A group's members, each with its own fix; DynamicResource because this template is still being read. -->
+            <ItemsControl ItemsSource="{Binding Members}" Focusable="False" ItemTemplate="{DynamicResource FindingTemplate}"
+                          Visibility="{Binding MembersVisibility}" Margin="0,6,0,0" />
+          </StackPanel>
           <StackPanel Margin="0,6,0,0" Visibility="{Binding DismissingVisibility}">
             <TextBlock x:Name="ReasonLabel" Text="{l:S Finding_ReasonLabel}" Style="{StaticResource CaptionText}" />
             <TextBox Text="{Binding Reason, UpdateSourceTrigger=PropertyChanged}" MaxLength="200" Margin="0,4,0,0"
@@ -37,10 +67,6 @@
               <Button Padding="12,4" Margin="8,0,0,0" Content="{l:S Common_Cancel}" Click="OnCancelDismiss" />
             </StackPanel>
           </StackPanel>
-          <!-- A group's members, each with its own fix; DynamicResource because this template is still being read. -->
-          <Expander Header="{Binding MembersHeader}" Visibility="{Binding MembersVisibility}" Margin="0,6,0,0">
-            <ItemsControl ItemsSource="{Binding Members}" Focusable="False" ItemTemplate="{DynamicResource FindingTemplate}" />
-          </Expander>
         </StackPanel>
       </Grid>
     </DataTemplate>

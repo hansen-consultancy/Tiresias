@@ -4,7 +4,7 @@
         xmlns:l="clr-namespace:Tiresias.App"
         xmlns:v="clr-namespace:Tiresias.App.Views"
         Title="{l:S Services_WindowTitle}"
-        l:WindowFit.Size="Wide"
+        l:WindowFit.Size="Wide" l:WindowFit.Tall="True"
         Icon="pack://application:,,,/Assets/tiresias.ico">
   <Window.Resources>
     <BooleanToVisibilityConverter x:Key="Visible" />

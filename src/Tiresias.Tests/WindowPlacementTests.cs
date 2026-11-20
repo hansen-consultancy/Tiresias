@@ -11,6 +11,10 @@ public class WindowPlacementTests
         Assert.That(WindowPlacement.MaxHeight(Laptop), Is.EqualTo(877));
 
     [Test]
+    public void A_window_whose_list_loads_later_opens_at_a_fixed_share() =>
+        Assert.That(WindowPlacement.TallHeight(Laptop), Is.EqualTo(722));
+
+    [Test]
     public void A_window_centres_on_the_monitor() =>
         Assert.That(WindowPlacement.Centre(Laptop, 720, 500, Laptop), Is.EqualTo((600d, 266d)));
 
@@ -37,14 +41,6 @@ public class WindowPlacementTests
 
         Assert.That(WindowPlacement.Centre(left, 960, 800, left), Is.EqualTo((-1760d, 300d)));
     }
-
-    [Test]
-    public void A_window_that_grew_stays_where_it_is_while_it_fits() =>
-        Assert.That(WindowPlacement.Inside(new(600, 266, 720, 500), Laptop), Is.EqualTo((600d, 266d)));
-
-    [Test]
-    public void A_window_that_grew_past_the_bottom_moves_up_just_enough() =>
-        Assert.That(WindowPlacement.Inside(new(600, 266, 720, 877), Laptop), Is.EqualTo((600d, 155d)));
 
     [Test]
     public void A_window_wider_than_the_work_area_keeps_its_corner_in_it()

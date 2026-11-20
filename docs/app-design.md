@@ -24,16 +24,21 @@ content, so S. resizes most of them.
 
 ## 1. Placement and size: one rule
 
-- **Every window fits its content's height** (`SizeToContent="Height"`), capped at 85% of the
-  work area of the monitor it opens on; past the cap the body scrolls (rule 2).
+- **Every window fits its content's height**, capped at 85% of the work area of the monitor it
+  opens on; past the cap the body scrolls (rule 2). The height is measured before the window
+  shows, so it opens centred at its final size.
+- **A window whose list loads after it opens** (Home, Activity, Secrets, Services, Environment)
+  cannot know that height yet: it opens at **70% of the work area** (`WindowFit.Tall`) and its
+  body scrolls. Fitting it to "Checking…" first made it open small and then grow down the screen.
 - **Three widths**, chosen per window: **narrow 480** (short questions: Ask, Problem),
   **standard 720** (everything with cards, and the Consent and Incident prompts, which show paths), **wide 960** (grids: Activity, Secrets, Services).
 - **Top-level windows open centred on the monitor holding the mouse** (where the tray was clicked);
   **windows opened from another window centre on it** and are owned by it. One helper
   (`WindowFit`) applies this from `App.ShowWindow` and for owned windows, so no window sets
   `Width`/`Height`/`WindowStartupLocation` itself.
-- After the first layout the window keeps its size: content changing later (a card opening) does
-  not make it jump. Resizing stays allowed for the non-prompt windows.
+- After it opens the window keeps its size: content changing later (a list arriving, a card
+  opening) scrolls in the body and never makes the window grow or jump. Resizing stays allowed
+  for the non-prompt windows.
 
 ## 2. One scroll region
 
@@ -54,8 +59,9 @@ The Add flow's pattern, applied everywhere: a **card** shows a title, one line o
 one main action. Everything else (members, reasons, paths, the second and third buttons) sits
 behind the card's **Details** expander, closed by default.
 
-- **Home:** the one-line state and Lock. Then the findings, each with its fix in view and the rest
-  under Details. Then one line "12 checks passed" that expands to the list. Navigation to
+- **Home:** the one-line state and Lock. Then the findings, each with its fix in view and one
+  small **Details** toggle on its title line that opens the explanation, Dismiss and a group's
+  members together; no full-width bars. Then one line "12 checks passed" that expands to the list. Navigation to
   Secrets, Services, Environment and Activity stays as today's row, only for areas in use.
 - **Services:** left as it is: four buttons on one grid, the setups already reached through Add.
 - **Environment:** each section a card; Sealed and Add new open, the others open when they list something to act on (or when a fix opens them).
