@@ -2042,6 +2042,9 @@ Store them in clear?</value>
   <data name="Status_SummaryMany" xml:space="preserve">
     <value>{0} things could be safer</value>
   </data>
+  <data name="Status_SummaryCheck" xml:space="preserve">
+    <value>One check needs a look</value>
+  </data>
   <data name="Status_SummaryChecks" xml:space="preserve">
     <value>{0} checks need a look</value>
   </data>

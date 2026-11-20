@@ -433,6 +433,7 @@ public sealed partial class StatusViewModel : ObservableObject
     public string Summary => IsRunning && last.Count == 0 ? Text.Get("Status_Running")
         : allFindings.Count == 1 ? Text.Get("Status_SummaryOne")
         : allFindings.Count > 1 ? Text.Format("Status_SummaryMany", allFindings.Count)
+        : Checks.Count == 1 ? Text.Get("Status_SummaryCheck")
         : Checks.Count > 0 ? Text.Format("Status_SummaryChecks", Checks.Count)
         : Text.Get("Status_SummaryNone");
 
