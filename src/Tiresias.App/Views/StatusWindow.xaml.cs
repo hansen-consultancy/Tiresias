@@ -110,7 +110,7 @@ public partial class StatusWindow : Window
     /// <summary>A page that edits what the agent serves is open, so the app must not quit or update under it.</summary>
     internal bool Editing => PageHost.Content is SecretsPage or ServicesPage;
 
-    bool CanLeavePage() => PageHost.Content is not SecretsPage secrets || secrets.CanLeave();
+    internal bool CanLeavePage() => PageHost.Content is not SecretsPage secrets || secrets.CanLeave();
 
     void OnNav(object sender, SelectionChangedEventArgs e)
     {
@@ -139,7 +139,7 @@ public partial class StatusWindow : Window
     /// <summary>Escape on a page goes back Home; on Home it closes the window (Close is the cancel button).</summary>
     protected override void OnPreviewKeyDown(System.Windows.Input.KeyEventArgs e)
     {
-        if (e.Key == System.Windows.Input.Key.Escape && PageHost.Content is not null && System.Windows.Input.Keyboard.FocusedElement is not TextBox)
+        if (e.Key == System.Windows.Input.Key.Escape && PageHost.Content is not null && System.Windows.Input.Keyboard.FocusedElement is not (TextBox or PasswordBox))
         {
             ShowHome();
             e.Handled = true;

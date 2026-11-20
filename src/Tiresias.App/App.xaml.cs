@@ -564,6 +564,9 @@ public partial class App : Application
 
     internal async void Quit()
     {
+        // Unsaved secrets are saved, discarded or keep the app running: Shutdown would close the window without asking.
+        if (windows.TryGetValue(typeof(StatusWindow), out var status) && !((StatusWindow)status).CanLeavePage())
+            return;
         SystemEvents.SessionSwitch -= OnSessionSwitch;
         SystemEvents.PowerModeChanged -= OnPowerModeChanged;
         updates?.Dispose();
