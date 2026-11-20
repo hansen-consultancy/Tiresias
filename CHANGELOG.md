@@ -8,6 +8,8 @@ its section below.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-20
+
 ### Added
 
 - `tir doctor` and the status page find git tokens in plain text: in a project's remote URL
@@ -265,7 +267,8 @@ its section below.
   - `Tiresias.Core` is the vault, the trust chain, grants, leases and the audit log.
   - `Tiresias.Protocol` holds the wire formats.
 
-[Unreleased]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.1.0-preview.4...HEAD
+[Unreleased]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.2.0...HEAD
+[0.2.0]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.1.0-preview.4...app-v0.2.0
 [0.1.0-preview.4]: https://github.com/hansen-consultancy/Tiresias/compare/v0.1.0-preview.2...app-v0.1.0-preview.4
 [0.1.0-preview.2]: https://github.com/hansen-consultancy/Tiresias/compare/v0.1.0-preview.1...v0.1.0-preview.2
 [0.1.0-preview.1]: https://github.com/hansen-consultancy/Tiresias/releases/tag/v0.1.0-preview.1
