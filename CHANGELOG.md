@@ -75,7 +75,7 @@ its section below.
 - **Edit...** in the Services window also changes an HTTP service added there: its upstream,
   secret, methods, paths and Windows Hello requirement. The name stays. Placeholders handed out
   for the old settings stop working, so programs using the service ask again.
-- **How to use...** in the Services window shows again what to paste for a saved service: the
+- **How to use...** on the Services page shows again what to paste for a saved service: the
   user secrets line for a SQL Server or RavenDB, or a placeholder for an API key.
 - RavenDB's Changes API works through the broker and the forwarder, for grants that list the
   `WEBSOCKET` method. Each tunnel is audited when it opens and when it closes, and closes with the
@@ -179,7 +179,6 @@ its section below.
 
 ### Fixed
 
-- **How to use...** on a service opens again; it failed with "Something went wrong".
 - After **Copy details** in the problem dialog, the "Details copied" line no longer pushes the
   buttons out of the window.
 - NuGet credential requests now show in Activity, with the program, the feed and the variable name
