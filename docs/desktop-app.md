@@ -24,10 +24,13 @@ CI and people who prefer it, and it talks to the same agent.
   to start while the app runs.
 - **The agent runs in the app:** the user-secrets pipe server, the lease heartbeat, locking on
   workstation lock, and in solo mode the broker on `127.0.0.1:7780`.
-- **Consent dialog**, topmost. It shows the program asking (its path, selectable, with **Open
-  folder** to look at it in Explorer) and the keys or what the placeholder gets, never values.
-  For `tir run` it shows the whole command line under the heading. Answers are Allow once / Allow for this session / Deny. Deny has
-  focus and is the Esc answer. A countdown runs, and no answer means Deny. Requests that arrive
+- **Consent dialog**, topmost, in two columns. On the left the question and its answers, Allow
+  for this session / Allow once / Deny, each with a line under it saying what it means. On the
+  right a panel with the facts to check: the keys or what the placeholder gets (never values),
+  the program asking (its file name, then its folder, selectable, with **Open folder** to look at
+  it in Explorer) and, for `tir run`, the whole command line. The first answer offered is drawn as
+  the accent, but nothing is the default, so Enter never approves; Deny has focus and is the Esc
+  answer. A countdown runs, and no answer means Deny. Requests that arrive
   while one is open wait their turn, and the dialog shows how many are waiting. Workstation lock,
   logoff or sleep answers every open dialog with Deny.
 - **Prompts come to the front.** `tir` and the NuGet plugin run in the background, and Windows
@@ -38,7 +41,7 @@ CI and people who prefer it, and it talks to the same agent.
   that arrive together (`tir`, a terminal, NuGet, the tray) share one Hello prompt. A Hello prompt
   answered too late (`WINBIO_E_INVALID_TICKET`, 0x80098044, after minutes out of sight) is
   reported as expired, with a way to try again.
-- **"This wasn't me"**, beside Deny on every consent dialog, for a prompt you didn't cause (it
+- **"This wasn't me"**, under the answers on every consent dialog, for a prompt you didn't cause (it
   could be malware). It denies the request and locks at once: session consents, terminal and NuGet
   allowances are forgotten, the terminals' placeholders revoked and the broker lease ended. Until
   you unlock with Windows Hello from the tray or the status page, every request is refused without

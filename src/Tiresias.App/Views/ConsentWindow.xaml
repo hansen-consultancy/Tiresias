@@ -5,60 +5,100 @@
         Title="{l:S Consent_WindowTitle}"
         l:WindowFit.Size="Standard" ResizeMode="NoResize" Topmost="True" ShowInTaskbar="True"
         Icon="pack://application:,,,/Assets/tiresias.ico">
+  <Window.Resources>
+    <!-- One answer: what it is, and on the line under it what it means. -->
+    <Style x:Key="Choice" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="Padding" Value="14,8" />
+      <Setter Property="Margin" Value="0,0,0,6" />
+    </Style>
+    <!-- The answer the window leads with: it looks first, but is not the default, so Enter never approves. -->
+    <Style x:Key="LeadChoice" TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="Padding" Value="14,8" />
+      <Setter Property="Margin" Value="0,0,0,6" />
+    </Style>
+    <Style x:Key="ChoiceSays" TargetType="TextBlock">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Opacity" Value="0.8" />
+    </Style>
+    <Style x:Key="PanelLabel" TargetType="TextBlock" BasedOn="{StaticResource CaptionText}">
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Margin" Value="0,0,0,4" />
+    </Style>
+  </Window.Resources>
   <Grid Margin="{StaticResource PagePadding}">
-    <Grid.RowDefinitions>
-      <RowDefinition Height="Auto" />
-      <RowDefinition Height="Auto" />
-      <RowDefinition Height="*" />
-      <RowDefinition Height="Auto" />
-      <RowDefinition Height="Auto" />
-    </Grid.RowDefinitions>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="260" />
+    </Grid.ColumnDefinitions>
 
-    <StackPanel Grid.Row="0">
+    <!-- The question and its answers. -->
+    <StackPanel Grid.Column="0" Margin="0,0,20,0">
       <TextBlock x:Name="Heading" Style="{StaticResource TitleText}" AutomationProperties.HeadingLevel="Level1" />
-      <!-- tir run's whole command line, as tir reports it: what the program is about to be asked to do. -->
-      <TextBox x:Name="Command" Style="{StaticResource SelectableText}" Margin="0,4,0,0" Visibility="Collapsed"
-               AutomationProperties.Name="{l:S Consent_CommandLabel}" />
+      <TextBlock x:Name="Note" Style="{StaticResource BodyText}" Margin="0,0,0,12" />
+
+      <Button x:Name="AllowSession" Style="{StaticResource Choice}" Click="OnAllowSession">
+        <StackPanel>
+          <TextBlock Text="{l:S Consent_AllowSession}" FontWeight="SemiBold" />
+          <TextBlock Text="{l:S Consent_AllowSession_Says}" Style="{StaticResource ChoiceSays}" />
+        </StackPanel>
+      </Button>
+      <Button x:Name="AllowOnce" Style="{StaticResource Choice}" Click="OnAllowOnce">
+        <StackPanel>
+          <TextBlock x:Name="AllowOnceLabel" Text="{l:S Consent_AllowOnce}" FontWeight="SemiBold" />
+          <TextBlock x:Name="AllowOnceSays" Text="{l:S Consent_AllowOnce_Says}" Style="{StaticResource ChoiceSays}" />
+        </StackPanel>
+      </Button>
+      <!-- Deny is the cancel button (Esc, closing the window) and nothing is the default: Enter never approves by accident. -->
+      <Button x:Name="DenyButton" Style="{StaticResource Choice}" IsCancel="True" Click="OnDeny">
+        <StackPanel>
+          <TextBlock Text="{l:S Consent_Deny}" FontWeight="SemiBold" />
+          <TextBlock Text="{l:S Consent_Deny_Says}" Style="{StaticResource ChoiceSays}" />
+        </StackPanel>
+      </Button>
+
+      <!-- An unexpected prompt can mean malware: deny, lock everything and block the program (docs/desktop-app.md). -->
+      <TextBlock Margin="0,6,0,0" ToolTip="{l:S Consent_NotMe_Tip}">
+        <Hyperlink Click="OnNotMe" Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+                   AutomationProperties.HelpText="{l:S Consent_NotMe_Tip}"><Run Text="{l:S Consent_NotMe}" /></Hyperlink>
+      </TextBlock>
+      <TextBlock x:Name="Countdown" Style="{StaticResource CaptionText}" Margin="0,12,0,0" />
     </StackPanel>
 
-    <Border Grid.Row="1" Style="{StaticResource Card}">
+    <!-- What it gets and who is asking: the facts to check before answering. -->
+    <Border Grid.Column="1" Style="{StaticResource Card}" Margin="0" VerticalAlignment="Top">
       <StackPanel>
-        <TextBlock x:Name="ProgramLabel" Style="{StaticResource CaptionText}" />
+        <TextBlock x:Name="ListLabel" Style="{StaticResource PanelLabel}" />
+        <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto" Focusable="False">
+          <ItemsControl x:Name="Items" Focusable="False" AutomationProperties.LabeledBy="{Binding ElementName=ListLabel}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <TextBlock Text="{Binding}" Style="{StaticResource MonoText}" FontSize="12" Margin="0,1" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+
+        <TextBlock x:Name="ProgramLabel" Style="{StaticResource PanelLabel}" Margin="0,14,0,4" />
         <!-- The file name first, so it reads at a glance; the folder below says which copy it is. -->
-        <TextBlock x:Name="ProgramName" Style="{StaticResource MonoText}" FontWeight="SemiBold" Margin="0,2,0,0"
+        <TextBlock x:Name="ProgramName" Style="{StaticResource MonoText}" FontWeight="SemiBold"
                    AutomationProperties.LabeledBy="{Binding ElementName=ProgramLabel}" />
-        <TextBox x:Name="ProgramFolder" Style="{StaticResource SelectableText}" Margin="0,2,0,0" Opacity="0.75" />
+        <TextBox x:Name="ProgramFolder" Style="{StaticResource SelectableText}" FontSize="12" Margin="0,2,0,0" Opacity="0.75" />
         <TextBlock x:Name="OpenFolderLine" Margin="0,4,0,0">
           <Hyperlink Click="OnOpenFolder"><Run Text="{l:S Consent_OpenFolder}" /></Hyperlink>
         </TextBlock>
+
+        <!-- tir run's whole command line, as tir reports it: what the program is about to be asked to do. -->
+        <StackPanel x:Name="CommandPanel" Visibility="Collapsed">
+          <TextBlock x:Name="CommandLabel" Text="{l:S Consent_CommandLabel}" Style="{StaticResource PanelLabel}" Margin="0,14,0,4" />
+          <TextBox x:Name="Command" Style="{StaticResource SelectableText}" FontSize="12"
+                   AutomationProperties.LabeledBy="{Binding ElementName=CommandLabel}" />
+        </StackPanel>
       </StackPanel>
     </Border>
-
-    <StackPanel Grid.Row="2">
-      <TextBlock x:Name="ListLabel" Style="{StaticResource SubtitleText}" />
-      <ScrollViewer MaxHeight="260" VerticalScrollBarVisibility="Auto" Focusable="False">
-        <ItemsControl x:Name="Items" Focusable="False" AutomationProperties.LabeledBy="{Binding ElementName=ListLabel}">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate>
-              <TextBlock Text="{Binding}" Style="{StaticResource MonoText}" Margin="0,2" />
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-      </ScrollViewer>
-      <TextBlock x:Name="Note" Style="{StaticResource CaptionText}" Margin="0,12,0,0" />
-    </StackPanel>
-
-    <TextBlock x:Name="Countdown" Grid.Row="3" Style="{StaticResource CaptionText}" Margin="0,16,0,0" />
-
-    <StackPanel Grid.Row="4" Style="{StaticResource ButtonRow}">
-      <Button x:Name="AllowSession" Style="{StaticResource RowButton}" Content="{l:S Consent_AllowSession}" Click="OnAllowSession" />
-      <Button x:Name="AllowOnce" Style="{DynamicResource AccentButtonStyle}" Margin="8,0,0,0" MinWidth="96" Padding="12,6"
-              Content="{l:S Consent_AllowOnce}" Click="OnAllowOnce" />
-      <!-- Deny is the cancel button (Esc, closing the window) and nothing is the default: Enter never approves by accident. -->
-      <Button x:Name="DenyButton" Style="{StaticResource RowButton}" Content="{l:S Consent_Deny}" IsCancel="True" Click="OnDeny" />
-      <!-- An unexpected prompt can mean malware: deny, lock everything and block the program (docs/desktop-app.md). -->
-      <Button x:Name="NotMeButton" Style="{StaticResource RowButton}" Content="{l:S Consent_NotMe}" Click="OnNotMe"
-              ToolTip="{l:S Consent_NotMe_Tip}" AutomationProperties.HelpText="{l:S Consent_NotMe_Tip}" />
-    </StackPanel>
   </Grid>
 </Window>

@@ -100,6 +100,17 @@ A user-secrets id used by many checkouts of one repository is one entry:
 **Show all 28**, which opens the list in place (rule 2). Grouping is by the id, so nothing changes
 in what is stored; the combo box lists one row per id as today, with the count in its label.
 
+## 7. The approval prompt
+
+The consent dialog asks on the left and shows the facts on the right. Each answer is a full-width
+button with a line saying what it means ("It isn't asked again until Tiresias locks."), so the
+choice doesn't depend on knowing the words. The first answer offered (Allow for this session, else
+Allow once or Unlock) is the accent button, but none is the default and focus starts on Deny:
+the accent says which answer is usual, never which one Enter gives. The button labels themselves
+stay as before, since the docs name them. The right-hand card holds what it gets, who is asking
+(file name first, folder under it) and the command line, so the left column stays the same height
+whatever is asked.
+
 ## Slices
 
 1. `WindowFit` and the size rule applied to every window; "(dev)" in titles; compact Home banner.
