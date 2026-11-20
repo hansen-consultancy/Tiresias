@@ -46,6 +46,12 @@ Read-only, per user wherever possible, from sources each check can name:
 
 What Windows doesn't record is shown as unknown, never guessed.
 
+**Uninstall entries are checked, not trusted.** An entry is only a claim that something is
+installed. Each one is compared with the disk: the uninstaller its `UninstallString` names, its
+`InstallLocation`, and whether another entry names the same uninstaller. That is what finds the
+entries below that no longer match anything. `EstimatedSize` is written once at install time and
+is shown as such, never as space in use.
+
 ## Trust
 
 Not a trust system of Tiresias's own. Existing sources, asked per package:
@@ -89,6 +95,12 @@ guided setup already has for it, with that finding's position.
 | Not used in 90 days | Last use is known and older; never when last use is unknown | `Uninstall(kind, id)` |
 | Starts at log-on, rarely used | A user Run key, startup folder entry or scheduled task, and the program is unused | `DisableStartup(entry)`, keeping the program |
 | Blocked program still installed | **This wasn't me** or a decoy hit put it on the block list | `RevealFile(path)`, then `Uninstall` |
+| Entry for software that is gone | Neither the uninstaller nor the install folder exists | `RemoveEntry(key)`; leftover data folders are listed, not removed |
+| Installed, but can't be uninstalled | The program is present and its uninstaller is missing | `Repair(kind, id)`: reinstall the same version over it, which restores the uninstaller |
+| Stale duplicate entry | Two entries name the same uninstaller, one for a version no longer on disk | `RemoveEntry(key)` for the stale one. Its **Uninstall** button runs the current version's uninstaller, so the finding says not to use it |
+| Desktop app with a web equivalent | The app is a wrapper around a site, or the site does what it does (mail, streaming, a device tool over WebUSB) | `ReplaceWithWebApp(id, url)` |
+| Global tool rarely used | A global developer tool unused for 90 days | `RunOnDemand(kind, id)`: `dnx`, `npx`/`bunx` or `uvx` instead of a global install |
+| Closed source with a trusted open replacement | A maintained open-source program does the same job (trust per *Trust*) | `ReplaceWithOpenSource(id, candidate)`, suggested only |
 
 Each fix is a `DoctorFix` like phase 1's, so the app opens the right place and `tir doctor` prints
 the command. The new kinds:
@@ -105,6 +117,18 @@ the command. The new kinds:
   entries are reported with the command, not changed.
 - **`RevealFile`** opens Explorer on the file. It is all Tiresias offers for a binary it can't
   attribute, because deleting an unknown file could break something the user needs.
+- **`RemoveEntry`** exports the uninstall key to a `.reg` file, then deletes it, so **Turn back
+  on** can import it again. A machine-wide key needs an administrator.
+- **`Repair`** is the installer's own reinstall (`winget install --id <id> --exact --force`).
+  It is offered before `Uninstall` whenever the uninstaller is missing, since removing by hand
+  leaves shell extensions and services registered.
+- **`ReplaceWithWebApp`** is a guide, not a command: install the site as an app from Edge or
+  Chrome (Start menu, taskbar, own window, notifications, listed and removed like any app), check
+  it works, then `Uninstall` the desktop app. Some sites only offer **Open in app** while the
+  desktop app is installed; then the order is reversed and the finding says so. The browser that
+  hosts web apps doesn't have to be the default one.
+- **`RunOnDemand`** and **`ReplaceWithOpenSource`** carry the uninstall command plus the line to
+  use instead; neither removes anything until approved.
 
 On a managed PC (joined to a domain or enrolled in device management, both readable without
 admin rights), surface findings cover what the user installed. Machine-wide software there is the
@@ -205,6 +229,28 @@ useless outside the broker, which still asks before each lease and records each 
 part is to make that easy: a placeholder environment for a container (`tir exec` into
 `docker run` / `wsl`), and a finding that suggests it when an agent or package manager is the one
 asking for credentials.
+
+## Field notes
+
+From doing this by hand on a developer laptop, before any of it was built:
+
+- **Broken entries are common.** About one in six user-installed applications had an entry
+  pointing at a missing uninstaller: some were gone entirely, five were running daily with their
+  uninstaller deleted (likely by a cleanup tool), and one was an old version's entry left after
+  an update.
+- **A stale duplicate is dangerous, not cosmetic.** Its uninstall command is the current
+  install's, and running it removes the program files that aren't in use. The program keeps
+  running until it is closed and then fails to start; the profile survives and `Repair` brings it
+  back.
+- **Access times arrive in bulk.** Many tools showed the same last access on one day, a backup
+  or scan reading them, which is why *Discovery* doesn't use them.
+- **Packaged callers see a private copy.** A command run from an MSIX-packaged app (some AI
+  desktop apps are) writes `HKCU` and `AppData` into that package's private copy: an uninstall
+  key deleted there is still in Windows. A fix must run outside the package, and a check made
+  from inside one can report a change that never happened. Relevant if `Tiresias.App` is ever
+  shipped as a package.
+- **Some web equivalents are better than the app.** Device tools that talk USB or serial through
+  the browser (WebUSB, Web Serial) replace whole desktop installs.
 
 ## Open questions
 
