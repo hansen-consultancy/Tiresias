@@ -272,6 +272,38 @@ static class Commands
         return checks.Any(c => c.Status == Tiresias.Client.DoctorStatus.Fail) ? 1 : 0;
     }
 
+    /// <summary>
+    /// <c>tir ai</c>: the agent guide; <c>--snippet</c> the block for CLAUDE.md / AGENTS.md;
+    /// <c>--install [&lt;file&gt;]</c> writes that block into the file (Claude Code's user-wide one by default), replacing an earlier copy.
+    /// </summary>
+    public static int Ai(CommandLine args)
+    {
+        if (args.Flag("--install"))
+        {
+            var path = ExpandHome(args.Option("--install") ?? "~/.claude/CLAUDE.md");
+            var existing = File.Exists(path) ? File.ReadAllText(path) : null;
+            var updated = AiGuide.Install(existing);
+            if (updated == existing)
+            {
+                Console.WriteLine($"{path} already has the Tiresias section.");
+                return 0;
+            }
+            if (Path.GetDirectoryName(Path.GetFullPath(path)) is { } folder)
+                Directory.CreateDirectory(folder);
+            File.WriteAllText(path, updated);
+            Console.WriteLine($"{(existing?.Contains(AiGuide.Begin, StringComparison.Ordinal) == true ? "Updated" : "Added")} the Tiresias section in {path}.");
+            return 0;
+        }
+        Console.WriteLine(args.Flag("--snippet") ? AiGuide.Block : AiGuide.Instructions);
+        return 0;
+    }
+
+    /// <summary>A leading <c>~</c> as the user's profile folder: PowerShell doesn't expand it for a native command.</summary>
+    static string ExpandHome(string path) =>
+        path == "~" || path.StartsWith("~/", StringComparison.Ordinal) || path.StartsWith(@"~\", StringComparison.Ordinal)
+            ? Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), path[1..].TrimStart('/', '\\'))
+            : path;
+
     /// <summary><c>tir advise "&lt;words&gt;"</c>: the needs the words match, each with its options strongest first, as the app's <i>What do you need?</i> lists them.</summary>
     public static int Advise(CommandLine args)
     {
