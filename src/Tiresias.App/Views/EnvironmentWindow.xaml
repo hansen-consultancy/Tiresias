@@ -103,7 +103,7 @@
           </StackPanel>
         </Expander>
 
-        <Expander IsExpanded="{Binding HasItems, ElementName=WindowsList, Mode=OneWay}" Margin="0,0,0,12">
+        <Expander IsExpanded="{Binding WindowsHasSecrets, Mode=OneWay}" Margin="0,0,0,12">
           <Expander.Header>
             <StackPanel>
               <TextBlock Text="{l:S Env_WindowsHeading}" Style="{StaticResource SubtitleText}" Margin="0" AutomationProperties.HeadingLevel="Level2" />
@@ -111,7 +111,7 @@
             </StackPanel>
           </Expander.Header>
           <StackPanel Margin="0,4,0,0">
-            <ItemsControl x:Name="WindowsList" ItemsSource="{Binding InWindows}" Margin="0,4,0,0" AutomationProperties.Name="{l:S Env_WindowsHeading}">
+            <ItemsControl ItemsSource="{Binding InWindows}" Margin="0,4,0,0" AutomationProperties.Name="{l:S Env_WindowsHeading}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
                   <CheckBox IsChecked="{Binding IsChecked}" Margin="0,2">
