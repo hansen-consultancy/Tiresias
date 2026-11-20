@@ -96,6 +96,17 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public IEnumerable<string> KeyFiles() => Found.Keys.Concat(Found.Pems.Where(HoldsPemPrivateKey));
 
+    public IEnumerable<DoctorFile> GitConfigs() => Found.Repositories.Select(Read).Where(f => f.Text is not null);
+
+    public DoctorGitCredentials? GitCredentials
+    {
+        get
+        {
+            var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            return DoctorGitCredentials.From(Read(Path.Combine(profile, ".gitconfig")).Text, Read(Path.Combine(profile, ".git-credentials")).Text);
+        }
+    }
+
     public IEnumerable<DoctorToolFile> ToolFiles()
     {
         var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -139,7 +150,7 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public sealed record ScanStats(TimeSpan Elapsed, int Folders, int Files);
 
-    sealed record FoundFiles(List<string> Projects, List<string> Configs, List<string> Keys, List<string> Pems, List<string> Tools, ScanStats Stats);
+    sealed record FoundFiles(List<string> Projects, List<string> Configs, List<string> Keys, List<string> Pems, List<string> Tools, List<string> Repositories, ScanStats Stats);
 
     FoundFiles? found;
     FoundFiles Found => found ??= Walk();
@@ -154,15 +165,18 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     FoundFiles Walk()
     {
         var clock = System.Diagnostics.Stopwatch.StartNew();
-        List<string> projects = [], configs = [], keys = [], pems = [], tools = [];
+        List<string> projects = [], configs = [], keys = [], pems = [], tools = [], repositories = [];
         var folders = roots.Length;
-        var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true };
+        // Not Hidden: Git for Windows hides .git. ReparsePoint: a junction can't loop the walk.
+        var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = FileAttributes.ReparsePoint | FileAttributes.System };
         foreach (var root in roots)
         {
             var files = new FileSystemEnumerable<string>(root, (ref FileSystemEntry entry) => entry.ToFullPath(), options)
             {
                 ShouldRecursePredicate = (ref FileSystemEntry entry) =>
                 {
+                    if (entry.FileName is ".git")
+                        repositories.Add(Path.Combine(entry.ToFullPath(), "config"));
                     if (entry.FileName is "bin" or "obj" or "node_modules" or ".git")
                         return false;
                     folders++;
@@ -185,7 +199,7 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
                     pems.Add(path);
             }
         }
-        return new(projects, configs, keys, pems, tools, new(clock.Elapsed, folders, projects.Count + configs.Count + keys.Count + pems.Count + tools.Count));
+        return new(projects, configs, keys, pems, tools, repositories, new(clock.Elapsed, folders, projects.Count + configs.Count + keys.Count + pems.Count + tools.Count));
     }
 
     static bool Wanted(string name) => Patterns.Any(p => Matches(p, name));

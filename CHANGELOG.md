@@ -10,12 +10,18 @@ its section below.
 
 ### Added
 
+- `tir doctor` and the status page find git tokens in plain text: in a project's remote URL
+  (`https://user:token@host`, with **Copy command** for the `git remote set-url` that takes it
+  out) and in `~/.git-credentials`, counted by host. URLs are shown without the token.
 - `tir doctor` and the status page find publishing keys: NuGet feed tokens in plain text or in a
   user environment variable, NuGet push keys, npm tokens and PyPI passwords in plain text. Each
   names the entry and the file, never the token. Feeds move to Tiresias as before; npm and PyPI
   tokens are sealed with the new `tir env import` (or **Seal token...**), which leaves `${NAME}`
   in the `.npmrc`. For nuget.org, npmjs.org and pypi.org the finding also points to trusted
   publishing from CI, which needs no key at all.
+- A doctor fix's command (git remote, publishing keys) is offered only when the folder, entry,
+  remote and URL it names hold letters, digits and `/:._@+-` alone, plus spaces and backslashes
+  in a folder; otherwise the finding shows without one, so a crafted name can't run in your shell.
 - `tir doctor` and the status page warn when a RavenDB service's certificate expires within 30
   days, and fail once it has, with **Replace certificate...** opening **Edit...** on the service.
   The expiry is recorded when a RavenDB is set up or edited; one set up earlier says "expiry
@@ -146,6 +152,10 @@ its section below.
 
 ### Fixed
 
+- NuGet credential requests now show in Activity, with the program, the feed and the variable name
+  (never the token): allowed, denied, handed over under an earlier allow for this session, a retry
+  that wasn't answered, or a mapped variable that isn't sealed. The **App** source filter covers
+  them, with user secrets and `tir run`.
 - Windows Hello and consent prompts for `tir`, terminals and NuGet (Visual Studio) come to the
   front instead of opening behind your windows; when Windows keeps one back, it flashes in the
   taskbar. Several programs asking to unlock at once share one Hello prompt rather than stacking
