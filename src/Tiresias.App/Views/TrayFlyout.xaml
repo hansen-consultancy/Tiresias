@@ -2,7 +2,8 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:l="clr-namespace:Tiresias.App"
-             Width="320" AutomationProperties.Name="{l:S App_Name}">
+             Width="320" AutomationProperties.Name="{l:S App_Name}"
+             Foreground="{DynamicResource TextFillColorPrimaryBrush}">
   <UserControl.Resources>
     <!-- A row to open something: icon, name, nothing else. -->
     <Style x:Key="Go" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
