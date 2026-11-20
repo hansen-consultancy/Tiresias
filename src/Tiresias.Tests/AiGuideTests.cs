@@ -53,7 +53,8 @@ public class AiGuideTests
     public void The_snippet_points_at_the_guide() =>
         Assert.That(AiGuide.Snippet, Does.Contain("`tir ai`"));
 
-    static readonly string Block = AiGuide.Block;
+    /// <summary>Install writes LF into a new or LF file, but <c>Block</c> comes from a C# literal, which is CRLF on a Windows checkout.</summary>
+    static readonly string Block = AiGuide.Block.ReplaceLineEndings("\n");
 
     [TestCase(null)]
     [TestCase("")]
