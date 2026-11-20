@@ -11,7 +11,7 @@
     <TextBlock x:Name="Why" Style="{StaticResource BodyText}" />
     <TextBlock Text="{l:S Problem_NextLabel}" Style="{StaticResource SubtitleText}" Margin="0,8,0,4" />
     <TextBlock x:Name="Next" Style="{StaticResource BodyText}" />
-    <TextBlock x:Name="Copied" Style="{StaticResource CaptionText}" Text="{l:S Problem_Copied}" Visibility="Collapsed" Margin="0,8,0,0" />
+    <TextBlock x:Name="Copied" Style="{StaticResource CaptionText}" Text="{l:S Problem_Copied}" Visibility="Hidden" Margin="0,8,0,0" />
     <Grid Margin="0,16,0,0">
       <Button x:Name="CopyDetails" HorizontalAlignment="Left" Padding="12,6" Click="OnCopyDetails"
               Content="{l:S Problem_CopyDetails}" />

@@ -179,6 +179,8 @@ its section below.
 
 ### Fixed
 
+- After **Copy details** in the problem dialog, the "Details copied" line no longer pushes the
+  buttons out of the window.
 - NuGet credential requests now show in Activity, with the program, the feed and the variable name
   (never the token): allowed, denied, handed over under an earlier allow for this session, a retry
   that wasn't answered, or a mapped variable that isn't sealed. The **App** source filter covers
