@@ -1794,7 +1794,7 @@ Store them in clear?</value>
     <value>Findings</value>
   </data>
   <data name="Finding_Intro" xml:space="preserve">
-    <value>Credentials delivered more weakly than they could be, each saying where it is now and where its fix takes it, and programs that can reach them with a reason to doubt them.</value>
+    <value>Credentials delivered more weakly than they could be, each saying how exposed it is now and where its fix takes it (point at that line for what the words mean), and programs that can reach them with a reason to doubt them.</value>
   </data>
   <data name="Finding_FixSecrets" xml:space="preserve">
     <value>Open in the secrets editor</value>
@@ -1975,5 +1975,62 @@ Store them in clear?</value>
   </data>
   <data name="Secrets_DetailMore" xml:space="preserve">
     <value>{0} and {1} more</value>
+  </data>
+  <data name="Position_NothingToCopy" xml:space="preserve">
+    <value>No secret</value>
+  </data>
+  <data name="Position_NothingToCopyTip" xml:space="preserve">
+    <value>The service accepts who you are; there is no secret to copy.</value>
+  </data>
+  <data name="Position_ShortLived" xml:space="preserve">
+    <value>Expires quickly</value>
+  </data>
+  <data name="Position_ShortLivedTip" xml:space="preserve">
+    <value>Made for this run and useless after it.</value>
+  </data>
+  <data name="Position_BrokerOnly" xml:space="preserve">
+    <value>Stays in Tiresias</value>
+  </data>
+  <data name="Position_BrokerOnlyTip" xml:space="preserve">
+    <value>The program gets a stand-in that is useless anywhere else.</value>
+  </data>
+  <data name="Position_Sealed" xml:space="preserve">
+    <value>Sealed</value>
+  </data>
+  <data name="Position_SealedTip" xml:space="preserve">
+    <value>Encrypted on disk, handed to the program as its value.</value>
+  </data>
+  <data name="Position_Readable" xml:space="preserve">
+    <value>Readable</value>
+  </data>
+  <data name="Position_ReadableTip" xml:space="preserve">
+    <value>Anything running as you can read it.</value>
+  </data>
+  <data name="Position_Approved" xml:space="preserve">
+    <value>asks you</value>
+  </data>
+  <data name="Position_ApprovedTip" xml:space="preserve">
+    <value>Each program needs your OK, and every use is recorded.</value>
+  </data>
+  <data name="Position_Recorded" xml:space="preserve">
+    <value>recorded</value>
+  </data>
+  <data name="Position_RecordedTip" xml:space="preserve">
+    <value>Every use is recorded, but nothing asks.</value>
+  </data>
+  <data name="Position_Silent" xml:space="preserve">
+    <value>unchecked</value>
+  </data>
+  <data name="Position_SilentTip" xml:space="preserve">
+    <value>Any program running as you can use it, and nothing records it.</value>
+  </data>
+  <data name="Position_Pair" xml:space="preserve">
+    <value>{0}, {1}</value>
+  </data>
+  <data name="Position_Moves" xml:space="preserve">
+    <value>{0} → {1}</value>
+  </data>
+  <data name="Position_Meaning" xml:space="preserve">
+    <value>{0}: {1}</value>
   </data>
 </root>

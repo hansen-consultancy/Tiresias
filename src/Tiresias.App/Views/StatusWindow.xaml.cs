@@ -246,7 +246,10 @@ public sealed partial class FindingRow(IReadOnlyList<DoctorCheck> checks) : Obse
 
     public Visibility DetailVisibility => Detail.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
 
-    public string Moves { get; } = FindingView.Moves(checks[0]);
+    /// <summary>Where it is and where the fix takes it, in words; the codes stay in Copy details.</summary>
+    public string Moves { get; } = PositionText.Moves(checks[0].Now, checks[0].Better);
+
+    public string? MovesMeaning => PositionText.Meaning(Check.Now, Check.Better) is { Length: > 0 } meaning ? meaning : null;
 
     public string Glyph => Check.Status == DoctorStatus.Fail ? "\uEA39" : "\uE7BA";
 

@@ -94,7 +94,10 @@ public sealed class OptionRow(RankedOption ranked, bool named)
 
     public string Title => Option.Title;
 
-    public string Position => Option.Position.ToString();
+    /// <summary>The option's position in words, such as "Stays in Tiresias, asks you".</summary>
+    public string Position => PositionText.Short(Option.Position);
+
+    public string PositionMeaning => PositionText.Meaning(Option.Position, null);
 
     public string Summary => Option.Summary;
 

@@ -55,7 +55,8 @@
                         <StackPanel>
                           <WrapPanel>
                             <TextBlock Text="{Binding Title}" Style="{StaticResource BodyText}" FontWeight="SemiBold" Margin="0,0,8,0" />
-                            <TextBlock Text="{Binding Position}" Style="{StaticResource CaptionText}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <TextBlock Text="{Binding Position}" Style="{StaticResource CaptionText}" VerticalAlignment="Center" Margin="0,0,8,0"
+                                       ToolTip="{Binding PositionMeaning}" />
                             <TextBlock Text="{Binding Badge}" Style="{StaticResource CaptionText}" VerticalAlignment="Center"
                                        Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" FontWeight="SemiBold" />
                           </WrapPanel>

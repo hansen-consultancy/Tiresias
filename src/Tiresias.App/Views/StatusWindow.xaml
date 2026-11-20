@@ -19,7 +19,7 @@
         <StackPanel Grid.Column="1">
           <TextBlock Text="{Binding Name}" Style="{StaticResource BodyText}" FontWeight="SemiBold" TextWrapping="Wrap" />
           <TextBlock Text="{Binding Detail}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Visibility="{Binding DetailVisibility}" />
-          <TextBlock Text="{Binding Moves}" Style="{StaticResource CaptionText}" />
+          <TextBlock Text="{Binding Moves}" Style="{StaticResource CaptionText}" ToolTip="{Binding MovesMeaning}" />
           <StackPanel Orientation="Horizontal" Margin="0,6,0,0" Visibility="{Binding ActionsVisibility}">
             <Button Padding="12,4" Content="{Binding FixLabel}" AutomationProperties.Name="{Binding FixName}"
                     Visibility="{Binding FixVisibility}" Click="OnReview" Margin="0,0,8,0" />
