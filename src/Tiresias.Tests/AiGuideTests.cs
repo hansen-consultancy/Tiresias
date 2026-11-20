@@ -11,7 +11,7 @@ namespace Tiresias.Tests;
 public class AiGuideTests
 {
     /// <summary>The words naming each command in the usage, e.g. <c>env nuget add</c>.</summary>
-    static readonly string[][] Commands = [.. Regex.Matches(CliUsage.Text, @"^\s*tir (.+)$", RegexOptions.Multiline)
+    static readonly string[][] Commands = [.. Regex.Matches(CliUsage.Text, @"^[ \t]*tir ([^\r\n]+)", RegexOptions.Multiline)
         .Select(m => Regex.Split(m.Groups[1].Value, @"\s{2,}")[0].Split(' ').TakeWhile(IsWord).ToArray())];
 
     static bool IsWord(string token) => Regex.IsMatch(token, "^[a-z][a-z-]*$");
