@@ -3,8 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:l="clr-namespace:Tiresias.App"
         Title="{l:S Activity_WindowTitle}"
-        Width="960" Height="620" MinWidth="560" MinHeight="360"
-        WindowStartupLocation="CenterScreen"
+        l:WindowFit.Size="Wide"
         Icon="pack://application:,,,/Assets/tiresias.ico">
   <Grid Margin="{StaticResource PagePadding}">
     <Grid.RowDefinitions>

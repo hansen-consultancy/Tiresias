@@ -128,6 +128,10 @@ its section below.
 
 ### Changed
 
+- **Every window opens centred at a size that fits its content**: on the window that opened it,
+  or on the monitor with the mouse, as tall as it needs up to most of the screen, in one of three
+  widths. Home's top card is one line; the mode and **Start Tiresias when I sign in** moved to
+  About, and a development build says "(dev)" in every title instead.
 - **Saving, changing or removing a service asks you to approve it with Windows Hello**, after
   showing what changes (upstream, grants, paths), in the Services window, both setups and
   `tir service add`/`remove`. Its secrets are then bound to those settings: if a program edits the

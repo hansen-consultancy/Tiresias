@@ -3,8 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:l="clr-namespace:Tiresias.App"
         Title="{l:S App_Name}"
-        Width="460" SizeToContent="Height" ResizeMode="NoResize"
-        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        l:WindowFit.Size="Narrow" ResizeMode="NoResize" ShowInTaskbar="False"
         Icon="pack://application:,,,/Assets/tiresias.ico">
   <StackPanel Margin="{StaticResource PagePadding}">
     <TextBlock x:Name="Heading" Style="{StaticResource TitleText}" AutomationProperties.HeadingLevel="Level1" />

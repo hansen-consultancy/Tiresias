@@ -4,8 +4,7 @@
         xmlns:l="clr-namespace:Tiresias.App"
         xmlns:v="clr-namespace:Tiresias.App.Views"
         Title="{l:S Raven_WindowTitle}"
-        Width="720" Height="760" MinWidth="560" MinHeight="520"
-        WindowStartupLocation="CenterOwner"
+        l:WindowFit.Size="Standard"
         Icon="pack://application:,,,/Assets/tiresias.ico">
   <Window.Resources>
     <BooleanToVisibilityConverter x:Key="Visible" />
