@@ -109,7 +109,7 @@
     <!-- Only the areas this machine uses (HomeAreas); the rest are reached through Add.... -->
     <ListBox x:Name="Nav" Margin="8,12,0,12" BorderThickness="0" Background="Transparent" SelectionChanged="OnNav"
              AutomationProperties.Name="{l:S Nav_Name}">
-      <ListBoxItem x:Name="NavHome" Tag="Home" IsSelected="True">
+      <ListBoxItem x:Name="NavHome" Tag="Home">
         <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE80F;" Style="{StaticResource NavIcon}" /><TextBlock Text="{l:S Nav_Home}" /></StackPanel>
       </ListBoxItem>
       <ListBoxItem x:Name="NavSecrets" Tag="Secrets" Visibility="{Binding SecretsVisibility}">

@@ -26,6 +26,8 @@ public partial class StatusWindow : Window
         InitializeComponent();
         // Pages show secret values (Secrets, Services, Environment), so the whole window stays out of capture.
         Desktop.ExcludeFromCapture(this);
+        // Selected here, not in XAML: selecting there runs OnNav before the page host exists.
+        Show(null);
         DataContext = model;
         Loaded += (_, _) => model.Refresh();
         // Back from a window opened here, Home may have a new area in use.
