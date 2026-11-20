@@ -49,7 +49,11 @@ public class GitTokenTests
     public void Plain_values_get_a_command() =>
         Assert.That(Remote("my-app_2.0", "up+stream.x", "team/my-app_2.0.git").Fix, Is.Not.Null);
 
-    // Only [A-Za-z0-9/:._@+-] (and a backslash inside the repository's path) is offered as a command.
+    [Test]
+    public void A_space_in_the_repository_path_stays_inside_its_quotes() =>
+        Assert.That(Remote("my app", "origin", "app.git").Fix!.Instruction, Does.StartWith($"git -C \"{Path.Combine("C:", "src", "my app")}\" "));
+
+    // Only [A-Za-z0-9/:._@+-] (and a backslash or space inside the repository's path) is offered as a command.
     [TestCase("app", "x\\\"y", "app.git", TestName = "A quote in a remote")]
     [TestCase("app", "origin$x", "app.git", TestName = "A dollar in a remote")]
     [TestCase("x!y", "origin", "app.git", TestName = "A bang in a folder")]
@@ -58,7 +62,7 @@ public class GitTokenTests
     [TestCase("x\ncalc", "origin", "app.git", TestName = "A newline in a folder")]
     [TestCase("app", "origin", "app?a=1&calc", TestName = "An ampersand in a URL")]
     [TestCase("app", "origin", "app|calc", TestName = "A pipe in a URL")]
-    [TestCase("my app", "origin", "app.git", TestName = "A space in a folder")]
+    [TestCase("app", "my origin", "app.git", TestName = "A space in a remote")]
     [TestCase("app", "origin", "café.git", TestName = "Non-ASCII in a URL")]
     public void A_value_outside_the_allowlist_is_a_finding_without_a_command(string folder, string remote, string path)
     {

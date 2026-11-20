@@ -108,14 +108,14 @@ public sealed record RemoveTokenFromRemote(string Repository, string Remote, str
     /// <summary>
     /// The fix, or none unless every value is made of characters no shell treats specially: the
     /// command is pasted into cmd, PowerShell or bash, and a .git/config is anyone's to write. Only
-    /// the repository's path may hold a backslash, and not as its last character, where it would
-    /// escape bash's closing quote.
+    /// the repository's path may hold a backslash (not as its last character, where it would escape
+    /// bash's closing quote) and a space, which its quotes keep.
     /// </summary>
     internal static RemoveTokenFromRemote? For(string repository, string remote, string url, bool push) =>
-        Plain(repository, allowBackslash: true) && Plain(remote) && Plain(url) ? new(repository, remote, url, push) : null;
+        Plain(repository, path: true) && Plain(remote) && Plain(url) ? new(repository, remote, url, push) : null;
 
-    static bool Plain(string value, bool allowBackslash = false) =>
-        value.Length > 0 && !value.EndsWith('\\') && value.All(c => char.IsAsciiLetterOrDigit(c) || "/:._@+-".Contains(c) || (allowBackslash && c == '\\'));
+    static bool Plain(string value, bool path = false) =>
+        value.Length > 0 && !value.EndsWith('\\') && value.All(c => char.IsAsciiLetterOrDigit(c) || "/:._@+-".Contains(c) || (path && c is '\\' or ' '));
 }
 
 /// <summary>Reads <c>.git-credentials</c>, git's <c>store</c> helper file, for its hosts alone.</summary>
