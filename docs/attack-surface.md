@@ -132,9 +132,9 @@ a plaintext password against an old browser extension.
 Most of what is installed is fine, so dismissing is the main thing people will do here. Surface
 findings use phase 2's dismissals, a reason kept per finding, with two additions:
 
-- **A dismissal names what it accepted.** It records the item, its publisher and the reasons
-  present. It comes back only for a reason it didn't accept: a new advisory, a publisher change,
-  or the host starting to use a credential it hadn't. A version update alone doesn't bring it
+- **A dismissal names what it accepted.** It records the item, its publisher, the reasons
+  present and the credentials its host used then. It comes back only for a reason it didn't
+  accept: a new advisory, a publisher change, or the host starting to use a credential it hadn't. A version update alone doesn't bring it
   back, and "I use this yearly" stays dismissed.
 - **Trust a publisher.** "I trust *publisher*" dismisses every finding whose only reason is
   that publisher's verification status or age, for every item signed by that publisher. A
@@ -144,9 +144,9 @@ findings use phase 2's dismissals, a reason kept per finding, with two additions
 The first slice needs neither: it puts the reasons in the finding's name, so phase 2's key (name,
 fix, position) already brings a dismissal back for a new reason and keeps it through a version
 update. The two additions don't fit that record. A new credential changes the reach, not the
-name, and trust needs the publisher, so `Dismissal` gains the publisher and the accepted reasons
-and matches on those for surface findings. That changes `dismissals.json`, so its version bumps
-and the old file is read forward rather than dropped.
+name, and trust needs the publisher, so `Dismissal` gains the publisher, the accepted reasons and
+the credentials reached, and matches on those for surface findings. That changes
+`dismissals.json`, so its version bumps and the old file is read forward rather than dropped.
 
 A dismissed blocked program stays blocked: the dismissal hides the finding, not the block, which
 only **Unblock** lifts.
