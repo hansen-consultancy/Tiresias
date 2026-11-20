@@ -127,7 +127,7 @@
           </StackPanel>
         </Expander>
 
-        <Expander IsExpanded="{Binding HasItems, ElementName=NuGetFoundList, Mode=OneWay}" Margin="0,0,0,12">
+        <Expander IsExpanded="{Binding NuGetListsFeeds, Mode=OneWay}" Margin="0,0,0,12">
           <Expander.Header>
             <StackPanel>
               <TextBlock Text="{l:S Env_NuGetHeading}" Style="{StaticResource SubtitleText}" Margin="0" AutomationProperties.HeadingLevel="Level2" />
@@ -150,7 +150,7 @@
             <Button Style="{StaticResource RowButton}" Content="{l:S Env_NuGetRemove}" Command="{Binding RemoveNuGetCommand}" HorizontalAlignment="Left" Margin="0,8,0,0"
                     Visibility="{Binding NuGetMappedVisibility}" />
             <TextBlock Text="{l:S Env_NuGetFoundHeading}" Style="{StaticResource BodyText}" Margin="0,12,0,0" Visibility="{Binding NuGetFoundVisibility}" />
-            <ItemsControl x:Name="NuGetFoundList" ItemsSource="{Binding NuGetFound}" Margin="0,4,0,0" AutomationProperties.Name="{l:S Env_NuGetFoundHeading}">
+            <ItemsControl ItemsSource="{Binding NuGetFound}" Margin="0,4,0,0" AutomationProperties.Name="{l:S Env_NuGetFoundHeading}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
                   <CheckBox IsChecked="{Binding IsChecked}" IsEnabled="{Binding CanPick}" Margin="0,2">

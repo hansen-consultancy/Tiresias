@@ -110,6 +110,10 @@ public sealed partial class EnvironmentViewModel : ObservableObject
     [ObservableProperty]
     public partial Visibility NuGetMappedVisibility { get; set; } = Visibility.Collapsed;
 
+    /// <summary>The NuGet card opens when it lists a feed, mapped or found (docs/app-design.md, rule 3).</summary>
+    [ObservableProperty]
+    public partial bool NuGetListsFeeds { get; set; }
+
     [ObservableProperty]
     public partial Visibility NuGetFoundVisibility { get; set; } = Visibility.Collapsed;
 
@@ -275,6 +279,7 @@ public sealed partial class EnvironmentViewModel : ObservableObject
                 step.Acts, canPick: step.Acts));
         NuGetMappedVisibility = NuGetMapped.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         NuGetFoundVisibility = NuGetFound.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        NuGetListsFeeds = NuGetMapped.Count + NuGetFound.Count > 0;
         NuGetSummary = NuGetMapped.Count == 0 && NuGetFound.Count == 0 ? Text.Get("Env_NuGetNone")
             : nugetSteps.Any(s => s.Acts) ? Text.Get("Env_NuGetFoundSummary")
             : Text.Format("Env_NuGetSummary", NuGetMapped.Count);
