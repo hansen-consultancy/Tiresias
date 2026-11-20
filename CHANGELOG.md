@@ -10,6 +10,10 @@ its section below.
 
 ### Added
 
+- `tir ai` prints instructions for AI coding agents (Claude Code, Codex, Copilot...): how to
+  get credentials through `tir exec` and `tir run` without seeing them, and what never to do with a
+  secret. `tir ai --snippet` prints a few lines to paste into your `CLAUDE.md` or `AGENTS.md` so
+  every agent session knows Tiresias is installed.
 - `tir doctor` and the status page find git tokens in plain text: in a project's remote URL
   (`https://user:token@host`, with **Copy command** for the `git remote set-url` that takes it
   out) and in `~/.git-credentials`, counted by host. URLs are shown without the token.

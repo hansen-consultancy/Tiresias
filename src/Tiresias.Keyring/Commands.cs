@@ -273,6 +273,12 @@ static class Commands
     }
 
     /// <summary><c>tir advise "&lt;words&gt;"</c>: the needs the words match, each with its options strongest first, as the app's <i>What do you need?</i> lists them.</summary>
+    public static int Ai(CommandLine args)
+    {
+        Console.WriteLine(args.Flag("--snippet") ? AiGuide.Snippet : AiGuide.Instructions);
+        return 0;
+    }
+
     public static int Advise(CommandLine args)
     {
         var facts = new Tiresias.Client.NeedFacts(HasBroker: KeyringStore.Broker is not null);
