@@ -38,7 +38,7 @@ public static partial class Doctor
 
     static IEnumerable<DoctorCheck> NuGetFile(DoctorToolFile file, HashSet<string> windows)
     {
-        var fix = file.InProfile || Quotable(file.Path) ? new ImportNuGetCredentials(file.Path, file.InProfile) : null;
+        var fix = file.InProfile || Pastable(file.Path, path: true) ? new ImportNuGetCredentials(file.Path, file.InProfile) : null;
         foreach (var credential in NuGetConfig.Read(file.Text!))
         {
             var source = credential.Source ?? credential.Key;
@@ -68,23 +68,17 @@ public static partial class Doctor
         NpmRc.Read(file.Text!).Where(c => c.Literal).Select(c => new DoctorCheck($"npm token for {c.Registry} in {file.Path}", DoctorStatus.Warn,
             $"in plain text, which {ReadableByAll}. Seal it as {c.Variable}: the file then says ${{{c.Variable}}}, which npm fills in from the environment tir run and the terminal hook give it. Sealing reads the token once"
             + (c.Registry == NpmRc.DefaultRegistry ? ". To publish to npmjs.org, trusted publishing from CI needs no token at all: docs.npmjs.com/trusted-publishers" : ""),
-            SealRegistryToken.For(file.Path, c.Key, c.Variable), Position.Plaintext, Quotable(file.Path) ? Position.SealedApproved : null, "npm tokens in plain text"));
+            SealRegistryToken.For(file.Path, c.Key, c.Variable), Position.Plaintext, Pastable(file.Path, path: true) ? Position.SealedApproved : null, "npm tokens in plain text"));
 
     static IEnumerable<DoctorCheck> PyPiFile(DoctorToolFile file) =>
         PyPiRc.Read(file.Text!).Select(c => string.Equals(c.Section, PyPiRc.DefaultSection, StringComparison.OrdinalIgnoreCase)
             ? new DoctorCheck($"PyPI password for {c.Section} in {file.Path}", DoctorStatus.Warn,
                 $"in plain text, which {ReadableByAll}. Seal it as {PyPiRc.Variable}, which twine reads from the environment tir run and the terminal hook give it. Sealing reads the password once. "
                 + "To publish to pypi.org, trusted publishing from CI needs no token at all: docs.pypi.org/trusted-publishers",
-                SealRegistryToken.For(file.Path, c.Section, PyPiRc.Variable), Position.Plaintext, Quotable(file.Path) ? Position.SealedApproved : null, "PyPI passwords in plain text")
+                SealRegistryToken.For(file.Path, c.Section, PyPiRc.Variable), Position.Plaintext, Pastable(file.Path, path: true) ? Position.SealedApproved : null, "PyPI passwords in plain text")
             : new DoctorCheck($"PyPI password for {c.Section} in {file.Path}", DoctorStatus.Warn,
                 $"in plain text, which {ReadableByAll}. twine reads one {PyPiRc.Variable} for every repository, so Tiresias seals only {PyPiRc.DefaultSection}'s; for {c.Section}, seal it with tir env set, pass it with tir run, and delete it from the file",
                 Now: Position.Plaintext, Kind: "PyPI passwords in plain text"));
-
-    /// <summary>
-    /// Whether <paramref name="text"/> stays literal inside double quotes in cmd, PowerShell and
-    /// bash. A fix's command is copied into a shell, and a cloned project names its own folders.
-    /// </summary>
-    internal static bool Quotable(string text) => text.IndexOfAny(['"', '%', '$', '`', '!']) < 0;
 
     static bool IsNuGetOrg(string source) =>
         Uri.TryCreate(source, UriKind.Absolute, out var uri) && (uri.Host.Equals("api.nuget.org", StringComparison.OrdinalIgnoreCase) || uri.Host.Equals("www.nuget.org", StringComparison.OrdinalIgnoreCase));
@@ -106,5 +100,5 @@ public sealed record SealRegistryToken(string File, string Entry, string Variabl
 
     /// <summary>The fix, or none when the file's path or the entry can't be printed in a command safely.</summary>
     internal static SealRegistryToken? For(string file, string entry, string variable) =>
-        Doctor.Quotable(file) && Doctor.Quotable(entry) ? new(file, entry, variable) : null;
+        Doctor.Pastable(file, path: true) && Doctor.Pastable(entry) ? new(file, entry, variable) : null;
 }
