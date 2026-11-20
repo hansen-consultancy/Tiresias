@@ -63,8 +63,12 @@ CI and people who prefer it, and it talks to the same agent.
   lives in `%LOCALAPPDATA%\Tiresias\projects.json`, paths and ids only. Ids no scanned project
   uses are grouped under **No project found** and can be moved to the Recycle Bin, once at least
   one folder has been scanned.
-- **Activity window** over the local logs: the agent's user-secrets decisions (`activity.jsonl`)
-  and the solo broker's audit (`solo\audit.jsonl`). Filters: period, outcome, source and text.
+- **Activity window** over the local logs: the agent's decisions (`activity.jsonl`: user secrets,
+  `tir run` and NuGet) and the solo broker's audit (`solo\audit.jsonl`). Filters: period, outcome,
+  source and text. Each NuGet credential request for a mapped feed is recorded with the program,
+  the feed and the variable name, never the token: allowed once, allowed for this session, allowed
+  earlier for this session (handed over without asking), denied, a retry after a refused token (not
+  answered), or a mapped variable that isn't sealed.
 - **Status page** running the same checks as `tir doctor`, with copy details.
 - **First-run wizard.** It creates the Hello key, shows the recovery key once, asks two of its
   groups back, then asks for a mode: solo by default, a broker, or user secrets only. It is

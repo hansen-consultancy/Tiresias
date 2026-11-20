@@ -105,7 +105,7 @@ First checks, by what they find and what they offer:
 | Certificate expiry | Built: a RavenDB service's certificate expiring within 30 days, or expired, from the subject, thumbprint and expiry recorded at setup (`raven-certificates.json`, beside the vault) | **Edit...** on the service with a new `.pfx` |
 | Sealed key handed out as a value | Built: a global sealed variable delivered as its value whose name has a base-URL partner (`*_API_KEY`, `*_KEY`, `*_TOKEN`), for a vault https service or a known Bearer API (OpenAI and compatible); not Anthropic, Azure or GitHub keys. Needs Tiresias unlocked, so `tir doctor` skips it | Placeholder delivery (E4 → E3): Environment variables with the key checked, or `tir env placeholder add` |
 | Publishing key | Built: a NuGet feed token in plain text or in a user variable, a NuGet push key under `apikeys`, an npm `_authToken`/`_password`/`_auth` in plain text, a `.pypirc` password; the entry, registry and file, never the value | Feeds: `tir env nuget import` (E5 → E4/C1). npm, PyPI's `pypi`: `tir env import` seals it and leaves `${NAME}` (E5 → E4/C1). Push keys: a sealed variable through `tir run`. For the public registries, trusted publishing in CI (→ E1) |
-| Git token in a remote URL | `https://user:token@…` in a project's `.git/config` | Out of the URL first (E5 → E4), then through the broker (→ C1) |
+| Git token in a remote URL | Built: `https://user:token@…` in a remote's `url`/`pushurl` or a `[url]` rewrite in a project's `.git/config`, printed without the user info; entries in `~/.git-credentials`, by host | `git remote set-url` without the user info, which stops it spreading (still E5/C3); later, a `git-credential-tiresias` helper (→ E4/C1) |
 | A CLI acting as the user, unseen | `gh` signed in with a stored token, the Azure CLI with a cached Entra session (asked through each tool's own status command, never the token) | Run it through `tir exec` with a token minted per run after consent (C3 → C1); keep the tool's own sign-in only for interactive use, or sign it out |
 
 A finding can be **dismissed** with a reason ("this server only takes SQL logins", "not mine").
@@ -205,7 +205,7 @@ Existing windows remain the places where the work happens; this changes how peop
    PC; the **Installed** list and the "*n* programs unused" line; trusting a publisher; separate
    *How credentials are held* and *What can reach them* groups; `tir doctor --surface` and a daily
    inventory instead of one per run.
-6. **Partly built. More checks**: RavenDB certificate expiry, sealed keys handed out as values and
-   publishing keys are built, each with its own fix; git tokens and a CLI acting as the user are
+6. **Partly built. More checks**: RavenDB certificate expiry, sealed keys handed out as values,
+   publishing keys and git tokens are built, each with its own fix; a CLI acting as the user is
    design ([more checks](more-checks.md)). RavenDB clearance waits for `/certificates/whoami` to be
    confirmed against a real server.

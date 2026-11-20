@@ -6,7 +6,7 @@ namespace Tiresias.App.Logic;
 
 public enum ActivitySource
 {
-    /// <summary>The agent's own log: user-secrets consent decisions.</summary>
+    /// <summary>The agent's own log (<c>activity.jsonl</c>): user-secrets, environment and NuGet consent decisions.</summary>
     UserSecrets,
     /// <summary>The solo broker's audit log: leases, placeholders, requests.</summary>
     Broker,
