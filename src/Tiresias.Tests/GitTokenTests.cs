@@ -49,6 +49,7 @@ public class GitTokenTests
     [TestCase("origin$(calc)", "https://alice:" + Token + "@example.com/app.git")]
     [TestCase("origin`calc`", "https://alice:" + Token + "@example.com/app.git")]
     [TestCase("origin", "https://alice:" + Token + "@example.com/%PATH%")]
+    [TestCase("x\\\\", "https://alice:" + Token + "@example.com/app?a=1&calc")]
     public void A_remote_a_quoted_argument_cannot_hold_is_a_finding_without_a_fix(string remote, string url)
     {
         var check = Checks($"[remote \"{remote}\"]\n\turl = {url}\n").Single();
@@ -63,6 +64,16 @@ public class GitTokenTests
     public void A_repository_in_a_folder_a_quoted_argument_cannot_hold_is_a_finding_without_a_fix(string folder)
     {
         var config = Path.Combine("C:", "src", folder, ".git", "config");
+        var check = Doctor.GitTokens([new DoctorFile(config, $"[remote \"origin\"]\n\turl = https://alice:{Token}@example.com/app.git\n")], null).Single();
+
+        Assert.That(check.Fix, Is.Null);
+        Assert.That(check.IsFinding);
+    }
+
+    [Test]
+    public void A_repository_path_ending_in_a_backslash_gets_no_fix()
+    {
+        var config = Path.Combine("C:\\", ".git", "config");
         var check = Doctor.GitTokens([new DoctorFile(config, $"[remote \"origin\"]\n\turl = https://alice:{Token}@example.com/app.git\n")], null).Single();
 
         Assert.That(check.Fix, Is.Null);
