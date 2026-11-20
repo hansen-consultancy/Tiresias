@@ -2054,4 +2054,10 @@ Store them in clear?</value>
   <data name="Status_Progress" xml:space="preserve">
     <value>{0} of {1} checks pass</value>
   </data>
+  <data name="Flyout_Fix" xml:space="preserve">
+    <value>Fix</value>
+  </data>
+  <data name="Flyout_Open" xml:space="preserve">
+    <value>Open Tiresias</value>
+  </data>
 </root>

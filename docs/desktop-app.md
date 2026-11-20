@@ -12,6 +12,11 @@ CI and people who prefer it, and it talks to the same agent.
 - **Tray icon** following the taskbar theme (light/dark icon). Its menu shows the state (not set
   up, locked, unlocked until 18:00, built-in broker not running), **Solo** when the broker runs in
   the app, Unlock (Windows Hello) / Lock, Status, Add... (*What do you need?*), Activity and Quit.
+  A left click opens a **flyout** instead: the state with Lock or Unlock, a line with how many
+  things could be safer when Home found any (it counts from Home's last check this session, so
+  it is absent until Home has run), then Add..., the secrets editor and Activity when in use, Open
+  Tiresias, a waiting update, the build and Quit. Before setup is finished a left click opens
+  setup, as before ([design](app-design.md#9-the-tray-flyout)).
 - **What do you need?** (**Add...** in the tray and the Services window): the needs, each with its
   ways to meet it strongest first and what each gives up, and a search box matched on this PC.
   An option opens the Services add form, Set up a SQL Server or a RavenDB, the environment

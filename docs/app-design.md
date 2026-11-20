@@ -122,6 +122,17 @@ finding is one line, with its fix's name and a chevron; clicking it opens that c
 open one, so one next step shows at a time. A group's members open inside its Details as before.
 The passing and the dismissed checks fold into one line each, and the areas in use follow.
 
+## 9. The tray flyout
+
+A left click on the tray icon opens a flyout above it; the right-click menu stays as it was. The
+flyout is for the two things the tray is for: seeing whether Tiresias is locked, and getting
+somewhere. So it shows the state card with Lock (or Unlock), a caution bar when Home last found
+something ("3 things could be safer", **Fix** opens Home), and then one row per place: Add...,
+the secrets editor and Activity when they are in use, Open Tiresias, and an update when one waits.
+The build and Quit sit on the bottom line. The tray does not run the checks itself: they walk the
+project folders and take seconds, so the bar repeats Home's last count and is absent until Home
+has checked in this session.
+
 ## Slices
 
 1. `WindowFit` and the size rule applied to every window; "(dev)" in titles; compact Home banner.

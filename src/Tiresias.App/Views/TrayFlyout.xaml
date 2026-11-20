@@ -1,0 +1,88 @@
+<UserControl x:Class="Tiresias.App.Views.TrayFlyout"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="clr-namespace:Tiresias.App"
+             Width="320" AutomationProperties.Name="{l:S App_Name}"
+             Foreground="{DynamicResource TextFillColorPrimaryBrush}">
+  <UserControl.Resources>
+    <!-- A row to open something: icon, name, nothing else. -->
+    <Style x:Key="Go" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="12,8" />
+    </Style>
+    <Style x:Key="GoIcon" TargetType="TextBlock">
+      <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets" />
+      <Setter Property="FontSize" Value="16" />
+      <Setter Property="Width" Value="28" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+  </UserControl.Resources>
+
+  <!-- The popup itself is transparent: this border is the flyout's surface. -->
+  <Border Background="{DynamicResource SolidBackgroundFillColorBaseBrush}" BorderBrush="{DynamicResource SurfaceStrokeColorFlyoutBrush}"
+          BorderThickness="1" CornerRadius="8" Padding="12">
+    <StackPanel>
+      <!-- Where things stand, and the one switch you reach for most. -->
+      <Border Style="{StaticResource Card}" Padding="12" Margin="0,0,0,8">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <StackPanel VerticalAlignment="Center">
+            <TextBlock x:Name="Headline" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" />
+            <TextBlock x:Name="Mode" Style="{StaticResource CaptionText}" />
+          </StackPanel>
+          <Button x:Name="LockButton" Grid.Column="1" Padding="12,4" Margin="12,0,0,0" VerticalAlignment="Center" Click="OnLock" />
+        </Grid>
+      </Border>
+
+      <!-- What Home found last time it checked; the fix is on Home. -->
+      <Button x:Name="Findings" Style="{StaticResource Go}" HorizontalContentAlignment="Stretch" Margin="0,0,0,8" Click="OnHome"
+              Background="{DynamicResource SystemFillColorCautionBackgroundBrush}">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Text="&#xE7BA;" Style="{StaticResource GoIcon}" Foreground="{DynamicResource SystemFillColorCautionBrush}" />
+          <TextBlock x:Name="FindingsText" Grid.Column="1" VerticalAlignment="Center" TextWrapping="Wrap" />
+          <TextBlock Grid.Column="2" Text="{l:S Flyout_Fix}" FontWeight="SemiBold" Margin="12,0,0,0" VerticalAlignment="Center"
+                     Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+        </Grid>
+      </Button>
+
+      <Button x:Name="Setup" Style="{StaticResource Go}" Click="OnHome">
+        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE713;" Style="{StaticResource GoIcon}" /><TextBlock Text="{l:S Tray_FinishSetup}" /></StackPanel>
+      </Button>
+      <Button x:Name="Add" Style="{StaticResource Go}" Click="OnAdd">
+        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE710;" Style="{StaticResource GoIcon}" /><TextBlock Text="{l:S Tray_Add}" /></StackPanel>
+      </Button>
+      <Button x:Name="Secrets" Style="{StaticResource Go}" Click="OnSecrets">
+        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE72E;" Style="{StaticResource GoIcon}" /><TextBlock Text="{l:S Tray_Secrets}" /></StackPanel>
+      </Button>
+      <Button x:Name="Activity" Style="{StaticResource Go}" Click="OnActivity">
+        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE81C;" Style="{StaticResource GoIcon}" /><TextBlock Text="{l:S Tray_Activity}" /></StackPanel>
+      </Button>
+      <Button x:Name="Open" Style="{StaticResource Go}" Click="OnHome">
+        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE80F;" Style="{StaticResource GoIcon}" /><TextBlock Text="{l:S Flyout_Open}" /></StackPanel>
+      </Button>
+      <Button x:Name="Update" Style="{StaticResource Go}" Click="OnUpdate">
+        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE777;" Style="{StaticResource GoIcon}" /><TextBlock x:Name="UpdateText" /></StackPanel>
+      </Button>
+
+      <Grid Margin="0,8,0,0">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <TextBlock x:Name="Build" Style="{StaticResource CaptionText}" VerticalAlignment="Center" Margin="12,0,0,0" />
+        <Button Grid.Column="1" Style="{StaticResource Go}" HorizontalAlignment="Right" Padding="12,4" Content="{l:S Tray_Quit}" Click="OnQuit" />
+      </Grid>
+    </StackPanel>
+  </Border>
+</UserControl>
