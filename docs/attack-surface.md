@@ -65,6 +65,13 @@ Not a trust system of Tiresias's own. Existing sources, asked per package:
   how mature the version is, how far it jumps and what kind of software it is. An existing winget
   scan-and-score engine does this today and is adopted as a library; its update flow is not.
 - **Authenticode**: whether a binary is signed, and by whom.
+- **[OpenSSF Scorecard](https://scorecard.dev)** for desktop apps, which deps.dev doesn't
+  cover: the project's repository, taken from its winget manifest, is looked up in the public API
+  (`api.scorecard.dev/projects/github.com/<owner>/<repo>`). The checks that matter here are
+  `Maintained`, `Code-Review`, `Signed-Releases`, `Vulnerabilities` and `Security-Policy`. A
+  replacement is only suggested when it is maintained and has no open vulnerabilities, and the
+  finding shows the score with those checks. The score helps decide; it doesn't prove the app is
+  safe.
 
 **Privacy.** Asking an online source sends package names and versions off the machine. That is
 **opt-in**, once, with the list of sources; only names and versions are sent, never paths, user
@@ -100,7 +107,7 @@ guided setup already has for it, with that finding's position.
 | Stale duplicate entry | Two entries name the same uninstaller, one for a version no longer on disk | `RemoveEntry(key)` for the stale one. Its **Uninstall** button runs the current version's uninstaller, so the finding says not to use it |
 | Desktop app with a web equivalent | The app is a wrapper around a site, or the site does what it does (mail, streaming, a device tool over WebUSB) | `ReplaceWithWebApp(id, url)` |
 | Global tool rarely used | A global developer tool unused for 90 days | `RunOnDemand(kind, id)`: `dnx`, `npx`/`bunx` or `uvx` instead of a global install |
-| Closed source with a trusted open replacement | A maintained open-source program does the same job (trust per *Trust*) | `ReplaceWithOpenSource(id, candidate)`, suggested only |
+| Closed source with a trusted open replacement | A maintained open-source program does the same job (trust per *Trust*, Scorecard for the candidate) | `ReplaceWithOpenSource(id, candidate)`, suggested only |
 
 Each fix is a `DoctorFix` like phase 1's, so the app opens the right place and `tir doctor` prints
 the command. The new kinds:
@@ -290,7 +297,7 @@ file**. [Guided setup](guided-setup.md#phases) lists what is still design.
    known, as `tir doctor --surface` facts and the app's **Installed** list. No online lookups.
 2. **Cross with credentials**: reach from the activity log, ranking, surface findings on Home,
    and the dismissals above, including trust per publisher.
-3. **Trust lookups** (opt-in): deps.dev, OSV, marketplaces, winget-pkgs, Authenticode.
+3. **Trust lookups** (opt-in): deps.dev, OSV, marketplaces, winget-pkgs, Authenticode, Scorecard.
 4. **Fixes**: approved uninstalls, updates, extension removal and startup changes.
 
 Later, outside phase 5: **Isolation**, the placeholder environments for containers and WSL, and the
