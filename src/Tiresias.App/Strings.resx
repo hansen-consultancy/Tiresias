@@ -1961,4 +1961,19 @@ Store them in clear?</value>
   <data name="Window_DevTitle" xml:space="preserve">
     <value>{0} (dev)</value>
   </data>
+  <data name="Status_PassedHeader" xml:space="preserve">
+    <value>{0} checks passed</value>
+  </data>
+  <data name="Finding_ShowAll" xml:space="preserve">
+    <value>Show all {0}</value>
+  </data>
+  <data name="Secrets_ProjectCheckouts" xml:space="preserve">
+    <value>{0} ({1} checkouts)</value>
+  </data>
+  <data name="Secrets_DetailCheckouts" xml:space="preserve">
+    <value>{0} and {1} other checkouts</value>
+  </data>
+  <data name="Secrets_DetailMore" xml:space="preserve">
+    <value>{0} and {1} more</value>
+  </data>
 </root>

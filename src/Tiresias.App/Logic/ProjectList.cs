@@ -10,6 +10,29 @@ public sealed record ProjectEntry(string Id, string Name, IReadOnlyList<string> 
     public bool Known => Paths.Count > 0;
 }
 
+/// <summary>
+/// The project files that use one id, summed up so a repository with many worktrees is one line:
+/// the first file, how many copies of it (other checkouts: the same file name), and how many other projects.
+/// </summary>
+public sealed record ProjectPaths(string First, int Copies, int Others)
+{
+    /// <summary>The main checkout is usually the shortest path: worktrees nest under a longer one.</summary>
+    public static ProjectPaths Of(IReadOnlyList<string> paths)
+    {
+        if (paths.Count == 0)
+            return new("", 0, 0);
+        var first = paths.OrderBy(p => p.Length).ThenBy(p => p, StringComparer.OrdinalIgnoreCase).First();
+        var name = Path.GetFileName(first);
+        var copies = paths.Count(p => !ReferenceEquals(p, first) && string.Equals(Path.GetFileName(p), name, StringComparison.OrdinalIgnoreCase));
+        return new(first, copies, paths.Count - 1 - copies);
+    }
+
+    /// <summary>Every file is a checkout of one project.</summary>
+    public bool OnlyCheckouts => Copies > 0 && Others == 0;
+
+    public int More => Copies + Others;
+}
+
 /// <summary>The editor's project list: named projects first, by name, then the ids no known project uses.</summary>
 public static class ProjectList
 {

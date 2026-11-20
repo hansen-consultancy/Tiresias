@@ -201,6 +201,8 @@ public partial class StatusWindow : Window
             model.Dismiss(row.Checks, row.Reason);
     }
 
+    void OnMoreFindings(object sender, RoutedEventArgs e) => model.ShowAllFindings();
+
     void OnRestoreFinding(object sender, RoutedEventArgs e)
     {
         if (((FrameworkElement)sender).DataContext is DismissedRow row)
@@ -353,9 +355,43 @@ public sealed partial class StatusViewModel : ObservableObject
             await App.Current.UnlockAsync(interactive: true);
     }
 
+    /// <summary>Checks that warn or fail; they stay in view.</summary>
     public ObservableCollection<CheckRow> Checks { get; } = [];
 
+    /// <summary>Checks that passed, behind one line.</summary>
+    public ObservableCollection<CheckRow> Passed { get; } = [];
+
+    public Visibility PassedVisibility => Passed.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+
+    public string PassedHeader => Text.Format("Status_PassedHeader", Passed.Count);
+
+    /// <summary>The findings shown: the first <see cref="FirstFindings"/> until Show all, since the page has one scroll region and a drive of repositories has hundreds.</summary>
     public ObservableCollection<FindingRow> Findings { get; } = [];
+
+    const int FirstFindings = 20;
+
+    IReadOnlyList<FindingRow> allFindings = [];
+
+    bool showAllFindings;
+
+    public Visibility MoreFindingsVisibility => Findings.Count < allFindings.Count ? Visibility.Visible : Visibility.Collapsed;
+
+    public string MoreFindingsLabel => Text.Format("Finding_ShowAll", allFindings.Count);
+
+    public void ShowAllFindings()
+    {
+        showAllFindings = true;
+        ShowFindings();
+    }
+
+    void ShowFindings()
+    {
+        Findings.Clear();
+        foreach (var row in showAllFindings ? allFindings : allFindings.Take(FirstFindings))
+            Findings.Add(row);
+        OnPropertyChanged(nameof(MoreFindingsVisibility));
+        OnPropertyChanged(nameof(MoreFindingsLabel));
+    }
 
     public ObservableCollection<DismissedRow> Dismissed { get; } = [];
 
@@ -460,15 +496,17 @@ public sealed partial class StatusViewModel : ObservableObject
     void Show()
     {
         var split = FindingView.Of(last, DismissalStore.Load());
-        Findings.Clear();
-        foreach (var group in split.Open)
-            Findings.Add(new(group));
+        allFindings = [.. split.Open.Select(group => new FindingRow(group))];
+        ShowFindings();
         Dismissed.Clear();
         foreach (var group in split.Dismissed)
             Dismissed.Add(new(group.Keys, group.Title, group.Reason));
         Checks.Clear();
+        Passed.Clear();
         foreach (var check in split.Others)
-            Checks.Add(Row(check));
+            (check.Status == DoctorStatus.Ok ? Passed : Checks).Add(Row(check));
+        OnPropertyChanged(nameof(PassedVisibility));
+        OnPropertyChanged(nameof(PassedHeader));
         OnPropertyChanged(nameof(FindingsVisibility));
         OnPropertyChanged(nameof(DismissedVisibility));
         OnPropertyChanged(nameof(DismissedHeader));
@@ -531,9 +569,9 @@ public sealed partial class StatusViewModel : ObservableObject
     void Copy()
     {
         var sb = new StringBuilder().AppendLine(Headline).AppendLine(mode).AppendLine(Build);
-        foreach (var check in Findings.SelectMany(row => row.Checks))
+        foreach (var check in allFindings.SelectMany(row => row.Checks))
             sb.AppendLine(CultureInfo.CurrentCulture, $"{check.Status}  {check.Name}: {check.Detail} [{FindingView.Moves(check)}]");
-        foreach (var row in Checks)
+        foreach (var row in Checks.Concat(Passed))
             sb.AppendLine(CultureInfo.CurrentCulture, $"{row.StatusText}  {row.Name}: {row.Detail}");
         try
         {

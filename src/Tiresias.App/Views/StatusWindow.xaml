@@ -6,30 +6,7 @@
         l:WindowFit.Size="Standard"
         Icon="pack://application:,,,/Assets/tiresias.ico">
   <Window.Resources>
-    <!-- A list that scrolls by itself and builds only the rows in view: a drive of repositories has hundreds of findings. -->
-    <Style x:Key="FindingList" TargetType="ItemsControl">
-      <Setter Property="Focusable" Value="False" />
-      <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True" />
-      <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling" />
-      <Setter Property="VirtualizingPanel.ScrollUnit" Value="Pixel" />
-      <Setter Property="ScrollViewer.CanContentScroll" Value="True" />
-      <Setter Property="Template">
-        <Setter.Value>
-          <ControlTemplate TargetType="ItemsControl">
-            <ScrollViewer Focusable="False" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" CanContentScroll="True">
-              <ItemsPresenter />
-            </ScrollViewer>
-          </ControlTemplate>
-        </Setter.Value>
-      </Setter>
-      <Setter Property="ItemsPanel">
-        <Setter.Value>
-          <ItemsPanelTemplate>
-            <VirtualizingStackPanel />
-          </ItemsPanelTemplate>
-        </Setter.Value>
-      </Setter>
-    </Style>
+    <BooleanToVisibilityConverter x:Key="Visible" />
 
     <DataTemplate x:Key="FindingTemplate">
       <Grid Margin="0,6" AutomationProperties.Name="{Binding Spoken}">
@@ -59,18 +36,37 @@
           </StackPanel>
           <!-- A group's members, each with its own fix; DynamicResource because this template is still being read. -->
           <Expander Header="{Binding MembersHeader}" Visibility="{Binding MembersVisibility}" Margin="0,6,0,0">
-            <ItemsControl ItemsSource="{Binding Members}" Style="{StaticResource FindingList}" MaxHeight="240"
-                          ItemTemplate="{DynamicResource FindingTemplate}" />
+            <ItemsControl ItemsSource="{Binding Members}" Focusable="False" ItemTemplate="{DynamicResource FindingTemplate}" />
           </Expander>
         </StackPanel>
       </Grid>
     </DataTemplate>
+
+    <DataTemplate x:Key="CheckTemplate">
+      <Grid Margin="0,6" AutomationProperties.Name="{Binding Spoken}">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="28" />
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <TextBlock Text="{Binding Glyph}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16"
+                   Foreground="{Binding Brush}" VerticalAlignment="Top" Margin="0,2,0,0" />
+        <StackPanel Grid.Column="1">
+          <TextBlock Style="{StaticResource SubtitleText}" Margin="0">
+            <Run Text="{Binding Name, Mode=OneWay}" /><Run Text=" - " /><Run Text="{Binding StatusText, Mode=OneWay}" />
+          </TextBlock>
+          <TextBlock Text="{Binding Detail}" Style="{StaticResource CaptionText}" />
+        </StackPanel>
+        <Button Grid.Column="2" VerticalAlignment="Center" Margin="12,0,4,0" Padding="12,4"
+                Content="{l:S Status_Review}" AutomationProperties.Name="{Binding ReviewName}"
+                Visibility="{Binding ReviewVisibility}" Click="OnReview" />
+      </Grid>
+    </DataTemplate>
   </Window.Resources>
 
+  <!-- Header, one scrolling body, footer (docs/app-design.md, rule 2): no list in the body scrolls by itself. -->
   <Grid Margin="{StaticResource PagePadding}">
     <Grid.RowDefinitions>
-      <RowDefinition Height="Auto" />
-      <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
       <RowDefinition Height="Auto" />
@@ -78,93 +74,89 @@
 
     <TextBlock Grid.Row="0" Text="{l:S Status_Heading}" Style="{StaticResource TitleText}" AutomationProperties.HeadingLevel="Level1" />
 
-    <StackPanel Grid.Row="1">
-      <Border Style="{StaticResource Card}">
-        <Grid>
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="Auto" />
-          </Grid.ColumnDefinitions>
-          <StackPanel>
+    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+      <StackPanel>
+        <Border Style="{StaticResource Card}">
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
             <!-- One line: mode, build and start with Windows live in About (docs/app-design.md, rule 5). -->
             <TextBlock Text="{Binding Headline}" Style="{StaticResource SubtitleText}" Margin="0" VerticalAlignment="Center" />
-          </StackPanel>
-          <Button Grid.Column="1" VerticalAlignment="Center" Padding="12,6" Margin="12,0,0,0" MinWidth="96"
-                  Content="{Binding LockLabel}" Command="{Binding ToggleLockCommand}" />
-        </Grid>
-      </Border>
+            <Button Grid.Column="1" VerticalAlignment="Center" Padding="12,6" Margin="12,0,0,0" MinWidth="96"
+                    Content="{Binding LockLabel}" Command="{Binding ToggleLockCommand}" />
+          </Grid>
+        </Border>
 
-      <!-- Sealed secrets this PC's Windows Hello can't open: only the recovery key gives them back. -->
-      <Border Style="{StaticResource Card}" Visibility="{Binding RestoreVisibility}">
-        <Grid>
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="Auto" />
-          </Grid.ColumnDefinitions>
+        <!-- Sealed secrets this PC's Windows Hello can't open: only the recovery key gives them back. -->
+        <Border Style="{StaticResource Card}" Visibility="{Binding RestoreVisibility}">
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+              <TextBlock Text="{l:S Status_RestoreTitle}" Style="{StaticResource SubtitleText}" />
+              <TextBlock Text="{Binding RestoreText}" Style="{StaticResource CaptionText}" />
+            </StackPanel>
+            <Button Grid.Column="1" VerticalAlignment="Center" Padding="12,6" Margin="12,0,0,0" MinWidth="96"
+                    Content="{l:S Status_RestoreButton}" Click="OnRestore" />
+          </Grid>
+        </Border>
+
+        <!-- After "This wasn't me": the lockdown until the next unlock, and the programs refused without asking. -->
+        <Border Style="{StaticResource Card}" Visibility="{Binding GuardVisibility}">
           <StackPanel>
-            <TextBlock Text="{l:S Status_RestoreTitle}" Style="{StaticResource SubtitleText}" />
-            <TextBlock Text="{Binding RestoreText}" Style="{StaticResource CaptionText}" />
+            <TextBlock x:Name="BlockedTitle" Text="{l:S Status_BlockedTitle}" Style="{StaticResource SubtitleText}" />
+            <TextBlock Text="{l:S Status_LockedDown}" Style="{StaticResource CaptionText}" Visibility="{Binding LockedDownVisibility}" Margin="0,0,0,4" />
+            <ItemsControl ItemsSource="{Binding Blocked}" Focusable="False" AutomationProperties.LabeledBy="{Binding ElementName=BlockedTitle}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Grid Margin="0,4">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                      <TextBox Text="{Binding Path, Mode=OneWay}" Style="{StaticResource SelectableText}" />
+                      <TextBlock Text="{Binding Since}" Style="{StaticResource CaptionText}" />
+                    </StackPanel>
+                    <Button Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0" Padding="12,4"
+                            Content="{l:S Status_Unblock}" AutomationProperties.Name="{Binding UnblockName}" Click="OnUnblock" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
           </StackPanel>
-          <Button Grid.Column="1" VerticalAlignment="Center" Padding="12,6" Margin="12,0,0,0" MinWidth="96"
-                  Content="{l:S Status_RestoreButton}" Click="OnRestore" />
-        </Grid>
-      </Border>
+        </Border>
 
-      <!-- After "This wasn't me": the lockdown until the next unlock, and the programs refused without asking. -->
-      <Border Style="{StaticResource Card}" Visibility="{Binding GuardVisibility}">
-        <StackPanel>
-          <TextBlock x:Name="BlockedTitle" Text="{l:S Status_BlockedTitle}" Style="{StaticResource SubtitleText}" />
-          <TextBlock Text="{l:S Status_LockedDown}" Style="{StaticResource CaptionText}" Visibility="{Binding LockedDownVisibility}" Margin="0,0,0,4" />
-          <ItemsControl ItemsSource="{Binding Blocked}" Focusable="False" AutomationProperties.LabeledBy="{Binding ElementName=BlockedTitle}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate>
-                <Grid Margin="0,4">
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                  </Grid.ColumnDefinitions>
-                  <StackPanel>
-                    <TextBox Text="{Binding Path, Mode=OneWay}" Style="{StaticResource SelectableText}" />
-                    <TextBlock Text="{Binding Since}" Style="{StaticResource CaptionText}" />
-                  </StackPanel>
-                  <Button Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0" Padding="12,4"
-                          Content="{l:S Status_Unblock}" AutomationProperties.Name="{Binding UnblockName}" Click="OnUnblock" />
-                </Grid>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </StackPanel>
-      </Border>
-    </StackPanel>
+        <!-- Where to go next sits with the state it acts on; the footer keeps only what acts on this page. -->
+        <WrapPanel Margin="0,0,0,12">
+          <!-- Only the areas this machine uses (HomeAreas); the rest are reached through Add.... -->
+          <Button Content="{l:S Tray_Add}" Padding="12,6" Margin="0,0,8,8" Click="OnAdd" />
+          <Button Content="{l:S Tray_Secrets}" Padding="12,6" Margin="0,0,8,8" Click="OnSecrets" Visibility="{Binding SecretsVisibility}" />
+          <Button Content="{l:S Status_Services}" Padding="12,6" Margin="0,0,8,8" Click="OnServices" Visibility="{Binding ServicesVisibility}" />
+          <Button Content="{l:S Tray_Environment}" Padding="12,6" Margin="0,0,8,8" Click="OnEnvironment" Visibility="{Binding EnvironmentVisibility}" />
+          <Button Content="{l:S Tray_Activity}" Padding="12,6" Margin="0,0,8,8" Click="OnActivity" Visibility="{Binding ActivityVisibility}" />
+          <Button Content="{l:S Status_About}" Padding="12,6" Margin="0,0,0,8" Click="OnAbout" />
+        </WrapPanel>
 
-    <!-- Where to go next sits with the state it acts on; the footer keeps only what acts on this page. -->
-    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,12">
-      <!-- Only the areas this machine uses (HomeAreas); the rest are reached through Add.... -->
-      <Button Content="{l:S Tray_Add}" Padding="12,6" Margin="0,0,8,0" Click="OnAdd" />
-      <Button Content="{l:S Tray_Secrets}" Padding="12,6" Margin="0,0,8,0" Click="OnSecrets" Visibility="{Binding SecretsVisibility}" />
-      <Button Content="{l:S Status_Services}" Padding="12,6" Margin="0,0,8,0" Click="OnServices" Visibility="{Binding ServicesVisibility}" />
-      <Button Content="{l:S Tray_Environment}" Padding="12,6" Margin="0,0,8,0" Click="OnEnvironment" Visibility="{Binding EnvironmentVisibility}" />
-      <Button Content="{l:S Tray_Activity}" Padding="12,6" Margin="0,0,8,0" Click="OnActivity" Visibility="{Binding ActivityVisibility}" />
-      <Button Content="{l:S Status_About}" Padding="12,6" Click="OnAbout" />
-    </StackPanel>
+        <TextBlock Text="{l:S Status_Running}" Style="{StaticResource BodyText}" HorizontalAlignment="Center"
+                   Visibility="{Binding IsRunning, Converter={StaticResource Visible}}" />
 
-    <Grid Grid.Row="3">
-      <Grid.RowDefinitions>
-        <RowDefinition Height="Auto" />
-        <RowDefinition Height="*" />
-      </Grid.RowDefinitions>
-
-      <!-- Findings: deliveries weaker than they could be, each with its fix and Dismiss with a reason. -->
-      <Border Grid.Row="0" Style="{StaticResource Card}" Margin="0,0,0,12" Visibility="{Binding FindingsVisibility}">
+        <!-- Findings: deliveries weaker than they could be, each with its fix and Dismiss with a reason. -->
+        <Border Style="{StaticResource Card}" Visibility="{Binding FindingsVisibility}">
           <StackPanel>
             <TextBlock x:Name="FindingsTitle" Text="{l:S Finding_Title}" Style="{StaticResource SubtitleText}" AutomationProperties.HeadingLevel="Level2" />
             <TextBlock Text="{l:S Finding_Intro}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,0,0,4" />
-            <ItemsControl ItemsSource="{Binding Findings}" Style="{StaticResource FindingList}" MaxHeight="300"
+            <ItemsControl ItemsSource="{Binding Findings}" Focusable="False"
                           ItemTemplate="{StaticResource FindingTemplate}" AutomationProperties.LabeledBy="{Binding ElementName=FindingsTitle}" />
+            <Button HorizontalAlignment="Left" Padding="12,4" Margin="28,6,0,0" Content="{Binding MoreFindingsLabel}"
+                    Visibility="{Binding MoreFindingsVisibility}" Click="OnMoreFindings" />
             <TextBox Text="{Binding FindingMessage, Mode=OneWay}" Style="{StaticResource SelectableText}" TextWrapping="Wrap"
                      Visibility="{Binding FindingMessageVisibility}" Margin="0,6,0,0" />
             <Expander Header="{Binding DismissedHeader}" Visibility="{Binding DismissedVisibility}" Margin="0,8,0,0">
-              <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto" Focusable="False">
               <ItemsControl ItemsSource="{Binding Dismissed}" Focusable="False">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
@@ -183,51 +175,20 @@
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
-              </ScrollViewer>
             </Expander>
           </StackPanel>
-      </Border>
+        </Border>
 
-      <ListView x:Name="Checks" Grid.Row="1" ItemsSource="{Binding Checks}" AutomationProperties.Name="{l:S Status_ChecksName}"
-                ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-        <ListView.ItemTemplate>
-          <DataTemplate>
-            <Grid Margin="0,6" AutomationProperties.Name="{Binding Spoken}">
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="28" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-              </Grid.ColumnDefinitions>
-              <TextBlock Text="{Binding Glyph}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16"
-                         Foreground="{Binding Brush}" VerticalAlignment="Top" Margin="0,2,0,0" />
-              <StackPanel Grid.Column="1">
-                <TextBlock Style="{StaticResource SubtitleText}" Margin="0">
-                  <Run Text="{Binding Name, Mode=OneWay}" /><Run Text=" - " /><Run Text="{Binding StatusText, Mode=OneWay}" />
-                </TextBlock>
-                <TextBlock Text="{Binding Detail}" Style="{StaticResource CaptionText}" />
-              </StackPanel>
-              <Button Grid.Column="2" VerticalAlignment="Center" Margin="12,0,4,0" Padding="12,4"
-                      Content="{l:S Status_Review}" AutomationProperties.Name="{Binding ReviewName}"
-                      Visibility="{Binding ReviewVisibility}" Click="OnReview" />
-            </Grid>
-          </DataTemplate>
-        </ListView.ItemTemplate>
-      </ListView>
-      <TextBlock Grid.Row="1" Text="{l:S Status_Running}" HorizontalAlignment="Center" VerticalAlignment="Center">
-        <TextBlock.Style>
-          <Style TargetType="TextBlock" BasedOn="{StaticResource BodyText}">
-            <Setter Property="Visibility" Value="Collapsed" />
-            <Style.Triggers>
-              <DataTrigger Binding="{Binding IsRunning}" Value="True">
-                <Setter Property="Visibility" Value="Visible" />
-              </DataTrigger>
-            </Style.Triggers>
-          </Style>
-        </TextBlock.Style>
-      </TextBlock>
-    </Grid>
+        <!-- Checks that need a look stay in view; the passing ones fold into one line. -->
+        <ItemsControl ItemsSource="{Binding Checks}" Focusable="False" ItemTemplate="{StaticResource CheckTemplate}"
+                      AutomationProperties.Name="{l:S Status_ChecksName}" />
+        <Expander Header="{Binding PassedHeader}" Visibility="{Binding PassedVisibility}" Margin="0,4,0,0">
+          <ItemsControl ItemsSource="{Binding Passed}" Focusable="False" ItemTemplate="{StaticResource CheckTemplate}" />
+        </Expander>
+      </StackPanel>
+    </ScrollViewer>
 
-    <Grid Grid.Row="4" Margin="0,16,0,0">
+    <Grid Grid.Row="2" Margin="0,16,0,0">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*" />
         <ColumnDefinition Width="Auto" />

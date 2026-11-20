@@ -120,4 +120,31 @@ public class ProjectScanTests
         Assert.That(index.Folders, Is.EqualTo(new[] { @"D:\src", @"P:\" }));
         Assert.That(index.WithoutFolder(@"d:\SRC").Folders, Is.EqualTo(new[] { @"P:\" }));
     }
+
+    [Test]
+    public void Worktrees_of_one_project_sum_up_to_the_main_checkout_and_a_count()
+    {
+        var paths = ProjectPaths.Of([
+            @"P:\.worktrees\Shop\fix-a\src\Shop\Shop.csproj",
+            @"P:\Shop\src\Shop\Shop.csproj",
+            @"P:\.worktrees\Shop\fix-b\src\Shop\Shop.csproj",
+        ]);
+
+        Assert.That(paths, Is.EqualTo(new ProjectPaths(@"P:\Shop\src\Shop\Shop.csproj", 2, 0)));
+        Assert.That(paths.OnlyCheckouts, Is.True);
+    }
+
+    [Test]
+    public void Other_projects_sharing_an_id_are_counted_apart_from_checkouts()
+    {
+        var paths = ProjectPaths.Of([@"C:\Web\Web.csproj", @"C:\Web.Tests\Web.Tests.csproj"]);
+
+        Assert.That(paths, Is.EqualTo(new ProjectPaths(@"C:\Web\Web.csproj", 0, 1)));
+        Assert.That(paths.OnlyCheckouts, Is.False);
+        Assert.That(paths.More, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void One_project_has_nothing_more() =>
+        Assert.That(ProjectPaths.Of([@"C:\Web\Web.csproj"]).More, Is.Zero);
 }

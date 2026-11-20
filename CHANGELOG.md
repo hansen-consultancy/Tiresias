@@ -132,6 +132,10 @@ its section below.
   or on the monitor with the mouse, as tall as it needs up to most of the screen, in one of three
   widths. Home's top card is one line; the mode and **Start Tiresias when I sign in** moved to
   About, and a development build says "(dev)" in every title instead.
+- **Home scrolls as one page**: findings, a group's members, dismissed findings and checks no
+  longer scroll inside it. The first 20 findings show with **Show all**, and the checks that passed
+  fold into one line. In the secrets editor, a project used by many worktrees is one line, such as
+  "Shop (28 checkouts)", with the full list under **Show all**.
 - **Saving, changing or removing a service asks you to approve it with Windows Hello**, after
   showing what changes (upstream, grants, paths), in the Services window, both setups and
   `tir service add`/`remove`. Its secrets are then bound to those settings: if a program edits the

@@ -64,8 +64,9 @@ public partial class SecretsWindow : Window
 /// <summary>One project in the picker.</summary>
 /// <param name="Label">Name and state, as the list shows it.</param>
 /// <param name="Group">Named projects, or the ids no known project uses.</param>
-/// <param name="Detail">Where the project is, or why no project is named.</param>
-public sealed record ProjectChoice(string Id, string Label, string Group, string Detail, bool Known);
+/// <param name="Detail">Where the project is, or why no project is named: one line however many checkouts use it.</param>
+/// <param name="Paths">Every project file using the id, shown on demand.</param>
+public sealed record ProjectChoice(string Id, string Label, string Group, string Detail, bool Known, IReadOnlyList<string> Paths);
 
 public sealed partial class SecretRow : ObservableObject
 {
@@ -119,10 +120,16 @@ public sealed partial class SecretsViewModel : ObservableObject
     public ObservableCollection<SecretRow> Rows { get; } = [];
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(SelectedDetail), nameof(CanRecycleSelected))]
+    [NotifyPropertyChangedFor(nameof(SelectedDetail), nameof(CanRecycleSelected), nameof(SelectedPaths), nameof(SelectedPathsHeader), nameof(SelectedPathsVisibility))]
     public partial ProjectChoice? SelectedProject { get; set; }
 
     public string SelectedDetail => SelectedProject?.Detail ?? "";
+
+    public IReadOnlyList<string> SelectedPaths => SelectedProject?.Paths ?? [];
+
+    public string SelectedPathsHeader => Text.Format("Finding_ShowAll", SelectedPaths.Count);
+
+    public Visibility SelectedPathsVisibility => SelectedPaths.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
 
     /// <summary>The open project is one no scanned project uses, and its folder is there to move.</summary>
     public bool CanRecycleSelected => SelectedProject is { } p && unused.Contains(p.Id, StringComparer.OrdinalIgnoreCase);
@@ -486,17 +493,21 @@ public sealed partial class SecretsViewModel : ObservableObject
 
     ProjectChoice Choice(ProjectEntry entry, SecretsFileKind kind)
     {
-        var name = entry.Paths.Count > 1 ? Text.Format("Secrets_ProjectMore", entry.Name, entry.Paths.Count - 1) : entry.Name;
+        var paths = ProjectPaths.Of(entry.Paths);
+        var name = paths.OnlyCheckouts ? Text.Format("Secrets_ProjectCheckouts", entry.Name, entry.Paths.Count)
+            : paths.More > 0 ? Text.Format("Secrets_ProjectMore", entry.Name, paths.More)
+            : entry.Name;
         var label = kind switch
         {
             SecretsFileKind.Sealed => Text.Format("Secrets_ProjectSealed", name),
             SecretsFileKind.Plain => Text.Format("Secrets_ProjectPlain", name),
             _ => name,
         };
-        var detail = entry.Known
-            ? string.Join(Environment.NewLine, entry.Paths)
-            : Text.Get(index.Folders.Count == 0 ? "Secrets_NotScannedDetail" : "Secrets_NoProjectDetail");
-        return new(entry.Id, label, Text.Get(entry.Known ? "Secrets_GroupProjects" : "Secrets_GroupUnknown"), detail, entry.Known);
+        var detail = !entry.Known ? Text.Get(index.Folders.Count == 0 ? "Secrets_NotScannedDetail" : "Secrets_NoProjectDetail")
+            : paths.OnlyCheckouts ? Text.Format("Secrets_DetailCheckouts", paths.First, paths.Copies)
+            : paths.More > 0 ? Text.Format("Secrets_DetailMore", paths.First, paths.More)
+            : paths.First;
+        return new(entry.Id, label, Text.Get(entry.Known ? "Secrets_GroupProjects" : "Secrets_GroupUnknown"), detail, entry.Known, entry.Paths);
     }
 
     IReadOnlyList<KeyValuePair<string, string>> Edited() =>
