@@ -39,7 +39,10 @@ public partial class EnvironmentWindow : Window
     void ShowPick()
     {
         if (model.ApplyPick())
-            PlaceholderLabel.BringIntoView();
+        {
+            PlaceholderSection.IsExpanded = true;
+            PlaceholderSection.BringIntoView();
+        }
     }
 
     void OnBrowse(object sender, RoutedEventArgs e)
