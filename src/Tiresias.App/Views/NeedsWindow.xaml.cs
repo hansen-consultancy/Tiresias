@@ -25,6 +25,31 @@ public partial class NeedsWindow : Window
 
     void OnClose(object sender, RoutedEventArgs e) => Close();
 
+    /// <summary>The group the user opened while its content slides in; kept in view so opening the last one does not show a sliver.</summary>
+    FrameworkElement? opening;
+
+    void OnExpanded(object sender, RoutedEventArgs e)
+    {
+        // Only a group the user opened: a search opens several, and the list should not jump to the last.
+        if (sender is not FrameworkElement expander || !(expander.IsMouseOver || expander.IsKeyboardFocusWithin))
+            return;
+        opening = expander;
+        var stop = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(600) };
+        stop.Tick += (_, _) =>
+        {
+            stop.Stop();
+            if (opening == expander)
+                opening = null;
+        };
+        stop.Start();
+    }
+
+    void OnExpanderSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (sender == opening)
+            ((FrameworkElement)sender).BringIntoView();
+    }
+
     void OnChoose(object sender, RoutedEventArgs e)
     {
         if (((FrameworkElement)sender).DataContext is not OptionRow { IsAvailable: true } row)

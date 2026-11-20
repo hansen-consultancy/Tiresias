@@ -179,6 +179,8 @@ its section below.
 
 ### Fixed
 
+- In *What do you need?*, opening the last group scrolls it into view instead of showing a sliver
+  of it at the bottom.
 - After **Copy details** in the problem dialog, the "Details copied" line no longer pushes the
   buttons out of the window.
 - NuGet credential requests now show in Activity, with the program, the feed and the variable name
