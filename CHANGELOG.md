@@ -8,6 +8,17 @@ its section below.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-20
+
+The desktop app's 0.2 release: everything listed under 0.2.0 below. The app's 0.2.0 build was
+never published, because the release stopped while checking its signatures; the NuGet packages
+were published as 0.2.0 and are unchanged.
+
+### Fixed
+
+- The app release now creates the folder it unpacks each package into before checking that the
+  executables inside are signed.
+
 ## [0.2.0] - 2026-11-20
 
 ### Added
@@ -282,7 +293,8 @@ its section below.
   - `Tiresias.Core` is the vault, the trust chain, grants, leases and the audit log.
   - `Tiresias.Protocol` holds the wire formats.
 
-[Unreleased]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.2.0...HEAD
+[Unreleased]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.2.1...HEAD
+[0.2.1]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.1.0-preview.4...app-v0.2.1
 [0.2.0]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.1.0-preview.4...app-v0.2.0
 [0.1.0-preview.4]: https://github.com/hansen-consultancy/Tiresias/compare/v0.1.0-preview.2...app-v0.1.0-preview.4
 [0.1.0-preview.2]: https://github.com/hansen-consultancy/Tiresias/compare/v0.1.0-preview.1...v0.1.0-preview.2
