@@ -141,6 +141,13 @@ findings use phase 2's dismissals, a reason kept per finding, with two additions
   vulnerability is never covered by it. The trust is tied to the signing certificate's subject, so
   an item from a different signer is judged on its own.
 
+The first slice needs neither: it puts the reasons in the finding's name, so phase 2's key (name,
+fix, position) already brings a dismissal back for a new reason and keeps it through a version
+update. The two additions don't fit that record. A new credential changes the reach, not the
+name, and trust needs the publisher, so `Dismissal` gains the publisher and the accepted reasons
+and matches on those for surface findings. That changes `dismissals.json`, so its version bumps
+and the old file is read forward rather than dropped.
+
 A dismissed blocked program stays blocked: the dismissal hides the finding, not the block, which
 only **Unblock** lifts.
 
@@ -174,7 +181,7 @@ Planner cases, with a fake probe and a fake trust cache:
 - an item whose last use is unknown is never "not used";
 - unused items reaching nothing collapse into the one summary line and don't count for the badge;
 - a dismissal survives a version update and returns for a new advisory or a new credential its
-  host starts using;
+  host starts using, and a version-1 `dismissals.json` still loads after the format bump;
 - trusting a publisher covers its age and verification findings, not its vulnerabilities, and
   not an item from another signer;
 - a blocked program ranks first and stays blocked when its finding is dismissed;
