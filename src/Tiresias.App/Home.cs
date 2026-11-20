@@ -13,6 +13,9 @@ static class Home
 {
     static readonly HashSet<HomeArea> Opened = [];
 
+    /// <summary>How many findings Home showed the last time it checked; <c>null</c> until it has, this session.</summary>
+    public static int? LastFindings { get; set; }
+
     /// <summary>An area opened from <i>What do you need?</i> stays on Home for the rest of the session.</summary>
     public static void Open(HomeArea area) => Opened.Add(area);
 

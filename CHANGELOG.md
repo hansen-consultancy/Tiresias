@@ -134,6 +134,9 @@ its section below.
 
 ### Changed
 
+- A left click on the tray icon opens a flyout: the lock state with Lock or Unlock, how many things
+  could be safer (from Home's last check), and Add..., the secrets editor, Activity and Open
+  Tiresias. The right-click menu is unchanged.
 - Home leads with the next step: the lock state and **Add...** on top, then a heading that counts
   what could be safer ("3 things could be safer") over a bar of the checks that pass. The first
   finding is open with its fix as the main button; the others are one line each until you click

@@ -542,6 +542,8 @@ public sealed partial class StatusViewModel : ObservableObject
     {
         var split = FindingView.Of(last, DismissalStore.Load());
         allFindings = [.. split.Open.Select((group, i) => new FindingRow(group) { IsOpen = i == 0 })];
+        if (last.Count > 0)
+            Home.LastFindings = allFindings.Count;
         ShowFindings();
         Dismissed.Clear();
         foreach (var group in split.Dismissed)

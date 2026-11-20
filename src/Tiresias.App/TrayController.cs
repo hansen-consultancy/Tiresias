@@ -11,9 +11,11 @@ using Tiresias.App.Views;
 namespace Tiresias.App;
 
 /// <summary>
-/// The notification-area icon and its menu: the lock state (plus "Solo"), Unlock or Lock, Home,
-/// Add... (<i>What do you need?</i>) and Activity once anything is recorded; every other window is reached from those. The icon follows the taskbar's light or dark theme, and a development build's
-/// icon has an orange corner and a menu line saying which build it is.
+/// The notification-area icon. A left click opens the <see cref="TrayFlyout"/> (or setup, until it is
+/// finished); the right-click menu keeps the lock state (plus "Solo"), Unlock or Lock, Home, Add...
+/// (<i>What do you need?</i>) and Activity once anything is recorded; every other window is reached
+/// from those. The icon follows the taskbar's light or dark theme, and a development build's icon has
+/// an orange corner and a menu line saying which build it is.
 /// </summary>
 sealed class TrayController : IDisposable
 {
@@ -27,6 +29,10 @@ sealed class TrayController : IDisposable
     readonly MenuItem setup = new() { Header = Text.Get("Tray_FinishSetup") };
     readonly MenuItem update = new() { Visibility = Visibility.Collapsed };
     readonly Separator updateSeparator = new() { Visibility = Visibility.Collapsed };
+    readonly TrayFlyout flyout = new();
+    TrayView? view;
+    string? updateVersion;
+    Action? updateApply;
 
     public TrayController(App app)
     {
@@ -43,9 +49,13 @@ sealed class TrayController : IDisposable
         {
             ToolTipText = Text.Get("App_Name"),
             ContextMenu = new ContextMenu(),
-            LeftClickCommand = new RelayCommand(app.ShowHome),
+            LeftClickCommand = new RelayCommand(OnLeftClick),
             NoLeftClickDelay = true,
+            TrayPopup = flyout,
+            PopupActivation = H.NotifyIcon.Core.PopupActivationMode.LeftClick,
         };
+        flyout.Done += icon.CloseTrayPopup;
+        icon.PreviewTrayPopupOpen += OnPreviewFlyout;
         if (AppBuild.Current.Development)
         {
             icon.ContextMenu.Items.Add(build);
@@ -71,9 +81,27 @@ sealed class TrayController : IDisposable
         icon.ForceCreate(enablesEfficiencyMode: false);
     }
 
+    /// <summary>Setup, until it is finished; after that a left click opens the flyout instead.</summary>
+    void OnLeftClick()
+    {
+        if (view is null or { OfferSetup: true })
+            app.ShowHome();
+    }
+
+    /// <summary>Fills the flyout as things are now, or keeps it closed while setup is unfinished.</summary>
+    void OnPreviewFlyout(object sender, RoutedEventArgs e)
+    {
+        if (view is null or { OfferSetup: true })
+        {
+            e.Handled = true;
+            return;
+        }
+        flyout.Show(view, Home.LastFindings, Home.Areas([]), updateVersion, updateApply);
+    }
+
     public void Refresh(AgentSnapshot snapshot)
     {
-        var view = TrayStatus.Describe(snapshot);
+        var view = this.view = TrayStatus.Describe(snapshot);
         headline.Header = Text.Of(view.Headline);
         mode.Header = view.Mode is null ? null : Text.Of(view.Mode);
         mode.Visibility = view.Mode is null ? Visibility.Collapsed : Visibility.Visible;
@@ -88,6 +116,7 @@ sealed class TrayController : IDisposable
     public void OfferUpdate(string? version, Action? apply)
     {
         var show = version is not null && apply is not null;
+        (updateVersion, updateApply) = show ? (version, apply) : (null, null);
         update.Visibility = updateSeparator.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         if (!show)
             return;
