@@ -130,6 +130,7 @@ jobs:
         run: |
           $fulls = @(Get-ChildItem Releases -Filter "*-${{ steps.meta.outputs.version }}*-full.nupkg")
           $files = @()
+          New-Item -ItemType Directory -Force "$env:RUNNER_TEMP/full" | Out-Null   # Copy-Item makes no parent folder
           foreach ($full in $fulls) {
             $into = "$env:RUNNER_TEMP/full/$($full.BaseName)"
             Copy-Item $full.FullName "$into.zip"   # Expand-Archive only takes a .zip name
