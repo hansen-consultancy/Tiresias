@@ -104,6 +104,24 @@ public class ProjectScanTests
     }
 
     [Test]
+    [Platform("Win")]
+    public void The_picker_lists_secrets_before_settings_and_hides_empty_folders_until_asked()
+    {
+        var index = new ProjectIndex([@"P:\"], [new(@"P:\a\A.csproj", "a"), new(@"P:\b\B.csproj", "b"), new(@"P:\c\C.csproj", "c")]);
+        var contents = new Dictionary<string, SecretsContent>
+        {
+            ["a"] = SecretsContent.Settings, ["b"] = SecretsContent.Secrets, ["c"] = SecretsContent.Empty,
+            ["x"] = SecretsContent.Settings, ["y"] = SecretsContent.Empty, ["z"] = SecretsContent.Secrets,
+        };
+        var list = ProjectList.Build(contents.Keys, index);
+        string[] Listed(ISet<string> kept, bool showEmpty) => [.. ProjectList.Listed(list, id => contents[id], kept, showEmpty).Select(e => e.Id)];
+
+        Assert.That(Listed(new HashSet<string>(), false), Is.EqualTo(new[] { "b", "a", "z", "x" }));
+        Assert.That(Listed(new HashSet<string> { "y" }, false), Is.EqualTo(new[] { "b", "a", "z", "x", "y" }), "an id opened by name stays");
+        Assert.That(Listed(new HashSet<string>(), true), Is.EqualTo(new[] { "b", "a", "c", "z", "x", "y" }));
+    }
+
+    [Test]
     public void Nothing_is_offered_for_removal_before_a_folder_was_scanned()
     {
         var list = ProjectList.Build(["a", "b"], ProjectIndex.Empty);

@@ -62,7 +62,8 @@ public partial class SecretsPage : UserControl
 /// <param name="Group">Named projects, or the ids no known project uses.</param>
 /// <param name="Detail">Where the project is, or why no project is named: one line however many checkouts use it.</param>
 /// <param name="Paths">Every project file using the id, shown on demand.</param>
-public sealed record ProjectChoice(string Id, string Label, string Group, string Detail, bool Known, IReadOnlyList<string> Paths);
+/// <param name="Content">What its file holds, read without unlocking: a sealed file counts as secrets.</param>
+public sealed record ProjectChoice(string Id, string Label, string Group, string Detail, bool Known, IReadOnlyList<string> Paths, SecretsContent Content);
 
 public sealed partial class SecretRow : ObservableObject
 {
@@ -90,12 +91,16 @@ public sealed partial class SecretsViewModel : ObservableObject
     bool relabelling;
     ProjectIndex index = ProjectIndexStore.Load();
     IReadOnlyList<string> unused = [];
+    IReadOnlyList<string> empties = [];
     bool scanning, rescanQueued;
+
+    /// <summary>The open file is sealed and opened with no keys: nothing in it to protect.</summary>
+    bool openedEmpty;
 
     /// <summary>The last rescan in this window finished: until it does, no id is called unused.</summary>
     bool scanned;
 
-    /// <summary>Ids opened here (Find a project, the status page) that have no folder yet.</summary>
+    /// <summary>Ids opened here (Find a project, the status page) that have no folder yet, or an empty one: listed anyway.</summary>
     readonly HashSet<string> extraIds = new(StringComparer.OrdinalIgnoreCase);
 
     public SecretsViewModel()
@@ -127,8 +132,24 @@ public sealed partial class SecretsViewModel : ObservableObject
 
     public Visibility SelectedPathsVisibility => SelectedPaths.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
 
-    /// <summary>The open project is one no scanned project uses, and its folder is there to move.</summary>
-    public bool CanRecycleSelected => SelectedProject is { } p && unused.Contains(p.Id, StringComparer.OrdinalIgnoreCase);
+    /// <summary>The open project's folder is there to move: no scanned project uses it, or it holds no keys.</summary>
+    public bool CanRecycleSelected => SelectedProject is { } p
+        && (unused.Contains(p.Id, StringComparer.OrdinalIgnoreCase) || empties.Contains(p.Id, StringComparer.OrdinalIgnoreCase) || openedEmpty);
+
+    /// <summary>Empty folders are listed too: the foot line's link turns this on and off.</summary>
+    [ObservableProperty]
+    public partial bool ShowEmpty { get; set; }
+
+    partial void OnShowEmptyChanged(bool value) => Rebuild();
+
+    [ObservableProperty]
+    public partial bool HasEmpty { get; set; }
+
+    [ObservableProperty]
+    public partial string EmptyFoldersLabel { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string RecycleEmptyLabel { get; set; } = "";
 
     [ObservableProperty]
     public partial SecretRow? SelectedRow { get; set; }
@@ -233,21 +254,30 @@ public sealed partial class SecretsViewModel : ObservableObject
     void RecycleSelected()
     {
         if (SelectedProject is { } project && CanRecycleSelected)
-            Recycle([project.Id]);
+            Recycle([project.Id], empty: !unused.Contains(project.Id, StringComparer.OrdinalIgnoreCase));
     }
 
     [RelayCommand]
-    void RecycleUnused() => Recycle(unused);
+    void RecycleUnused() => Recycle(unused, empty: false);
+
+    [RelayCommand]
+    void RecycleEmpty() => Recycle(empties, empty: true);
+
+    [RelayCommand]
+    void ToggleEmpty() => ShowEmpty = !ShowEmpty;
 
     /// <summary>
-    /// Moves folders no scanned project uses to the Recycle Bin, after asking: a project kept
-    /// somewhere not scanned may still use one, and the Recycle Bin is where it comes back from.
+    /// Moves folders to the Recycle Bin, after asking: a project kept somewhere not scanned may still
+    /// use an unused one, and the Recycle Bin is where it comes back from. An <paramref name="empty"/>
+    /// one holds no keys, and <c>dotnet user-secrets set</c> creates it again when a project needs it.
     /// </summary>
-    void Recycle(IReadOnlyList<string> ids)
+    void Recycle(IReadOnlyList<string> ids, bool empty)
     {
         if (ids.Count == 0)
             return;
-        var body = Text.Format("Secrets_RecycleBody", ids.Count, string.Join(", ", index.Folders));
+        var body = empty
+            ? Text.Format("Secrets_RecycleEmptyBody", ids.Count)
+            : Text.Format("Secrets_RecycleBody", ids.Count, string.Join(", ", index.Folders));
         if (!AskWindow.Confirm(Owner(), Text.Get("Secrets_RecycleTitle"), body, Text.Get("Secrets_Recycle")))
             return;
         if (SelectedProject is { } open && ids.Contains(open.Id, StringComparer.OrdinalIgnoreCase))
@@ -266,7 +296,7 @@ public sealed partial class SecretsViewModel : ObservableObject
             else
                 failed.Add(id);
         }
-        AppLog.Info($"user secrets: {ids.Count - failed.Count} unused folder(s) moved to the Recycle Bin, {failed.Count} failed");
+        AppLog.Info($"user secrets: {ids.Count - failed.Count} {(empty ? "empty" : "unused")} folder(s) moved to the Recycle Bin, {failed.Count} failed");
         var moved = ids.Count - failed.Count;
         Rebuild();
         Message = failed.Count == 0
@@ -365,6 +395,12 @@ public sealed partial class SecretsViewModel : ObservableObject
             Message = Text.Get("Secrets_LockedCannotSave");
             return false;
         }
+        // An empty file has nothing to protect: sealing it would only make it look like a real one.
+        if (loaded.Keys.Count == 0 && Rows.Count == 0)
+        {
+            Message = Text.Get("Secrets_NothingToSeal");
+            return true;
+        }
         // The first seal can break an app that doesn't use Tiresias yet: say so once, before it happens.
         if (loaded.Version == 0 && File.Exists(folder.FilePath)
             && !AskWindow.Confirm(Owner(), Text.Get("Secrets_SealConfirmTitle"), Text.Format("Secrets_SealConfirmBody", folder.Id), Text.Get("Secrets_Seal")))
@@ -406,6 +442,8 @@ public sealed partial class SecretsViewModel : ObservableObject
         CanEdit = false;
         IsPlain = false;
         IsSealed = false;
+        openedEmpty = false;
+        OnPropertyChanged(nameof(CanRecycleSelected));
         NeedsUnlock = folder is not null;
         if (folder is not null)
             State = Text.Get("Secrets_StateLocked");
@@ -445,11 +483,13 @@ public sealed partial class SecretsViewModel : ObservableObject
             Rows.Add(new SecretRow { Key = key, Value = value });
         CanEdit = true;
         NeedsUnlock = false;
-        State = loaded.Version == 0
-            ? Text.Format("Secrets_StateNotSealed", KeyCount(Rows.Count))
+        openedEmpty = loaded.Version > 0 && Rows.Count == 0;
+        State = Rows.Count == 0 ? Text.Get(openedEmpty ? "Secrets_StateSealedEmpty" : "Secrets_StateEmpty")
+            : loaded.Version == 0 ? Text.Format("Secrets_StateNotSealed", KeyCount(Rows.Count))
             : Text.Format("Secrets_StateSealed", KeyCount(Rows.Count), loaded.Version);
         IsPlain = loaded.Version == 0 && Rows.Count > 0;
         IsSealed = loaded.Version > 0;
+        OnPropertyChanged(nameof(CanRecycleSelected));
     }
 
     /// <summary>
@@ -459,16 +499,18 @@ public sealed partial class SecretsViewModel : ObservableObject
     void Rebuild()
     {
         var folders = UserSecretsFiles.All();
-        var kinds = folders.ToDictionary(f => f.Id, f => f.Kind, StringComparer.OrdinalIgnoreCase);
+        var kinds = folders.ToDictionary(f => f.Id, f => (f.Kind, f.Content), StringComparer.OrdinalIgnoreCase);
         var entries = ProjectList.Build(folders.Select(f => f.Id).Concat(extraIds), index);
         unused = scanned ? [.. ProjectList.Unused(entries, index).Where(kinds.ContainsKey)] : [];
+        empties = [.. folders.Where(f => kinds[f.Id].Content == SecretsContent.Empty).Select(f => f.Id)];
+        var listed = ProjectList.Listed(entries, id => kinds.TryGetValue(id, out var k) ? k.Content : SecretsContent.Empty, extraIds, ShowEmpty);
         var selectedId = SelectedProject?.Id;
         relabelling = true;
         try
         {
             Projects.Clear();
-            foreach (var entry in entries)
-                Projects.Add(Choice(entry, kinds.GetValueOrDefault(entry.Id, SecretsFileKind.None)));
+            foreach (var entry in listed)
+                Projects.Add(Choice(entry, kinds.GetValueOrDefault(entry.Id, (SecretsFileKind.None, SecretsContent.Empty))));
             SelectedProject = selectedId is null ? null : Projects.FirstOrDefault(p => string.Equals(p.Id, selectedId, StringComparison.OrdinalIgnoreCase));
         }
         finally
@@ -480,6 +522,9 @@ public sealed partial class SecretsViewModel : ObservableObject
             Folders.Add(path);
         HasUnused = unused.Count > 0;
         RecycleUnusedLabel = Text.Format("Secrets_RecycleUnused", unused.Count);
+        HasEmpty = empties.Count > 0;
+        EmptyFoldersLabel = Text.Format(ShowEmpty ? "Secrets_EmptyFoldersHide" : "Secrets_EmptyFolders", empties.Count);
+        RecycleEmptyLabel = Text.Format("Secrets_RecycleEmpty", empties.Count);
         ScanStatus = index.Folders.Count == 0
             ? Text.Get("Secrets_NoFolders")
             : Text.Format("Secrets_Scanned", entries.Count(e => e.Known), entries.Count);
@@ -487,23 +532,25 @@ public sealed partial class SecretsViewModel : ObservableObject
         OnPropertyChanged(nameof(CanRecycleSelected));
     }
 
-    ProjectChoice Choice(ProjectEntry entry, SecretsFileKind kind)
+    ProjectChoice Choice(ProjectEntry entry, (SecretsFileKind Kind, SecretsContent Content) file)
     {
         var paths = ProjectPaths.Of(entry.Paths);
         var name = paths.OnlyCheckouts ? Text.Format("Secrets_ProjectCheckouts", entry.Name, entry.Paths.Count)
             : paths.More > 0 ? Text.Format("Secrets_ProjectMore", entry.Name, paths.More)
             : entry.Name;
-        var label = kind switch
+        var label = file switch
         {
-            SecretsFileKind.Sealed => Text.Format("Secrets_ProjectSealed", name),
-            SecretsFileKind.Plain => Text.Format("Secrets_ProjectPlain", name),
+            (SecretsFileKind.Sealed, _) => Text.Format("Secrets_ProjectSealed", name),
+            (_, SecretsContent.Empty) => Text.Format("Secrets_ProjectEmpty", name),
+            (_, SecretsContent.Settings) => Text.Format("Secrets_ProjectSettings", name),
+            (SecretsFileKind.Plain, _) => Text.Format("Secrets_ProjectPlain", name),
             _ => name,
         };
         var detail = !entry.Known ? Text.Get(index.Folders.Count == 0 ? "Secrets_NotScannedDetail" : "Secrets_NoProjectDetail")
             : paths.OnlyCheckouts ? Text.Format("Secrets_DetailCheckouts", paths.First, paths.Copies)
             : paths.More > 0 ? Text.Format("Secrets_DetailMore", paths.First, paths.More)
             : paths.First;
-        return new(entry.Id, label, Text.Get(entry.Known ? "Secrets_GroupProjects" : "Secrets_GroupUnknown"), detail, entry.Known, entry.Paths);
+        return new(entry.Id, label, Text.Get(entry.Known ? "Secrets_GroupProjects" : "Secrets_GroupUnknown"), detail, entry.Known, entry.Paths, file.Content);
     }
 
     IReadOnlyList<KeyValuePair<string, string>> Edited() =>

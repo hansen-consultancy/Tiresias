@@ -23,7 +23,9 @@ public enum DoctorStatus
 /// <param name="Better">The position <paramref name="Fix"/> reaches.</param>
 /// <param name="Kind">For a finding a check can raise many times, what its findings are, as a plural noun phrase
 /// ("projects that ..."), so a UI can show them as one line with a count. <c>null</c> for a one-off line.</param>
-public sealed record DoctorCheck(string Name, DoctorStatus Status, string Detail, DoctorFix? Fix = null, Position? Now = null, Position? Better = null, string? Kind = null)
+/// <param name="Subject">What the finding is about that can change under the same name, such as a file's key
+/// names. A dismissal is bound to it, so a change raises the finding again. Never a secret value.</param>
+public sealed record DoctorCheck(string Name, DoctorStatus Status, string Detail, DoctorFix? Fix = null, Position? Now = null, Position? Better = null, string? Kind = null, string? Subject = null)
 {
     public bool IsFinding => Fix is not null || Now is not null;
 }
@@ -185,7 +187,8 @@ public static partial class Doctor
     /// <returns><c>null</c> for an empty file, one without keys, or one that is sealed and clean: nothing to report.</returns>
     /// <remarks>
     /// A plaintext file is a warning, not a failure: it is what .NET does by default, the app works,
-    /// and sealing it breaks any app that doesn't use Tiresias.Extensions.Configuration yet.
+    /// and sealing it breaks any app that doesn't use Tiresias.Extensions.Configuration yet. A file of
+    /// settings only (<see cref="SecretsContents"/>) has nothing to seal, so it is an Ok line.
     /// </remarks>
     static DoctorCheck? UserSecretsFile(DoctorFile file)
     {
@@ -194,11 +197,15 @@ public static partial class Doctor
         switch (SecretsFile.Classify(file.Text))
         {
             case SecretsFileKind.Plain:
-                var keys = UserSecretsVault.FlattenKeys(Parse(file.Text!)).Count;
-                return keys == 0
-                    ? null
-                    : new(name, DoctorStatus.Warn, $"in plain text: {Keys(keys)} any program running as you can read. Seal it once the project uses Tiresias.Extensions.Configuration: run the app once, or use Seal now in the secrets editor",
-                        new ReviewUserSecrets(id), Position.Plaintext, Position.SealedApproved, "user secrets files in plain text");
+                var document = Parse(file.Text!);
+                var keys = UserSecretsVault.FlattenKeys(document);
+                return SecretsContents.Of(document) switch
+                {
+                    SecretsContent.Empty => null,
+                    SecretsContent.Settings => new(name, DoctorStatus.Ok, $"holds settings, not secrets: {Keys(keys.Count)}"),
+                    _ => new(name, DoctorStatus.Warn, $"in plain text: {Keys(keys.Count)} any program running as you can read. Seal it once the project uses Tiresias.Extensions.Configuration: run the app once, or use Seal now in the secrets editor",
+                        new ReviewUserSecrets(id), Position.Plaintext, Position.SealedApproved, "user secrets files in plain text", KeyNames(keys)),
+                };
             case SecretsFileKind.Invalid:
                 return new(name, DoctorStatus.Fail, "not valid JSON; apps reading it will fail at startup", new ReviewUserSecrets(id), Kind: "user secrets files that aren't valid JSON");
             case SecretsFileKind.Sealed:
@@ -211,10 +218,11 @@ public static partial class Doctor
                 {
                     return new(name, DoctorStatus.Fail, $"sealed envelope unreadable ({e.Message})", new ReviewUserSecrets(id), Kind: "sealed user secrets files that can't be read");
                 }
-                return plain is null
-                    ? null
-                    : new(name, DoctorStatus.Warn, $"sealed, but {UserSecretsVault.FlattenKeys(plain).Count} plaintext key(s) were added beside it; they are sealed on the next run",
-                        new ReviewUserSecrets(id), Position.Plaintext, Position.SealedApproved, "sealed user secrets files with plaintext keys added beside them");
+                if (plain is null)
+                    return null;
+                var added = UserSecretsVault.FlattenKeys(plain);
+                return new(name, DoctorStatus.Warn, $"sealed, but {added.Count} plaintext key(s) were added beside it; they are sealed on the next run",
+                    new ReviewUserSecrets(id), Position.Plaintext, Position.SealedApproved, "sealed user secrets files with plaintext keys added beside them", KeyNames(added));
             default:
                 return null;
         }
@@ -232,6 +240,9 @@ public static partial class Doctor
     }
 
     static string Keys(int count) => count == 1 ? "1 key" : $"{count} keys";
+
+    /// <summary>A file's key names, order aside: a dismissal bound to them lapses when a key is added.</summary>
+    static string KeyNames(IEnumerable<string> keys) => string.Join('\n', keys.Order(StringComparer.Ordinal));
 
     static JsonNode? Parse(string text) =>
         JsonNode.Parse(text, documentOptions: new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });

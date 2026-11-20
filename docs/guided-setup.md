@@ -182,8 +182,8 @@ Existing windows remain the places where the work happens; this changes how peop
    findings with positions and fixes, plus the connection-string and certificate-on-disk checks.
 2. **Built. Findings in the app**: a findings section on Home, one-click fixes opening today's windows filled
    in, dismissals. The app checks the project folders the secrets editor scans. A dismissal is keyed
-   by the line, its fix's inputs and its position, hashed (`Dismissals.KeyOf`), so a changed finding
-   comes back; `dismissals.json` beside the keyring is shared with `tir doctor`.
+   by the line, its fix's inputs, its position and, for a secrets file, its key names, hashed
+   (`Dismissals.KeyOf`), so a changed finding comes back; `dismissals.json` beside the keyring is shared with `tir doctor`.
 3. **Built. What do you need?**: the catalogue, the ranked options, the free-text match; Add, Set up a SQL
    Server and Set up a RavenDB move behind it ([design](what-do-you-need.md)). `tir advise` prints the same list.
 4. **Built. Show what is in use**: the home screen keeps only the areas that apply; the rest live in the catalogue

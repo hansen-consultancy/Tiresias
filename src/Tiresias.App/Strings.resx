@@ -2072,4 +2072,31 @@ Store them in clear?</value>
   <data name="Flyout_ApprovalsMany" xml:space="preserve">
     <value>{0} approvals today</value>
   </data>
+  <data name="Secrets_ProjectSettings" xml:space="preserve">
+    <value>{0} (settings only)</value>
+  </data>
+  <data name="Secrets_ProjectEmpty" xml:space="preserve">
+    <value>{0} (empty)</value>
+  </data>
+  <data name="Secrets_EmptyFolders" xml:space="preserve">
+    <value>{0} empty folders: show</value>
+  </data>
+  <data name="Secrets_EmptyFoldersHide" xml:space="preserve">
+    <value>{0} empty folders: hide</value>
+  </data>
+  <data name="Secrets_RecycleEmpty" xml:space="preserve">
+    <value>Move {0} empty to Recycle Bin</value>
+  </data>
+  <data name="Secrets_RecycleEmptyBody" xml:space="preserve">
+    <value>The user secrets you picked hold no keys ({0} folder(s)). dotnet user-secrets set creates a folder again when a project needs one. They go to the Recycle Bin, so you can put them back from there.</value>
+  </data>
+  <data name="Secrets_StateEmpty" xml:space="preserve">
+    <value>No keys yet.</value>
+  </data>
+  <data name="Secrets_StateSealedEmpty" xml:space="preserve">
+    <value>Sealed, but empty: there is nothing in it to protect. Move it to the Recycle Bin, or add keys.</value>
+  </data>
+  <data name="Secrets_NothingToSeal" xml:space="preserve">
+    <value>Nothing to seal: this file holds no keys.</value>
+  </data>
 </root>

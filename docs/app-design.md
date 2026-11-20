@@ -159,6 +159,58 @@ no Close (Escape closes Home); Copy details and Open data folder moved to About,
 now includes the checks. The flyout shows the same lock circle, today's approvals under the
 headline, and Quit as a link beside the version.
 
+## 12. Empty and settings-only secrets files
+
+**Problem.** The secrets editor lists every folder under `%APPDATA%\Microsoft\UserSecrets`,
+including the many that hold nothing: `dotnet user-secrets init` and Visual Studio's *Manage User
+Secrets* leave a `{}` or a comment-only file behind. Sealing them was the only way to mark them, and
+a sealed empty file looks just like a real one afterwards. Some other files hold only settings
+(flags, numbers, plain URLs), and Home warns about them "in plain text" as if they were keys.
+One developer PC, counted by shape and never by value: 62 folders. 5 were empty, 31 plain with
+keys, 3 of those held only setting-shaped values, and 23 were sealed, several of them sealed only
+to mark them as empty.
+
+**What a folder is.** The editor and `tir doctor` read every folder into one of these, from one
+pure classifier in `Tiresias.Core` so the two can't disagree:
+
+- **Empty**: no file, whitespace, `{}`, or comments only. Also a *sealed* file whose document has no
+  keys; that is known only while unlocked, because only opening the file tells.
+- **Settings**: plain, and every value is a shape that can't be a credential: a boolean, a number,
+  null or empty, a log level under `Logging`, or an http(s) URL with no user info, query or fragment
+  and no path segment long enough to be a token (a webhook's last segment). A value that
+  fits none of these makes the file **Secrets**. A doubtful case falls on the side of Secrets,
+  because a hidden key costs more than one warning too many.
+- **Secrets** (plain or sealed) and **Invalid**, as today.
+
+**The editor.** The list leads with folders holding secrets, as now. Settings-only folders follow
+with "(settings only)" in place of "(not sealed yet)". Empty folders are not listed; a line at the
+foot, "*N* empty folders", shows them, and offers **Move *N* empty to Recycle Bin**. This uses the
+same ask-first, recoverable path as **Move unused to Recycle Bin**: `dotnet user-secrets set`
+creates the folder again whenever a project needs it. Opening a sealed file that turns out to be
+empty says so, with the same Recycle Bin button for that one folder. Sealing an empty file is no
+longer offered: there is nothing to protect.
+
+**Home and `tir doctor`.** Empty folders stay silent, as they already are. A settings-only folder
+is an *Ok* line, "holds settings, not secrets", not a warning. A finding that is still wrong (a
+real file the classifier can't tell apart) is dismissed with a reason, as any finding is. For a
+secrets file, the dismissal is bound to the file's key names, so adding a key later raises the
+finding again; today a dismissal outlives any change to the file.
+
+**Considered and not chosen.**
+
+- *A per-folder "These aren't secrets" switch.* That would be a second way to silence a finding,
+  next to Dismiss. Binding Dismiss to the key names gives the same result with no new control.
+- *Hiding empty folders with no way to show them.* An id a project still uses would then vanish
+  from the editor, and the next step for it would be unclear.
+- *Writing the key count into the sealed envelope*, so empty sealed files could be recognised while
+  locked. That would put information outside the ciphertext for little gain; sealed files are
+  sorted while unlocked, which is when the editor can open them anyway.
+
+**Executable references.** `SecretsContentTests` (each shape, including the doubtful ones:
+`Password=` in a connection string, `https://user@host`, `?sig=`, a webhook path);
+`ClientPlannerTests` (the Ok line, and a dismissal lapsing when a key is added); and
+`ProjectScanTests` (the picker's order and what it hides).
+
 ## Slices
 
 1. `WindowFit` and the size rule applied to every window; "(dev)" in titles; compact Home banner.

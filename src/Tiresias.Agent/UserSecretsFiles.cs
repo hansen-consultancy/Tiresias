@@ -12,6 +12,9 @@ public sealed record UserSecretsFolder(string Id, string Directory)
     public string FilePath => Path.Combine(Directory, SecretsFile.FileName);
 
     public SecretsFileKind Kind => SecretsFile.Classify(File.Exists(FilePath) ? File.ReadAllText(FilePath) : null);
+
+    /// <summary>What the file holds, judged without unlocking: a sealed file counts as secrets.</summary>
+    public SecretsContent Content => SecretsContents.OfFile(File.Exists(FilePath) ? File.ReadAllText(FilePath) : null);
 }
 
 /// <summary>

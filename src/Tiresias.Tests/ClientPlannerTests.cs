@@ -228,6 +228,32 @@ public class DoctorTests
         Assert.That((await Doctor.RunAsync(probe)).Where(c => c.Name.StartsWith("user secrets", StringComparison.Ordinal)), Is.Empty);
     }
 
+    [Test]
+    public async Task A_secrets_file_of_settings_only_is_an_ok_line_not_a_finding()
+    {
+        var probe = new FakeProbe();
+        probe.Secrets.Add(new(@"C:\u\abc\secrets.json", """{"Feature":{"Enabled":true},"Api":"https://api.example.com"}"""));
+        var check = await Check(probe, "user secrets");
+
+        Assert.That((check.Status, check.IsFinding), Is.EqualTo((DoctorStatus.Ok, false)));
+        Assert.That(check.Detail, Does.Contain("settings, not secrets").And.Contain("2 keys").And.Not.Contain("example"));
+    }
+
+    [Test]
+    public async Task Dismissing_a_plaintext_secrets_file_lapses_when_a_key_is_added()
+    {
+        static async Task<DoctorCheck> For(string text)
+        {
+            var probe = new FakeProbe();
+            probe.Secrets.Add(new(@"C:\u\abc\secrets.json", text));
+            return await Check(probe, "user secrets");
+        }
+        var dismissals = Dismissals.Empty.Dismiss(await For("""{"ApiKey":"a"}"""), "test key", DateTimeOffset.UnixEpoch);
+
+        Assert.That(dismissals.For(await For("""{"ApiKey":"changed"}""")), Is.Not.Null, "a new value is not a new finding");
+        Assert.That(dismissals.For(await For("""{"ApiKey":"a","Other":"b"}""")), Is.Null, "a new key is");
+    }
+
     [TestCase("{ not json")]
     [TestCase("""["array"]""")]
     [TestCase("""{"$tiresias":{"v":9,"sealed":"AQ=="}}""")]
