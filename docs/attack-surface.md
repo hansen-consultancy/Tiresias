@@ -131,6 +131,10 @@ the command. The new kinds:
   hosts web apps doesn't have to be the default one.
 - **`RunOnDemand`** and **`ReplaceWithOpenSource`** carry the uninstall command plus the line to
   use instead; neither removes anything until approved.
+  `ReplaceWithOpenSource` doesn't claim open source is safer. The gain is that its code and
+  releases can be reviewed, while it still needs updating like anything else. A paid license or
+  a habit the replacement doesn't match is a good reason to keep the app; the user says so once
+  and the finding stays dismissed. Sometimes the right replacement is a slim tool of your own.
 
 On a managed PC (joined to a domain or enrolled in device management, both readable without
 admin rights), surface findings cover what the user installed. Machine-wide software there is the
