@@ -122,6 +122,7 @@ public class ProjectScanTests
     }
 
     [Test]
+    [Platform("Win")]
     public void Worktrees_of_one_project_sum_up_to_the_main_checkout_and_a_count()
     {
         var paths = ProjectPaths.Of([
@@ -135,6 +136,7 @@ public class ProjectScanTests
     }
 
     [Test]
+    [Platform("Win")]
     public void Other_projects_sharing_an_id_are_counted_apart_from_checkouts()
     {
         var paths = ProjectPaths.Of([@"C:\Web\Web.csproj", @"C:\Web.Tests\Web.Tests.csproj"]);
