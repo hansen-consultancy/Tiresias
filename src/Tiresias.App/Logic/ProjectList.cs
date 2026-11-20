@@ -23,7 +23,7 @@ public sealed record ProjectPaths(string First, int Copies, int Others)
             return new("", 0, 0);
         var first = paths.OrderBy(p => p.Length).ThenBy(p => p, StringComparer.OrdinalIgnoreCase).First();
         var name = Path.GetFileName(first);
-        var copies = paths.Count(p => !ReferenceEquals(p, first) && string.Equals(Path.GetFileName(p), name, StringComparison.OrdinalIgnoreCase));
+        var copies = paths.Count(p => string.Equals(Path.GetFileName(p), name, StringComparison.OrdinalIgnoreCase)) - 1;
         return new(first, copies, paths.Count - 1 - copies);
     }
 
