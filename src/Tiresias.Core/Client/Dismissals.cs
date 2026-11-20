@@ -9,8 +9,9 @@ public sealed record Dismissal(string Key, string Name, string Reason, DateTimeO
 
 /// <summary>
 /// The findings the user dismissed. A finding is matched by <see cref="KeyOf"/>: the line, its fix
-/// with that fix's inputs, and its position. So the same thing isn't raised again, while one that
-/// comes back changed (another server, another variable, a new key) is a new finding. Immutable;
+/// with that fix's inputs, its position and its <see cref="DoctorCheck.Subject"/>. So the same thing
+/// isn't raised again, while one that comes back changed (another server, another variable, a new
+/// key) is a new finding. Immutable;
 /// the agent keeps it in <c>dismissals.json</c>.
 /// </summary>
 public sealed record Dismissals(IReadOnlyList<Dismissal> Items)
@@ -22,7 +23,9 @@ public sealed record Dismissals(IReadOnlyList<Dismissal> Items)
 
     /// <summary>A finding's identity, hashed so the file holds no instruction text beyond the name.</summary>
     public static string KeyOf(DoctorCheck check) =>
-        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"{check.Name}\n{check.Fix?.Instruction}\n{check.Now}")));
+        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(check.Subject is null
+            ? $"{check.Name}\n{check.Fix?.Instruction}\n{check.Now}"
+            : $"{check.Name}\n{check.Fix?.Instruction}\n{check.Now}\n{check.Subject}")));
 
     public Dismissal? For(DoctorCheck check)
     {

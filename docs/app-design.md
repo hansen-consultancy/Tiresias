@@ -176,7 +176,8 @@ pure classifier in `Tiresias.Core` so the two can't disagree:
 - **Empty**: no file, whitespace, `{}`, or comments only. Also a *sealed* file whose document has no
   keys; that is known only while unlocked, because only opening the file tells.
 - **Settings**: plain, and every value is a shape that can't be a credential: a boolean, a number,
-  null or empty, a log level under `Logging`, or a URL with no user info and no query. A value that
+  null or empty, a log level under `Logging`, or an http(s) URL with no user info, query or fragment
+  and no path segment long enough to be a token (a webhook's last segment). A value that
   fits none of these makes the file **Secrets**. A doubtful case falls on the side of Secrets,
   because a hidden key costs more than one warning too many.
 - **Secrets** (plain or sealed) and **Invalid**, as today.
@@ -205,9 +206,10 @@ finding again; today a dismissal outlives any change to the file.
   locked. That would put information outside the ciphertext for little gain; sealed files are
   sorted while unlocked, which is when the editor can open them anyway.
 
-**Executable references** (to write with the change): classifier cases for each shape, including
-the doubtful ones (`Password=` in a connection string, `https://user@host`, `?sig=`); a dismissal
-lapsing when a key is added; and the editor's grouping from a list of folders.
+**Executable references.** `SecretsContentTests` (each shape, including the doubtful ones:
+`Password=` in a connection string, `https://user@host`, `?sig=`, a webhook path);
+`ClientPlannerTests` (the Ok line, and a dismissal lapsing when a key is added); and
+`ProjectScanTests` (the picker's order and what it hides).
 
 ## Slices
 

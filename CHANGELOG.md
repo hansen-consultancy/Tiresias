@@ -8,6 +8,16 @@ its section below.
 
 ## [Unreleased]
 
+### Changed
+
+- The secrets editor hides user-secrets folders that hold no keys behind a line, "*N* empty
+  folders", with **Move *N* empty to Recycle Bin**. Folders holding only settings (flags, numbers,
+  plain URLs) say "(settings only)" and are listed after those holding secrets. Saving an empty file
+  no longer seals it, and a sealed file that opens empty says so.
+- Home and `tir doctor` list a settings-only `secrets.json` as passing ("holds settings, not
+  secrets") instead of warning that it is in plain text. Dismissing a plain-text secrets file now
+  lasts only until a key is added to it.
+
 ## [0.2.1] - 2026-11-20
 
 The desktop app's 0.2 release: everything listed under 0.2.0 below. The app's 0.2.0 build was

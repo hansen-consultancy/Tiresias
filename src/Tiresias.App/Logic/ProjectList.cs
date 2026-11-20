@@ -58,4 +58,17 @@ public static class ProjectList
     /// </summary>
     public static IReadOnlyList<string> Unused(IEnumerable<ProjectEntry> entries, ProjectIndex index) =>
         index.Folders.Count == 0 ? [] : [.. entries.Where(e => !e.Known).Select(e => e.Id)];
+
+    /// <summary>
+    /// The picker's entries: within each group, folders holding secrets before settings-only ones.
+    /// Empty folders are left out unless <paramref name="showEmpty"/>, or the id was opened by name
+    /// (<paramref name="kept"/>), so a Review from Home never lands on nothing.
+    /// </summary>
+    public static IReadOnlyList<ProjectEntry> Listed(IEnumerable<ProjectEntry> entries, Func<string, SecretsContent> contentOf, ISet<string> kept, bool showEmpty) =>
+        [.. entries
+            .Select(e => (Entry: e, Content: contentOf(e.Id)))
+            .Where(x => showEmpty || x.Content != SecretsContent.Empty || kept.Contains(x.Entry.Id))
+            .OrderBy(x => x.Entry.Known ? 0 : 1)
+            .ThenBy(x => x.Content switch { SecretsContent.Settings => 1, SecretsContent.Empty => 2, _ => 0 })
+            .Select(x => x.Entry)];
 }

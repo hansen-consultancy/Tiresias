@@ -80,7 +80,9 @@ CI and people who prefer it, and it talks to the same agent.
   from the program that asked the agent for that id (traced back from its `bin` folder). The map
   lives in `%LOCALAPPDATA%\Tiresias\projects.json`, paths and ids only. Ids no scanned project
   uses are grouped under **No project found** and can be moved to the Recycle Bin, once at least
-  one folder has been scanned.
+  one folder has been scanned. Folders with no keys are hidden behind "*N* empty folders", which
+  shows them and offers to move them to the Recycle Bin; settings-only ones say so and come after
+  those holding secrets ([design](app-design.md#12-empty-and-settings-only-secrets-files)).
 - **Activity page** over the local logs: the agent's decisions (`activity.jsonl`: user secrets,
   `tir run` and NuGet) and the solo broker's audit (`solo\audit.jsonl`). Filters: period, outcome,
   source and text. Each NuGet credential request for a mapped feed is recorded with the program,
