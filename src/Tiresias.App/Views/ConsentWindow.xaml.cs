@@ -43,7 +43,7 @@ public partial class ConsentWindow : Window
         if (view.Command is { Length: > 0 } command)
         {
             Command.Text = command;
-            Command.Visibility = Visibility.Visible;
+            CommandPanel.Visibility = Visibility.Visible;
         }
         ProgramLabel.Text = Text.Get("Consent_ProgramLabel");
         ProgramName.Text = view.Program is null ? Text.Get("Consent_ProgramUnknown") : Path.GetFileName(view.Program);
@@ -55,9 +55,13 @@ public partial class ConsentWindow : Window
         Items.ItemsSource = view.Items.Count > 0 ? view.Items : [Text.Get("Consent_NoKeys")];
         Items.Visibility = view.Unlock ? Visibility.Collapsed : Visibility.Visible;
         if (view.Unlock)
-            AllowOnce.Content = Text.Get("Consent_Unlock");
+        {
+            AllowOnceLabel.Text = Text.Get("Consent_Unlock");
+            AllowOnceSays.Text = Text.Get("Consent_Unlock_Says");
+        }
         Note.Text = waiting > 0 ? $"{view.Note} {Text.Format("Consent_Waiting", waiting)}" : view.Note;
         AllowSession.Visibility = view.AllowSession ? Visibility.Visible : Visibility.Collapsed;
+        (view.AllowSession ? AllowSession : AllowOnce).Style = (Style)FindResource("LeadChoice");
         tick.Tick += (_, _) => UpdateCountdown();
         UpdateCountdown();
         tick.Start();

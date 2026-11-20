@@ -2033,4 +2033,16 @@ Store them in clear?</value>
   <data name="Finding_Details" xml:space="preserve">
     <value>Details</value>
   </data>
+  <data name="Consent_AllowSession_Says" xml:space="preserve">
+    <value>It isn't asked again until Tiresias locks.</value>
+  </data>
+  <data name="Consent_AllowOnce_Says" xml:space="preserve">
+    <value>This request only: it is asked again next time.</value>
+  </data>
+  <data name="Consent_Deny_Says" xml:space="preserve">
+    <value>It gets nothing.</value>
+  </data>
+  <data name="Consent_Unlock_Says" xml:space="preserve">
+    <value>Then you see what it gets, and choose.</value>
+  </data>
 </root>

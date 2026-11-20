@@ -134,6 +134,10 @@ its section below.
 
 ### Changed
 
+- The approval prompt is laid out in two columns: the question and its answers on the left, each
+  answer with a line saying what it means, and what it gets, who is asking and the command line in
+  a panel on the right. The usual answer is highlighted; Enter still approves nothing, and Deny
+  keeps the focus.
 - **Windows open where they should, at the size they keep**: each one opens centred on the
   window it came from, or on the screen, already at its final size. Home, Activity, Secrets,
   Services and Environment open at a fixed height instead of starting small and growing as their
