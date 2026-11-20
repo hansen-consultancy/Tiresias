@@ -8,6 +8,7 @@ public enum ProblemKind
 {
     HelloNotSetUp,
     HelloCancelled,
+    HelloExpired,
     HelloCredentialMissing,
     HelloUnavailable,
     BrokerUnreachable,
@@ -41,6 +42,8 @@ public static class Problems
             new("Problem_HelloNotSetUp_Why"), new("Problem_HelloNotSetUp_Next"), ProblemAction.OpenHelloSettings),
         ProblemKind.HelloCancelled => new(kind, new("Problem_HelloCancelled_Title"), new("Problem_HelloCancelled_What"),
             new("Problem_HelloCancelled_Why"), new("Problem_HelloCancelled_Next"), ProblemAction.TryAgain),
+        ProblemKind.HelloExpired => new(kind, new("Problem_HelloExpired_Title"), new("Problem_HelloExpired_What"),
+            new("Problem_HelloExpired_Why"), new("Problem_HelloExpired_Next"), ProblemAction.TryAgain),
         ProblemKind.HelloCredentialMissing => new(kind, new("Problem_HelloCredentialMissing_Title"), new("Problem_HelloCredentialMissing_What"),
             new("Problem_HelloCredentialMissing_Why"), new("Problem_HelloCredentialMissing_Next"), ProblemAction.None),
         ProblemKind.HelloUnavailable => new(kind, new("Problem_HelloUnavailable_Title"), new("Problem_HelloUnavailable_What"),

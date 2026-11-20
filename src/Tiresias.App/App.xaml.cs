@@ -29,6 +29,8 @@ public partial class App : Application
     TrayController? tray;
     AppUpdates? updates;
     readonly Dictionary<Type, Window> windows = [];
+    /// <summary>tir, a terminal, NuGet and the tray asking at once share one Windows Hello prompt.</summary>
+    readonly SingleFlight<UnlockResult?> unlocking = new();
 
     internal AgentHost Host => host!;
 
@@ -269,7 +271,7 @@ public partial class App : Application
             return (false, Text.Get("Lockdown_UnlockFromApp"));
         try
         {
-            var result = await host!.UnlockAsync();
+            var result = await unlocking.RunAsync(host!.UnlockAsync);
             Refresh();
             if (result is { Ok: false })
             {

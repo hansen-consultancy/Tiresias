@@ -30,6 +30,14 @@ CI and people who prefer it, and it talks to the same agent.
   focus and is the Esc answer. A countdown runs, and no answer means Deny. Requests that arrive
   while one is open wait their turn, and the dialog shows how many are waiting. Workstation lock,
   logoff or sleep answers every open dialog with Deny.
+- **Prompts come to the front.** `tir` and the NuGet plugin run in the background, and Windows
+  only lets a process take the foreground when the program the user is in hands it the right. So
+  before asking the app anything they call `AllowSetForegroundWindow` for the app's process (found
+  from the pipe), and the app brings its consent dialog and the Windows Hello prompt forward. When
+  Windows still keeps one back, its taskbar button flashes until you look at it. Unlock requests
+  that arrive together (`tir`, a terminal, NuGet, the tray) share one Hello prompt. A Hello prompt
+  answered too late (`WINBIO_E_INVALID_TICKET`, 0x80098044, after minutes out of sight) is
+  reported as expired, with a way to try again.
 - **"This wasn't me"**, beside Deny on every consent dialog, for a prompt you didn't cause (it
   could be malware). It denies the request and locks at once: session consents, terminal and NuGet
   allowances are forgotten, the terminals' placeholders revoked and the broker lease ended. Until
