@@ -41,31 +41,28 @@ public class GitTokenTests
         Assert.That(check.Fix!.Instruction, Does.Contain("remote set-url --push \"origin\" \"https://github.com/example/app.git\""));
     }
 
+    static DoctorCheck Remote(string folder, string remote, string path) =>
+        Doctor.GitTokens([new DoctorFile(Path.Combine("C:", "src", folder, ".git", "config"),
+            $"[remote \"{remote}\"]\n\turl = https://alice:{Token}@example.com/{path}\n")], null).Single();
+
     [Test]
-    public void Shell_separators_in_a_url_stay_inside_quotes() =>
-        Assert.That(Checks($"[remote \"origin\"]\n\turl = https://alice:{Token}@example.com/app?a=1&calc|x\n").Single().Fix!.Instruction,
-            Does.EndWith("\"https://example.com/app?a=1&calc|x\""));
+    public void Plain_values_get_a_command() =>
+        Assert.That(Remote("my-app_2.0", "up+stream.x", "team/my-app_2.0.git").Fix, Is.Not.Null);
 
-    [TestCase("origin$(calc)", "https://alice:" + Token + "@example.com/app.git")]
-    [TestCase("origin`calc`", "https://alice:" + Token + "@example.com/app.git")]
-    [TestCase("origin", "https://alice:" + Token + "@example.com/%PATH%")]
-    [TestCase("x\\\\", "https://alice:" + Token + "@example.com/app?a=1&calc")]
-    public void A_remote_a_quoted_argument_cannot_hold_is_a_finding_without_a_fix(string remote, string url)
+    // Only [A-Za-z0-9/:._@+-] (and a backslash inside the repository's path) is offered as a command.
+    [TestCase("app", "x\\\"y", "app.git", TestName = "A quote in a remote")]
+    [TestCase("app", "origin$x", "app.git", TestName = "A dollar in a remote")]
+    [TestCase("x!y", "origin", "app.git", TestName = "A bang in a folder")]
+    [TestCase("app", "origin`calc`", "app.git", TestName = "A backtick in a remote")]
+    [TestCase("app", "x\\\\", "app.git", TestName = "A trailing backslash in a remote")]
+    [TestCase("x\ncalc", "origin", "app.git", TestName = "A newline in a folder")]
+    [TestCase("app", "origin", "app?a=1&calc", TestName = "An ampersand in a URL")]
+    [TestCase("app", "origin", "app|calc", TestName = "A pipe in a URL")]
+    [TestCase("my app", "origin", "app.git", TestName = "A space in a folder")]
+    [TestCase("app", "origin", "café.git", TestName = "Non-ASCII in a URL")]
+    public void A_value_outside_the_allowlist_is_a_finding_without_a_command(string folder, string remote, string path)
     {
-        var check = Checks($"[remote \"{remote}\"]\n\turl = {url}\n").Single();
-
-        Assert.That(check.Fix, Is.Null);
-        Assert.That(check.IsFinding);
-    }
-
-    [TestCase("$(calc)")]
-    [TestCase("%PATH%")]
-    [TestCase("x!y")]
-    [TestCase("x\ncalc")]
-    public void A_repository_in_a_folder_a_quoted_argument_cannot_hold_is_a_finding_without_a_fix(string folder)
-    {
-        var config = Path.Combine("C:", "src", folder, ".git", "config");
-        var check = Doctor.GitTokens([new DoctorFile(config, $"[remote \"origin\"]\n\turl = https://alice:{Token}@example.com/app.git\n")], null).Single();
+        var check = Remote(folder, remote, path);
 
         Assert.That(check.Fix, Is.Null);
         Assert.That(check.IsFinding);

@@ -12,7 +12,8 @@ its section below.
 
 - `tir doctor` and the status page find git tokens in plain text: in a project's remote URL
   (`https://user:token@host`, with **Copy command** for the `git remote set-url` that takes it
-  out) and in `~/.git-credentials`, counted by host. URLs are shown without the token.
+  out, offered only when the folder, remote and URL hold letters, digits and `/:._@+-` alone)
+  and in `~/.git-credentials`, counted by host. URLs are shown without the token.
 - `tir doctor` and the status page find publishing keys: NuGet feed tokens in plain text or in a
   user environment variable, NuGet push keys, npm tokens and PyPI passwords in plain text. Each
   names the entry and the file, never the token. Feeds move to Tiresias as before; npm and PyPI
