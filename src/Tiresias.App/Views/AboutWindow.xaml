@@ -3,8 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:l="clr-namespace:Tiresias.App"
         Title="{l:S About_WindowTitle}"
-        Width="620" Height="600" MinWidth="460" MinHeight="420"
-        WindowStartupLocation="CenterScreen"
+        l:WindowFit.Size="Standard"
         Icon="pack://application:,,,/Assets/tiresias.ico">
   <Grid Margin="{StaticResource PagePadding}">
     <Grid.RowDefinitions>
@@ -19,7 +18,15 @@
     <TextBlock Grid.Row="0" x:Name="Heading" Style="{StaticResource TitleText}" AutomationProperties.HeadingLevel="Level1" />
     <TextBlock Grid.Row="1" x:Name="Summary" Style="{StaticResource BodyText}" />
 
-    <Border Grid.Row="2" Style="{StaticResource Card}">
+    <StackPanel Grid.Row="2">
+    <!-- Settings that used to fill Home's banner (docs/app-design.md, rule 5). -->
+    <Border Style="{StaticResource Card}">
+      <StackPanel>
+        <CheckBox x:Name="StartWithWindowsBox" Content="{l:S Status_StartWithWindows}" Checked="OnStartWithWindows" Unchecked="OnStartWithWindows" />
+        <TextBlock x:Name="StartWithWindowsNote" Style="{StaticResource CaptionText}" />
+      </StackPanel>
+    </Border>
+    <Border Style="{StaticResource Card}">
       <ItemsControl x:Name="Facts" Focusable="False">
         <ItemsControl.ItemTemplate>
           <DataTemplate>
@@ -37,6 +44,7 @@
         </ItemsControl.ItemTemplate>
       </ItemsControl>
     </Border>
+    </StackPanel>
 
     <TextBlock Grid.Row="3" x:Name="NotesHeading" Style="{StaticResource SubtitleText}" />
     <TextBox Grid.Row="4" x:Name="Notes" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"

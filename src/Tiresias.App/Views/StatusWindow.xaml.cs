@@ -329,8 +329,8 @@ public sealed partial class StatusViewModel : ObservableObject
     [ObservableProperty]
     public partial string Headline { get; set; } = "";
 
-    [ObservableProperty]
-    public partial string Mode { get; set; } = "";
+    /// <summary>Solo or not: About shows it; Home keeps it only for Copy details.</summary>
+    string mode = "";
 
     [ObservableProperty]
     public partial bool IsRunning { get; set; }
@@ -341,25 +341,10 @@ public sealed partial class StatusViewModel : ObservableObject
 
     public Visibility RestoreVisibility => RestoreText.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
 
-    public string Build { get; } = Text.Format("Status_Build", Text.Of(AppBuild.Current.Label), AppBuild.Current.Folder);
+    static readonly string Build = Text.Format("Status_Build", Text.Of(AppBuild.Current.Label), AppBuild.Current.Folder);
 
     [ObservableProperty]
     public partial string LockLabel { get; set; } = "";
-
-    /// <summary>A development build never registers itself: its folder goes stale with the next build.</summary>
-    public bool CanStartWithWindows { get; } = AppBuild.Current.Installed;
-
-    [ObservableProperty]
-    public partial bool StartsWithWindows { get; set; } = StartWithWindows.IsOn;
-
-    [ObservableProperty]
-    public partial string StartWithWindowsNote { get; set; } = Text.Get(AppBuild.Current.Installed ? "Status_StartWithWindowsNote" : "Status_StartWithWindowsDev");
-
-    partial void OnStartsWithWindowsChanged(bool value)
-    {
-        if (!StartWithWindows.Set(value))
-            StartWithWindowsNote = Text.Get("Status_StartWithWindowsFailed");
-    }
 
     /// <summary>Lock right here, or unlock with one Hello prompt; the agent's state change refreshes the page.</summary>
     [RelayCommand]
@@ -410,7 +395,7 @@ public sealed partial class StatusViewModel : ObservableObject
         ShowGuard();
         var view = TrayStatus.Describe(App.Current.Snapshot());
         Headline = Text.Of(view.Headline);
-        Mode = view.Mode is null ? Text.Get("Status_ModeNone") : Text.Get("Status_ModeSolo");
+        mode = Text.Get(view.Mode is null ? "Status_ModeNone" : "Status_ModeSolo");
         LockLabel = Text.Get(App.Current.Host.Keys.IsUnlocked ? "Tray_Lock" : "Tray_Unlock");
         ShowAreas();
     }
@@ -548,7 +533,7 @@ public sealed partial class StatusViewModel : ObservableObject
     [RelayCommand]
     void Copy()
     {
-        var sb = new StringBuilder().AppendLine(Headline).AppendLine(Mode).AppendLine(Build);
+        var sb = new StringBuilder().AppendLine(Headline).AppendLine(mode).AppendLine(Build);
         foreach (var check in Findings.SelectMany(row => row.Checks))
             sb.AppendLine(CultureInfo.CurrentCulture, $"{check.Status}  {check.Name}: {check.Detail} [{FindingView.Moves(check)}]");
         foreach (var row in Checks)

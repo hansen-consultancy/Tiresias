@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
 using Tiresias.Agent;
+using Tiresias.App.Logic;
 
 namespace Tiresias.App.Views;
 
@@ -31,6 +32,7 @@ public partial class AboutWindow : Window
         }
         else
             Add("About_Since", AppBuild.Since.ToString("g", CultureInfo.CurrentCulture));
+        Add("About_Mode", Text.Get(TrayStatus.Describe(App.Current.Snapshot()).Mode is null ? "Status_ModeNone" : "Status_ModeSolo"));
         Add("About_Folder", build.Folder);
         Add("About_Data", KeyringStore.Directory);
         Add("About_Runtime", $"{RuntimeInformation.FrameworkDescription}, {RuntimeInformation.ProcessArchitecture}");
@@ -40,8 +42,19 @@ public partial class AboutWindow : Window
         NotesHeading.Text = build.Installed ? Text.Format("About_NotesHeading", build.Version) : Text.Get("About_NotesUnreleased");
         Notes.Text = AppBuild.Notes() ?? Text.Get("About_NoNotes");
 
+        // A development build never registers itself: its folder goes stale with the next build.
+        StartWithWindowsBox.IsChecked = StartWithWindows.IsOn;
+        StartWithWindowsBox.IsEnabled = build.Installed;
+        StartWithWindowsNote.Text = Text.Get(build.Installed ? "Status_StartWithWindowsNote" : "Status_StartWithWindowsDev");
+
         PageButton.Content = Text.Get(build.Installed ? "About_ReleasePage" : "About_CommitPage");
         PageButton.Visibility = build.Installed || AppBuild.CommitPage is not null ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    void OnStartWithWindows(object sender, RoutedEventArgs e)
+    {
+        if (IsLoaded && !StartWithWindows.Set(StartWithWindowsBox.IsChecked == true))
+            StartWithWindowsNote.Text = Text.Get("Status_StartWithWindowsFailed");
     }
 
     void Add(string key, string value) => facts.Add(new(Text.Get(key), value));

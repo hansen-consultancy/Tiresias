@@ -3,8 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:l="clr-namespace:Tiresias.App"
         Title="{l:S Needs_WindowTitle}"
-        Width="720" Height="640" MinWidth="520" MinHeight="420"
-        WindowStartupLocation="CenterScreen"
+        l:WindowFit.Size="Standard"
         FocusManager.FocusedElement="{Binding ElementName=SearchBox}"
         Icon="pack://application:,,,/Assets/tiresias.ico">
   <Window.Resources>
