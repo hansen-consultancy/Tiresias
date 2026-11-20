@@ -144,6 +144,12 @@ its section below.
 - Home, the secrets editor, Services, Environment variables, Activity and About are now pages of
   one window, listed on the left, instead of separate windows. The whole window stays out of
   screenshots and screen shares. Escape on a page goes back Home.
+- The window and the tray flyout now match the chosen design. Each place on the left shows its
+  count (Activity shows today's), and About sits at the bottom. A lock in a circle, green while
+  unlocked, sits beside the state. Findings are numbered, and the open one explains itself and
+  shows where its fix takes it in green. The foot of Home is links: the checks passed, the
+  dismissed, and Check again. Close is gone (Escape closes the window); Copy details and Open data
+  folder are on About. The flyout shows today's approvals and Quit is a link.
 - A left click on the tray icon opens a flyout: the lock state with Lock or Unlock, how many things
   could be safer (from Home's last check), and Add..., the secrets editor, Activity and Open
   Tiresias. The right-click menu is unchanged.

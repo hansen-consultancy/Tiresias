@@ -12,10 +12,10 @@ CI and people who prefer it, and it talks to the same agent.
 - **Tray icon** following the taskbar theme (light/dark icon). Its menu shows the state (not set
   up, locked, unlocked until 18:00, built-in broker not running), **Solo** when the broker runs in
   the app, Unlock (Windows Hello) / Lock, Status, Add... (*What do you need?*), Activity and Quit.
-  A left click opens a **flyout** instead: the state with Lock or Unlock, a line with how many
+  A left click opens a **flyout** instead: the state with Lock or Unlock and today's approvals, a line with how many
   things could be safer when Home found any (it counts from Home's last check this session, so
   it is absent until Home has run), then Add..., the secrets editor and Activity when in use, Open
-  Tiresias, a waiting update, the build and Quit. Before setup is finished a left click opens
+  Tiresias, a waiting update, the build and a Quit link. Before setup is finished a left click opens
   setup, as before ([design](app-design.md#9-the-tray-flyout)).
 - **What do you need?** (**Add...** in the tray and on the Services page): the needs, each with its
   ways to meet it strongest first and what each gives up, and a search box matched on this PC.
@@ -23,12 +23,15 @@ CI and people who prefer it, and it talks to the same agent.
   variables or the secrets editor, or a guide when there is no secret to keep
   ([design](what-do-you-need.md)). `tir advise "<words>"` prints the same list.
 - **One window**: Home, the secrets editor, Services, Environment variables, Activity and About
-  are pages listed on the left, the ones this machine uses; the whole window is excluded from
-  screen capture. Escape on a page goes back Home ([design](app-design.md#10-one-window)).
+  are pages listed on the left, the ones this machine uses, each with its count (Activity's is
+  today's), and About at the bottom; the whole window is excluded from screen capture. Escape on a
+  page goes back Home, and on Home closes the window ([design](app-design.md#10-one-window)).
 - **Home leads with the next step**: the lock state with Lock and Add..., then a heading that
-  counts what could be safer over a bar of the checks that pass. The first finding is open with
-  its fix; the others are one line each, and clicking one opens it instead
-  ([design](app-design.md#8-home-leads-with-the-next-step)).
+  counts what could be safer over a bar of the checks that pass. The findings are numbered; the
+  first is open with its fix; the others are one line each, and clicking one opens it instead
+  ([design](app-design.md#8-home-leads-with-the-next-step)). Links at the foot open the checks
+  passed and the dismissed, and run the checks again; Copy details and Open data folder are on
+  About ([design](app-design.md#11-the-chosen-look)).
 - **Home shows what is in use**: Secrets, Services, Environment variables and Activity appear
   once they have something in them (or a finding leads there); the rest are reached through
   **Add...**.

@@ -538,9 +538,6 @@ Switch to this copy, {2}, from {3}? The other copy quits first, ending its lease
   <data name="Tray_FinishSetup" xml:space="preserve">
     <value>Finish setup...</value>
   </data>
-  <data name="Tray_Secrets" xml:space="preserve">
-    <value>Edit user secrets...</value>
-  </data>
   <data name="Tray_Activity" xml:space="preserve">
     <value>Activity...</value>
   </data>
@@ -2056,5 +2053,23 @@ Store them in clear?</value>
   </data>
   <data name="Nav_Activity" xml:space="preserve">
     <value>Activity</value>
+  </data>
+  <data name="Nav_ActivityToday" xml:space="preserve">
+    <value>{0} today</value>
+  </data>
+  <data name="Flyout_Add" xml:space="preserve">
+    <value>Add a credential...</value>
+  </data>
+  <data name="Flyout_Quit" xml:space="preserve">
+    <value>Quit</value>
+  </data>
+  <data name="Flyout_ApprovalsNone" xml:space="preserve">
+    <value>No approvals today</value>
+  </data>
+  <data name="Flyout_ApprovalsOne" xml:space="preserve">
+    <value>One approval today</value>
+  </data>
+  <data name="Flyout_ApprovalsMany" xml:space="preserve">
+    <value>{0} approvals today</value>
   </data>
 </root>

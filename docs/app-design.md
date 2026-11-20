@@ -145,6 +145,20 @@ services and environment pages show values, the whole window is excluded from sc
 Coming back Home after Environment variables re-runs the checks, since a change there can clear a
 finding. Dialogs (Add..., the approval prompt, setup, the forms a page opens) stay windows.
 
+## 11. The chosen look
+
+Home and the flyout follow the chosen mock-up. Each place on the left carries its count: user
+secrets folders, services, user environment variables, and Activity's records today. A count that
+can't be read shows nothing rather than a guess. About is pinned to the bottom; the picked place
+has a subtle fill and an accent bar. The page sits on a lighter panel. Beside the headline, a lock
+in a circle, open and green while unlocked; Add... is the accent button. Findings are numbered,
+and the open one says what it is in plain words, then where it stands and, in green, where the fix
+takes it. The foot of Home is links, not buttons: the checks passed and the dismissed open their
+lists, and Check again runs the checks. The page has one button row, the open finding's. There is
+no Close (Escape closes Home); Copy details and Open data folder moved to About, whose Copy details
+now includes the checks. The flyout shows the same lock circle, today's approvals under the
+headline, and Quit as a link beside the version.
+
 ## Slices
 
 1. `WindowFit` and the size rule applied to every window; "(dev)" in titles; compact Home banner.

@@ -54,8 +54,6 @@ public partial class StatusWindow : Window
 
     void OnAgentStateChanged() => Dispatcher.BeginInvoke(model.Refresh);
 
-    void OnClose(object sender, RoutedEventArgs e) => Close();
-
     /// <summary>The environment page; its changes can clear the exposed-variables check, so coming back Home re-runs the checks.</summary>
     EnvironmentPage? ShowEnvironment() => Navigate<EnvironmentPage>();
 
@@ -110,6 +108,9 @@ public partial class StatusWindow : Window
     /// <summary>A page that edits what the agent serves is open, so the app must not quit or update under it.</summary>
     internal bool Editing => PageHost.Content is SecretsPage or ServicesPage;
 
+    /// <summary>The last run's checks as text, for About's Copy details.</summary>
+    internal string Details() => model.Details();
+
     internal bool CanLeavePage() => PageHost.Content is not SecretsPage secrets || secrets.CanLeave();
 
     void OnNav(object sender, SelectionChangedEventArgs e)
@@ -136,12 +137,15 @@ public partial class StatusWindow : Window
         }
     }
 
-    /// <summary>Escape on a page goes back Home; on Home it closes the window (Close is the cancel button).</summary>
+    /// <summary>Escape on a page goes back Home; on Home it closes the window.</summary>
     protected override void OnPreviewKeyDown(System.Windows.Input.KeyEventArgs e)
     {
-        if (e.Key == System.Windows.Input.Key.Escape && PageHost.Content is not null && System.Windows.Input.Keyboard.FocusedElement is not (TextBox or PasswordBox))
+        if (e.Key == System.Windows.Input.Key.Escape && System.Windows.Input.Keyboard.FocusedElement is not (TextBox or PasswordBox))
         {
-            ShowHome();
+            if (PageHost.Content is null)
+                Close();
+            else
+                ShowHome();
             e.Handled = true;
         }
         base.OnPreviewKeyDown(e);
@@ -338,8 +342,12 @@ public sealed partial class FindingRow(IReadOnlyList<DoctorCheck> checks) : Obse
 
     public Visibility ClosedVisibility => IsOpen ? Visibility.Collapsed : Visibility.Visible;
 
-    /// <summary>Details has something to show: the longer text, or a group's members.</summary>
-    public Visibility DetailsVisibility => Detail.Length > 0 || IsGroup ? Visibility.Visible : Visibility.Collapsed;
+    /// <summary>Its place in the list, shown in the badge; 0 for a group's member, which shows its status glyph instead.</summary>
+    public int Number { get; init; }
+
+    public Visibility NumberVisibility => Number > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+    public Visibility GlyphVisibility => Number > 0 ? Visibility.Collapsed : Visibility.Visible;
 
     public string Name { get; } = FindingView.Title(checks);
 
@@ -349,6 +357,13 @@ public sealed partial class FindingRow(IReadOnlyList<DoctorCheck> checks) : Obse
 
     /// <summary>Where it is and where the fix takes it, in words; the codes stay in Copy details.</summary>
     public string Moves { get; } = PositionText.Moves(checks[0].Now, checks[0].Better);
+
+    /// <summary><see cref="Moves"/> in three parts, so the place the fix leads to can stand out.</summary>
+    public string MovesNow => Check.Now is { } now ? PositionText.Short(now) : "";
+
+    public string MovesArrow => Check.Now is not null && Check.Better is not null ? " → " : "";
+
+    public string MovesBetter => Check.Now is not null && Check.Better is { } better ? PositionText.Short(better) : "";
 
     public string? MovesMeaning => PositionText.Meaning(Check.Now, Check.Better) is { Length: > 0 } meaning ? meaning : null;
 
@@ -453,6 +468,10 @@ public sealed partial class StatusViewModel : ObservableObject
     [ObservableProperty]
     public partial string LockLabel { get; set; } = "";
 
+    /// <summary>Draws the lock beside the headline: open and green while unlocked.</summary>
+    [ObservableProperty]
+    public partial bool IsUnlocked { get; set; }
+
     /// <summary>Lock right here, or unlock with one Hello prompt; the agent's state change refreshes the page.</summary>
     [RelayCommand]
     async Task ToggleLockAsync()
@@ -472,6 +491,20 @@ public sealed partial class StatusViewModel : ObservableObject
     public Visibility PassedVisibility => Passed.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
 
     public string PassedHeader => Text.Format("Status_PassedHeader", Passed.Count);
+
+    /// <summary>The passed checks, opened from the link at the foot of the page.</summary>
+    [ObservableProperty]
+    public partial bool ShowPassed { get; set; }
+
+    [RelayCommand]
+    void TogglePassed() => ShowPassed = !ShowPassed;
+
+    /// <summary>The dismissed findings, opened from the link at the foot of the page.</summary>
+    [ObservableProperty]
+    public partial bool ShowDismissed { get; set; }
+
+    [RelayCommand]
+    void ToggleDismissed() => ShowDismissed = !ShowDismissed;
 
     /// <summary>The findings shown: the first <see cref="FirstFindings"/> until Show all, since the page has one scroll region and a drive of repositories has hundreds.</summary>
     public ObservableCollection<FindingRow> Findings { get; } = [];
@@ -559,7 +592,8 @@ public sealed partial class StatusViewModel : ObservableObject
         var view = TrayStatus.Describe(App.Current.Snapshot());
         Headline = Text.Of(view.Headline);
         mode = Text.Get(view.Mode is null ? "Status_ModeNone" : "Status_ModeSolo");
-        LockLabel = Text.Get(App.Current.Host.Keys.IsUnlocked ? "Tray_Lock" : "Tray_Unlock");
+        IsUnlocked = App.Current.Host.Keys.IsUnlocked;
+        LockLabel = Text.Get(IsUnlocked ? "Tray_Lock" : "Tray_Unlock");
         ShowAreas();
     }
 
@@ -571,7 +605,32 @@ public sealed partial class StatusViewModel : ObservableObject
         OnPropertyChanged(nameof(ServicesVisibility));
         OnPropertyChanged(nameof(EnvironmentVisibility));
         OnPropertyChanged(nameof(ActivityVisibility));
+        _ = ShowCountsAsync();
     }
+
+    [ObservableProperty]
+    public partial string SecretsCount { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string ServicesCount { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string VariablesCount { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string ActivityCount { get; set; } = "";
+
+    /// <summary>The counts beside the places; one that can't be read shows nothing rather than a guess.</summary>
+    async Task ShowCountsAsync()
+    {
+        var counts = await Task.Run(Home.Counts);
+        SecretsCount = Count(counts.Secrets);
+        ServicesCount = Count(counts.Services);
+        VariablesCount = Count(counts.Variables);
+        ActivityCount = counts.ActivityToday is { } today ? Text.Format("Nav_ActivityToday", today) : "";
+    }
+
+    static string Count(int? count) => count?.ToString(CultureInfo.CurrentCulture) ?? "";
 
     IReadOnlySet<HomeArea> areas = new HashSet<HomeArea>();
 
@@ -626,7 +685,7 @@ public sealed partial class StatusViewModel : ObservableObject
     void Show()
     {
         var split = FindingView.Of(last, DismissalStore.Load());
-        allFindings = [.. split.Open.Select((group, i) => new FindingRow(group) { IsOpen = i == 0 })];
+        allFindings = [.. split.Open.Select((group, i) => new FindingRow(group) { IsOpen = i == 0, Number = i + 1 })];
         if (last.Count > 0)
             Home.LastFindings = allFindings.Count;
         ShowFindings();
@@ -700,26 +759,16 @@ public sealed partial class StatusViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
-    void Copy()
+    /// <summary>The state and every check of the last run, as text for a bug report; About copies it with its own facts.</summary>
+    public string Details()
     {
         var sb = new StringBuilder().AppendLine(Headline).AppendLine(mode).AppendLine(Build);
         foreach (var check in allFindings.SelectMany(row => row.Checks))
             sb.AppendLine(CultureInfo.CurrentCulture, $"{check.Status}  {check.Name}: {check.Detail} [{FindingView.Moves(check)}]");
         foreach (var row in Checks.Concat(Passed))
             sb.AppendLine(CultureInfo.CurrentCulture, $"{row.StatusText}  {row.Name}: {row.Detail}");
-        try
-        {
-            Clipboard.SetText(sb.ToString());
-        }
-        catch (System.Runtime.InteropServices.COMException)
-        {
-            // The clipboard is busy; pressing again works.
-        }
+        return sb.ToString();
     }
-
-    [RelayCommand]
-    void OpenFolder() => Desktop.OpenDataFolder();
 
     static CheckRow Row(DoctorCheck check) => check.Status switch
     {

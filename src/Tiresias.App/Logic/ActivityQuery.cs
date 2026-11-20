@@ -66,12 +66,7 @@ public static class ActivityQuery
 
     public static IReadOnlyList<ActivityEntry> Filter(IEnumerable<ActivityEntry> entries, ActivityFilter filter, DateTimeOffset now)
     {
-        var since = filter.Period switch
-        {
-            ActivityPeriod.Today => new DateTimeOffset(now.ToLocalTime().Date, now.ToLocalTime().Offset),
-            ActivityPeriod.Week => now.AddDays(-7),
-            _ => DateTimeOffset.MinValue,
-        };
+        var since = Since(filter.Period, now);
         var text = filter.Text?.Trim();
         return entries
             .Where(e => e.Time >= since)
@@ -87,6 +82,21 @@ public static class ActivityQuery
             .Take(Limit)
             .ToArray();
     }
+
+    /// <summary>Today's records and, among them, the approvals: the counts beside Activity and in the tray.</summary>
+    public static (int Records, int Approvals) Today(IEnumerable<ActivityEntry> entries, DateTimeOffset now)
+    {
+        var since = Since(ActivityPeriod.Today, now);
+        var today = entries.Where(e => e.Time >= since).ToArray();
+        return (today.Length, today.Count(e => e.Kind == AuditKind.Allow));
+    }
+
+    static DateTimeOffset Since(ActivityPeriod period, DateTimeOffset now) => period switch
+    {
+        ActivityPeriod.Today => new DateTimeOffset(now.ToLocalTime().Date, now.ToLocalTime().Offset),
+        ActivityPeriod.Week => now.AddDays(-7),
+        _ => DateTimeOffset.MinValue,
+    };
 
     public static bool IsDenial(AuditKind kind) => kind is AuditKind.Deny or AuditKind.TrustRejected;
 
