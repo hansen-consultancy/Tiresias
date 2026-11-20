@@ -107,6 +107,9 @@ public partial class StatusWindow : Window
         navigating = false;
     }
 
+    /// <summary>A page that edits what the agent serves is open, so the app must not quit or update under it.</summary>
+    internal bool Editing => PageHost.Content is SecretsPage or ServicesPage;
+
     bool CanLeavePage() => PageHost.Content is not SecretsPage secrets || secrets.CanLeave();
 
     void OnNav(object sender, SelectionChangedEventArgs e)
@@ -124,7 +127,7 @@ public partial class StatusWindow : Window
         };
         if (place == "Home")
             ShowHome();
-        else if (shown is null)
+        if (PageHost.Content is not null && (place == "Home" || shown is null))
         {
             // The page open now kept the window: put the selection back on it.
             navigating = true;

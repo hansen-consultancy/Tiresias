@@ -1367,7 +1367,7 @@ Store them in clear?</value>
     <value>Later</value>
   </data>
   <data name="Update_Busy" xml:space="preserve">
-    <value>Finish what's open first (an approval, the secrets editor, the services window or setup), then choose the update in the tray menu again.</value>
+    <value>Finish what's open first (an approval, the secrets editor, the Services page or setup), then choose the update in the tray menu again.</value>
   </data>
   <data name="Services_Heading" xml:space="preserve">
     <value>Services</value>

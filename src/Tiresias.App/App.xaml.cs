@@ -40,7 +40,7 @@ public partial class App : Application
     internal ProgramGuard Guard => guard!;
 
     /// <summary>A window that must not be interrupted (consent, secrets editor, services, first run, recovery) is open.</summary>
-    internal bool Busy => consent?.Busy == true || windows.ContainsKey(typeof(SecretsPage)) || windows.ContainsKey(typeof(ServicesPage))
+    internal bool Busy => consent?.Busy == true || (windows.TryGetValue(typeof(StatusWindow), out var status) && ((StatusWindow)status).Editing)
         || windows.ContainsKey(typeof(FirstRunWindow)) || windows.ContainsKey(typeof(RecoveryWindow));
 
     internal static new App Current => (App)Application.Current;
