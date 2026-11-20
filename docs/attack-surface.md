@@ -119,8 +119,10 @@ the command. The new kinds:
   attribute, because deleting an unknown file could break something the user needs.
 - **`RemoveEntry`** exports the uninstall key to a `.reg` file, then deletes it, so **Turn back
   on** can import it again. A machine-wide key needs an administrator.
-- **`Repair`** is the installer's own reinstall (`winget install --id <id> --exact --force`).
-  It is offered before `Uninstall` whenever the uninstaller is missing, since removing by hand
+- **`Repair`** is the installer's own reinstall of the installed version
+  (`winget install --id <id> --exact --version <installed version> --force`); without
+  `--version`, winget installs the latest. When winget no longer offers that version, the fix
+  says so and offers the latest instead. It is offered before `Uninstall` whenever the uninstaller is missing, since removing by hand
   leaves shell extensions and services registered.
 - **`ReplaceWithWebApp`** is a guide, not a command: install the site as an app from Edge or
   Chrome (Start menu, taskbar, own window, notifications, listed and removed like any app), check
