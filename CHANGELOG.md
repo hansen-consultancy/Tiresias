@@ -139,6 +139,9 @@ its section below.
 
 ### Changed
 
+- Home, the secrets editor, Services, Environment variables, Activity and About are now pages of
+  one window, listed on the left, instead of separate windows. The whole window stays out of
+  screenshots and screen shares. Escape on a page goes back Home.
 - A left click on the tray icon opens a flyout: the lock state with Lock or Unlock, how many things
   could be safer (from Home's last check), and Add..., the secrets editor, Activity and Open
   Tiresias. The right-click menu is unchanged.

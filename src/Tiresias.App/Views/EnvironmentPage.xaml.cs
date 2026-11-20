@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Tiresias.Agent;
@@ -12,14 +13,13 @@ namespace Tiresias.App.Views;
 /// The sealed environment: user environment variables moved out of Windows, put back, added and
 /// removed. Values are typed here but never shown; the window is excluded from screen capture.
 /// </summary>
-public partial class EnvironmentWindow : Window
+public partial class EnvironmentPage : UserControl
 {
     readonly EnvironmentViewModel model = new();
 
-    public EnvironmentWindow()
+    public EnvironmentPage()
     {
         InitializeComponent();
-        Desktop.ExcludeFromCapture(this);
         DataContext = model;
         Loaded += async (_, _) =>
         {
@@ -48,7 +48,7 @@ public partial class EnvironmentWindow : Window
     void OnBrowse(object sender, RoutedEventArgs e)
     {
         var dialog = new Microsoft.Win32.OpenFolderDialog { Title = Text.Get("Env_FolderPick") };
-        if (dialog.ShowDialog(this) == true)
+        if (dialog.ShowDialog(Window.GetWindow(this)) == true)
             model.NewFolder = dialog.FolderName;
     }
 
@@ -58,7 +58,6 @@ public partial class EnvironmentWindow : Window
         NewValue.Clear();
     }
 
-    void OnClose(object sender, RoutedEventArgs e) => Close();
 }
 
 /// <param name="folder">For a sealed variable kept for one folder: that folder; <c>null</c> for the global set and for Windows' own.</param>

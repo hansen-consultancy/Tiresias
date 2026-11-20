@@ -94,7 +94,7 @@ needed for a catalogue of this size, and the deterministic match stays as the fa
 | Services: Add, Set up a SQL Server, Set up a RavenDB | One **Add...** opening *What do you need?*. Edit, How to use and Remove stay, since they act on a selected service |
 | Home: Secrets, Services, Environment variables buttons | The areas in use (phase 4) |
 | Tray: a line per window | Unlock/Lock, Home, Add..., Activity, Quit, and the findings badge |
-| `SqlServerWindow`, `RavenServerWindow`, the Services add form, `EnvironmentWindow` | Unchanged; they are where options lead, opened filled in where the need gave inputs |
+| `SqlServerWindow`, `RavenServerWindow`, the Services add form, `EnvironmentPage` | Unchanged; they are where options lead, opened filled in where the need gave inputs |
 
 Existing windows keep doing the work. This changes how people get to them, not what they do.
 

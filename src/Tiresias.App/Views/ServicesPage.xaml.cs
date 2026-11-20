@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Text;
 using System.Windows;
+using System.Windows.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Tiresias.Agent;
@@ -17,17 +18,16 @@ namespace Tiresias.App.Views;
 /// agent locks or the window closes. In solo mode the broker uses a saved service from its next
 /// request.
 /// </summary>
-public partial class ServicesWindow : Window
+public partial class ServicesPage : UserControl
 {
     readonly ServicesViewModel model = new();
 
-    public ServicesWindow()
+    public ServicesPage()
     {
         InitializeComponent();
-        Desktop.ExcludeFromCapture(this);
         DataContext = model;
         App.Current.Host.StateChanged += OnAgentStateChanged;
-        Closed += (_, _) =>
+        Unloaded += (_, _) =>
         {
             App.Current.Host.StateChanged -= OnAgentStateChanged;
             model.Value = "";
@@ -45,7 +45,6 @@ public partial class ServicesWindow : Window
     /// <summary>Set up a RavenDB, from <i>What do you need?</i>.</summary>
     public void SetUpRaven() => model.SetUpRaven(null);
 
-    void OnClose(object sender, RoutedEventArgs e) => Close();
 }
 
 public sealed record ServiceRow(string Slug, string Upstream, string Grants);
@@ -53,7 +52,7 @@ public sealed record ServiceRow(string Slug, string Upstream, string Grants);
 public sealed partial class ServicesViewModel : ObservableObject
 {
     /// <summary>The window this model drives, so a question opens over it.</summary>
-    static Window? Owner() => Application.Current.Windows.OfType<ServicesWindow>().FirstOrDefault();
+    static Window? Owner() => Application.Current.Windows.OfType<StatusWindow>().FirstOrDefault();
 
     bool attempted;
 

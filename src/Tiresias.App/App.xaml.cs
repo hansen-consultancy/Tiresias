@@ -40,7 +40,7 @@ public partial class App : Application
     internal ProgramGuard Guard => guard!;
 
     /// <summary>A window that must not be interrupted (consent, secrets editor, services, first run, recovery) is open.</summary>
-    internal bool Busy => consent?.Busy == true || windows.ContainsKey(typeof(SecretsWindow)) || windows.ContainsKey(typeof(ServicesWindow))
+    internal bool Busy => consent?.Busy == true || (windows.TryGetValue(typeof(StatusWindow), out var status) && ((StatusWindow)status).Editing)
         || windows.ContainsKey(typeof(FirstRunWindow)) || windows.ContainsKey(typeof(RecoveryWindow));
 
     internal static new App Current => (App)Application.Current;
@@ -238,13 +238,16 @@ public partial class App : Application
         return window;
     }
 
+    /// <summary>Opens Home's window on page <typeparamref name="T"/>; <c>null</c> when the page open there keeps it (unsaved secrets).</summary>
+    internal T? ShowPage<T>() where T : System.Windows.Controls.UserControl, new() => ShowWindow<StatusWindow>().Navigate<T>();
+
     /// <summary>The app's front door: setup while it is unfinished, the status page after.</summary>
     internal void ShowHome()
     {
         if (FirstRunPlan.Needed(SetupFacts()))
             ShowWindow<FirstRunWindow>();
         else
-            ShowWindow<StatusWindow>();
+            ShowWindow<StatusWindow>().ShowHome();
     }
 
     /// <summary>Secrets saved before policy binding are refused by the broker until the user approves binding them.</summary>
@@ -561,6 +564,9 @@ public partial class App : Application
 
     internal async void Quit()
     {
+        // Unsaved secrets are saved, discarded or keep the app running: Shutdown would close the window without asking.
+        if (windows.TryGetValue(typeof(StatusWindow), out var status) && !((StatusWindow)status).CanLeavePage())
+            return;
         SystemEvents.SessionSwitch -= OnSessionSwitch;
         SystemEvents.PowerModeChanged -= OnPowerModeChanged;
         updates?.Dispose();

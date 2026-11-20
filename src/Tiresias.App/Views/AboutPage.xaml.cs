@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
+using System.Windows.Controls;
 using Tiresias.Agent;
 using Tiresias.App.Logic;
 
@@ -11,13 +12,13 @@ namespace Tiresias.App.Views;
 /// Which Tiresias this is: version, where it runs from, since when, and this version's release
 /// notes. A development build adds what a tester needs: the commit, build time and configuration.
 /// </summary>
-public partial class AboutWindow : Window
+public partial class AboutPage : UserControl
 {
     public sealed record Fact(string Name, string Value);
 
     readonly List<Fact> facts = [];
 
-    public AboutWindow()
+    public AboutPage()
     {
         InitializeComponent();
         var build = AppBuild.Current;
@@ -78,5 +79,4 @@ public partial class AboutWindow : Window
         }
     }
 
-    void OnClose(object sender, RoutedEventArgs e) => Close();
 }

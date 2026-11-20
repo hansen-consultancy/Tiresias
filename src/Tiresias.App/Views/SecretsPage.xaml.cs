@@ -19,18 +19,17 @@ namespace Tiresias.App.Views;
 /// window is excluded from screen capture, its values are dropped when the agent locks, and saving
 /// always seals: there is no way to write the file back in clear.
 /// </summary>
-public partial class SecretsWindow : Window
+public partial class SecretsPage : UserControl
 {
     readonly SecretsViewModel model = new();
 
-    public SecretsWindow()
+    public SecretsPage()
     {
         InitializeComponent();
-        Desktop.ExcludeFromCapture(this);
         DataContext = model;
         App.Current.Host.StateChanged += OnAgentStateChanged;
         Loaded += (_, _) => _ = model.RescanAsync();
-        Closed += (_, _) =>
+        Unloaded += (_, _) =>
         {
             App.Current.Host.StateChanged -= OnAgentStateChanged;
             model.Forget();
@@ -43,19 +42,16 @@ public partial class SecretsWindow : Window
             model.Forget();
     });
 
-    protected override void OnClosing(CancelEventArgs e)
+    /// <summary>Asked before the shell leaves this page or closes: unsaved changes are saved, discarded, or keep it open.</summary>
+    public bool CanLeave()
     {
-        if (model.IsDirty)
-        {
-            var choice = AskWindow.Show(this, Text.Get("Secrets_UnsavedTitle"), Text.Get("Secrets_UnsavedBody"),
-                Text.Get("Secrets_Save"), Text.Get("Secrets_Discard"), Text.Get("Common_Cancel"));
-            if (choice is null || (choice == true && !model.TrySave()))
-                e.Cancel = true;
-        }
-        base.OnClosing(e);
+        if (!model.IsDirty)
+            return true;
+        var choice = AskWindow.Show(Window.GetWindow(this), Text.Get("Secrets_UnsavedTitle"), Text.Get("Secrets_UnsavedBody"),
+            Text.Get("Secrets_Save"), Text.Get("Secrets_Discard"), Text.Get("Common_Cancel"));
+        return choice is not null && (choice == false || model.TrySave());
     }
 
-    void OnClose(object sender, RoutedEventArgs e) => Close();
 
     /// <summary>Opens <paramref name="id"/>'s secrets, as the status page's Review does.</summary>
     public void Select(string id) => model.Select(id);
@@ -86,7 +82,7 @@ public sealed partial class SecretRow : ObservableObject
 public sealed partial class SecretsViewModel : ObservableObject
 {
     /// <summary>The window this model drives, so a question opens over it.</summary>
-    static Window? Owner() => Application.Current.Windows.OfType<SecretsWindow>().FirstOrDefault();
+    static Window? Owner() => Application.Current.Windows.OfType<StatusWindow>().FirstOrDefault();
 
     UserSecretsFolder? folder;
     UserSecretsLoad? loaded;

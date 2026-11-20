@@ -17,11 +17,14 @@ CI and people who prefer it, and it talks to the same agent.
   it is absent until Home has run), then Add..., the secrets editor and Activity when in use, Open
   Tiresias, a waiting update, the build and Quit. Before setup is finished a left click opens
   setup, as before ([design](app-design.md#9-the-tray-flyout)).
-- **What do you need?** (**Add...** in the tray and the Services window): the needs, each with its
+- **What do you need?** (**Add...** in the tray and on the Services page): the needs, each with its
   ways to meet it strongest first and what each gives up, and a search box matched on this PC.
   An option opens the Services add form, Set up a SQL Server or a RavenDB, the environment
   variables or the secrets editor, or a guide when there is no secret to keep
   ([design](what-do-you-need.md)). `tir advise "<words>"` prints the same list.
+- **One window**: Home, the secrets editor, Services, Environment variables, Activity and About
+  are pages listed on the left, the ones this machine uses; the whole window is excluded from
+  screen capture. Escape on a page goes back Home ([design](app-design.md#10-one-window)).
 - **Home leads with the next step**: the lock state with Lock and Add..., then a heading that
   counts what could be safer over a bar of the checks that pass. The first finding is open with
   its fix; the others are one line each, and clicking one opens it instead
@@ -75,7 +78,7 @@ CI and people who prefer it, and it talks to the same agent.
   lives in `%LOCALAPPDATA%\Tiresias\projects.json`, paths and ids only. Ids no scanned project
   uses are grouped under **No project found** and can be moved to the Recycle Bin, once at least
   one folder has been scanned.
-- **Activity window** over the local logs: the agent's decisions (`activity.jsonl`: user secrets,
+- **Activity page** over the local logs: the agent's decisions (`activity.jsonl`: user secrets,
   `tir run` and NuGet) and the solo broker's audit (`solo\audit.jsonl`). Filters: period, outcome,
   source and text. Each NuGet credential request for a mapped feed is recorded with the program,
   the feed and the variable name, never the token: allowed once, allowed for this session, allowed
@@ -131,7 +134,7 @@ hosts:
 | Placeholder consent (`tir grant`, `tir exec`) | terminal y/N | dialog; the CLI asks the agent |
 | Unlock / lock | `tir unlock`, `tir lock` | tray menu, plus the Hello prompt |
 | Secrets editing | `tir vault add` | capture-excluded editor: the full JSON view, like App Service |
-| Services for `tir exec` | `tir service add`, `list`, `remove` | Services window: list, add (same checks as the CLI), remove; each change shown and approved with Windows Hello |
+| Services for `tir exec` | `tir service add`, `list`, `remove` | Services page: list, add (same checks as the CLI), remove; each change shown and approved with Windows Hello |
 | SQL Server per-lease logins | (none yet) | **Add...**, *An app needs a database*, **Set up a SQL Server**: runs the setup script with a one-off administrator sign-in, seals the provisioner, saves the service |
 | Activity | not built | window with filters (tenant, service, process, decision) |
 | Health | `tir doctor` | status page, same checks, a "fix" button where it's safe |

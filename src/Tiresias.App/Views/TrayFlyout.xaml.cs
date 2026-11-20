@@ -72,9 +72,9 @@ public partial class TrayFlyout : UserControl
 
     void OnAdd(object sender, RoutedEventArgs e) => Act(() => App.Current.ShowWindow<NeedsWindow>());
 
-    void OnSecrets(object sender, RoutedEventArgs e) => Act(() => App.Current.ShowWindow<SecretsWindow>());
+    void OnSecrets(object sender, RoutedEventArgs e) => Act(() => App.Current.ShowPage<SecretsPage>());
 
-    void OnActivity(object sender, RoutedEventArgs e) => Act(() => App.Current.ShowWindow<ActivityWindow>());
+    void OnActivity(object sender, RoutedEventArgs e) => Act(() => App.Current.ShowPage<ActivityPage>());
 
     void OnUpdate(object sender, RoutedEventArgs e) => Act(() => applyUpdate?.Invoke());
 

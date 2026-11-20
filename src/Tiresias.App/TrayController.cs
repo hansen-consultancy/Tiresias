@@ -42,7 +42,7 @@ sealed class TrayController : IDisposable
         setup.Click += (_, _) => app.ShowWindow<FirstRunWindow>();
         var status = Item("Tray_Status", () => app.ShowWindow<StatusWindow>());
         var add = Item("Tray_Add", () => app.ShowWindow<NeedsWindow>());
-        var activity = Item("Tray_Activity", () => app.ShowWindow<ActivityWindow>());
+        var activity = Item("Tray_Activity", () => app.ShowPage<ActivityPage>());
         var quit = Item("Tray_Quit", app.Quit);
 
         icon = new TaskbarIcon
