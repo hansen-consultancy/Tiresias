@@ -39,7 +39,10 @@ public partial class EnvironmentWindow : Window
     void ShowPick()
     {
         if (model.ApplyPick())
-            PlaceholderLabel.BringIntoView();
+        {
+            PlaceholderSection.IsExpanded = true;
+            PlaceholderSection.BringIntoView();
+        }
     }
 
     void OnBrowse(object sender, RoutedEventArgs e)
@@ -107,6 +110,14 @@ public sealed partial class EnvironmentViewModel : ObservableObject
     [ObservableProperty]
     public partial Visibility NuGetMappedVisibility { get; set; } = Visibility.Collapsed;
 
+    /// <summary>The NuGet card opens when it lists a feed, mapped or found (docs/app-design.md, rule 3).</summary>
+    [ObservableProperty]
+    public partial bool NuGetListsFeeds { get; set; }
+
+    /// <summary>The Windows card lists every user variable; it opens only when one looks like a secret.</summary>
+    [ObservableProperty]
+    public partial bool WindowsHasSecrets { get; set; }
+
     [ObservableProperty]
     public partial Visibility NuGetFoundVisibility { get; set; } = Visibility.Collapsed;
 
@@ -162,6 +173,7 @@ public sealed partial class EnvironmentViewModel : ObservableObject
                 Text.Format(variable.LooksSecret ? "Env_DetailSecret" : "Env_Detail", variable.Length), variable.LooksSecret));
         SealedSummary = Sealed.Count == 0 ? Text.Get("Env_NoneSealed") : Text.Format("Env_SealedSummary", Sealed.Count);
         WindowsSummary = Text.Format("Env_WindowsSummary", user.Count(v => v.LooksSecret));
+        WindowsHasSecrets = user.Any(v => v.LooksSecret);
         RefreshNuGet(sealedNow);
         RefreshPlaceholders();
         CanEdit = true;
@@ -272,6 +284,7 @@ public sealed partial class EnvironmentViewModel : ObservableObject
                 step.Acts, canPick: step.Acts));
         NuGetMappedVisibility = NuGetMapped.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         NuGetFoundVisibility = NuGetFound.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        NuGetListsFeeds = NuGetMapped.Count + NuGetFound.Count > 0;
         NuGetSummary = NuGetMapped.Count == 0 && NuGetFound.Count == 0 ? Text.Get("Env_NuGetNone")
             : nugetSteps.Any(s => s.Acts) ? Text.Get("Env_NuGetFoundSummary")
             : Text.Format("Env_NuGetSummary", NuGetMapped.Count);

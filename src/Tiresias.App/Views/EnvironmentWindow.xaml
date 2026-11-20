@@ -19,112 +19,153 @@
     </StackPanel>
 
     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Focusable="False">
+      <!-- One card per task, open when it has something to act on (docs/app-design.md, rule 3). -->
       <StackPanel IsEnabled="{Binding CanEdit}">
-        <TextBlock Text="{l:S Env_SealedHeading}" Style="{StaticResource SubtitleText}" AutomationProperties.HeadingLevel="Level2" Margin="0,8,0,4" />
-        <TextBlock Text="{Binding SealedSummary}" Style="{StaticResource CaptionText}" />
-        <ItemsControl ItemsSource="{Binding Sealed}" Margin="0,4,0,0" AutomationProperties.Name="{l:S Env_SealedHeading}">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate>
-              <CheckBox IsChecked="{Binding IsChecked}" Margin="0,2">
-                <TextBlock>
-                  <Run Text="{Binding Name, Mode=OneWay}" />
-                  <Run Text="{Binding Detail, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                </TextBlock>
-              </CheckBox>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-          <Button Style="{StaticResource RowButton}" Content="{l:S Env_PutBack}" Command="{Binding PutBackCommand}" />
-          <Button Style="{StaticResource RowButton}" Content="{l:S Env_Remove}" Command="{Binding RemoveCommand}" Margin="8,0,0,0" />
-          <Button Style="{StaticResource RowButton}" Content="{l:S Env_PlaceholderRemove}" Command="{Binding RemovePlaceholderCommand}" Margin="8,0,0,0" />
-        </StackPanel>
+        <Expander IsExpanded="True" Margin="0,0,0,12">
+          <Expander.Header>
+            <StackPanel>
+              <TextBlock Text="{l:S Env_SealedHeading}" Style="{StaticResource SubtitleText}" Margin="0" AutomationProperties.HeadingLevel="Level2" />
+              <TextBlock Text="{Binding SealedSummary}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
+            </StackPanel>
+          </Expander.Header>
+          <StackPanel Margin="0,4,0,0">
+            <ItemsControl ItemsSource="{Binding Sealed}" Margin="0,4,0,0" AutomationProperties.Name="{l:S Env_SealedHeading}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <CheckBox IsChecked="{Binding IsChecked}" Margin="0,2">
+                    <TextBlock>
+                      <Run Text="{Binding Name, Mode=OneWay}" />
+                      <Run Text="{Binding Detail, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </TextBlock>
+                  </CheckBox>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+              <Button Style="{StaticResource RowButton}" Content="{l:S Env_PutBack}" Command="{Binding PutBackCommand}" />
+              <Button Style="{StaticResource RowButton}" Content="{l:S Env_Remove}" Command="{Binding RemoveCommand}" Margin="8,0,0,0" />
+              <Button Style="{StaticResource RowButton}" Content="{l:S Env_PlaceholderRemove}" Command="{Binding RemovePlaceholderCommand}" Margin="8,0,0,0" />
+            </StackPanel>
+          </StackPanel>
+        </Expander>
 
-        <TextBlock x:Name="PlaceholderLabel" Text="{l:S Env_PlaceholderHeading}" Style="{StaticResource SubtitleText}" AutomationProperties.HeadingLevel="Level2" Margin="0,20,0,4" />
-        <TextBlock Text="{Binding PlaceholderSummary}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
-        <Grid Margin="0,4,0,0">
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="Auto" />
-          </Grid.ColumnDefinitions>
-          <ComboBox ItemsSource="{Binding PlaceholderServices}" SelectedItem="{Binding PlaceholderService}" HorizontalAlignment="Stretch"
-                    AutomationProperties.Name="{l:S Env_PlaceholderService}" />
-          <TextBox Grid.Column="1" Text="{Binding PlaceholderBaseUrl, UpdateSourceTrigger=PropertyChanged}" FontFamily="Cascadia Mono, Consolas" Margin="8,0,0,0"
-                   AutomationProperties.Name="{l:S Env_PlaceholderBaseUrl}" ToolTip="{l:S Env_PlaceholderBaseUrlHint}" />
-          <Button Grid.Column="2" Style="{StaticResource RowButton}" Content="{l:S Env_PlaceholderAdd}" Command="{Binding AddPlaceholderCommand}" Margin="8,0,0,0" />
-        </Grid>
-        <TextBlock Text="{l:S Env_PlaceholderBaseUrlHint}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,4,0,0" />
+        <Expander x:Name="PlaceholderSection" IsExpanded="False" Margin="0,0,0,12">
+          <Expander.Header>
+            <StackPanel>
+              <TextBlock Text="{l:S Env_PlaceholderHeading}" Style="{StaticResource SubtitleText}" Margin="0" AutomationProperties.HeadingLevel="Level2" />
+              <TextBlock Text="{Binding PlaceholderSummary}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
+            </StackPanel>
+          </Expander.Header>
+          <StackPanel Margin="0,4,0,0">
+            <Grid Margin="0,4,0,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <ComboBox ItemsSource="{Binding PlaceholderServices}" SelectedItem="{Binding PlaceholderService}" HorizontalAlignment="Stretch"
+                        AutomationProperties.Name="{l:S Env_PlaceholderService}" />
+              <TextBox Grid.Column="1" Text="{Binding PlaceholderBaseUrl, UpdateSourceTrigger=PropertyChanged}" FontFamily="Cascadia Mono, Consolas" Margin="8,0,0,0"
+                       AutomationProperties.Name="{l:S Env_PlaceholderBaseUrl}" ToolTip="{l:S Env_PlaceholderBaseUrlHint}" />
+              <Button Grid.Column="2" Style="{StaticResource RowButton}" Content="{l:S Env_PlaceholderAdd}" Command="{Binding AddPlaceholderCommand}" Margin="8,0,0,0" />
+            </Grid>
+            <TextBlock Text="{l:S Env_PlaceholderBaseUrlHint}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,4,0,0" />
+          </StackPanel>
+        </Expander>
 
-        <TextBlock x:Name="AddLabel" Text="{l:S Env_AddHeading}" Style="{StaticResource SubtitleText}" AutomationProperties.HeadingLevel="Level2" Margin="0,20,0,4" />
-        <Grid>
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="2*" />
-            <ColumnDefinition Width="Auto" />
-          </Grid.ColumnDefinitions>
-          <TextBox Text="{Binding NewName, UpdateSourceTrigger=PropertyChanged}" FontFamily="Cascadia Mono, Consolas"
-                   AutomationProperties.Name="{l:S Env_NewName}" />
-          <PasswordBox x:Name="NewValue" Grid.Column="1" Margin="8,0,0,0" AutomationProperties.Name="{l:S Env_NewValue}" />
-          <Button Grid.Column="2" Style="{StaticResource RowButton}" Content="{l:S Env_Seal}" Margin="8,0,0,0" Click="OnAdd" />
-        </Grid>
-        <Grid Margin="0,8,0,0">
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="Auto" />
-          </Grid.ColumnDefinitions>
-          <TextBox Text="{Binding NewFolder, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="{l:S Env_NewFolder}" />
-          <Button Grid.Column="1" Style="{StaticResource RowButton}" Content="{l:S Env_FolderBrowse}" Margin="8,0,0,0" Click="OnBrowse" />
-        </Grid>
-        <TextBlock Text="{l:S Env_NewFolderHint}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,4,0,0" />
+        <Expander IsExpanded="True" Margin="0,0,0,12">
+          <Expander.Header>
+            <StackPanel>
+              <TextBlock Text="{l:S Env_AddHeading}" Style="{StaticResource SubtitleText}" Margin="0" AutomationProperties.HeadingLevel="Level2" />
+            </StackPanel>
+          </Expander.Header>
+          <StackPanel Margin="0,4,0,0">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="2*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBox Text="{Binding NewName, UpdateSourceTrigger=PropertyChanged}" FontFamily="Cascadia Mono, Consolas"
+                       AutomationProperties.Name="{l:S Env_NewName}" />
+              <PasswordBox x:Name="NewValue" Grid.Column="1" Margin="8,0,0,0" AutomationProperties.Name="{l:S Env_NewValue}" />
+              <Button Grid.Column="2" Style="{StaticResource RowButton}" Content="{l:S Env_Seal}" Margin="8,0,0,0" Click="OnAdd" />
+            </Grid>
+            <Grid Margin="0,8,0,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBox Text="{Binding NewFolder, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="{l:S Env_NewFolder}" />
+              <Button Grid.Column="1" Style="{StaticResource RowButton}" Content="{l:S Env_FolderBrowse}" Margin="8,0,0,0" Click="OnBrowse" />
+            </Grid>
+            <TextBlock Text="{l:S Env_NewFolderHint}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,4,0,0" />
+          </StackPanel>
+        </Expander>
 
-        <TextBlock Text="{l:S Env_WindowsHeading}" Style="{StaticResource SubtitleText}" AutomationProperties.HeadingLevel="Level2" Margin="0,20,0,4" />
-        <TextBlock Text="{Binding WindowsSummary}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
-        <ItemsControl ItemsSource="{Binding InWindows}" Margin="0,4,0,0" AutomationProperties.Name="{l:S Env_WindowsHeading}">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate>
-              <CheckBox IsChecked="{Binding IsChecked}" Margin="0,2">
-                <TextBlock>
-                  <Run Text="{Binding Name, Mode=OneWay}" />
-                  <Run Text="{Binding Detail, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                </TextBlock>
-              </CheckBox>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-        <Button Style="{StaticResource RowButton}" Content="{l:S Env_Protect}" Command="{Binding ProtectCommand}" HorizontalAlignment="Left" Margin="0,8,0,0" />
+        <Expander IsExpanded="{Binding WindowsHasSecrets, Mode=OneWay}" Margin="0,0,0,12">
+          <Expander.Header>
+            <StackPanel>
+              <TextBlock Text="{l:S Env_WindowsHeading}" Style="{StaticResource SubtitleText}" Margin="0" AutomationProperties.HeadingLevel="Level2" />
+              <TextBlock Text="{Binding WindowsSummary}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
+            </StackPanel>
+          </Expander.Header>
+          <StackPanel Margin="0,4,0,0">
+            <ItemsControl ItemsSource="{Binding InWindows}" Margin="0,4,0,0" AutomationProperties.Name="{l:S Env_WindowsHeading}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <CheckBox IsChecked="{Binding IsChecked}" Margin="0,2">
+                    <TextBlock>
+                      <Run Text="{Binding Name, Mode=OneWay}" />
+                      <Run Text="{Binding Detail, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </TextBlock>
+                  </CheckBox>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Button Style="{StaticResource RowButton}" Content="{l:S Env_Protect}" Command="{Binding ProtectCommand}" HorizontalAlignment="Left" Margin="0,8,0,0" />
+          </StackPanel>
+        </Expander>
 
-        <TextBlock Text="{l:S Env_NuGetHeading}" Style="{StaticResource SubtitleText}" AutomationProperties.HeadingLevel="Level2" Margin="0,20,0,4" />
-        <TextBlock Text="{Binding NuGetSummary}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
-        <ItemsControl ItemsSource="{Binding NuGetMapped}" Margin="0,4,0,0" AutomationProperties.Name="{l:S Env_NuGetHeading}">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate>
-              <CheckBox IsChecked="{Binding IsChecked}" IsEnabled="{Binding CanPick}" Margin="0,2">
-                <TextBlock TextWrapping="Wrap">
-                  <Run Text="{Binding Name, Mode=OneWay}" />
-                  <Run Text="{Binding Detail, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                </TextBlock>
-              </CheckBox>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-        <Button Style="{StaticResource RowButton}" Content="{l:S Env_NuGetRemove}" Command="{Binding RemoveNuGetCommand}" HorizontalAlignment="Left" Margin="0,8,0,0"
-                Visibility="{Binding NuGetMappedVisibility}" />
-        <TextBlock Text="{l:S Env_NuGetFoundHeading}" Style="{StaticResource BodyText}" Margin="0,12,0,0" Visibility="{Binding NuGetFoundVisibility}" />
-        <ItemsControl ItemsSource="{Binding NuGetFound}" Margin="0,4,0,0" AutomationProperties.Name="{l:S Env_NuGetFoundHeading}">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate>
-              <CheckBox IsChecked="{Binding IsChecked}" IsEnabled="{Binding CanPick}" Margin="0,2">
-                <TextBlock TextWrapping="Wrap">
-                  <Run Text="{Binding Name, Mode=OneWay}" />
-                  <Run Text="{Binding Detail, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                </TextBlock>
-              </CheckBox>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-        <Button Style="{StaticResource RowButton}" Content="{l:S Env_NuGetImport}" Command="{Binding ImportNuGetCommand}" HorizontalAlignment="Left" Margin="0,8,0,0"
-                Visibility="{Binding NuGetFoundVisibility}" />
+        <Expander IsExpanded="{Binding NuGetListsFeeds, Mode=OneWay}" Margin="0,0,0,12">
+          <Expander.Header>
+            <StackPanel>
+              <TextBlock Text="{l:S Env_NuGetHeading}" Style="{StaticResource SubtitleText}" Margin="0" AutomationProperties.HeadingLevel="Level2" />
+              <TextBlock Text="{Binding NuGetSummary}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
+            </StackPanel>
+          </Expander.Header>
+          <StackPanel Margin="0,4,0,0">
+            <ItemsControl ItemsSource="{Binding NuGetMapped}" Margin="0,4,0,0" AutomationProperties.Name="{l:S Env_NuGetHeading}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <CheckBox IsChecked="{Binding IsChecked}" IsEnabled="{Binding CanPick}" Margin="0,2">
+                    <TextBlock TextWrapping="Wrap">
+                      <Run Text="{Binding Name, Mode=OneWay}" />
+                      <Run Text="{Binding Detail, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </TextBlock>
+                  </CheckBox>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Button Style="{StaticResource RowButton}" Content="{l:S Env_NuGetRemove}" Command="{Binding RemoveNuGetCommand}" HorizontalAlignment="Left" Margin="0,8,0,0"
+                    Visibility="{Binding NuGetMappedVisibility}" />
+            <TextBlock Text="{l:S Env_NuGetFoundHeading}" Style="{StaticResource BodyText}" Margin="0,12,0,0" Visibility="{Binding NuGetFoundVisibility}" />
+            <ItemsControl ItemsSource="{Binding NuGetFound}" Margin="0,4,0,0" AutomationProperties.Name="{l:S Env_NuGetFoundHeading}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <CheckBox IsChecked="{Binding IsChecked}" IsEnabled="{Binding CanPick}" Margin="0,2">
+                    <TextBlock TextWrapping="Wrap">
+                      <Run Text="{Binding Name, Mode=OneWay}" />
+                      <Run Text="{Binding Detail, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </TextBlock>
+                  </CheckBox>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Button Style="{StaticResource RowButton}" Content="{l:S Env_NuGetImport}" Command="{Binding ImportNuGetCommand}" HorizontalAlignment="Left" Margin="0,8,0,0"
+                    Visibility="{Binding NuGetFoundVisibility}" />
+          </StackPanel>
+        </Expander>
       </StackPanel>
     </ScrollViewer>
 

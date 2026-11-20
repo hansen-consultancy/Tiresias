@@ -2033,4 +2033,7 @@ Store them in clear?</value>
   <data name="Position_Meaning" xml:space="preserve">
     <value>{0}: {1}</value>
   </data>
+  <data name="Finding_Details" xml:space="preserve">
+    <value>Details</value>
+  </data>
 </root>

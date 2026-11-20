@@ -1,6 +1,6 @@
 # App design: show less, allow more
 
-**Status:** proposed. A design pass over every window in `src/Tiresias.App`, using
+**Status:** built (#61, #63, #64, #65). A design pass over every window in `src/Tiresias.App`, using
 *What do you need?* (`NeedsWindow`, the Add flow) as the model: one title, one search or summary,
 a list of cards that open on demand, one footer.
 
@@ -11,7 +11,7 @@ a list of cards that open on demand, one footer.
 | Home (`StatusWindow`) | 720×600, centre screen | 4: findings (max 300), a group's members inside it (max 240), dismissed (max 200), checks list | `E5/C3 → E2/C1` on every finding; "Solo mode" | Status card carries headline, mode, build + folder, start-with-Windows and its note; then nav, findings and every passing check |
 | Add (`NeedsWindow`) | 720×640, centre screen | 1 | `E3/C1` beside each option | — the model |
 | Secrets | 820×600, centre screen | grid, plus a detail block that grows with the project | — | A project used by 28 worktrees prints 28 paths above the grid; the grid gets what is left |
-| Services | 860×680, centre screen | grid, or the add form's own scroller | — | Six equal buttons |
+| Services | 860×680, centre screen | grid, or the add form's own scroller | — | Four buttons on one grid (setups already moved to Add) |
 | SQL Server / RavenDB setup | 720×760, centre *owner* | 1 | — | 760 tall: taller than a laptop's work area |
 | Environment | 720×600 | 1 | — | Four sections always open |
 | Activity | 960×620 | grid | — | — |
@@ -54,12 +54,11 @@ The Add flow's pattern, applied everywhere: a **card** shows a title, one line o
 one main action. Everything else (members, reasons, paths, the second and third buttons) sits
 behind the card's **Details** expander, closed by default.
 
-- **Home:** a one-line state ("Unlocked, 3 things to look at"), Lock, Add. Then the findings as
-  cards, worst first. Then one line "12 checks passed" that expands to the list. Navigation to
+- **Home:** the one-line state and Lock. Then the findings, each with its fix in view and the rest
+  under Details. Then one line "12 checks passed" that expands to the list. Navigation to
   Secrets, Services, Environment and Activity stays as today's row, only for areas in use.
-- **Services:** each service a row with *Edit*; How to use, Remove and the setups move into the
-  row's menu or Details.
-- **Environment:** each section a card, closed when empty, its count in the header.
+- **Services:** left as it is: four buttons on one grid, the setups already reached through Add.
+- **Environment:** each section a card; Sealed and Add new open, the others open when they list something to act on (or when a fix opens them).
 
 ## 4. Ratings in plain language
 

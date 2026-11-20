@@ -145,6 +145,9 @@ its section below.
 - **Ratings read as words**: findings and *What do you need?* show "Readable, unchecked → Stays in
   Tiresias, asks you" instead of `E5/C3 → E3/C1`, and pointing at them says what each word means.
   `tir` and Copy details keep the codes.
+- **Summary first**: a finding shows what it is, where it stands and its fix; its detail and
+  **Dismiss** are under **Details**. The environment variables window is one card per task, open
+  when it has something to act on.
 - **Saving, changing or removing a service asks you to approve it with Windows Hello**, after
   showing what changes (upstream, grants, paths), in the Services window, both setups and
   `tir service add`/`remove`. Its secrets are then bound to those settings: if a program edits the
