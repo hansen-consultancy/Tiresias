@@ -93,6 +93,7 @@ static partial class Desktop
     {
         HelloException { Problem: HelloProblem.NotSetUp } => ProblemKind.HelloNotSetUp,
         HelloException { Problem: HelloProblem.Cancelled } => ProblemKind.HelloCancelled,
+        HelloException { Problem: HelloProblem.Expired } => ProblemKind.HelloExpired,
         HelloException { Problem: HelloProblem.CredentialMissing } => ProblemKind.HelloCredentialMissing,
         HelloException => ProblemKind.HelloUnavailable,
         HttpRequestException or TaskCanceledException => ProblemKind.BrokerUnreachable,

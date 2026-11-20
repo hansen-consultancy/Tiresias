@@ -63,6 +63,8 @@ public static class ControlClient
         {
             return null;
         }
+        // The app may answer with a consent dialog or a Hello prompt: let it come to the front.
+        Foreground.AllowServerOf(pipe.SafePipeHandle);
         using var cts = new CancellationTokenSource(replyTimeout ?? TimeSpan.FromSeconds(30));
         await AgentWire.WriteAsync(pipe, request, cts.Token);
         return await AgentWire.ReadAsync<ControlReply>(pipe, cts.Token);

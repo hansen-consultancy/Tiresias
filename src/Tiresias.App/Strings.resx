@@ -797,6 +797,18 @@ Switch to this copy, {2}, from {3}? The other copy quits first, ending its lease
   <data name="Problem_HelloCancelled_Next" xml:space="preserve">
     <value>Try again when you're ready. Nothing was changed.</value>
   </data>
+  <data name="Problem_HelloExpired_Title" xml:space="preserve">
+    <value>The Windows Hello prompt expired</value>
+  </data>
+  <data name="Problem_HelloExpired_What" xml:space="preserve">
+    <value>The prompt was answered too late. This happens when it waits for minutes behind other windows.</value>
+  </data>
+  <data name="Problem_HelloExpired_Why" xml:space="preserve">
+    <value>Tiresias stays locked, so apps asking for secrets are told to wait until you unlock.</value>
+  </data>
+  <data name="Problem_HelloExpired_Next" xml:space="preserve">
+    <value>Try again and answer the prompt when it appears. A prompt Windows keeps behind other windows flashes in the taskbar.</value>
+  </data>
   <data name="Problem_HelloCredentialMissing_Title" xml:space="preserve">
     <value>The Windows Hello key for Tiresias is gone</value>
   </data>
