@@ -1,6 +1,6 @@
 # AI coding agents
 
-**Status:** built: `tir ai` and `tir ai --snippet`.
+**Status:** built: `tir ai`, `tir ai --snippet` and `tir ai --install`.
 
 An agent such as Claude Code, Codex or Copilot runs as you, so it can read every plain-text
 secret you can. Tiresias gives it a better way: placeholders through `tir exec`, sealed variables
@@ -10,13 +10,16 @@ agent only uses that if it knows Tiresias is there.
 ## Tell every session once
 
 ```powershell
-tir ai --snippet
+tir ai --install ~/.claude/CLAUDE.md
+tir ai --install ~/.codex/AGENTS.md
 ```
 
-prints a few lines to paste into your `CLAUDE.md`, `AGENTS.md` or the equivalent for your agent
-(user-wide or per repository). They say Tiresias is installed, to run `tir ai` before a task needs
-a credential, and never to read, print or ask for a secret value. Tiresias doesn't edit those files
-for you.
+writes a few lines into the file your agent reads (user-wide, as here, or a repository's
+`AGENTS.md`), creating it if needed. They say Tiresias is installed, to run `tir ai` before a task
+needs a credential, and never to read, print or ask for a secret value. The lines sit between
+`<!-- tiresias:begin -->` and `<!-- tiresias:end -->`: installing again replaces them in place,
+and leaves the rest of the file alone. `tir ai --snippet` prints the same lines, markers included,
+to paste by hand.
 
 ## What the agent reads
 

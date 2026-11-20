@@ -2,9 +2,9 @@ namespace Tiresias.Keyring;
 
 /// <summary>
 /// <c>tir ai</c>: what an AI coding agent on this machine needs to know to get credentials through
-/// Tiresias. <see cref="Snippet"/> is the few lines a user pastes into CLAUDE.md or AGENTS.md; it
-/// only points at <c>tir ai</c>, so it stays right as <see cref="Instructions"/> follow the installed
-/// version. Every <c>tir</c> command and flag named here is checked against <see cref="CliUsage"/>.
+/// Tiresias. <see cref="Block"/> is the few lines a user pastes (or <c>tir ai --install</c> writes)
+/// into CLAUDE.md or AGENTS.md; it only points at <c>tir ai</c>, so it stays right as
+/// <see cref="Instructions"/> follow the installed version. Every <c>tir</c> command and flag named here is checked against <see cref="CliUsage"/>.
 /// </summary>
 static class AiGuide
 {
@@ -15,6 +15,37 @@ static class AiGuide
         password or connection string, or an authenticated call, run `tir ai` and follow what it says.
         Never read, print or ask the user for a secret value.
         """;
+
+    public const string Begin = "<!-- tiresias:begin -->";
+    public const string End = "<!-- tiresias:end -->";
+
+    /// <summary>The snippet between markers, so an install finds and replaces it, pasted by hand or not.</summary>
+    public const string Block = Begin + "\n" + Snippet + "\n" + End;
+
+    /// <summary>
+    /// The file's text with <see cref="Block"/> in it: in place of the one between the markers, or
+    /// appended after a blank line. Keeps the file's line endings; the same text when it is current.
+    /// </summary>
+    public static string Install(string? existing)
+    {
+        existing ??= "";
+        var newline = existing.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
+        var block = Block.ReplaceLineEndings(newline);
+        var begin = existing.IndexOf(Begin, StringComparison.Ordinal);
+        if (begin >= 0)
+        {
+            var end = existing.IndexOf(End, begin, StringComparison.Ordinal);
+            if (end < 0)
+                throw new InvalidOperationException($"The file has \"{Begin}\" but no \"{End}\" after it. Remove the Tiresias section by hand, then install again.");
+            return existing[..begin] + block + existing[(end + End.Length)..];
+        }
+        if (existing.Length == 0)
+            return block + newline;
+        var separator = existing.EndsWith(newline + newline, StringComparison.Ordinal) ? ""
+            : existing.EndsWith(newline, StringComparison.Ordinal) ? newline
+            : newline + newline;
+        return existing + separator + block + newline;
+    }
 
     public const string Instructions = """
         # Tiresias: credentials for AI agents

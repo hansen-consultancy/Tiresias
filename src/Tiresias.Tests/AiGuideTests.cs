@@ -53,6 +53,49 @@ public class AiGuideTests
     public void The_snippet_points_at_the_guide() =>
         Assert.That(AiGuide.Snippet, Does.Contain("`tir ai`"));
 
+    static readonly string Block = AiGuide.Block;
+
+    [TestCase(null)]
+    [TestCase("")]
+    public void Install_into_a_new_file_writes_the_block(string? existing) =>
+        Assert.That(AiGuide.Install(existing), Is.EqualTo(Block + "\n"));
+
+    [TestCase("# Mine\n", "# Mine\n\n")]
+    [TestCase("# Mine", "# Mine\n\n")]
+    [TestCase("# Mine\n\n", "# Mine\n\n")]
+    public void Install_appends_after_a_blank_line(string existing, string kept) =>
+        Assert.That(AiGuide.Install(existing), Is.EqualTo(kept + Block + "\n"));
+
+    [Test]
+    public void Install_replaces_an_earlier_copy_in_place()
+    {
+        var old = $"# Mine\n\n{AiGuide.Begin}\nan older snippet\n{AiGuide.End}\n\n## After\n";
+        Assert.That(AiGuide.Install(old), Is.EqualTo($"# Mine\n\n{Block}\n\n## After\n"));
+    }
+
+    [Test]
+    public void Install_twice_changes_nothing()
+    {
+        var once = AiGuide.Install("# Mine\n");
+        Assert.That(AiGuide.Install(once), Is.EqualTo(once));
+    }
+
+    [Test]
+    public void Install_keeps_crlf_line_endings()
+    {
+        var result = AiGuide.Install("# Mine\r\nline\r\n");
+        Assert.That(result, Is.EqualTo("# Mine\r\nline\r\n\r\n" + Block.ReplaceLineEndings("\r\n") + "\r\n"));
+        Assert.That(result.Replace("\r\n", ""), Does.Not.Contain("\n"));
+    }
+
+    [Test]
+    public void Install_refuses_a_begin_marker_without_an_end() =>
+        Assert.That(() => AiGuide.Install($"{AiGuide.Begin}\ncut off"), Throws.InvalidOperationException);
+
+    [Test]
+    public void The_pasted_snippet_is_the_installed_block() =>
+        Assert.That(AiGuide.Block, Does.StartWith(AiGuide.Begin).And.EndWith(AiGuide.End).And.Contain(AiGuide.Snippet));
+
     static string RepoRoot()
     {
         for (var dir = new DirectoryInfo(TestContext.CurrentContext.TestDirectory); dir is not null; dir = dir.Parent)
