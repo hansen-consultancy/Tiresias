@@ -10,6 +10,9 @@ its section below.
 
 ### Added
 
+- `Tiresias.Core` and `Tiresias.Protocol` carry the groundwork for out-of-band alerts: the
+  `tiresias.alert/v1` payload and the planner that decides, per sink, what to send, with dedupe,
+  rate limits and redaction. Nothing sends alerts yet.
 - Home and `tir doctor` list programs you haven't opened in 90 days. A program that works without
   being opened (a tray icon, a service, a driver, something that starts at log-on, a command on
   `PATH`) is never counted, nor one that used a credential. On Home they are one line, last, that
