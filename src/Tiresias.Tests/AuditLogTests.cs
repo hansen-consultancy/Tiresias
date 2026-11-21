@@ -48,6 +48,37 @@ public class AuditLogTests
     }
 
     [Test]
+    public async Task A_complete_snapshot_round_trips_and_an_interrupted_snapshot_is_unavailable()
+    {
+        Write(2);
+        using var log = new AuditLog(path, TimeProvider.System);
+        using var frame = new MemoryStream();
+        await AuditSnapshot.WriteAsync(log, frame, CancellationToken.None);
+        frame.Position = 0;
+        var lines = await AuditSnapshot.ReadAsync(frame, CancellationToken.None);
+        Assert.That(lines, Is.EqualTo(File.ReadAllLines(path)));
+        Assert.That(AuditLog.Verify(lines), Is.Null);
+
+        frame.SetLength(frame.Length - 1);
+        frame.Position = 0;
+        Assert.ThrowsAsync<EndOfStreamException>(async () => await AuditSnapshot.ReadAsync(frame, CancellationToken.None));
+    }
+
+    [Test]
+    public void A_snapshot_keeps_its_record_boundary_while_the_service_continues_writing()
+    {
+        Write(1);
+        using var log = new AuditLog(path, TimeProvider.System);
+        var (file, length) = log.OpenSnapshot();
+        using (file)
+        {
+            log.Append(new(AuditKind.Deny));
+            Assert.That(file.Length, Is.GreaterThan(length));
+            Assert.That(AuditLog.Verify(path), Is.Null);
+        }
+    }
+
+    [Test]
     public void Reopening_continues_the_chain()
     {
         Write(2);

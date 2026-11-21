@@ -23,6 +23,7 @@
   <ItemGroup>
     <!-- Solo mode identifies the loopback caller the way the forwarder does: the same code, linked. -->
     <Compile Include="..\Tiresias.Forwarder\ClientProcess.cs" Link="ClientProcess.cs" />
+    <Compile Include="..\Tiresias.Forwarder\TcpConnectionOwner.cs" Link="TcpConnectionOwner.cs" />
   </ItemGroup>
 
   <ItemGroup>

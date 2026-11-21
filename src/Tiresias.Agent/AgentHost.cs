@@ -1,4 +1,6 @@
 using Tiresias.Audit;
+using Tiresias.Client;
+using Tiresias.Vault;
 using Tiresias.EnvironmentVariables;
 using Tiresias.Protocol;
 using Tiresias.UserSecrets;
@@ -19,12 +21,17 @@ public sealed class AgentHost : IAsyncDisposable
     readonly DecoyWatch decoys = new();
     readonly AuditLog activity;
     readonly List<Task> running = [];
+    readonly SemaphoreSlim soloGate = new(1, 1);
+    FileSystemWatcher? vaultWatcher;
+    BrokerServiceState? soloService;
+    Dictionary<string, int> vaultVersions = [];
 
-    public AgentHost(IUserSecretsConsentPrompt prompt)
+    public AgentHost(IUserSecretsConsentPrompt prompt, Func<string?, CancellationToken, Task<ReleasePolicy>>? checkProgram = null)
     {
         System.IO.Directory.CreateDirectory(KeyringStore.Directory);
         activity = new AuditLog(ActivityPath, TimeProvider.System);
-        UserSecrets = new UserSecretsService(UserSecretsFiles.Root, Keys, prompt, TimeProvider.System, activity, new BrokerSecretReferences(Keys));
+        UserSecrets = new UserSecretsService(UserSecretsFiles.Root, Keys, prompt, TimeProvider.System, activity, new BrokerSecretReferences(Keys),
+            checkProgram ?? AdminProgramBlocks.CheckAsync);
         UserSecrets.Log += Say;
         keeper.Log += Say;
         keeper.Locked += reason => Lock(reason);
@@ -32,14 +39,39 @@ public sealed class AgentHost : IAsyncDisposable
         solo.SecretsUnleased = SealIntoLeaseAsync;
         solo.Audited += (record, at) => BrokerAudited?.Invoke(record, at);
         decoys.Log += Say;
-        decoys.Touched += touch =>
+        decoys.Touched += OnDecoyTouched;
+    }
+
+    void OnDecoyTouched(DecoyTouch touch)
+    {
+        activity.Append(touch.Record());
+        Say(touch.Hit.Use == Decoys.DecoyUse.Read
+            ? $"Decoy file opened: {touch.Sentence}{(touch.Routine is { } routine ? $" (routine: {routine})" : "")}."
+            : $"Decoy used: {touch.Sentence}.");
+        DecoyTouched?.Invoke(touch);
+    }
+
+    /// <summary>
+    /// The service owns incident history and enforces its blocks even when the desktop is closed.
+    /// The position here belongs to this running agent. Restarting resumes at the last explicit review.
+    /// </summary>
+    async Task FollowAdminTierAsync(CancellationToken ct)
+    {
+        long after = 0;
+        while (!ct.IsCancellationRequested)
         {
-            activity.Append(touch.Record());
-            Say(touch.Hit.Use == Decoys.DecoyUse.Read
-                ? $"Decoy file opened: {touch.Sentence}{(touch.Routine is { } routine ? $" (routine: {routine})" : "")}."
-                : $"Decoy used: {touch.Sentence}.");
-            DecoyTouched?.Invoke(touch);
-        };
+            if (await AdminIncidents.WaitAsync(after, ct) is not { } page)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(30), ct);
+                continue;
+            }
+            if (page.Events.Count > 0)
+            {
+                Say("The admin service has decoy incidents awaiting review. See Service incidents in Activity.");
+                ServiceIncidentsReceived?.Invoke();
+            }
+            after = page.LastId;
+        }
     }
 
     /// <summary>The agent's own decisions (user secrets), beside the broker's audit log.</summary>
@@ -58,6 +90,10 @@ public sealed class AgentHost : IAsyncDisposable
     /// <summary>Records how a NuGet credential request for a mapped feed was answered: program, feed and variable, never the token.</summary>
     public void RecordNuGet(NuGetOutcome outcome, string program, int processId, string source, string variable) =>
         activity.Append(NuGetActivity.Record(outcome, program, processId, source, variable));
+
+    public void RecordPolicyRefusal(string consumer, string service, string program, string? peer, string reason) =>
+        activity.Append(new(AuditKind.Deny, Consumer: consumer, Service: service, Process: program,
+            Reason: string.Equals(program, peer, StringComparison.OrdinalIgnoreCase) ? reason : $"{reason} Pipe client: {peer ?? "unidentified"}."));
 
     /// <summary>
     /// Records "This wasn't me" in the activity log: what was asked, the program and the processes
@@ -84,11 +120,13 @@ public sealed class AgentHost : IAsyncDisposable
     /// <summary>Solo mode: a record the broker this agent hosts wrote to its audit log, on the broker's thread. A handler must not throw.</summary>
     public event Action<AuditRecord, DateTimeOffset>? BrokerAudited;
 
+    public event Action? ServiceIncidentsReceived;
+
     /// <summary>Whether the decoys' listeners are up (decoys are placed and their ports were free).</summary>
     public bool DecoysListening => decoys.Listening;
 
-    /// <summary>Solo mode: whether the broker this agent hosts is up.</summary>
-    public bool SoloBrokerRunning => solo.Running;
+    /// <summary>Solo mode: whether the broker is up, in this agent or as the Windows service.</summary>
+    public bool SoloBrokerRunning => solo.Running || vaultWatcher is not null && SoloBrokerProblem is null;
 
     /// <summary>Solo mode: why the broker could not start, until it does.</summary>
     public string? SoloBrokerProblem { get; private set; }
@@ -105,7 +143,27 @@ public sealed class AgentHost : IAsyncDisposable
         running.Add(serving);
         running.Add(keeper.RunAsync(stop.Token));
         decoys.Start();
+        running.Add(FollowAdminTierAsync(stop.Token));
         await StartSoloBrokerAsync();
+        running.Add(FollowBrokerServiceAsync(stop.Token));
+    }
+
+    /// <summary>
+    /// The service can be installed, stopped or removed while this agent runs unlocked all day: each check that finds
+    /// it changed starts the solo broker over, so the status and the vault watcher never describe a broker that is gone.
+    /// </summary>
+    async Task FollowBrokerServiceAsync(CancellationToken ct)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(15));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(ct))
+                if (KeyringStore.Tenant is { Solo: true } && BrokerService.State() != soloService)
+                    await StartSoloBrokerAsync();
+        }
+        catch (OperationCanceledException)
+        {
+        }
     }
 
     /// <summary>Answers the request, then links its id to the asking program's project, off the pipe's path.</summary>
@@ -119,8 +177,38 @@ public sealed class AgentHost : IAsyncDisposable
     /// <summary>Starts the solo broker when this device uses one and it isn't up; a failure is kept in <see cref="SoloBrokerProblem"/>, not thrown.</summary>
     async Task StartSoloBrokerAsync()
     {
-        if (KeyringStore.Tenant is not { Solo: true })
+        await soloGate.WaitAsync();
+        try
+        {
+            await StartSoloBrokerLockedAsync();
+        }
+        finally
+        {
+            soloGate.Release();
+        }
+    }
+
+    async Task StartSoloBrokerLockedAsync()
+    {
+        if (KeyringStore.Tenant is not { Solo: true } tenant)
             return;
+        var service = BrokerService.State();
+        if (soloService is { } was && was != service)
+            Say(service == BrokerServiceState.NotInstalled
+                ? "The Tiresias service was removed: the solo broker runs in this app again. Unlock to open its lease."
+                : $"The Tiresias service is {service.ToString().ToLowerInvariant()}.");
+        soloService = service;
+        if (service is not BrokerServiceState.NotInstalled)
+        {
+            SoloBrokerProblem = service == BrokerServiceState.Stopped
+                ? "The Tiresias service is stopped: start it in Windows Services, or run tir solo service install again."
+                : null;
+            WatchVault(tenant.VaultPath);
+            StateChanged?.Invoke();
+            return;
+        }
+        vaultWatcher?.Dispose();
+        vaultWatcher = null;
         try
         {
             await solo.StartAsync();
@@ -141,7 +229,7 @@ public sealed class AgentHost : IAsyncDisposable
     /// </summary>
     public async Task<UnlockResult?> UnlockAsync()
     {
-        await Task.Run(() => Keys.Unlock());
+        await Task.Run(() => UnlockActivity.Run(() => Keys.Unlock(), activity));
         StateChanged?.Invoke();
         if (KeyringStore.Broker is null)
             return null;
@@ -152,6 +240,46 @@ public sealed class AgentHost : IAsyncDisposable
         Say(result.Message);
         StateChanged?.Invoke();
         return result;
+    }
+
+    /// <summary>
+    /// With the broker in the Windows service, which can't call back into this process: seals each
+    /// secret whose version changed on disk into the open lease, as the in-app broker asks for
+    /// through <see cref="SoloBroker.SecretsUnleased"/>. The service reloads the vault before it
+    /// handles the seal.
+    /// </summary>
+    void WatchVault(string vaultPath)
+    {
+        if (vaultWatcher is not null)
+            return;
+        vaultVersions = Versions(vaultPath);
+        var full = Path.GetFullPath(vaultPath);
+        vaultWatcher = new FileSystemWatcher(Path.GetDirectoryName(full)!, Path.GetFileName(full)) { NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName };
+        FileSystemEventHandler changed = (_, _) => _ = Task.Run(async () =>
+        {
+            await Task.Delay(300);
+            var now = Versions(vaultPath);
+            var slugs = now.Where(v => !vaultVersions.TryGetValue(v.Key, out var was) || was != v.Value).Select(v => v.Key).ToArray();
+            vaultVersions = now;
+            if (slugs.Length > 0)
+                await SealIntoLeaseAsync(slugs);
+        });
+        vaultWatcher.Changed += changed;
+        vaultWatcher.Created += changed;
+        vaultWatcher.Renamed += (s, e) => changed(s, e);
+        vaultWatcher.EnableRaisingEvents = true;
+    }
+
+    static Dictionary<string, int> Versions(string vaultPath)
+    {
+        try
+        {
+            return VaultFile.Load(vaultPath).Secrets.ToDictionary(s => s.Slug, s => s.Version);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or System.Text.Json.JsonException)
+        {
+            return [];
+        }
     }
 
     /// <summary>Solo mode: seals secrets added to the vault since the unlock into the open lease, when unlocked; locked, the next unlock seals them.</summary>
@@ -212,6 +340,8 @@ public sealed class AgentHost : IAsyncDisposable
         {
         }
         await solo.DisposeAsync();
+        vaultWatcher?.Dispose();
+        soloGate.Dispose();
         decoys.Dispose();
         Keys.Dispose();
         UserSecrets.Dispose();

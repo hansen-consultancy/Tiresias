@@ -21,15 +21,19 @@ static class Commands
         if (genesis is not null && !Regex.IsMatch(genesis, "^[0-9a-f]{64}$"))
             throw new UsageException("--genesis is the trust chain's genesis hash, 64 lower-case hex digits.");
 
-        var settings = KeyringStore.Settings;
+        var settings = ProfileAccess.Run(() => KeyringStore.Settings);
         settings = settings with { DeviceId = args.Option("--device") ?? settings.DeviceId };
-        KeyringStore.Settings = settings;
         var vaultPath = args.Option("--vault") is { } vault ? Path.GetFullPath(vault)
-            : KeyringStore.Tenants.FirstOrDefault(t => t.Name == tenant)?.VaultPath
+            : ProfileAccess.Run(() => KeyringStore.Tenants.FirstOrDefault(t => t.Name == tenant)?.VaultPath)
             ?? (tenant == KeyringStore.DefaultTenant ? settings.VaultPath : Path.Combine(KeyringStore.Directory, $"vault-{tenant}.json"));
-        KeyringStore.Enroll(new(tenant, url, brokerKey, vaultPath, genesis));
-
-        var devicePublicKey = KeyringStore.DevicePublicKey();
+        var enrollment = new TenantConfig(tenant, url, brokerKey, vaultPath, genesis);
+        BrokerService.EnrollRemote(enrollment);
+        var devicePublicKey = ProfileAccess.Run(() =>
+        {
+            KeyringStore.Settings = settings;
+            KeyringStore.Enroll(enrollment);
+            return KeyringStore.DevicePublicKey();
+        });
         Console.WriteLine($"Pinned broker {url} for tenant {tenant} (identity {brokerKey}, vault {vaultPath}).");
         Console.WriteLine("Add this device to the broker's configuration:");
         Console.WriteLine($"  \"Broker\": {{ \"Devices\": {{ \"{settings.DeviceId}\": \"{devicePublicKey}\" }} }}");
@@ -132,6 +136,27 @@ static class Commands
         Console.WriteLine("Solo mode is set up. The broker runs inside the Tiresias app; start the app (or tir agent) and unlock.");
         Console.WriteLine("Trade-off: no fixed egress IP, and secrets stay on this machine. tir doctor lists what that means.");
         return 0;
+    }
+
+    /// <summary>Installs, removes or (for the service manager) runs the solo broker as a Windows service (docs/broker-service.md).</summary>
+    public static async Task<int> SoloServiceAsync(CommandLine line)
+    {
+        switch (line.At(2))
+        {
+            case "install":
+                await BrokerService.InstallAsync();
+                Console.WriteLine("The broker now runs as the Tiresias service. Start the Tiresias app again and unlock.");
+                return 0;
+            case "uninstall":
+                BrokerService.Uninstall();
+                Console.WriteLine("The Tiresias service is removed. The broker runs inside the app again from its next start.");
+                return 0;
+            case "run":
+                await BrokerService.RunAsync();
+                return 0;
+            default:
+                throw new UsageException("tir solo service install | uninstall");
+        }
     }
 
     /// <summary>Binds this device's Hello key into the trust chain with the paper key (docs/trust-links.md).</summary>

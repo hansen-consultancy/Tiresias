@@ -101,6 +101,16 @@ public sealed class AuditLog : IDisposable
     /// <summary>Raised after a record is written, outside the log's lock, on the writer's thread. The app alerts on some (docs/alerts.md).</summary>
     public event Action<AuditRecord, DateTimeOffset>? Appended;
 
+    /// <summary>Captures the last complete record boundary. Later appends can proceed while a client reads this prefix.</summary>
+    public (FileStream File, long Length) OpenSnapshot()
+    {
+        lock (gate)
+        {
+            var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            return (file, file.Length);
+        }
+    }
+
     public void Append(AuditRecord record)
     {
         DateTimeOffset at;
@@ -124,17 +134,21 @@ public sealed class AuditLog : IDisposable
     }
 
     /// <returns>The 1-based number of the first line whose chain is broken, or <c>null</c> when the whole file verifies.</returns>
-    public static int? Verify(string path)
+    public static int? Verify(string path) => Verify(File.ReadLines(path));
+
+    /// <summary>Verifies the same snapshot that the caller will display.</summary>
+    public static int? Verify(IEnumerable<string> lines)
     {
         var expected = Genesis;
         var number = 0;
-        foreach (var line in File.ReadLines(path))
+        foreach (var line in lines)
         {
             number++;
             try
             {
                 using var doc = JsonDocument.Parse(line);
-                if (!doc.RootElement.TryGetProperty("prevHash", out var prev) || prev.GetString() != expected)
+                if (doc.RootElement.ValueKind != JsonValueKind.Object || !doc.RootElement.TryGetProperty("prevHash", out var prev)
+                    || prev.ValueKind != JsonValueKind.String || prev.GetString() != expected)
                     return number;
             }
             catch (JsonException)

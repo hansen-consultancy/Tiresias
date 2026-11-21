@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using Tiresias.Agent;
 using Tiresias.App.Logic;
+using Tiresias.UserSecrets;
 
 namespace Tiresias.App;
 
@@ -15,6 +16,8 @@ sealed class ProgramGuard
     readonly Lock gate = new();
     readonly Dictionary<string, (DateTime Written, long Length, string? Sha256)> hashes = new(StringComparer.OrdinalIgnoreCase);
     Blocklist list;
+    readonly Dictionary<string, long> revisions = new(StringComparer.OrdinalIgnoreCase);
+    long revision;
 
     public ProgramGuard()
     {
@@ -43,6 +46,34 @@ sealed class ProgramGuard
 
     public GateDecision Decide(string? program) => Current.Decide(program, Sha256);
 
+    public async Task<ReleasePolicy> CheckAsync(string? program, CancellationToken ct)
+    {
+        var policy = await AdminProgramBlocks.CheckAsync(program, ct);
+        if (policy.Refusal is not null)
+            return policy;
+        lock (gate)
+        {
+            string? refusal = list.Decide(program, Sha256) switch
+            {
+                GateDecision.LockedDown => "Tiresias is locked down after an access report.",
+                GateDecision.Blocked => $"Tiresias blocked access for {program}.",
+                _ => null,
+            };
+            var changed = program is null ? 0 : revisions.GetValueOrDefault(program);
+            if (revisions.Count > 0 && program is not null && Sha256(program) is { } hash)
+                changed = Math.Max(changed, revisions.GetValueOrDefault(hash));
+            return new(new ReleaseScope(new ProgramRevision(policy.Scope.Program.Service, changed)), refusal);
+        }
+    }
+
+    public async Task<ReleasePolicy> CheckAsync(string program, string? peer, CancellationToken ct)
+    {
+        var policy = await CheckAsync(program, ct);
+        if (policy.Refusal is not null || string.Equals(program, peer, StringComparison.OrdinalIgnoreCase))
+            return policy;
+        return policy.WithPeer(peer, await CheckAsync(peer, ct));
+    }
+
     /// <summary>Refuse everything from now on; the program is blocked later by <see cref="Block"/>, once its file is hashed.</summary>
     public void LockDown() => Change(l => l with { LockedDown = true });
 
@@ -63,7 +94,14 @@ sealed class ProgramGuard
     {
         lock (gate)
         {
+            var before = list.Programs;
             list = change(list);
+            foreach (var entry in before.Except(list.Programs).Concat(list.Programs.Except(before)))
+            {
+                revisions[entry.Path] = ++revision;
+                if (entry.Sha256 is { } hash)
+                    revisions[hash] = revision;
+            }
             try
             {
                 var temp = path + ".tmp";

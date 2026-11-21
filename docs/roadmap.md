@@ -12,10 +12,10 @@ design and issue. A PR that finishes, starts or adds an item edits this page in 
 - [x] Local activity log and the app's activity window
 - [ ] `tir activity`
 - [x] Solo mode, with the broker hosted in the app ([design](desktop-app.md#solo-mode))
-- [ ] Solo mode: local broker as a Windows service (in review)
-- [ ] Policy integrity: the broker refuses a service policy the user didn't approve
-      ([design](policy-integrity.md), #24). Phases 1 to 3 and the rollback high-water mark within a
-      lease built; keeping it across locks and restarts waits for the Windows service
+- [x] Solo mode: local broker as a Windows service
+- [x] Policy integrity: the broker refuses a service policy the user didn't approve
+      ([design](policy-integrity.md), #24). The rollback high-water mark holds within a lease, and
+      across locks and restarts when the solo broker runs as the Windows service
 - [x] Step-up at the broker: minting, elevation and tokens need an approval only the vault can
       produce ([design](step-up.md), #23)
 - [x] Trust-chain links that add a key need a Windows Hello signature ([design](trust-links.md), #41)
@@ -34,7 +34,7 @@ design and issue. A PR that finishes, starts or adds an item edits this page in 
 - [ ] Out-of-band alerts: ntfy, LcdHub and a webhook, public by default ([design](alerts.md), #101).
       The planner, the webhook and ntfy built; LcdHub and the other events in review
 - [ ] Secrets reachable in containers, WSL and VMs from the user's account
-      ([design](containers-and-vms.md), #113). Design in review
+      ([design](containers-and-vms.md), #113). Designed, not built
 - [x] `tir ai`: instructions for AI coding agents ([guide](ai-agents.md))
 - [x] Velopack installer and auto-update from GitHub Releases (`app-release.yml`)
 - [x] Signed with Azure Artifact Signing ([releasing.md](releasing.md))

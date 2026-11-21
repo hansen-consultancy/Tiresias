@@ -85,8 +85,8 @@ public partial class App : Application
         // Before the agent starts: the solo broker audits a trust chain it rejects at startup.
         alerts = new AppAlerts();
         var alertCenter = alerts.Center;
-        host = new AgentHost(consent);
         guard = new ProgramGuard();
+        host = new AgentHost(consent, guard.CheckAsync);
         consent.Unlock = async () => (await UnlockAsync(interactive: true)).Ok;
         consent.Gate = guard.Decide;
         consent.SessionLocked = () => sessionLocked;
@@ -130,8 +130,7 @@ public partial class App : Application
             {
                 shells.Clear();
                 _ = PlaceholderMinter.RevokeAsync(shellPlaceholders.Release((_, _) => false));
-                lock (nugetAllowed)
-                    nugetAllowed.Clear();
+                nugetAllowed.Clear();
             }
             Dispatcher.BeginInvoke(Refresh);
         };
@@ -141,6 +140,8 @@ public partial class App : Application
             if (Tiresias.Alerts.AlertSources.Audited(record, at) is { } alert)
                 alertCenter.Raise(alert);
         };
+        host.ServiceIncidentsReceived += () => Dispatcher.BeginInvoke(() =>
+            tray?.Notify(Text.Get("Notify_Decoy_Title"), Text.Get("Notify_AdminIncidents")));
         host.UserSecrets.FirstSealed += id => Dispatcher.BeginInvoke(() =>
             tray?.Notify(Text.Get("Notify_FirstSealed_Title"), Text.Format("Notify_FirstSealed_Body", id)));
         SystemEvents.SessionSwitch += OnSessionSwitch;
@@ -509,15 +510,24 @@ public partial class App : Application
             return new(false, Text.Get("Shell_Unrecognised"));
         if (!EnvironmentStore.IsSealed)
             return new(true, Approved: true, Variables: new Dictionary<string, string>());
+        var policy = await Guard.CheckAsync(shell.Program, caller.Image, ct);
+        ControlReply Refuse(string why)
+        {
+            Host.RecordPolicyRefusal("environment", "terminal", shell.Program, caller.Image, why);
+            return new(true, why, Approved: false);
+        }
+        if (policy.Refusal is { } refused)
+            return Refuse(refused);
+
         shells.Prune(ProcessTree.IsRunning);
-        if (!host!.Keys.IsUnlocked && shells.HasRefused(shell) && !request.AskAgain)
+        if (!host!.Keys.IsUnlocked && shells.HasRefused(shell, policy.Scope) && !request.AskAgain)
             return new(true, Approved: false);
         if (!host.Keys.IsUnlocked)
         {
             var (unlocked, message) = await Dispatcher.InvokeAsync(() => UnlockAsync(interactive: false)).Task.Unwrap();
             if (!unlocked)
             {
-                shells.Refuse(shell);
+                shells.Refuse(shell, policy.Scope);
                 return new(true, Text.Format("Shell_NotUnlocked", message), Approved: false);
             }
         }
@@ -526,7 +536,7 @@ public partial class App : Application
         _ = PlaceholderMinter.RevokeAsync(shellPlaceholders.Release(ProcessTree.IsRunning));
         var sealedNow = await Task.Run(() => EnvironmentStore.Open(hello).Environment, ct);
         var variables = sealedNow.Resolve(directory);
-        var (answer, fresh) = shells.Check(shell, variables.Select(v => v.Name), request.AskAgain);
+        var (answer, fresh) = shells.Check(shell, variables.Select(v => v.Name), request.AskAgain, policy.Scope);
         string? note = null;
         if (answer == ShellAnswer.Ask)
         {
@@ -534,27 +544,30 @@ public partial class App : Application
             AppLog.Info($"terminal {System.IO.Path.GetFileName(shell.Program)} ({shell.ProcessId}): {(approved ? "allowed" : "denied")} {fresh.Count} environment variable(s)");
             if (approved)
             {
-                shells.Allow(shell, fresh);
+                shells.Allow(shell, fresh, policy.Scope);
                 fresh = [];
             }
             else
             {
-                shells.Refuse(shell);
+                shells.Refuse(shell, policy.Scope);
                 note = Text.Get("Shell_Refused");
             }
         }
         // Whatever the shell was allowed before still reaches it; only the names it was refused stay out.
         var given = variables.Where(v => !fresh.Contains(v.Name, StringComparer.OrdinalIgnoreCase));
         var observed = $"{shell.Program} ({shell.ProcessId})";
-        var delivery = await EnvironmentDelivery.DeliverAsync(sealedNow, given, PlaceholderMinter.Endpoint,
-            (placeholder, _) => shellPlaceholders.GetAsync(shell, placeholder,
-                () => PlaceholderMinter.MintAsync(hello, placeholder, $"terminal:{System.IO.Path.GetFileNameWithoutExtension(shell.Program)}", observed)), ct);
+        var (delivery, refusal) = await ShellConsent.ReleaseAsync(policy, () => Guard.CheckAsync(shell.Program, caller.Image, ct),
+            () => EnvironmentDelivery.DeliverAsync(sealedNow, given, PlaceholderMinter.Endpoint,
+                (placeholder, _) => shellPlaceholders.GetAsync(shell, placeholder,
+                    () => PlaceholderMinter.MintAsync(hello, placeholder, $"terminal:{System.IO.Path.GetFileNameWithoutExtension(shell.Program)}", observed)), ct));
+        if (delivery is null)
+            return Refuse(refusal!);
         return new(true, string.Join(Environment.NewLine, new[] { note, Note(delivery) }.OfType<string>()) is { Length: > 0 } text ? text : null,
             Approved: true, Variables: delivery.Variables);
     }
 
     /// <summary>Programs allowed a NuGet source's token until the agent locks: image path and variable.</summary>
-    readonly HashSet<(string Program, string Variable)> nugetAllowed = [];
+    readonly NuGetConsent nugetAllowed = new();
 
     /// <summary>
     /// The NuGet credential plugin, asked by <c>dotnet restore</c>, Visual Studio or Rider. The
@@ -569,6 +582,14 @@ public partial class App : Application
             return new(true, Approved: false);
         if (caller.ProcessId is not { } pid || ProcessTree.ParentOf(pid) is not { } program)
             return new(false, Text.Get("Shell_Unrecognised"));
+        var policy = await Guard.CheckAsync(program.Program, caller.Image, ct);
+        ControlReply Refuse(string why)
+        {
+            Host.RecordPolicyRefusal("nuget", uri.Host, program.Program, caller.Image, why);
+            return new(true, why, Approved: false);
+        }
+        if (policy.Refusal is { } refused)
+            return Refuse(refused);
         if (!host!.Keys.IsUnlocked)
         {
             var (unlocked, message) = await Dispatcher.InvokeAsync(() => UnlockAsync(interactive: false)).Task.Unwrap();
@@ -591,28 +612,14 @@ public partial class App : Application
             return new(true, Text.Format("NuGet_Refused", source.Variable, source.Source), Approved: false);
         }
 
-        var key = (program.Program, variable.Name);
-        bool known;
-        lock (nugetAllowed)
-            known = nugetAllowed.Contains(key);
-        if (known)
-            host.RecordNuGet(NuGetOutcome.CoveredBySession, program.Program, program.ProcessId, source.Source, variable.Name);
-        else
-        {
-            var answer = await consent!.AskNuGetAsync(program.Program, program.ProcessId, source.Source, variable.Name, ct);
-            AppLog.Info($"nuget {System.IO.Path.GetFileName(program.Program)} {source.Source}: {answer} {variable.Name}");
-            host.RecordNuGet(answer switch
-            {
-                ConsentAnswer.AllowOnce => NuGetOutcome.AllowedOnce,
-                ConsentAnswer.AllowForSession => NuGetOutcome.AllowedForSession,
-                _ => NuGetOutcome.Denied,
-            }, program.Program, program.ProcessId, source.Source, variable.Name);
-            if (answer == ConsentAnswer.Deny)
-                return new(true, Approved: false);
-            if (answer == ConsentAnswer.AllowForSession)
-                lock (nugetAllowed)
-                    nugetAllowed.Add(key);
-        }
+        var (outcome, why) = await nugetAllowed.DecideAsync(program.Program, variable.Name, policy,
+            () => consent!.AskNuGetAsync(program.Program, program.ProcessId, source.Source, variable.Name, ct),
+            () => Guard.CheckAsync(program.Program, caller.Image, ct));
+        if (why is not null)
+            return Refuse(why);
+        host.RecordNuGet(outcome, program.Program, program.ProcessId, source.Source, variable.Name);
+        if (outcome == NuGetOutcome.Denied)
+            return new(true, Approved: false);
         return new(true, Approved: true, Username: source.Username, Password: variable.Value);
     }
 

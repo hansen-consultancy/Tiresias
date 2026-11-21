@@ -1,32 +1,65 @@
+using System.ComponentModel;
 using Tiresias.Agent;
 using Tiresias.App.Logic;
+using Tiresias.Client;
 
 namespace Tiresias.App;
 
-/// <summary>The two local audit logs, read as activity entries: the agent's and the solo broker's.</summary>
+/// <summary>Reads local activity and the enrolled account's broker journal, including while locked.</summary>
 static class ActivityLog
 {
-    /// <summary>Every record in both logs; slow on a long log, so read it off the UI thread.</summary>
-    public static ActivityEntry[] ReadAll() =>
-        [.. Read(AgentHost.ActivityPath, ActivitySource.UserSecrets).Concat(Read(SoloBroker.AuditPath, ActivitySource.Broker))];
+    public static bool HasHistory() => new FileInfo(AgentHost.ActivityPath) is { Exists: true, Length: > 0 }
+        || new FileInfo(SoloBroker.AuditPath) is { Exists: true, Length: > 0 } || ServiceState() != BrokerServiceState.NotInstalled;
 
-    /// <summary>Reads one log, skipping what isn't a record; a missing or locked file reads as empty.</summary>
-    static IEnumerable<ActivityEntry> Read(string path, ActivitySource source)
+    public static ActivityHistory ReadAll()
     {
-        string[] lines;
+        var state = ServiceState();
+        IReadOnlyList<string>? serviceJournal = null;
         try
         {
-            if (!File.Exists(path))
-                return [];
+            if (state == BrokerServiceState.Running)
+                serviceJournal = BrokerService.ReadJournalAsync().GetAwaiter().GetResult();
+        }
+        catch (Exception e) when (e is InvalidOperationException or IOException or InvalidDataException or UnauthorizedAccessException or Win32Exception
+            or System.Security.SecurityException or TimeoutException or OperationCanceledException or System.Text.Json.JsonException)
+        {
+            AppLog.Error(e, "reading the broker service journal");
+        }
+        return ActivityHistory.From(Read(AgentHost.ActivityPath) ?? [], Read(SoloBroker.AuditPath) ?? [], state, serviceJournal);
+    }
+
+    static BrokerServiceState? ServiceState()
+    {
+        try
+        {
+            return DemoMode.On ? BrokerServiceState.NotInstalled : BrokerService.State();
+        }
+        catch (Exception e) when (e is Win32Exception or InvalidOperationException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            AppLog.Error(e, "checking the broker service");
+            return null;
+        }
+    }
+
+    static List<string>? Read(string path)
+    {
+        try
+        {
             using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             using var reader = new StreamReader(stream);
-            lines = reader.ReadToEnd().Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var lines = new List<string>();
+            while (reader.ReadLine() is { } line)
+                lines.Add(line);
+            return lines;
+        }
+        catch (Exception e) when (e is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return null;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             AppLog.Error(e, $"reading {path}");
-            return [];
+            return null;
         }
-        return lines.Select(l => ActivityQuery.Parse(l, source)).OfType<ActivityEntry>();
     }
 }
