@@ -219,6 +219,12 @@ public partial class StatusWindow : Window
             case RevealFile { Path: var path }:
                 Desktop.Reveal(path);
                 break;
+            case RunThroughExec { Setup: { } setup }:
+                Navigate<ServicesPage>()?.Add(setup.Upstream);
+                break;
+            case RunThroughExec exec:
+                model.CopyFix(exec.Instruction);
+                break;
         }
     }
 

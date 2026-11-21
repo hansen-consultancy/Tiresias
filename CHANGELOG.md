@@ -8,6 +8,13 @@ its section below.
 
 ## [Unreleased]
 
+### Added
+
+- Home and `tir doctor` find the GitHub CLI or the Azure CLI signed in as you, which any program
+  running as you can use unasked. For `gh`, **Add a GitHub App...** sets up the service `tir exec`
+  mints a token per run from, after you allow it. Read from each tool's own config, offline; never
+  a token.
+
 ### Changed
 
 - The secrets editor hides user-secrets folders that hold no keys behind a line, "*N* empty
