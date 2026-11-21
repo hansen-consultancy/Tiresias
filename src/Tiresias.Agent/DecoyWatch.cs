@@ -17,7 +17,8 @@ public sealed record DecoyTouch(DecoyHit Hit, IReadOnlyList<string> Parents)
         _ => "a decoy endpoint",
     };
 
-    public string Process => Hit.ProcessId is { } pid ? $"{Hit.Program ?? "unknown program"} ({pid})" : "an unknown process";
+    /// <summary>As every activity record names a process: <c>{image} (pid {pid})</c>.</summary>
+    public string? Process => Hit.ProcessId is { } pid ? $"{Hit.Program ?? "unknown image"} (pid {pid})" : null;
 
     /// <summary>The activity record: what, where, who and who started it. Decoy values are never in it.</summary>
     public AuditRecord Record() => new(AuditKind.Deny, Consumer: "decoy", Service: What, Path: Hit.Endpoint, Process: Process,
