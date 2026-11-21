@@ -25,6 +25,8 @@ public enum FixAction
     DisableStartup,
     /// <summary>Settings, Apps, Startup, for a machine-wide entry only an administrator can turn off.</summary>
     OpenStartupSettings,
+    /// <summary>Take a program off the blocklist.</summary>
+    Unblock,
     /// <summary>The Services page's add form, its address filled in.</summary>
     AddService,
 }
@@ -86,6 +88,7 @@ public static class FindingView
         RevealFile => (FixAction.RevealFile, "Finding_FixReveal"),
         DisableStartup { Machine: false } => (FixAction.DisableStartup, "Finding_FixDisableStartup"),
         DisableStartup => (FixAction.OpenStartupSettings, "Finding_FixStartupSettings"),
+        UnblockProgram => (FixAction.Unblock, "Finding_FixUnblock"),
         RunThroughExec { Setup: not null } => (FixAction.AddService, "Finding_FixGitHubApp"),
         RunThroughExec => (FixAction.CopyCommand, "Finding_FixCopy"),
         _ => null,

@@ -1,6 +1,8 @@
 using System.IO.Enumeration;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using Tiresias.Client;
+using Tiresias.Decoys;
 using Tiresias.EnvironmentVariables;
 using Tiresias.Protocol;
 using Tiresias.Vault;
@@ -88,11 +90,23 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     }
 
     public IReadOnlyList<string> ExposedVariables =>
-        [.. EnvironmentStore.UserVariables().Where(v => v.LooksSecret).Select(v => v.Name)];
+        [.. EnvironmentStore.UserVariables().Where(v => v.LooksSecret && !IsDecoyVariable(v.Name)).Select(v => v.Name)];
+
+    /// <summary>The decoy variables, while placed: a decoy is not a secret to seal.</summary>
+    static bool IsDecoyVariable(string name) =>
+        DecoyStore.Current is { } set && set.Placed.Any(p => p.Kind == DecoyKind.Variables) && DecoyPlan.VariableNames.Contains(name, StringComparer.OrdinalIgnoreCase);
+
+    public DoctorDecoys? Decoys => DecoyStore.Current is { Placed.Count: > 0 } set
+        ? new(set.Placed.Count, IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners().Any(e => e.Port == set.HttpPort))
+        : null;
 
     public IEnumerable<DoctorFile> Projects() => Found.Projects.Select(Read);
 
-    public IEnumerable<DoctorFile> ConfigFiles() => Found.Configs.Select(Read);
+    public IEnumerable<DoctorFile> ConfigFiles()
+    {
+        var decoys = DecoyStore.Current;
+        return Found.Configs.Where(p => decoys?.Covers(p) != true).Select(Read);
+    }
 
     public IEnumerable<string> KeyFiles() => Found.Keys.Concat(Found.Pems.Where(HoldsPemPrivateKey));
 
@@ -150,6 +164,8 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     /// <summary>Everything the attack surface checks read, plus the global tools, which take seconds to list.</summary>
     public SurfaceInventory Inventory() =>
         new([.. Extensions()], [.. SurfaceProbe.GlobalTools()], [.. StartupEntries()], [.. CredentialUses()], [.. ProgramRuns()]);
+
+    public IEnumerable<DecoyUseRecord> DecoyUses() => SurfaceProbe.DecoyUses();
 
     /// <summary>Where each tool keeps them, honouring <c>GH_CONFIG_DIR</c> and <c>AZURE_CONFIG_DIR</c> as the tools do.</summary>
     public DoctorCliConfigs CliConfigs

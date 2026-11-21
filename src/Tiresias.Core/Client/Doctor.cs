@@ -107,12 +107,21 @@ public interface IDoctorProbe
     /// <summary>When the user last started each program themselves, where Windows records it (UserAssist).</summary>
     IEnumerable<ProgramRun> ProgramRuns() => [];
 
+    /// <summary>Uses of a decoy, from the activity log.</summary>
+    IEnumerable<DecoyUseRecord> DecoyUses() => [];
+
+    /// <summary>The decoys placed (docs/decoys.md), or <c>null</c> when there are none.</summary>
+    DoctorDecoys? Decoys => null;
+
     /// <summary>The config files of the CLIs that sign in as the user. See <see cref="Doctor.CliSignIns"/>.</summary>
     DoctorCliConfigs CliConfigs => new(null, null);
 
     /// <summary>The slug of a vault GitHub App service, for <c>tir exec gh</c>; <c>null</c> when there is none.</summary>
     string? GitHubAppService => null;
 }
+
+/// <summary>How many decoys are placed, and whether something listens on their endpoints (checked without connecting, which would be a hit).</summary>
+public sealed record DoctorDecoys(int Placed, bool Listening);
 
 /// <summary>
 /// The <c>tir doctor</c> checklist: turns probe facts into ok / warn / fail lines. A failure is
@@ -148,6 +157,10 @@ public static partial class Doctor
                 ? new("forwarder", DoctorStatus.Ok, "listening on loopback")
                 : new("forwarder", DoctorStatus.Warn, "not running: placeholders work only against the broker directly"));
 
+        if (probe.Decoys is { Placed: > 0 } decoys)
+            checks.Add(decoys.Listening
+                ? new("decoys", DoctorStatus.Ok, $"{decoys.Placed} placed; a program that uses one is named")
+                : new("decoys", DoctorStatus.Warn, $"{decoys.Placed} placed, but nothing listens on their endpoints, so a use goes unseen: start the app or tir agent"));
         checks.AddRange(probe.UserSecretsFiles().Select(UserSecretsFile).OfType<DoctorCheck>());
         checks.AddRange(probe.Projects().Select(Project).OfType<DoctorCheck>());
         checks.Add(probe.ExposedVariables switch
@@ -162,8 +175,13 @@ public static partial class Doctor
         checks.AddRange(PublishingKeys(probe.ToolFiles(), probe.UserVariableNames));
         checks.AddRange(RavenExpiry(probe.RavenCertificates(), DateTimeOffset.UtcNow));
         checks.AddRange(KeysAsValues(probe.SealedEnvironment));
+        // A program blocked for using a decoy is that finding, not "This wasn't me"'s.
+        var decoyUses = probe.DecoyUses().ToArray();
+        var blocked = probe.BlockedPrograms().ToArray();
+        checks.AddRange(Decoys(decoyUses, blocked, DateTimeOffset.UtcNow));
         checks.AddRange(CliSignIns(probe.CliConfigs, probe.GitHubAppService));
-        checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), probe.CredentialUses(), probe.BlockedPrograms(), DateTimeOffset.UtcNow, probe.ProgramRuns()));
+        checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), probe.CredentialUses(),
+            blocked.Where(b => !decoyUses.Any(u => SamePath(u.Program, b))), DateTimeOffset.UtcNow, probe.ProgramRuns()));
         return checks;
     }
 
