@@ -18,7 +18,9 @@ public static class Text
 
     public static string Format(string key, params object?[] args) => string.Format(CultureInfo.CurrentCulture, Get(key), args);
 
-    public static string Of(Phrase phrase) => phrase.Args.Length == 0 ? Get(phrase.Key) : Format(phrase.Key, phrase.Args);
+    /// <summary>A phrase's text; an argument that is itself a phrase is put in words first.</summary>
+    public static string Of(Phrase phrase) =>
+        phrase.Args.Length == 0 ? Get(phrase.Key) : Format(phrase.Key, [.. phrase.Args.Select(a => a is Phrase inner ? Of(inner) : a)]);
 }
 
 /// <summary><c>{l:S Key}</c>: a string from <c>Strings.resx</c> in XAML.</summary>

@@ -52,6 +52,78 @@ public partial class AboutPage : UserControl
         PageButton.Visibility = build.Installed || AppBuild.CommitPage is not null ? Visibility.Visible : Visibility.Collapsed;
 
         Loaded += async (_, _) => await ShowAdminTierAsync();
+        Loaded += (_, _) =>
+        {
+            App.Current.Alerts.Changed += OnAlertsChanged;
+            ShowAlerts();
+        };
+        Unloaded += (_, _) => App.Current.Alerts.Changed -= OnAlertsChanged;
+    }
+
+    /// <summary>A sink as the card's row binds it.</summary>
+    public sealed record AlertRow(string Id, string Detail, string MuteLabel);
+
+    void OnAlertsChanged() => Dispatcher.BeginInvoke(ShowAlerts);
+
+    void ShowAlerts()
+    {
+        var alerts = App.Current.Alerts;
+        var config = alerts.Center.Config;
+        AlertsText.Text = Text.Of(AlertsCard.Describe(alerts.Opened, config));
+        AlertSinks.ItemsSource = AlertsCard.Rows(config, AppAlerts.Narrowing, alerts.Center.Sender.IsStopped)
+            .Select(r => new AlertRow(r.Id, Text.Of(r.Detail), Text.Get(r.Muted ? "Alerts_Unmute" : "Alerts_Mute"))).ToList();
+    }
+
+    async void OnAlertAdd(object sender, RoutedEventArgs e)
+    {
+        // Adding widens what leaves the machine: it is a sealed save, so it needs Windows Hello.
+        if (!App.Current.Host.Keys.IsUnlocked && !(await App.Current.UnlockAsync(interactive: true)).Ok)
+            return;
+        var window = new AlertWebhookWindow { Owner = Window.GetWindow(this) };
+        if (window.ShowDialog() == true)
+            AlertsOutcome.Text = Text.Format("Alerts_Added", window.AddedId);
+    }
+
+    async void OnAlertTest(object sender, RoutedEventArgs e)
+    {
+        var button = (Button)sender;
+        var id = (string)button.Tag;
+        button.IsEnabled = false;
+        AlertsOutcome.Text = Text.Format("Alerts_Testing", id);
+        try
+        {
+            var result = await App.Current.Alerts.Center.SendTestAsync(id, CancellationToken.None);
+            AlertsOutcome.Text = Text.Of(AlertsCard.Outcome(id, result));
+            ShowAlerts();
+        }
+        finally
+        {
+            button.IsEnabled = true;
+        }
+    }
+
+    void OnAlertMute(object sender, RoutedEventArgs e)
+    {
+        var id = (string)((Button)sender).Tag;
+        var muted = AlertsCard.Rows(App.Current.Alerts.Center.Config, AppAlerts.Narrowing, _ => false).FirstOrDefault(r => r.Id == id)?.Muted == true;
+        App.Current.Alerts.Mute(id, !muted);
+    }
+
+    void OnAlertRemove(object sender, RoutedEventArgs e)
+    {
+        var id = (string)((Button)sender).Tag;
+        if (!AskWindow.Confirm(Window.GetWindow(this), Text.Get("Alerts_RemoveHeading"), Text.Format("Alerts_RemoveBody", id), Text.Get("Alerts_Remove")))
+            return;
+        try
+        {
+            App.Current.Alerts.Remove(id, App.Current.Host.Keys.Hello);
+            AlertsOutcome.Text = Text.Format("Alerts_Removed", id);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            AppLog.Error(ex, "alerts: removing a sink");
+            AlertsOutcome.Text = Text.Get("Alerts_RemoveFailed");
+        }
     }
 
     async Task ShowAdminTierAsync()
