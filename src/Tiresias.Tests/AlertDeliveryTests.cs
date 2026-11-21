@@ -26,6 +26,16 @@ sealed class SteppedTime(DateTimeOffset start) : TimeProvider
             return now;
     }
 
+    /// <summary>Timers waiting to fire: a worker that has gone to sleep has one.</summary>
+    public int Pending
+    {
+        get
+        {
+            lock (gate)
+                return timers.Count;
+        }
+    }
+
     public void Advance(TimeSpan by)
     {
         List<SteppedTimer> due;
@@ -307,7 +317,7 @@ public class AlertDeliveryTests
         sender.Enqueue(new("siem", Payload(1)));
         sender.Enqueue(new("siem", Payload(2)));
 
-        await Until(() => handler.Requests.Count == 1 && sender.Waiting("siem") == 2);
+        await Until(() => handler.Requests.Count == 1 && sender.Waiting("siem") == 2 && time.Pending == 1);
         time.Advance(TimeSpan.FromSeconds(29));
         await Task.Delay(50);
         Assert.That(handler.Requests, Has.Count.EqualTo(1), "nothing before the backoff ends");
@@ -356,8 +366,8 @@ public class AlertDeliveryTests
 
         for (var i = 0; i < 60 && sender.Waiting("siem") > 0; i++)
         {
+            await Until(() => time.Pending == 1 || sender.Waiting("siem") == 0);
             time.Advance(TimeSpan.FromMinutes(30));
-            await Task.Delay(20);
         }
         await Until(() => sender.Waiting("siem") == 0);
         Assert.That(log, Has.Some.Contains("dropped decoy.used after 24 hours"));
@@ -375,7 +385,7 @@ public class AlertDeliveryTests
         sender.Configure([Sink]);
         sender.Start();
         sender.Enqueue(new("siem", Payload(1) with { Title = "CANARY-body" }));
-        await Until(() => handler.Requests.Count == 1 && log.Count == 1);
+        await Until(() => handler.Requests.Count == 1 && log.Count == 1 && time.Pending == 1);
         time.Advance(TimeSpan.FromSeconds(30));
         await Until(() => sender.IsStopped("siem"));
 
