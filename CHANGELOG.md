@@ -10,10 +10,13 @@ its section below.
 
 ### Added
 
+- Home and `tir doctor` list programs you haven't opened in 90 days, with **Open Installed apps**
+  to uninstall them. A program that works without being opened (a tray icon, a service, a driver,
+  something that starts at log-on, a command on `PATH`) is never counted, nor one that used a
+  credential. These lines sort last and don't light the tray badge.
 - `tir doctor --surface` also lists what is installed: each editor's extensions with the
   credentials that editor used through Tiresias in the last 90 days, global `dotnet`, `npm`, `pipx`
   and `cargo` tools, and what starts at log-on with its signature and when you last opened it.
-
 - Home and `tir doctor` point out programs that start at log-on but that you haven't opened in 90
   days, with **Turn off at log-on...**: the same switch as Task Manager's Startup tab, so Settings,
   Apps, Startup turns it back on. Programs with a tray icon are never counted as unused, and
