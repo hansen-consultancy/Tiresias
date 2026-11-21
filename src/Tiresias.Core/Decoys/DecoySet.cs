@@ -1,3 +1,4 @@
+using System.Net;
 using System.Security.Cryptography;
 using System.Text.Json;
 
@@ -116,7 +117,7 @@ public sealed record DecoySet(int HttpPort, int SqlPort, DecoyValues Values, IRe
         try
         {
             var file = JsonSerializer.Deserialize<File>(json, Json);
-            if (file is not { V: Version, Values: { } values } || file.HttpPort <= 0 || file.SqlPort <= 0)
+            if (file is not { V: Version, Values: { } values } || file.HttpPort is < 1 or > IPEndPoint.MaxPort || file.SqlPort is < 1 or > IPEndPoint.MaxPort)
                 return null;
             return new(file.HttpPort, file.SqlPort, values, [.. (file.Placed ?? []).Where(p => !string.IsNullOrEmpty(p.Where))]);
         }
