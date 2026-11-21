@@ -2620,6 +2620,9 @@ Store them in clear?</value>
   <data name="Alerts_NtfyTopicBad" xml:space="preserve">
     <value>A topic is 1 to 64 letters, digits, - or _, and the server address has no ? or #.</value>
   </data>
+  <data name="Alerts_NtfyTrusted" xml:space="preserve">
+    <value>Trusted: also send the program's file name</value>
+  </data>
   <data name="Alerts_NtfyTokenBad" xml:space="preserve">
     <value>The token can't hold spaces or line breaks.</value>
   </data>

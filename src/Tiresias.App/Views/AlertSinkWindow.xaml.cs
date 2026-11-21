@@ -35,6 +35,9 @@ public partial class AlertSinkWindow : Window
         WebhookFields.Visibility = form == SinkForm.Webhook ? Visibility.Visible : Visibility.Collapsed;
         NtfyFields.Visibility = form == SinkForm.Ntfy ? Visibility.Visible : Visibility.Collapsed;
         TrustedField.Visibility = form == SinkForm.LcdHub ? Visibility.Collapsed : Visibility.Visible;
+        // A trusted ntfy body carries the program's file name only (NtfyFormat), not paths or names.
+        if (form == SinkForm.Ntfy)
+            TrustedBox.Content = Text.Get("Alerts_NtfyTrusted");
         needsMachine = App.Current.Alerts.Center.Config is null;
         MachineField.Visibility = needsMachine ? Visibility.Visible : Visibility.Collapsed;
         ThresholdBox.ItemsSource = new[] { Text.Get("Alerts_Critical"), Text.Get("Alerts_High"), Text.Get("Alerts_Warning"), Text.Get("Alerts_Info") };
