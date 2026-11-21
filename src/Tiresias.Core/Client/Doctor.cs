@@ -90,6 +90,9 @@ public interface IDoctorProbe
     /// <summary>The vault's RavenDB services with their certificates as recorded at setup. Never the certificate.</summary>
     IEnumerable<DoctorRavenCertificate> RavenCertificates() => [];
 
+    /// <summary>The broker's answer to <c>/clearance</c> for the service; <c>null</c> when it didn't answer. Never prompts.</summary>
+    Task<DoctorBrokerAnswer?> RavenClearanceAsync(string service) => Task.FromResult<DoctorBrokerAnswer?>(null);
+
     /// <summary>The sealed environment's deliveries, by name; <c>null</c> while locked. See <see cref="Doctor.KeysAsValues"/>.</summary>
     DoctorEnvironment? SealedEnvironment => null;
 
@@ -149,8 +152,9 @@ public static partial class Doctor
 
         if (probe.Solo)
             checks.AddRange(SoloTradeOffs);
+        var brokerStatus = probe.Enrolled ? await probe.BrokerStatusAsync() : null;
         if (probe.Enrolled)
-            checks.Add(await probe.BrokerStatusAsync() switch
+            checks.Add(brokerStatus switch
             {
                 null when probe.Solo => new("broker reachable", DoctorStatus.Fail, "no answer: the broker runs inside the Tiresias app; start the app (or tir agent)"),
                 null => new("broker reachable", DoctorStatus.Fail, "no answer (NetBird down, or the broker stopped)"),
@@ -182,7 +186,12 @@ public static partial class Doctor
         checks.AddRange(ConfigChecks(probe.UserSecretsFiles(), probe.ConfigFiles(), probe.KeyFiles()));
         checks.AddRange(GitTokens(probe.GitConfigs(), probe.GitCredentials));
         checks.AddRange(PublishingKeys(probe.ToolFiles(), probe.UserVariableNames));
-        checks.AddRange(RavenExpiry(probe.RavenCertificates(), DateTimeOffset.UtcNow));
+        var ravenCertificates = probe.RavenCertificates().ToArray();
+        checks.AddRange(RavenExpiry(ravenCertificates, DateTimeOffset.UtcNow));
+        var clearances = new List<(DoctorRavenCertificate, DoctorBrokerAnswer?)>();
+        foreach (var certificate in ravenCertificates)
+            clearances.Add((certificate, brokerStatus is null ? null : await probe.RavenClearanceAsync(certificate.Service)));
+        checks.AddRange(RavenClearance(clearances));
         checks.AddRange(KeysAsValues(probe.SealedEnvironment));
         // A program blocked for using a decoy is that finding, not "This wasn't me"'s.
         var decoyUses = probe.DecoyUses().ToArray();

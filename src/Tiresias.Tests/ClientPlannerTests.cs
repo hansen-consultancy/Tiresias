@@ -128,6 +128,15 @@ public class DoctorTests
         public IEnumerable<DoctorFile> Projects() => ProjectFiles;
         public IEnumerable<DoctorFile> ConfigFiles() => Config;
         public IEnumerable<string> KeyFiles() => Keys;
+        public List<DoctorRavenCertificate> Raven { get; } = [];
+        public List<string> ClearanceAsked { get; } = [];
+        public IEnumerable<DoctorRavenCertificate> RavenCertificates() => Raven;
+
+        public Task<DoctorBrokerAnswer?> RavenClearanceAsync(string service)
+        {
+            ClearanceAsked.Add(service);
+            return Task.FromResult<DoctorBrokerAnswer?>(new(200, System.Text.Encoding.UTF8.GetBytes("""{"clearance":"Operator","databases":{}}""")));
+        }
         public AdminTierFacts? AdminTier { get; set; }
     }
 
@@ -192,6 +201,22 @@ public class DoctorTests
         var checks = await Doctor.RunAsync(new FakeProbe());
         Assert.That(checks.Select(c => c.Status), Is.All.EqualTo(DoctorStatus.Ok));
         Assert.That(checks.Select(c => c.Name), Is.EqualTo(new[] { "broker pinned", "device key", "recovery key", "vault", "broker reachable", "forwarder", "environment variables", Doctor.KeysAsValuesCheck }));
+    }
+
+    [Test]
+    public async Task RavenDB_clearance_is_asked_through_a_broker_that_answers()
+    {
+        var probe = new FakeProbe { Raven = { new("orders", null, null, null) } };
+        Assert.That((await Check(probe, "RavenDB clearance")).Status, Is.EqualTo(DoctorStatus.Warn));
+        Assert.That(probe.ClearanceAsked, Is.EqualTo(new[] { "orders" }));
+    }
+
+    [Test]
+    public async Task RavenDB_clearance_is_skipped_without_waiting_on_a_broker_that_doesnt()
+    {
+        var probe = new FakeProbe { BrokerStatus = null, Raven = { new("orders", null, null, null) } };
+        Assert.That((await Check(probe, "RavenDB clearance")).Detail, Does.StartWith("skipped"));
+        Assert.That(probe.ClearanceAsked, Is.Empty);
     }
 
     [Test]
