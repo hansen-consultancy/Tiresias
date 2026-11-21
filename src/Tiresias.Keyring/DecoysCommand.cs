@@ -43,10 +43,12 @@ static class DecoysCommand
 
     static int Remove()
     {
-        var left = DecoyStore.RemoveAll();
+        var (left, kept) = DecoyStore.RemoveAll();
+        if (kept.Count > 0)
+            Console.WriteLine($"Kept {string.Join(", ", kept)}: changed since Tiresias placed it, so it is yours now.");
         if (left.Count == 0)
         {
-            Console.WriteLine("Every decoy is removed.");
+            Console.WriteLine(kept.Count == 0 ? "Every decoy is removed." : "Every other decoy is removed.");
             return 0;
         }
         Console.Error.WriteLine($"Couldn't remove: {string.Join(", ", left)}. Close what holds them and run this again.");

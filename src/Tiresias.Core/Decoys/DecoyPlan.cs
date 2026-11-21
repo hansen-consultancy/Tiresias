@@ -41,13 +41,32 @@ public static class DecoyPlan
         return steps;
     }
 
-    /// <summary>What to delete or clear to remove a decoy: its file, its folder's two files and the folder when nothing else is in it, or its variables.</summary>
-    public static IReadOnlyList<string> Undo(PlacedDecoy placed) => placed.Kind switch
+    /// <summary>
+    /// What removing a decoy deletes or clears: each of its files or variables that still holds
+    /// exactly what was placed. One that is gone needs nothing; one the user changed is theirs now
+    /// and is kept, by path or name.
+    /// </summary>
+    /// <param name="current">A file's text or a user variable's value now, or <c>null</c> when it is gone.</param>
+    public static (IReadOnlyList<DecoyStep> Remove, IReadOnlyList<string> Kept) Undo(DecoySet set, PlacedDecoy placed, Func<string, string?> current)
     {
-        DecoyKind.PasswordsFile => [placed.Where],
-        DecoyKind.Project => [Path.Combine(placed.Where, "appsettings.Production.json"), Path.Combine(placed.Where, ".env")],
-        _ => VariableNames,
-    };
+        var remove = new List<DecoyStep>();
+        var kept = new List<string>();
+        foreach (var step in Steps(set, placed.Kind, placed.Where, _ => false))
+        {
+            var (target, content) = step switch
+            {
+                WriteDecoyFile f => (f.Path, f.Content),
+                SetDecoyVariable v => (v.Name, v.Value),
+                _ => throw new InvalidOperationException(),
+            };
+            var now = current(target);
+            if (now == content)
+                remove.Add(step);
+            else if (now is not null)
+                kept.Add(target);
+        }
+        return (remove, kept);
+    }
 
     public static string DecoyListText(DecoySet set) => $"""
         Billing database (production)
