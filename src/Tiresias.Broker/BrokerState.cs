@@ -28,9 +28,14 @@ public sealed record MintedPlaceholder(string Token, DateTimeOffset ExpiresAt);
 /// Leased secrets bound to their policy whose policy the new vault changes without a re-seal. When
 /// there are any, the new vault was refused and the previous one kept.
 /// </param>
-public sealed record VaultReload(IReadOnlyList<string> Unleased, IReadOnlyList<string> Unapproved)
+/// <param name="RolledBack">
+/// Secrets whose version in the new vault is lower than one this lease already saw: an older
+/// <c>vault.json</c> restored, with its once-approved policy. When there are any, the new vault was
+/// refused and the previous one kept.
+/// </param>
+public sealed record VaultReload(IReadOnlyList<string> Unleased, IReadOnlyList<string> Unapproved, IReadOnlyList<string>? RolledBack = null)
 {
-    public bool Refused => Unapproved.Count > 0;
+    public bool Refused => Unapproved.Count > 0 || RolledBack is { Count: > 0 };
 }
 
 /// <summary>
@@ -71,6 +76,12 @@ public sealed class BrokerState : IDisposable
     PublicKey? approvalKey;
     readonly Dictionary<string, DateTimeOffset> usedNonces = [];
 
+    /// <summary>
+    /// The highest version of each secret this lease has seen. A vault that goes below it is a
+    /// rollback to an older, once-approved policy (docs/policy-integrity.md, *Rollback*).
+    /// </summary>
+    readonly Dictionary<string, int> highWater = [];
+
     public BrokerState(VaultDocument vault, LeaseTerms terms, AuditLog audit, Key identity, TimeProvider time)
     {
         this.vault = vault;
@@ -102,6 +113,7 @@ public sealed class BrokerState : IDisposable
 
             var id = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
             lease = Lease.Begin(id, now, terms);
+            RaiseHighWater(vault);
             leaseKey = Key.Create(KeyAgreementAlgorithm.X25519);
             leaseDevice = device;
             audit.Append(new(AuditKind.LeaseBegin, id, device));
@@ -176,6 +188,17 @@ public sealed class BrokerState : IDisposable
     {
         lock (gate)
         {
+            var rolledBack = lease is null ? Array.Empty<string>() : next.Secrets
+                .Where(s => highWater.TryGetValue(s.Slug, out var seen) && s.Version < seen)
+                .Select(s => s.Slug)
+                .ToArray();
+            if (rolledBack.Length > 0)
+            {
+                foreach (var slug in rolledBack)
+                    audit.Append(new(AuditKind.Deny, lease?.Id, Reason: $"secret-rolled-back: {slug}; vault reload refused"));
+                return new([], [], rolledBack);
+            }
+
             var unapproved = deks
                 .Where(d => vault.FindSecret(d.Key) is { PolicyHash: not null } current
                     && next.FindSecret(d.Key) is { } incoming
@@ -200,8 +223,18 @@ public sealed class BrokerState : IDisposable
             }
             RetireChangedServices(next);
             vault = next;
+            if (lease is not null)
+                RaiseHighWater(next);
             return new(CurrentLease(time.GetUtcNow()) is null ? [] : next.Secrets.Where(s => !deks.ContainsKey(s.Slug)).Select(s => s.Slug).ToArray(), []);
         }
+    }
+
+    /// <summary>Call under <see cref="gate"/>, with a lease open.</summary>
+    void RaiseHighWater(VaultDocument accepted)
+    {
+        foreach (var secret in accepted.Secrets)
+            if (!highWater.TryGetValue(secret.Slug, out var seen) || secret.Version > seen)
+                highWater[secret.Slug] = secret.Version;
     }
 
     /// <summary>Ends the placeholders and elevations of every service whose policy differs in <paramref name="next"/>. Call under <see cref="gate"/>.</summary>
@@ -574,6 +607,7 @@ public sealed class BrokerState : IDisposable
         leaseKey = null;
         approvalKey = null;
         usedNonces.Clear();
+        highWater.Clear();
         placeholders.RevokeLease(id);
         audit.Append(new(AuditKind.LeaseEnd, id, leaseDevice, Reason: reason));
         lease = null;
