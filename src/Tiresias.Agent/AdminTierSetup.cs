@@ -7,7 +7,7 @@ using Tiresias.AdminTier;
 namespace Tiresias.Agent;
 
 /// <summary>
-/// <c>Tiresias.exe --admin-tier install|remove</c>, run elevated after a UAC prompt: carries out
+/// <c>Tiresias.exe --admin-tier install|remove|release-decoys</c>, run elevated after a UAC prompt: carries out
 /// <see cref="AdminInstallPlan"/>. The service's files go to <c>%ProgramFiles%</c>, never run from
 /// the app's per-user folder; its state folder is made, or made again, so that only SYSTEM and
 /// Administrators control it.
@@ -40,9 +40,15 @@ public static class AdminTierSetup
                             return AdminSetupResult.DidNotStart;
                     return AdminSetupResult.Done;
                 case "remove":
+                    var handedBack = true;
                     foreach (var step in AdminInstallPlan.Remove(service.Facts))
-                        Do(step, service, appFolder);
-                    return AdminSetupResult.Done;
+                        if (step == AdminInstallStep.HandBackDecoys)
+                            handedBack = !Trusted(StateFolder) || AdminDecoys.HandBackAll(StateFolder);
+                        else if (step != AdminInstallStep.DeleteStateFolder || handedBack)
+                            Do(step, service, appFolder);
+                    return handedBack ? AdminSetupResult.Done : AdminSetupResult.Failed;
+                case "release-decoys":
+                    return AdminDecoys.Release();
                 default:
                     return AdminSetupResult.Usage;
             }

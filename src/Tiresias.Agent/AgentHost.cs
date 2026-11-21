@@ -31,12 +31,46 @@ public sealed class AgentHost : IAsyncDisposable
         solo.Log += Say;
         solo.SecretsUnleased = SealIntoLeaseAsync;
         decoys.Log += Say;
-        decoys.Touched += touch =>
+        decoys.Touched += OnDecoyTouched;
+    }
+
+    void OnDecoyTouched(DecoyTouch touch)
+    {
+        activity.Append(touch.Record());
+        Say($"Decoy used: {touch.Hit.Program ?? "an unknown program"} connected with {touch.What}.");
+        DecoyTouched?.Invoke(touch);
+    }
+
+    /// <summary>
+    /// With the admin tier installed: hands it the decoys placed before it was (the agent then stops
+    /// listening, the tier listens), and takes each use it saw, including those while no agent ran,
+    /// through the same path as a use the agent saw itself. A use is acknowledged once recorded.
+    /// </summary>
+    async Task FollowAdminTierAsync(CancellationToken ct)
+    {
+        if (!AdminClient.Installed)
+            return;
+        try
         {
-            activity.Append(touch.Record());
-            Say($"Decoy used: {touch.Hit.Program ?? "an unknown program"} connected with {touch.What}.");
-            DecoyTouched?.Invoke(touch);
-        };
+            await Task.Run(AdminDecoys.Adopt, ct);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Say($"The admin tier couldn't take the decoys ({e.Message}); the agent listens for them.");
+        }
+        IReadOnlyList<long> ack = [];
+        while (!ct.IsCancellationRequested)
+        {
+            if (await AdminDecoys.WaitAsync(ack, ct) is not { } events)
+            {
+                // Stopped, updating or not answering: look again later; its queue keeps meanwhile.
+                await Task.Delay(TimeSpan.FromSeconds(30), ct);
+                continue;
+            }
+            foreach (var e in events)
+                OnDecoyTouched(new(e.Hit, e.Parents));
+            ack = [.. events.Select(e => e.Id)];
+        }
     }
 
     /// <summary>The agent's own decisions (user secrets), beside the broker's audit log.</summary>
@@ -99,6 +133,7 @@ public sealed class AgentHost : IAsyncDisposable
         running.Add(serving);
         running.Add(keeper.RunAsync(stop.Token));
         decoys.Start();
+        running.Add(FollowAdminTierAsync(stop.Token));
         await StartSoloBrokerAsync();
     }
 

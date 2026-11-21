@@ -3,6 +3,7 @@ using System.IO.Pipes;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
+using System.Text.Json.Nodes;
 using Microsoft.Win32.SafeHandles;
 using Tiresias.AdminTier;
 using Tiresias.Protocol;
@@ -53,17 +54,37 @@ public static partial class AdminClient
         }
         if (!service.Exists || !service.Running)
             return new(service.Exists, false, null, AppVersion);
-        var reply = await SendAsync(new(AdminWire.ProtocolVersion, AdminOps.Status), service.ProcessId);
+        var reply = await SendAsync(new(AdminWire.ProtocolVersion, AdminOps.Status), service.ProcessId, ReplyTimeout, CancellationToken.None);
         return new(true, true, reply?.ResultAs<AdminStatusResult>(), AppVersion);
     }
 
-    /// <summary>One request to the service; <c>null</c> when it can't be reached or the pipe isn't the service's.</summary>
-    static async Task<AdminReply?> SendAsync(AdminRequest request, int serviceProcessId)
+    /// <summary>
+    /// One request to the running service; <c>null</c> when it isn't installed or running, can't be
+    /// reached, or the pipe isn't the service's. <paramref name="reply"/> bounds the wait for the answer.
+    /// </summary>
+    public static async Task<AdminReply?> SendAsync(string op, JsonObject? args = null, TimeSpan? reply = null, CancellationToken ct = default)
+    {
+        AdminService.State service;
+        try
+        {
+            service = AdminService.Query();
+        }
+        catch (Win32Exception)
+        {
+            return null;
+        }
+        return service.Running
+            ? await SendAsync(new(AdminWire.ProtocolVersion, op, args), service.ProcessId, reply ?? ReplyTimeout, ct)
+            : null;
+    }
+
+    static async Task<AdminReply?> SendAsync(AdminRequest request, int serviceProcessId, TimeSpan reply, CancellationToken ct)
     {
         // Identification only: the service may read who is asking, never act as them.
         await using var pipe = new NamedPipeClientStream(".", AdminWire.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous,
             TokenImpersonationLevel.Identification);
-        using var timeout = new CancellationTokenSource(ConnectTimeout + ReplyTimeout);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(ConnectTimeout + reply);
         try
         {
             await pipe.ConnectAsync(ConnectTimeout, timeout.Token);
