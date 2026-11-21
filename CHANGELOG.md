@@ -75,6 +75,8 @@ its section below.
 - An app loading its user secrets through `Tiresias.Extensions.Configuration` now lets the
   consent dialog and Windows Hello prompt come to the front, as `tir` already did, instead of
   opening behind the IDE.
+- Microsoft Defender for Endpoint's sensor opening a decoy file during a scan is recorded as a
+  routine open, like Defender's own, instead of raising a warning on Home.
 
 ## [0.2.1] - 2026-11-20
 
