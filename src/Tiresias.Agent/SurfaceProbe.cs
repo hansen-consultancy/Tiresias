@@ -147,6 +147,48 @@ static partial class SurfaceProbe
         }
     }
 
+    const string UninstallKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall";
+
+    /// <summary>
+    /// The uninstall entries a person would see in Settings, machine (64- and 32-bit) and user, each
+    /// with whether the uninstaller its command names and its folder exist. Windows components,
+    /// updates and Windows Installer entries are left out: the first two aren't apps, and the last
+    /// names <c>msiexec</c>, which says nothing about the program's own files.
+    /// </summary>
+    public static IEnumerable<UninstallEntry> UninstallEntries()
+    {
+        List<UninstallEntry> entries = [];
+        foreach (var (hive, view, prefix) in new[]
+        {
+            (RegistryHive.CurrentUser, RegistryView.Default, @"HKCU\" + UninstallKey),
+            (RegistryHive.LocalMachine, RegistryView.Registry64, @"HKLM\" + UninstallKey),
+            (RegistryHive.LocalMachine, RegistryView.Registry32, @"HKLM\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"),
+        })
+        {
+            using var root = RegistryKey.OpenBaseKey(hive, view);
+            using var uninstall = root.OpenSubKey(UninstallKey);
+            if (uninstall is null)
+                continue;
+            foreach (var name in uninstall.GetSubKeyNames())
+            {
+                using var key = uninstall.OpenSubKey(name);
+                if (key?.GetValue("DisplayName") is not string { Length: > 0 } display
+                    || key.GetValue("SystemComponent") is 1 || key.GetValue("ParentKeyName") is not null || key.GetValue("WindowsInstaller") is 1
+                    || key.GetValue("UninstallString") is not string command)
+                    continue;
+                command = Environment.ExpandEnvironmentVariables(command).Trim();
+                var uninstaller = Doctor.ExecutableIn(command);
+                if (uninstaller is null || !Path.IsPathFullyQualified(uninstaller) || Path.GetFileName(uninstaller).Equals("msiexec.exe", StringComparison.OrdinalIgnoreCase))
+                    uninstaller = null;
+                var location = key.GetValue("InstallLocation") is string { Length: > 0 } l ? Environment.ExpandEnvironmentVariables(l.Trim().Trim('"')) : null;
+                var folder = location is not null && Path.IsPathFullyQualified(location) ? location : Path.GetDirectoryName(uninstaller);
+                entries.Add(new($@"{prefix}\{name}", display, key.GetValue("DisplayVersion") as string, uninstaller,
+                    uninstaller is not null && File.Exists(uninstaller), folder is not null && Directory.Exists(folder), command));
+            }
+        }
+        return entries;
+    }
+
     public static IEnumerable<DecoyUseRecord> DecoyUses() => Doctor.DecoyUses(Lines(AgentHost.ActivityPath));
 
     public static IEnumerable<CredentialUse> CredentialUses() =>

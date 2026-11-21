@@ -157,6 +157,8 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public IEnumerable<CredentialUse> CredentialUses() => SurfaceProbe.CredentialUses();
 
+    public IEnumerable<UninstallEntry> UninstallEntries() => SurfaceProbe.UninstallEntries();
+
     public IEnumerable<string> BlockedPrograms() => SurfaceProbe.BlockedPrograms();
 
     public IEnumerable<ProgramRun> ProgramRuns() => SurfaceProbe.ProgramRuns();
