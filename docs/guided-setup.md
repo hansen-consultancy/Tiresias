@@ -101,12 +101,12 @@ First checks, by what they find and what they offer:
 | Secret-looking environment variables | Unsealed user variables (already in `tir doctor`) | Seal them; for an API key, placeholder delivery (→ E3/C1) |
 | Connection string with a password | `Password=`/`Pwd=` in `appsettings*.json`, user secrets or a sealed value; the key name and the server, not the password | *An app needs a database*: a `tiresias:sql/…` reference (→ E2/C1), or Windows / Entra sign-in where the server takes it (→ E1) |
 | RavenDB certificate on disk | A `.pfx`/`.pem` in a project folder, or a `Certificate` path in RavenDB configuration | *Set up a RavenDB* with that file (→ E3/C1), then offer to delete it |
-| Broad RavenDB clearance | A RavenDB service whose certificate is Cluster Admin or Operator, or has access to databases the app doesn't use (asked through the broker; not built: RavenDB's `/certificates/whoami` isn't confirmed against a real server yet) | Issue a certificate scoped to the databases the app uses, and swap it in with **Edit...** |
+| Broad RavenDB clearance | Built: a RavenDB service whose certificate is Cluster Admin or Operator, a ValidUser for more than one database, or Admin on its database (asked through the broker, which calls RavenDB's `/certificates/whoami` with the certificate) | Issue a certificate scoped to the databases the app uses, and swap it in with **Edit...** |
 | Certificate expiry | Built: a RavenDB service's certificate expiring within 30 days, or expired, from the subject, thumbprint and expiry recorded at setup (`raven-certificates.json`, beside the vault) | **Edit...** on the service with a new `.pfx` |
 | Sealed key handed out as a value | Built: a global sealed variable delivered as its value whose name has a base-URL partner (`*_API_KEY`, `*_KEY`, `*_TOKEN`), for a vault https service or a known Bearer API (OpenAI and compatible); not Anthropic, Azure or GitHub keys. Needs Tiresias unlocked, so `tir doctor` skips it | Placeholder delivery (E4 → E3): Environment variables with the key checked, or `tir env placeholder add` |
 | Publishing key | Built: a NuGet feed token in plain text or in a user variable, a NuGet push key under `apikeys`, an npm `_authToken`/`_password`/`_auth` in plain text, a `.pypirc` password; the entry, registry and file, never the value | Feeds: `tir env nuget import` (E5 → E4/C1). npm, PyPI's `pypi`: `tir env import` seals it and leaves `${NAME}` (E5 → E4/C1). Push keys: a sealed variable through `tir run`. For the public registries, trusted publishing in CI (→ E1) |
 | Git token in a remote URL | Built: `https://user:token@…` in a remote's `url`/`pushurl` or a `[url]` rewrite in a project's `.git/config`, printed without the user info; entries in `~/.git-credentials`, by host | `git remote set-url` without the user info, which stops it spreading (still E5/C3); later, a `git-credential-tiresias` helper (→ E4/C1) |
-| A CLI acting as the user, unseen | `gh` signed in with a stored token, the Azure CLI with a cached Entra session (asked through each tool's own status command, never the token) | Run it through `tir exec` with a token minted per run after consent (C3 → C1); keep the tool's own sign-in only for interactive use, or sign it out |
+| A CLI acting as the user, unseen | Built: `gh` signed in with a stored token, the Azure CLI with a cached Entra session (from each tool's own config file, offline, never the token) | Run it through `tir exec` with a token minted per run after consent (C3 → C1); keep the tool's own sign-in only for interactive use, or sign it out |
 
 A finding can be **dismissed** with a reason ("this server only takes SQL logins", "not mine").
 The dismissal is kept per finding, so the same thing isn't raised again; one that comes back
@@ -148,7 +148,8 @@ enough at first; nothing typed there leaves the machine.
 - **What is in use**: the areas that apply to this machine, e.g. Services once a service exists,
   Environment variables once one is sealed. An area with nothing in it isn't on the home screen;
   it is reached through *What do you need?*.
-- The tray menu stays short: Unlock/Lock, Home, and a badge when there are new findings.
+- The tray menu stays short: Unlock/Lock, Home, and a badge when there are new findings (built: a
+  dot on the icon, from checks the app runs in the background; [as built](what-do-you-need.md#as-built)).
 
 Existing windows remain the places where the work happens; this changes how people get to them.
 
@@ -166,8 +167,6 @@ Existing windows remain the places where the work happens; this changes how peop
 
 ## Open questions
 
-- **RavenDB clearance.** Which endpoint reports a certificate's own clearance and database access
-  without admin rights, and on which versions? Needs checking against a real server.
 - **Integrated sign-in.** Telling that a SQL Server would accept Windows or Entra sign-in for this
   app means trying it; doing that unasked is too much. Offer it as a question in the flow instead.
 - **Scan scope.** Project folders the user added, user secrets and sealed services only, or also
@@ -197,15 +196,24 @@ Existing windows remain the places where the work happens; this changes how peop
    with a position: an extension with an unknown publisher or unchanged for two years inside a
    program that used a credential (**Remove...** runs the host's `--uninstall-extension` after
    approval), an unsigned program that starts at log-on, and a blocked program still on the PC
-   (both **Show file**). A finding's reasons are in its name, so a dismissal survives a version
+   (both **Show file**). A program that starts at log-on but that the user hasn't opened in 90
+   days (UserAssist; unknown for a program with a tray icon) gets **Turn off at log-on...**, the
+   same switch as Task Manager's. Uninstall entries are checked against the disk: an entry for
+   software that is gone and an older version's stale duplicate (**Remove entry...** saves it to a
+   `.reg` file first), and a program whose uninstaller is missing (reinstall it over itself). A
+   program the user hasn't opened in 90 days (nothing in its folder in UserAssist; unknown when it
+   runs unseen) is listed last, all of them as one line, without counting for the badge; its
+   **Show installed programs** opens the **Installed** page: every installed program with its last
+   opening, why its use is unknown where it is, and the credentials it used, unused first. A
+   finding's reasons are in its name, so a dismissal survives a version
    update and a new reason brings it back. Still design: the opt-in trust lookups (OSV,
    deps.dev, marketplaces, winget-pkgs) and the vulnerability and unverified-publisher findings
-   they raise; **Update** and `winget`/`dotnet tool`/`npm` uninstalls; "not used in 90 days" with
-   UserAssist, and **DisableStartup**; global tools and other hosts' extensions; scope on a managed
-   PC; the **Installed** list and the "*n* programs unused" line; trusting a publisher; separate
-   *How credentials are held* and *What can reach them* groups; `tir doctor --surface` and a daily
-   inventory instead of one per run.
-6. **Partly built. More checks**: RavenDB certificate expiry, sealed keys handed out as values,
-   publishing keys and git tokens are built, each with its own fix; a CLI acting as the user is
-   design ([more checks](more-checks.md)). RavenDB clearance waits for `/certificates/whoami` to be
-   confirmed against a real server.
+   they raise; **Update** and `winget`/`dotnet tool`/`npm` uninstalls; global tools and other
+   hosts' extensions; scope on a managed
+   PC; extensions and global tools on the **Installed** page; trusting a publisher; separate
+   *How credentials are held* and *What can reach them* groups; a daily inventory
+   instead of one per run. `tir doctor --surface` lists the inventory (extensions with their host's
+   reach, global tools, log-on entries with signature and last use).
+6. **Built. More checks**: RavenDB certificate expiry and clearance, sealed keys handed
+   out as values, publishing keys, git tokens and a CLI acting as the user (`gh`, `az`), each with
+   its own fix where one exists ([more checks](more-checks.md)).

@@ -353,25 +353,46 @@ public sealed class BrokerState : IDisposable
     /// Opens a GitHub App service's secret for <c>/token</c>, on behalf of a signed device. Uses the
     /// service's least privileged grant; one that needs elevation is refused unless elevated.
     /// </summary>
-    public (AllowedRequest? Allowed, Refusal? Refusal) AuthorizeToken(string serviceSlug, string device, SignedApproval? signed)
+    public (AllowedRequest? Allowed, Refusal? Refusal) AuthorizeToken(string serviceSlug, string device, SignedApproval? signed) =>
+        AuthorizeDeviceUse(serviceSlug, device, "TOKEN", AuditKind.Token,
+            s => s.Upstream.Host.Equals(GitHub.GitHubAppSecret.ApiHost, StringComparison.OrdinalIgnoreCase), "not-a-token-service", needsApproval: true, signed);
+
+    /// <summary>
+    /// Lets a device ask RavenDB who a service's certificate is (<c>/clearance</c>), with that
+    /// certificate. Only for a service the RavenDB setup saved, whose one grant is the certificate;
+    /// not through the grant's rule: the answer is metadata about the certificate, never data, so it
+    /// needs no signed approval (docs/step-up.md).
+    /// </summary>
+    public (AllowedRequest? Allowed, Refusal? Refusal) AuthorizeClearance(string serviceSlug, string device) =>
+        AuthorizeDeviceUse(serviceSlug, device, "CLEARANCE", AuditKind.Allow, s => RavenSetupPlanner.Recognize(s) is not null, "not-a-raven-service");
+
+    /// <summary>
+    /// A device using a service's first grant itself, outside any placeholder: <c>/token</c> and
+    /// <c>/clearance</c>. With <paramref name="needsApproval"/>, only with a signed token approval for this service.
+    /// </summary>
+    (AllowedRequest? Allowed, Refusal? Refusal) AuthorizeDeviceUse(string serviceSlug, string device, string method, AuditKind kind, Func<Service, bool> fits, string misfit,
+        bool needsApproval = false, SignedApproval? signed = null)
     {
-        var record = new AuditRecord(AuditKind.Deny, Consumer: device, Service: serviceSlug, Method: "TOKEN");
+        var record = new AuditRecord(AuditKind.Deny, Consumer: device, Service: serviceSlug, Method: method);
         lock (gate)
         {
             var now = time.GetUtcNow();
             if (CurrentLease(now) is not { } current)
                 return (null, Refuse(record, 503, "no-lease"));
             record = record with { LeaseId = current.Id };
-            var (approval, denied) = Approved(signed, Approval.TokenOp, current, now, record);
-            if (approval is null)
-                return (null, denied);
-            if (approval.Service != serviceSlug)
-                return (null, Refuse(record, 401, "approval-invalid"));
-            record = record with { Consumer = approval.Consumer, Reason = approval.Purpose };
+            if (needsApproval)
+            {
+                var (approval, denied) = Approved(signed, Approval.TokenOp, current, now, record);
+                if (approval is null)
+                    return (null, denied);
+                if (approval.Service != serviceSlug)
+                    return (null, Refuse(record, 401, "approval-invalid"));
+                record = record with { Consumer = approval.Consumer, Reason = approval.Purpose };
+            }
             if (vault.FindService(serviceSlug) is not { } service)
                 return (null, Refuse(record, 404, "unknown-service"));
-            if (!service.Upstream.Host.Equals(GitHub.GitHubAppSecret.ApiHost, StringComparison.OrdinalIgnoreCase) || service.Grants.Count == 0)
-                return (null, Refuse(record, 400, "not-a-token-service"));
+            if (!fits(service) || service.Grants.Count == 0)
+                return (null, Refuse(record, 400, misfit));
             var grant = service.Grants[0];
             record = record with { Grant = grant.Name };
             if (grant.RequiresElevation && !current.ActiveElevations(serviceSlug, now).Contains(grant.Name))
@@ -381,7 +402,7 @@ public sealed class BrokerState : IDisposable
                 return (null, Refuse(record, 503, "secret-not-leased"));
             if (Open(secret, dek, vault) is not { } value)
                 return (null, !PolicyBinding.Allows(vault, secret) ? Refuse(record, 403, "policy-not-approved") : Refuse(record, 500, "secret-unreadable"));
-            return (new AllowedRequest(audit, record with { Kind = AuditKind.Token }, service, grant, value, current.HardCapAt), null);
+            return (new AllowedRequest(audit, record with { Kind = kind }, service, grant, value, current.HardCapAt), null);
         }
     }
 

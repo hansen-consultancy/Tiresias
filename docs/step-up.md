@@ -29,6 +29,8 @@ token route also hands the caller a usable credential, not a placeholder.
 - **The broker checks approvals itself.** `/placeholder`, `/elevate` and `/token` need an
   **approval** as well as the device signature: the operation's exact parameters, signed with a
   key only an unlocked agent or a fresh Hello prompt can produce.
+  `/clearance/{service}` stays on the device signature alone: it returns what RavenDB says a
+  certificate may do, never a credential or data, and the doctor calls it without a prompt.
 - **The approval key comes from the vault, not from the device.** It is derived from the Hello wrap
   key and the lease id. The broker learns its public half only in the same `/lease/seal` that
   delivers DEKs which really open the vault's secrets. A program that holds the device key, but

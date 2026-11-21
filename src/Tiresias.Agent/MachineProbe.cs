@@ -1,6 +1,9 @@
-﻿using System.IO.Enumeration;
+using System.IO.Enumeration;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using Tiresias.AdminTier;
 using Tiresias.Client;
+using Tiresias.Decoys;
 using Tiresias.EnvironmentVariables;
 using Tiresias.Protocol;
 using Tiresias.Trust;
@@ -105,11 +108,26 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     }
 
     public IReadOnlyList<string> ExposedVariables =>
-        [.. EnvironmentStore.UserVariables().Where(v => v.LooksSecret).Select(v => v.Name)];
+        [.. EnvironmentStore.UserVariables().Where(v => v.LooksSecret && !IsDecoyVariable(v.Name)).Select(v => v.Name)];
+
+    /// <summary>The decoy variables, while placed: a decoy is not a secret to seal.</summary>
+    static bool IsDecoyVariable(string name) =>
+        DecoyStore.Current is { } set && set.Placed.Any(p => p.Kind == DecoyKind.Variables) && DecoyPlan.VariableNames.Contains(name, StringComparer.OrdinalIgnoreCase);
+
+    public DoctorDecoys? Decoys => DecoyStore.Current is { Placed.Count: > 0 } set
+        ? new(set.Placed.Count, IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners().Any(e => e.Port == set.HttpPort))
+        : null;
+
+    // On the thread pool: the app runs the doctor from its UI thread, and this waits on a pipe.
+    public AdminTierFacts? AdminTier => Task.Run(AdminClient.FactsAsync).GetAwaiter().GetResult() is { Installed: true } tier ? tier : null;
 
     public IEnumerable<DoctorFile> Projects() => Found.Projects.Select(Read);
 
-    public IEnumerable<DoctorFile> ConfigFiles() => Found.Configs.Select(Read);
+    public IEnumerable<DoctorFile> ConfigFiles()
+    {
+        var decoys = DecoyStore.Current;
+        return Found.Configs.Where(p => decoys?.Covers(p) != true).Select(Read);
+    }
 
     public IEnumerable<string> KeyFiles() => Found.Keys.Concat(Found.Pems.Where(HoldsPemPrivateKey));
 
@@ -138,6 +156,23 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public IEnumerable<DoctorRavenCertificate> RavenCertificates() => RavenCertificateStore.ForVault();
 
+    /// <summary>Asks the broker's <c>/clearance</c>, which needs the lease the unlocked agent holds. Waits longer than the broker waits on RavenDB.</summary>
+    public async Task<DoctorBrokerAnswer?> RavenClearanceAsync(string service)
+    {
+        if (KeyringStore.Broker is not { } broker)
+            return null;
+        try
+        {
+            using var client = BrokerClient.For(broker);
+            var (status, body) = await client.GetAsync($"/clearance/{Uri.EscapeDataString(service)}").WaitAsync(TimeSpan.FromSeconds(15));
+            return new((int)status, body);
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or TimeoutException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>The unlocked key, for the checks that need the sealed environment's names; <c>null</c> skips them. Never prompts.</summary>
     public IKeyWrapper? Hello { get; init; }
 
@@ -160,7 +195,37 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public IEnumerable<CredentialUse> CredentialUses() => SurfaceProbe.CredentialUses();
 
+    public IEnumerable<UninstallEntry> UninstallEntries() => SurfaceProbe.UninstallEntries();
+
     public IEnumerable<string> BlockedPrograms() => SurfaceProbe.BlockedPrograms();
+
+    /// <inheritdoc cref="SurfaceProbe.Signature"/>
+    public static (bool? Valid, string? Signer) Signature(string path) => SurfaceProbe.Signature(path);
+
+    public IEnumerable<ProgramRun> ProgramRuns() => SurfaceProbe.ProgramRuns();
+
+    /// <summary>Everything the attack surface checks read, plus the global tools, which take seconds to list.</summary>
+    public SurfaceInventory Inventory() =>
+        new([.. Extensions()], [.. SurfaceProbe.GlobalTools()], [.. StartupEntries()], [.. CredentialUses()], [.. ProgramRuns()]);
+
+    public IEnumerable<DecoyUseRecord> DecoyUses() => SurfaceProbe.DecoyUses();
+
+    /// <summary>Where each tool keeps them, honouring <c>GH_CONFIG_DIR</c> and <c>AZURE_CONFIG_DIR</c> as the tools do.</summary>
+    public DoctorCliConfigs CliConfigs
+    {
+        get
+        {
+            var gh = Environment.GetEnvironmentVariable("GH_CONFIG_DIR") is { Length: > 0 } ghDir ? ghDir
+                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GitHub CLI");
+            var az = Environment.GetEnvironmentVariable("AZURE_CONFIG_DIR") is { Length: > 0 } azDir ? azDir
+                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".azure");
+            return new(Existing(Path.Combine(gh, "hosts.yml")), Existing(Path.Combine(az, "azureProfile.json")));
+
+            static DoctorFile? Existing(string path) => File.Exists(path) ? Read(path) : null;
+        }
+    }
+
+    public string? GitHubAppService => VaultEditor.Load().Services.FirstOrDefault(ExecPlan.IsGitHubApp)?.Slug;
 
     /// <summary>How long the walk of the project roots took and what it covered; <c>null</c> until a check needed it.</summary>
     public ScanStats? Scan => found?.Stats;

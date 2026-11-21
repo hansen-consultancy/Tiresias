@@ -48,9 +48,9 @@ CI and people who prefer it, and it talks to the same agent.
   answer. A countdown runs, and no answer means Deny. Requests that arrive
   while one is open wait their turn, and the dialog shows how many are waiting. Workstation lock,
   logoff or sleep answers every open dialog with Deny.
-- **Prompts come to the front.** `tir` and the NuGet plugin run in the background, and Windows
-  only lets a process take the foreground when the program the user is in hands it the right. So
-  before asking the app anything they call `AllowSetForegroundWindow` for the app's process (found
+- **Prompts come to the front.** `tir`, the NuGet plugin and an app loading its user secrets run
+  in the background, and Windows only lets a process take the foreground when the program the
+  user is in hands it the right. So before asking the app anything they call `AllowSetForegroundWindow` for the app's process (found
   from the pipe), and the app brings its consent dialog and the Windows Hello prompt forward. When
   Windows still keeps one back, its taskbar button flashes until you look at it. Unlock requests
   that arrive together (`tir`, a terminal, NuGet, the tray) share one Hello prompt. A Hello prompt
@@ -214,6 +214,9 @@ The goal is one command or one download, then a first-run wizard:
 3. Enrol this device: pin the broker key, scan or paste the genesis hash.
 4. Optional: scan the machine for plaintext secrets (the `doctor` checks) and offer to import
    them.
+5. Optional, once: **Protect more with admin rights**, the [admin tier](admin-tier.md): **Set
+   up** (one UAC prompt) or **Not now**, which changes nothing. About shows the tier's state
+   afterwards, with **Set up**, **Update** or **Remove**.
 
 ## Solo mode
 

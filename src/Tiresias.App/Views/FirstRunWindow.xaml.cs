@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Tiresias.AdminTier;
 using Tiresias.Agent;
 using Tiresias.App.Logic;
 using Tiresias.Client;
@@ -38,7 +39,7 @@ public partial class FirstRunWindow : Window
 
     void ShowStep()
     {
-        foreach (var panel in new Panel[] { Welcome, Hello, RecoveryShow, RecoveryConfirm, Restore, Mode, RecoveryType, Done })
+        foreach (var panel in new Panel[] { Welcome, Hello, RecoveryShow, RecoveryConfirm, Restore, Mode, RecoveryType, AdminTierPanel, Done })
             panel.Visibility = (FirstRunStep)panel.Tag == model.Step ? Visibility.Visible : Visibility.Collapsed;
         if (model.Step == FirstRunStep.RecoveryConfirm)
             Dispatcher.BeginInvoke(() => FirstGroup.Focus());
@@ -55,7 +56,14 @@ public partial class FirstRunWindow : Window
         base.OnClosed(e);
     }
 
-    void OnClose(object sender, RoutedEventArgs e) => Close();
+    /// <summary>On the admin tier's offer the second button is <b>Not now</b>, which moves on rather than closing.</summary>
+    void OnClose(object sender, RoutedEventArgs e)
+    {
+        if (model.Step == FirstRunStep.AdminTier)
+            model.NotNow();
+        else
+            Close();
+    }
 }
 
 public sealed partial class FirstRunViewModel : ObservableObject
@@ -203,6 +211,13 @@ public sealed partial class FirstRunViewModel : ObservableObject
                     recoveryKey = typed;
                     await SetUpSoloAsync();
                     break;
+                case FirstRunStep.AdminTier:
+                    var result = await AdminTierElevation.RunAsync("install");
+                    if (result == AdminSetupResult.Done)
+                        MoveOn(FirstRunStep.Done);
+                    else
+                        Message = Text.Of(AdminTierCard.Outcome(result, removing: false));
+                    break;
                 case FirstRunStep.Done:
                     Finished?.Invoke();
                     break;
@@ -251,6 +266,13 @@ public sealed partial class FirstRunViewModel : ObservableObject
     {
         AppLog.Info("first run: new recovery key chosen over restoring the sealed secrets here");
         MoveOn(FirstRunStep.RecoveryShow);
+    }
+
+    /// <summary>The admin tier declined: nothing changes, and About offers it later.</summary>
+    public void NotNow()
+    {
+        AppLog.Info("first run: admin tier not set up (not now)");
+        MoveOn(FirstRunStep.Done);
     }
 
     [RelayCommand]
@@ -350,7 +372,7 @@ public sealed partial class FirstRunViewModel : ObservableObject
             SetupMode.Broker => "FirstRun_Done_Broker",
             _ => "FirstRun_Done_SecretsOnly",
         });
-        Step = FirstRunStep.Done;
+        MoveOn(FirstRunPlan.Finishing(App.SetupFacts()));
     }
 
     /// <summary>Enters a step, doing what it needs on the way in (the recovery key is created as its page opens).</summary>
@@ -398,9 +420,15 @@ public sealed partial class FirstRunViewModel : ObservableObject
         {
             FirstRunStep.Welcome => "FirstRun_Primary_Start",
             FirstRunStep.Hello => "FirstRun_Primary_Hello",
+            FirstRunStep.AdminTier => "FirstRun_Primary_AdminTier",
             FirstRunStep.Done => "FirstRun_Primary_Finish",
             _ => "FirstRun_Primary_Continue",
         });
-        CloseLabel = Text.Get(Step == FirstRunStep.Done ? "Common_Close" : "FirstRun_Later");
+        CloseLabel = Text.Get(Step switch
+        {
+            FirstRunStep.Done => "Common_Close",
+            FirstRunStep.AdminTier => "FirstRun_AdminTier_NotNow",
+            _ => "FirstRun_Later",
+        });
     }
 }

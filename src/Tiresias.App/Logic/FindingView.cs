@@ -21,6 +21,18 @@ public enum FixAction
     RemoveExtension,
     /// <summary>Show a file in Explorer.</summary>
     RevealFile,
+    /// <summary>Turn a log-on entry off the way Task Manager does, after the user approves.</summary>
+    DisableStartup,
+    /// <summary>Settings, Apps, Startup, for a machine-wide entry only an administrator can turn off.</summary>
+    OpenStartupSettings,
+    /// <summary>Save one of the user's uninstall entries to a <c>.reg</c> file and delete it, after the user approves.</summary>
+    RemoveEntry,
+    /// <summary>Take a program off the blocklist.</summary>
+    Unblock,
+    /// <summary>The Services page's add form, its address filled in.</summary>
+    AddService,
+    /// <summary>The Installed page: the whole list, unused programs first.</summary>
+    OpenInstalledList,
 }
 
 /// <summary>
@@ -78,8 +90,25 @@ public static class FindingView
         UsePlaceholder => (FixAction.UsePlaceholder, "Finding_FixPlaceholder"),
         RemoveExtension => (FixAction.RemoveExtension, "Finding_FixRemoveExtension"),
         RevealFile => (FixAction.RevealFile, "Finding_FixReveal"),
+        DisableStartup { Machine: false } => (FixAction.DisableStartup, "Finding_FixDisableStartup"),
+        DisableStartup => (FixAction.OpenStartupSettings, "Finding_FixStartupSettings"),
+        RemoveEntry { Machine: false } => (FixAction.RemoveEntry, "Finding_FixRemoveEntry"),
+        RemoveEntry or Repair { Command: not null } => (FixAction.CopyCommand, "Finding_FixCopy"),
+        UnblockProgram => (FixAction.Unblock, "Finding_FixUnblock"),
+        RunThroughExec { Setup: not null } => (FixAction.AddService, "Finding_FixGitHubApp"),
+        RunThroughExec => (FixAction.CopyCommand, "Finding_FixCopy"),
+        UninstallApp => (FixAction.OpenInstalledList, "Finding_FixInstalledList"),
         _ => null,
     };
+
+    /// <summary>
+    /// A row's button: a finding's own, or for a group the one its members share when it opens a
+    /// list rather than acting on one of them, so unused programs are one line with one button.
+    /// </summary>
+    public static (FixAction Action, string Label)? GroupButton(IReadOnlyList<DoctorCheck> group) =>
+        group.Count == 1 ? Button(group[0].Fix)
+        : group.Select(c => Button(c.Fix)).Distinct().ToArray() is [{ Action: FixAction.OpenInstalledList } shared] ? shared
+        : null;
 
     /// <summary>Where the delivery sits and where the fix takes it, as <c>E5/C3 → E2/C1</c>.</summary>
     public static string Moves(DoctorCheck check) => check switch

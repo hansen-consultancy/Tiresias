@@ -1,9 +1,11 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Tiresias.AdminTier;
 using Tiresias.Client;
 using Tiresias.GitHub;
 using Tiresias.Policy;
+using Tiresias.Protocol;
 using NSec.Cryptography;
 
 namespace Tiresias.Tests;
@@ -116,6 +118,11 @@ public class DoctorTests
         public List<DoctorFile> ProjectFiles { get; } = [];
         public List<DoctorFile> Config { get; } = [];
         public List<string> Keys { get; } = [];
+        public DoctorDecoys? Decoys { get; set; }
+        public List<string> Blocked { get; } = [];
+        public List<DecoyUseRecord> Uses { get; } = [];
+        public IEnumerable<string> BlockedPrograms() => Blocked;
+        public IEnumerable<DecoyUseRecord> DecoyUses() => Uses;
 
         public Task<int?> BrokerStatusAsync() => Task.FromResult(BrokerStatus);
         public Task<bool> ForwarderListeningAsync() => Task.FromResult(Forwarder);
@@ -123,6 +130,64 @@ public class DoctorTests
         public IEnumerable<DoctorFile> Projects() => ProjectFiles;
         public IEnumerable<DoctorFile> ConfigFiles() => Config;
         public IEnumerable<string> KeyFiles() => Keys;
+        public List<DoctorRavenCertificate> Raven { get; } = [];
+        public List<string> ClearanceAsked { get; } = [];
+        public IEnumerable<DoctorRavenCertificate> RavenCertificates() => Raven;
+
+        public Task<DoctorBrokerAnswer?> RavenClearanceAsync(string service)
+        {
+            ClearanceAsked.Add(service);
+            return Task.FromResult<DoctorBrokerAnswer?>(new(200, System.Text.Encoding.UTF8.GetBytes("""{"clearance":"Operator","databases":{}}""")));
+        }
+        public AdminTierFacts? AdminTier { get; set; }
+    }
+
+    static AdminStatusResult Answer(string version) => new(version, AdminWire.ProtocolVersion, new());
+
+    [Test]
+    public async Task The_admin_tier_has_a_line_only_when_installed_and_fails_when_stopped()
+    {
+        Assert.That((await Doctor.RunAsync(new FakeProbe())).Any(c => c.Name == Doctor.AdminTierCheck), Is.False);
+        Assert.That((await Doctor.RunAsync(new FakeProbe { AdminTier = new(false, false, null, "0.3.0") })).Any(c => c.Name == Doctor.AdminTierCheck), Is.False);
+
+        async Task<DoctorCheck> Line(AdminTierFacts facts) =>
+            (await Doctor.RunAsync(new FakeProbe { AdminTier = facts })).Single(c => c.Name == Doctor.AdminTierCheck);
+
+        var running = await Line(new(true, true, Answer("0.3.0"), "0.3.0"));
+        Assert.That(running.Status, Is.EqualTo(DoctorStatus.Ok));
+        Assert.That(running.Detail, Does.Contain("0.3.0").And.Contain("none yet"));
+        Assert.That((await Line(new(true, false, null, "0.3.0"))).Status, Is.EqualTo(DoctorStatus.Fail));
+        Assert.That((await Line(new(true, true, null, "0.3.0"))).Status, Is.EqualTo(DoctorStatus.Fail));
+        var older = await Line(new(true, true, Answer("0.2.1"), "0.3.0"));
+        Assert.That(older.Status, Is.EqualTo(DoctorStatus.Warn));
+        Assert.That(older.Detail, Does.Contain("Update"));
+    }
+
+    [Test]
+    public async Task Decoys_say_whether_a_use_would_be_seen()
+    {
+        Assert.That((await Doctor.RunAsync(new FakeProbe())).Any(c => c.Name == "decoys"), Is.False);
+
+        var listening = (await Doctor.RunAsync(new FakeProbe { Decoys = new(2, true) })).Single(c => c.Name == "decoys");
+        var deaf = (await Doctor.RunAsync(new FakeProbe { Decoys = new(2, false) })).Single(c => c.Name == "decoys");
+
+        Assert.That(listening.Status, Is.EqualTo(DoctorStatus.Ok));
+        Assert.That(deaf.Status, Is.EqualTo(DoctorStatus.Warn));
+        Assert.That(deaf.Detail, Does.Contain("goes unseen"));
+    }
+
+    [Test]
+    public async Task A_program_blocked_for_a_decoy_is_that_finding_not_this_wasnt_mes()
+    {
+        const string evil = @"C:\Temp\evil.exe", other = @"C:\Temp\other.exe";
+        var probe = new FakeProbe();
+        probe.Blocked.AddRange([evil, other]);
+        probe.Uses.Add(new(evil, "the decoy API key", DateTimeOffset.UtcNow));
+
+        var checks = await Doctor.RunAsync(probe);
+
+        Assert.That(checks.Where(c => c.Kind == Doctor.DecoyKind).Select(c => c.Subject), Is.EqualTo(new[] { evil }));
+        Assert.That(checks.Where(c => c.Kind == Doctor.BlockedKind).Select(c => c.Fix), Is.EqualTo(new DoctorFix[] { new RevealFile(other) }));
     }
 
     static readonly Position Plaintext = new(Exposure.Readable, Control.Silent);
@@ -138,6 +203,22 @@ public class DoctorTests
         var checks = await Doctor.RunAsync(new FakeProbe());
         Assert.That(checks.Select(c => c.Status), Is.All.EqualTo(DoctorStatus.Ok));
         Assert.That(checks.Select(c => c.Name), Is.EqualTo(new[] { "broker pinned", "device key", "recovery key", "vault", "broker reachable", "forwarder", "environment variables", Doctor.KeysAsValuesCheck }));
+    }
+
+    [Test]
+    public async Task RavenDB_clearance_is_asked_through_a_broker_that_answers()
+    {
+        var probe = new FakeProbe { Raven = { new("orders", null, null, null) } };
+        Assert.That((await Check(probe, "RavenDB clearance")).Status, Is.EqualTo(DoctorStatus.Warn));
+        Assert.That(probe.ClearanceAsked, Is.EqualTo(new[] { "orders" }));
+    }
+
+    [Test]
+    public async Task RavenDB_clearance_is_skipped_without_waiting_on_a_broker_that_doesnt()
+    {
+        var probe = new FakeProbe { BrokerStatus = null, Raven = { new("orders", null, null, null) } };
+        Assert.That((await Check(probe, "RavenDB clearance")).Detail, Does.StartWith("skipped"));
+        Assert.That(probe.ClearanceAsked, Is.Empty);
     }
 
     [Test]

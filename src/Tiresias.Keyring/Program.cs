@@ -30,6 +30,7 @@ try
         ("env", "shell") => await EnvCommand.ShellAsync(line),
         ("env", _) => EnvCommand.Run(line),
         ("run", _) => await EnvCommand.RunCommandAsync(line),
+        ("decoys", _) => DecoysCommand.Run(line),
         _ => throw new UsageException("Unknown command."),
     };
 }

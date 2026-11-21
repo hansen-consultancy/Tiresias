@@ -48,6 +48,9 @@ sealed class ProgramGuard
 
     public void Block(string? program, string? sha256) => Change(l => l.Escalate(program, sha256, DateTimeOffset.Now));
 
+    /// <summary>A decoy was used: block the program, without a lockdown.</summary>
+    public void BlockForDecoy(string? program, string? sha256) => Change(l => l.Block(program, sha256, DateTimeOffset.Now));
+
     public void Unlocked()
     {
         if (Current.LockedDown)
