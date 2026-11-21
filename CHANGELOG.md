@@ -10,6 +10,11 @@ its section below.
 
 ### Changed
 
+- Trust-chain links that add a device, user or broker, or change the admin threshold, now need a
+  Windows Hello signature from each device that signs them and each device they add. Setting up
+  solo mode asks for Windows Hello once more, to put this PC's Hello key in the chain. A chain made
+  earlier keeps working; `tir trust bind-hello` (with the recovery key) adds the key to it, and
+  `tir doctor` says when that is needed.
 - While unlocked, the broker refuses a `vault.json` holding older versions of secrets than it
   already saw, as when an older copy is restored, and keeps the newer one.
 - The broker now checks that you approved each placeholder, elevation and GitHub App token itself,

@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
@@ -186,8 +186,8 @@ public sealed class SoloBroker : IAsyncDisposable
     }
 
     /// <summary>
-    /// Sets up solo mode: a trust chain whose genesis this device and the paper key sign, the broker
-    /// identity, and the Keyring enrolled with that broker. <paramref name="recoveryKey"/> is the
+    /// Sets up solo mode: a trust chain whose genesis this device (device key and Hello key, one Hello
+    /// prompt) and the paper key sign, the broker identity, and the Keyring enrolled with that broker. <paramref name="recoveryKey"/> is the
     /// paper key's raw bytes, which must match the recovery key already stored.
     /// </summary>
     /// <exception cref="InvalidOperationException">Already enrolled, no recovery key yet, or the key typed isn't it.</exception>
@@ -206,7 +206,7 @@ public sealed class SoloBroker : IAsyncDisposable
         System.IO.Directory.CreateDirectory(Directory);
         using var deviceKey = KeyringStore.LoadOrCreateDeviceKey();
         using var paperKey = PaperKey.SigningKey(recoveryKey);
-        var genesis = TrustChain.Start("solo", "owner", new Signer(settings.DeviceId, deviceKey), new Signer("paper", paperKey),
+        var genesis = TrustChain.Start("solo", "owner", new Signer(settings.DeviceId, deviceKey, HelloKeyWrapper.LinkKey(create: true)), new Signer("paper", paperKey),
             new TrustPolicy(), DateTimeOffset.UtcNow);
         File.WriteAllBytes(TrustChainPath, TrustLinkJson.WriteChain([genesis]));
         File.Delete(TrustChainPath + ".head");

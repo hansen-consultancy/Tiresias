@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Tiresias.Protocol;
@@ -52,6 +52,9 @@ public interface IDoctorProbe
 
     /// <summary><c>null</c> when the vault file is missing.</summary>
     DoctorVault? Vault { get; }
+
+    /// <summary>Whether the trust chain names this device's Windows Hello key (docs/trust-links.md); <c>null</c> when there is no chain to read.</summary>
+    bool? HelloBound => null;
 
     /// <summary>The HTTP status of an unsigned call to the broker (401 means up), or <c>null</c> when unreachable.</summary>
     Task<int?> BrokerStatusAsync();
@@ -122,6 +125,10 @@ public static partial class Doctor
             Vault(probe.Vault),
         };
 
+        if (probe.HelloBound is { } bound)
+            checks.Add(bound
+                ? new("trust chain", DoctorStatus.Ok, "this device's Windows Hello key signs the links that add trust")
+                : new("trust chain", DoctorStatus.Warn, "this device's Windows Hello key isn't in the trust chain yet, so it can't add a device or change trust: run tir trust bind-hello"));
         if (probe.Solo)
             checks.AddRange(SoloTradeOffs);
         if (probe.Enrolled)

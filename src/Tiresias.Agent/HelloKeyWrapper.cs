@@ -1,8 +1,10 @@
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using Tiresias.Vault;
 using Windows.Foundation;
 using Windows.Security.Credentials;
 using Windows.Security.Cryptography;
+using Windows.Security.Cryptography.Core;
+using Tiresias.Trust;
 
 namespace Tiresias.Agent;
 
@@ -43,6 +45,17 @@ public sealed partial class HelloKeyWrapper : IKeyWrapper, IDisposable
 
     /// <summary>The lease's approval key; no extra prompt once this wrapper has derived its wrap key.</summary>
     public NSec.Cryptography.Key ApprovalKey(string leaseId) => inner.ApprovalKey(leaseId);
+
+    /// <summary>
+    /// The same credential as a trust-chain link key (docs/trust-links.md): its public key, and a
+    /// signer that shows a Hello prompt for every link it signs.
+    /// </summary>
+    public static HelloKey LinkKey(bool create)
+    {
+        var credential = OpenCredential(create);
+        CryptographicBuffer.CopyToByteArray(credential.RetrievePublicKey(CryptographicPublicKeyBlobType.X509SubjectPublicKeyInfo), out var spki);
+        return new(spki, data => Sign(credential, data));
+    }
 
     public byte[] Wrap(ReadOnlySpan<byte> dek, string context) => inner.Wrap(dek, context);
 

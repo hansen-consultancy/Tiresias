@@ -1,4 +1,4 @@
-using Tiresias.Agent;
+﻿using Tiresias.Agent;
 using Tiresias.Keyring;
 
 var line = new CommandLine(args);
@@ -11,6 +11,7 @@ try
         ("recovery", "init") => Commands.RecoveryInit(),
         ("recovery", "restore") => Commands.RecoveryRestore(),
         ("solo", "init") => Commands.SoloInit(),
+        ("trust", "bind-hello") => await Commands.TrustBindHelloAsync(),
         ("vault", "add") => Commands.VaultAdd(line),
         ("vault", "migrate") => await ServiceCommand.MigrateAsync(),
         ("service", _) => ServiceCommand.Run(line),

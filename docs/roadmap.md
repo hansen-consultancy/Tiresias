@@ -15,7 +15,7 @@ public.
 - [ ] Solo mode: local broker as a Windows service
 - [x] Step-up at the broker: minting, elevation and tokens need an approval only the vault can
       produce ([design](step-up.md), #23)
-- [ ] Trust-chain links that add a key need a Windows Hello signature ([design](trust-links.md), #41)
+- [x] Trust-chain links that add a key need a Windows Hello signature ([design](trust-links.md), #41)
 - [ ] Seal user environment variables and hand them back per shell session ([design](environment-variables.md))
 - [x] Databases for applications: SQL Server logins per lease, RavenDB through the broker ([design](databases.md))
 - [ ] RavenDB subscriptions through the broker (the TCP relay, [phase 3](databases.md#phases))

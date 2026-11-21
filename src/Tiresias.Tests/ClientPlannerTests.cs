@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Tiresias.Client;
@@ -107,6 +107,7 @@ public class DoctorTests
         public bool RecoveryKeySet { get; set; } = true;
         public IReadOnlyList<string> ExposedVariables { get; set; } = [];
         public bool Solo { get; set; }
+        public bool? HelloBound { get; set; }
         public DoctorVault? Vault { get; set; } = new(2, [], []);
         public int? BrokerStatus { get; set; } = 401;
         public bool Forwarder { get; set; } = true;
@@ -157,6 +158,16 @@ public class DoctorTests
         Assert.That(warnings, Has.Some.Contains("fixed IP"));
         Assert.That(warnings, Has.Some.Contains("same machine").And.Some.Contains("admin"));
         Assert.That(warnings, Has.Some.StartsWith("Broker runs inside the app"));
+    }
+
+    [Test]
+    public async Task A_device_whose_hello_key_isnt_in_the_chain_is_told_to_bind_it()
+    {
+        var unbound = await Check(new FakeProbe { HelloBound = false }, "trust chain");
+        Assert.That(unbound.Status, Is.EqualTo(DoctorStatus.Warn));
+        Assert.That(unbound.Detail, Does.Contain("tir trust bind-hello"));
+        Assert.That((await Check(new FakeProbe { HelloBound = true }, "trust chain")).Status, Is.EqualTo(DoctorStatus.Ok));
+        Assert.That((await Doctor.RunAsync(new FakeProbe())).Select(c => c.Name), Does.Not.Contain("trust chain"), "no chain to read");
     }
 
     [Test]
