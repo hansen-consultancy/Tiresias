@@ -20,7 +20,7 @@ its section below.
 - Decoy files are watched for opens too: while the app or `tir agent` runs, a program that opens
   `passwords.txt` or a decoy project's files is named in the activity log and raised as a warning
   on Home, with a notification. An open never blocks the program, and Windows Search, Defender,
-  Explorer and OneDrive opening them raise nothing. Openers that can't be told apart are recorded
+  Explorer and OneDrive installed for all users opening them raise nothing. Openers that can't be told apart are recorded
   as unknown, never guessed.
 - Home has a **Decoys** card: place `passwords.txt`, a decoy project or the decoy variables at
   their default places, each after asking first, see what is placed, and **Remove decoys**.
