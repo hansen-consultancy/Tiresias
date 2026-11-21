@@ -204,16 +204,18 @@ Existing windows remain the places where the work happens; this changes how peop
    software that is gone and an older version's stale duplicate (**Remove entry...** saves it to a
    `.reg` file first), and a program whose uninstaller is missing (reinstall it over itself). A
    program the user hasn't opened in 90 days (nothing in its folder in UserAssist; unknown when it
-   runs unseen) is listed last with **Open Installed apps**, without counting for the badge. A
+   runs unseen) is listed last, all of them as one line, without counting for the badge; its
+   **Show installed programs** opens the **Installed** page: every installed program with its last
+   opening, why its use is unknown where it is, and the credentials it used, unused first. A
    finding's reasons are in its name, so a dismissal survives a version
    update and a new reason brings it back. Still design: the opt-in trust lookups (OSV,
    deps.dev, marketplaces, winget-pkgs) and the vulnerability and unverified-publisher findings
    they raise; **Update** and `winget`/`dotnet tool`/`npm` uninstalls; global tools and other
    hosts' extensions; scope on a managed
-   PC; the **Installed** list and the "*n* programs unused" line; trusting a publisher; separate
-   *How credentials are held* and *What can reach them* groups; a daily inventory instead of one
-   per run. `tir doctor --surface` lists the inventory (extensions with their host's reach, global
-   tools, log-on entries with signature and last use).
+   PC; extensions and global tools on the **Installed** page; trusting a publisher; separate
+   *How credentials are held* and *What can reach them* groups; a daily inventory
+   instead of one per run. `tir doctor --surface` lists the inventory (extensions with their host's
+   reach, global tools, log-on entries with signature and last use).
 6. **Built, except RavenDB clearance. More checks**: RavenDB certificate expiry, sealed keys handed
    out as values, publishing keys, git tokens and a CLI acting as the user (`gh`, `az`), each with
    its own fix where one exists ([more checks](more-checks.md)). RavenDB clearance waits for

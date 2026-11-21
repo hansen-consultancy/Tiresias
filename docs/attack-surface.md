@@ -1,6 +1,6 @@
 # Attack surface: less software, less to trust
 
-Status: **first slice, log-on use, uninstall-entry checks, unused applications and `tir doctor --surface` built** (#34, #55); the rest is design. [Guided setup](guided-setup.md) phase 5: it builds on the
+Status: **first slice, log-on use, uninstall-entry checks, unused applications, the Installed list and `tir doctor --surface` built** (#34, #55); the rest is design. [Guided setup](guided-setup.md) phase 5: it builds on the
 findings `tir doctor` reports since phase 1 and the findings section, fixes and dismissals the app
 gets in phase 2.
 
@@ -311,8 +311,20 @@ names winget's command once the inventory knows the package id, and the steps un
 **Unused applications are found**: an installed program whose folder had nothing opened in 90
 days (UserAssist), never one with no recorded run or one that runs unseen (a tray icon, a service,
 a driver, a log-on entry, a folder on `PATH`), nor one that used a credential. It is a finding with
-status `ok`, so it sorts last and doesn't count for the badge, and its fix, `UninstallApp`, opens
-Settings, Apps, Installed apps until the inventory knows each program's installer command.
+status `ok`, so it sorts last and doesn't count for the badge; all of them are one line on Home,
+"*n* programs you haven't opened in 90 days", whose one button opens the **Installed** page. That
+page is built too: every entry of the installed-apps list once (Windows Installer entries
+included), for you or for everyone, its last opening or why its use is unknown (works in the
+background, not recorded), and the credentials its folder's programs used in 90 days; unused
+first, longest unused first. Two columns (program with the icon its entry names, last opened) fit any width; an icon is read
+from a local file only, never a network path; selecting one shows
+the rest below the list, and a search box matches every word against name, version, folder and
+services. The selected program's panel also shows the publisher its entry claims and who signed
+its program file (the `.exe` its icon comes from, else its uninstaller), checked offline with
+WinVerifyTrust when it is selected; a name from a signature that doesn't verify is shown as a
+claim only. **Search online...** opens the browser with a web search for the name and version, on
+the user's click only; Tiresias itself sends nothing. Uninstalling goes through Settings, Apps, Installed apps
+(`UninstallApp`) until the inventory knows each program's installer command.
 [Guided setup](guided-setup.md#phases) lists what is still design.
 
 1. **Inventory**: applications, extensions, global tools and startup entries, with last use where

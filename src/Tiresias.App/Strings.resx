@@ -1859,8 +1859,101 @@ Store them in clear?</value>
   <data name="Finding_StartupOff" xml:space="preserve">
     <value>{0} no longer starts at log-on. Turn it back on in Settings, Apps, Startup.</value>
   </data>
-  <data name="Finding_FixInstalledApps" xml:space="preserve">
-    <value>Open Installed apps</value>
+  <data name="Finding_FixInstalledList" xml:space="preserve">
+    <value>Show installed programs</value>
+  </data>
+  <data name="Nav_Installed" xml:space="preserve">
+    <value>Installed</value>
+  </data>
+  <data name="Installed_Search" xml:space="preserve">
+    <value>Search</value>
+  </data>
+  <data name="Installed_ColFolder" xml:space="preserve">
+    <value>Folder</value>
+  </data>
+  <data name="Installed_ShortUnused" xml:space="preserve">
+    <value>{0} (unused)</value>
+  </data>
+  <data name="Installed_ShortBackground" xml:space="preserve">
+    <value>Unknown (background)</value>
+  </data>
+  <data name="Installed_ShortNotRecorded" xml:space="preserve">
+    <value>Unknown</value>
+  </data>
+  <data name="Installed_ReachedNone" xml:space="preserve">
+    <value>None</value>
+  </data>
+  <data name="Installed_FolderUnknown" xml:space="preserve">
+    <value>Not known</value>
+  </data>
+  <data name="Installed_ShortRecentNoRun" xml:space="preserve">
+    <value>Uses credentials</value>
+  </data>
+  <data name="Installed_Heading" xml:space="preserve">
+    <value>Installed programs</value>
+  </data>
+  <data name="Installed_Intro" xml:space="preserve">
+    <value>Every program in the installed-apps list, those you haven't opened in 90 days first. Last opened is the last time you started something in its folder from Start, the taskbar or Explorer; Windows doesn't record other use, so that shows as unknown, never as unused.</value>
+  </data>
+  <data name="Installed_ShowLabel" xml:space="preserve">
+    <value>Show</value>
+  </data>
+  <data name="Installed_ShowAll" xml:space="preserve">
+    <value>All programs</value>
+  </data>
+  <data name="Installed_ShowUnused" xml:space="preserve">
+    <value>Not opened in 90 days</value>
+  </data>
+  <data name="Installed_ListName" xml:space="preserve">
+    <value>Installed programs</value>
+  </data>
+  <data name="Installed_ColName" xml:space="preserve">
+    <value>Program</value>
+  </data>
+  <data name="Installed_ColVersion" xml:space="preserve">
+    <value>Version</value>
+  </data>
+  <data name="Installed_ColFor" xml:space="preserve">
+    <value>Installed for</value>
+  </data>
+  <data name="Installed_ColUse" xml:space="preserve">
+    <value>Last opened</value>
+  </data>
+  <data name="Installed_ColReached" xml:space="preserve">
+    <value>Credentials used (90 days)</value>
+  </data>
+  <data name="Installed_ForYou" xml:space="preserve">
+    <value>You</value>
+  </data>
+  <data name="Installed_ForEveryone" xml:space="preserve">
+    <value>Everyone (administrator)</value>
+  </data>
+  <data name="Installed_UseUnused" xml:space="preserve">
+    <value>{0}, over 90 days ago</value>
+  </data>
+  <data name="Installed_UseBackground" xml:space="preserve">
+    <value>Unknown: part of it works without being opened (a tray icon, a service, a driver, something that starts at log-on, or a command on PATH), which Windows doesn't record</value>
+  </data>
+  <data name="Installed_UseNotRecorded" xml:space="preserve">
+    <value>Unknown: Windows has no record of you opening anything in its folder, or it names no folder of its own</value>
+  </data>
+  <data name="Installed_UseRecentNoRun" xml:space="preserve">
+    <value>Not recorded, but it used credentials through Tiresias in the last 90 days</value>
+  </data>
+  <data name="Installed_Summary" xml:space="preserve">
+    <value>{0} programs, {1} not opened in 90 days</value>
+  </data>
+  <data name="Installed_Loading" xml:space="preserve">
+    <value>Reading the installed-apps list...</value>
+  </data>
+  <data name="Installed_Empty" xml:space="preserve">
+    <value>Nothing to show.</value>
+  </data>
+  <data name="Installed_Refresh" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="Installed_OpenSettings" xml:space="preserve">
+    <value>Open Installed apps in Settings</value>
   </data>
   <data name="Finding_FixRemoveEntry" xml:space="preserve">
     <value>Remove entry...</value>
@@ -2161,6 +2254,39 @@ Store them in clear?</value>
   </data>
   <data name="Secrets_NothingToSeal" xml:space="preserve">
     <value>Nothing to seal: this file holds no keys.</value>
+  </data>
+  <data name="Installed_ColPublisher" xml:space="preserve">
+    <value>Publisher (as its installer says)</value>
+  </data>
+  <data name="Installed_PublisherUnknown" xml:space="preserve">
+    <value>Not given</value>
+  </data>
+  <data name="Installed_ColSigner" xml:space="preserve">
+    <value>Signed by</value>
+  </data>
+  <data name="Installed_SignerChecking" xml:space="preserve">
+    <value>Checking…</value>
+  </data>
+  <data name="Installed_SignedBy" xml:space="preserve">
+    <value>{0}, a valid signature (checked on this PC)</value>
+  </data>
+  <data name="Installed_SignedNoName" xml:space="preserve">
+    <value>A valid signature without a name (checked on this PC)</value>
+  </data>
+  <data name="Installed_SignedInvalid" xml:space="preserve">
+    <value>A signature that is not valid; it names {0}, which anyone can write</value>
+  </data>
+  <data name="Installed_NotSigned" xml:space="preserve">
+    <value>Not signed</value>
+  </data>
+  <data name="Installed_SignerUnknown" xml:space="preserve">
+    <value>Not checked: a part of Windows or a Store app, or no program file found</value>
+  </data>
+  <data name="Installed_SearchOnline" xml:space="preserve">
+    <value>Search online…</value>
+  </data>
+  <data name="Installed_SearchOnlineTip" xml:space="preserve">
+    <value>Opens your browser with a web search for this name and version</value>
   </data>
   <data name="Decoys_Title" xml:space="preserve">
     <value>Decoys</value>
