@@ -61,6 +61,7 @@ public class DecoyTests
         Assert.That(read.Placed, Is.EqualTo(set.Placed));
         Assert.That(DecoySet.Parse(set.ToJson().Replace("\"v\": 1", "\"v\": 2")), Is.Null);
         Assert.That(DecoySet.Parse("{"), Is.Null);
+        Assert.That(DecoySet.Parse(set.ToJson().Replace($"{set.HttpPort}", "99999")), Is.Null);
         Assert.That(DecoySet.Parse(null), Is.Null);
     }
 
@@ -197,6 +198,24 @@ public class DecoyTests
         Assert.That(hit.Use, Is.EqualTo(DecoyUse.ApiKey));
         Assert.That(hit.Endpoint, Is.EqualTo("HTTP POST /v1/chat/completions"));
         Assert.That((hit.ProcessId, hit.Program), Is.EqualTo(((int?)4242, $"seen {set.HttpPort}")));
+    }
+
+    [Test]
+    public async Task A_request_line_cannot_forge_lines_in_the_record()
+    {
+        var set = DecoySet.Mint(Free);
+
+        var (hit, _) = await HitAsync(set, async () =>
+        {
+            using var tcp = new TcpClient();
+            await tcp.ConnectAsync(IPAddress.Loopback, set.HttpPort);
+            var stream = tcp.GetStream();
+            await stream.WriteAsync(Encoding.Latin1.GetBytes("GET /x\nforged\u001b[2J HTTP/1.1\r\n\r\n"));
+            await stream.ReadAsync(new byte[1024]);
+            return 0;
+        });
+
+        Assert.That(hit.Endpoint, Is.EqualTo("HTTP GET /xforged[2J"));
     }
 
     [Test]

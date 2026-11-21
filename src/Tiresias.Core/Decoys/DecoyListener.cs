@@ -90,12 +90,19 @@ public sealed class DecoyListener : IAsyncDisposable
         }
     }
 
+    /// <summary>The caller's text as the record may hold it: no control characters (no forged log lines), and short.</summary>
+    static string Printable(string text, int max)
+    {
+        var clean = new string([.. text.Where(c => !char.IsControl(c))]);
+        return clean.Length <= max ? clean : clean[..max] + "…";
+    }
+
     async Task<(DecoyUse, string)> ServeHttpAsync(Stream stream, CancellationToken ct)
     {
         var head = await ReadHeadAsync(stream, ct);
         var request = head.Split("\r\n", 2)[0].Split(' ');
         // Only the path: a token in the query string stays out of the record.
-        var endpoint = request.Length >= 2 ? $"HTTP {request[0]} {request[1].Split('?')[0]}" : "HTTP";
+        var endpoint = request.Length >= 2 ? $"HTTP {Printable(request[0], 16)} {Printable(request[1].Split('?')[0], 200)}" : "HTTP";
         var use = set.Recognise(head) ?? DecoyUse.Connected;
         var body = request.Length >= 2 && request[1].StartsWith("/v1", StringComparison.Ordinal)
             ? """{"error":{"message":"Incorrect API key provided.","type":"invalid_request_error","param":null,"code":"invalid_api_key"}}"""
