@@ -19,6 +19,10 @@ its section below.
   and raises a finding on Home naming the program, with **Unblock (that was me)**.
 - Home has a **Decoys** card: place `passwords.txt`, a decoy project or the decoy variables at
   their default places, each after asking first, see what is placed, and **Remove decoys**.
+- Home and `tir doctor` find the GitHub CLI or the Azure CLI signed in as you, which any program
+  running as you can use unasked. For `gh`, **Add a GitHub App...** sets up the service `tir exec`
+  mints a token per run from, after you allow it. Read from each tool's own config, offline; never
+  a token.
 
 ### Changed
 
