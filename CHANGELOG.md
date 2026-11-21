@@ -8,6 +8,11 @@ its section below.
 
 ## [Unreleased]
 
+### Added
+
+- The app checks for findings in the background, a minute after it starts and every four hours.
+  New ones put a dot on the tray icon and "(*n* new)" on **Status...** until you open Home.
+
 ### Changed
 
 - The secrets editor hides user-secrets folders that hold no keys behind a line, "*N* empty

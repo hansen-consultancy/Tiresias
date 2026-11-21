@@ -544,6 +544,12 @@ Switch to this copy, {2}, from {3}? The other copy quits first, ending its lease
   <data name="Tray_Status" xml:space="preserve">
     <value>Status...</value>
   </data>
+  <data name="Tray_StatusNew" xml:space="preserve">
+    <value>Status... ({0} new)</value>
+  </data>
+  <data name="Tray_NewFindings" xml:space="preserve">
+    <value>New findings: {0}</value>
+  </data>
   <data name="Tray_Quit" xml:space="preserve">
     <value>Quit Tiresias</value>
   </data>

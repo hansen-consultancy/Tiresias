@@ -111,6 +111,7 @@ public partial class App : Application
 
         updates = new AppUpdates(this, tray);
         updates.Start();
+        FindingWatch.Start();
 
         if (FirstRunPlan.Needed(SetupFacts()))
             ShowWindow<FirstRunWindow>();
@@ -215,6 +216,8 @@ public partial class App : Application
             KeyringStore.Lease?.HardCapAt, host.SoloBrokerProblem);
 
     internal void Refresh() => tray?.Refresh(Snapshot());
+
+    internal bool IsOpen<T>() where T : Window => windows.ContainsKey(typeof(T));
 
     /// <summary>Opens one window of a kind, or brings the open one forward.</summary>
     internal T ShowWindow<T>() where T : Window, new()
@@ -570,6 +573,7 @@ public partial class App : Application
         SystemEvents.SessionSwitch -= OnSessionSwitch;
         SystemEvents.PowerModeChanged -= OnPowerModeChanged;
         updates?.Dispose();
+        FindingWatch.Stop();
         tray?.Dispose();
         await stop.CancelAsync();
         if (host is not null)
