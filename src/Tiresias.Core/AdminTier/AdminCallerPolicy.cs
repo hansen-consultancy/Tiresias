@@ -12,7 +12,8 @@ namespace Tiresias.AdminTier;
 public sealed record AdminCaller(string UserSid, int SessionId, string? SessionUserSid, bool Elevated, bool IsService);
 
 /// <param name="Reason">Why it was refused, for the reply and the action log; <c>null</c> when allowed. Never a value from the request.</param>
-public sealed record AdminDecision(bool Allowed, string? Reason)
+/// <param name="ActingFor">Whose things the request acts on when allowed: the caller's user, or, for an elevated caller, the user signed in to its session.</param>
+public sealed record AdminDecision(bool Allowed, string? Reason, string? ActingFor = null)
 {
     public static readonly AdminDecision Allow = new(true, null);
 
@@ -40,12 +41,12 @@ public static class AdminCallerPolicy
     static readonly Dictionary<string, OpRule> Rules = new(StringComparer.Ordinal)
     {
         [AdminOps.Status] = new(false, NoArgs),
-        [AdminOps.EventsWait] = new(false, null),
-        [AdminOps.DecoysAdopt] = new(false, null),
-        [AdminOps.DecoysStatus] = new(false, null),
+        [AdminOps.EventsWait] = new(false, new Dictionary<string, ArgCheck> { ["ack"] = AdminArgs.Ack, ["wait"] = AdminArgs.Wait }),
+        [AdminOps.DecoysAdopt] = new(false, new Dictionary<string, ArgCheck> { ["set"] = AdminArgs.Set, ["files"] = AdminArgs.Files }),
+        [AdminOps.DecoysStatus] = new(false, NoArgs),
         [AdminOps.Freeze] = new(false, null),
         [AdminOps.Thaw] = new(true, null),
-        [AdminOps.DecoysRelease] = new(true, null),
+        [AdminOps.DecoysRelease] = new(true, NoArgs),
         [AdminOps.LastRun] = new(false, null),
         [AdminOps.Teardown] = new(true, null),
     };
@@ -64,13 +65,20 @@ public static class AdminCallerPolicy
             return AdminDecision.Refuse("unknown op");
         if (caller.IsService || caller.SessionId == 0)
             return AdminDecision.Refuse("services can't call the admin tier");
-        if (caller.SessionUserSid is null || !string.Equals(caller.SessionUserSid, caller.UserSid, StringComparison.OrdinalIgnoreCase))
+        // Over the shoulder, a standard user's UAC prompt is approved with an administrator's
+        // password: the elevated caller is that administrator, in the user's session, acting for
+        // the user. An administrator could do all of it anyway; an unelevated caller never acts
+        // for anyone but itself.
+        if (caller.SessionUserSid is null
+            || (!caller.Elevated && !string.Equals(caller.SessionUserSid, caller.UserSid, StringComparison.OrdinalIgnoreCase))
+            || !AdminArgs.UserSid(caller.SessionUserSid))
             return AdminDecision.Refuse("the caller isn't the user signed in to its session");
         if (rule.Elevated && !caller.Elevated)
             return AdminDecision.Refuse($"{request.Op} needs an elevated caller");
         if (rule.Args is null)
             return AdminDecision.Refuse($"{request.Op} isn't available in this version of the service");
-        return Validate(request.Args, rule.Args);
+        var decision = Validate(request.Args, rule.Args);
+        return decision.Allowed ? decision with { ActingFor = caller.SessionUserSid.ToUpperInvariant() } : decision;
     }
 
     static AdminDecision Validate(JsonObject? args, IReadOnlyDictionary<string, ArgCheck> expected)

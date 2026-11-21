@@ -72,6 +72,9 @@ public static class AdminWire
 
     public const int MaxMessageBytes = 1 << 20;
 
+    /// <summary>The longest <see cref="AdminOps.EventsWait"/> waits for an event; a client allows a little more for the reply.</summary>
+    public const int MaxWaitSeconds = 30;
+
     internal static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     {
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
@@ -82,6 +85,12 @@ public static class AdminWire
 
     public static Task<T> ReadAsync<T>(Stream stream, CancellationToken ct) =>
         LengthPrefixedJson.ReadAsync<T>(stream, Json, MaxMessageBytes, "Admin", ct);
+
+    /// <summary>An argument as the wire carries it, for <see cref="AdminRequest.Args"/>.</summary>
+    public static JsonNode? ToNode<T>(T value) => JsonSerializer.SerializeToNode(value, Json);
+
+    /// <summary>An argument read back; call only after the service's policy checked its shape.</summary>
+    public static T? FromNode<T>(JsonNode? node) => node is null ? default : node.Deserialize<T>(Json);
 
     internal static JsonObject ToObject<T>(T value) =>
         JsonSerializer.SerializeToNode(value, Json) as JsonObject ?? throw new ArgumentException("A result is a JSON object.", nameof(value));

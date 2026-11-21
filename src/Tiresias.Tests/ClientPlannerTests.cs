@@ -166,6 +166,18 @@ public class DoctorTests
     }
 
     [Test]
+    public async Task Decoys_held_by_the_admin_tier_count_it_as_the_listener()
+    {
+        var held = (await Doctor.RunAsync(new FakeProbe { Decoys = new(2, true, Held: true) })).Single(c => c.Name == "decoys");
+        var portTaken = (await Doctor.RunAsync(new FakeProbe { Decoys = new(2, false, Held: true) })).Single(c => c.Name == "decoys");
+
+        Assert.That(held.Status, Is.EqualTo(DoctorStatus.Ok));
+        Assert.That(held.Detail, Does.Contain("admin tier").And.Not.Contain("tir agent"));
+        Assert.That(portTaken.Status, Is.EqualTo(DoctorStatus.Warn));
+        Assert.That(portTaken.Detail, Does.Contain("admin tier").And.Not.Contain("start the app"));
+    }
+
+    [Test]
     public async Task A_program_blocked_for_a_decoy_is_that_finding_not_this_wasnt_mes()
     {
         const string evil = @"C:\Temp\evil.exe", other = @"C:\Temp\other.exe";
