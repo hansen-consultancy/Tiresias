@@ -14,12 +14,11 @@ design and issue. A PR that finishes, starts or adds an item edits this page in 
 - [x] Solo mode, with the broker hosted in the app ([design](desktop-app.md#solo-mode))
 - [ ] Solo mode: local broker as a Windows service (in review)
 - [ ] Policy integrity: the broker refuses a service policy the user didn't approve
-      ([design](policy-integrity.md), #24). Phases 1 to 3 built; the rollback high-water mark is in
-      review
+      ([design](policy-integrity.md), #24). Phases 1 to 3 and the rollback high-water mark within a
+      lease built; keeping it across locks and restarts waits for the Windows service
 - [x] Step-up at the broker: minting, elevation and tokens need an approval only the vault can
       produce ([design](step-up.md), #23)
-- [ ] Trust-chain links that add a key need a Windows Hello signature ([design](trust-links.md), #41).
-      In review
+- [x] Trust-chain links that add a key need a Windows Hello signature ([design](trust-links.md), #41)
 - [x] Seal user environment variables and hand them back per shell session ([design](environment-variables.md))
 - [x] Databases for applications: SQL Server logins per lease, RavenDB through the broker ([design](databases.md))
 - [ ] RavenDB subscriptions through the broker (the TCP relay, [phase 3](databases.md#phases))

@@ -92,7 +92,8 @@ See [docs/ai-agents.md](docs/ai-agents.md).
 ## Trust model in one paragraph
 
 Devices are enrolled into a per-tenant **trust chain**: hash-linked, signed links rooted in a
-genesis hash you pin at setup, so a server relaying the chain cannot add a device. A **paper
+genesis hash you pin at setup, so a server relaying the chain cannot add a device, and every link
+that adds trust needs a Windows Hello signature, so a program running as you cannot either. A **paper
 recovery key** can repair the chain if every device is lost. Brokers verify the chain themselves,
 and so does the Keyring before it hands the broker any key. A control plane (an optional HTTP
 service) only relays chains, approves known locations and collects audit summaries. It is never

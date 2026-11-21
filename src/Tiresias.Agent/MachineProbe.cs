@@ -6,6 +6,7 @@ using Tiresias.Client;
 using Tiresias.Decoys;
 using Tiresias.EnvironmentVariables;
 using Tiresias.Protocol;
+using Tiresias.Trust;
 using Tiresias.Vault;
 using Microsoft.Extensions.Configuration.UserSecrets;
 
@@ -35,6 +36,21 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     public bool Solo => KeyringStore.Tenant is { Solo: true };
     public bool HasDeviceKey => KeyringStore.HasDeviceKey;
     public bool RecoveryKeySet => KeyringStore.Settings.RecoveryPublicKey is not null;
+
+    /// <summary>Read from the solo broker's chain file; a remote broker's chain isn't fetched here.</summary>
+    public bool? HelloBound
+    {
+        get
+        {
+            if (KeyringStore.Tenant is not { Solo: true, GenesisHash: { } genesis } || !File.Exists(SoloBroker.TrustChainPath))
+                return null;
+            var chain = TrustLinkJson.ParseChain(File.ReadAllBytes(SoloBroker.TrustChainPath));
+            return chain is not null && TrustChainVerifier.Verify(chain, genesis).State is { } state
+                && state.Devices.TryGetValue(KeyringStore.Settings.DeviceId, out var device)
+                    ? device.Hello is not null
+                    : null;
+        }
+    }
 
     public DoctorVault? Vault
     {

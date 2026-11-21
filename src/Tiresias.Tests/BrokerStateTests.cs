@@ -267,6 +267,34 @@ public class BrokerStateTests
     }
 
     [Test]
+    public void Restoring_an_older_vault_mid_lease_is_refused_and_the_newer_one_kept()
+    {
+        OpenLease();
+        var token = Mint();
+        var newer = SecretEnvelope.Seal("llm-read", 2, "Bearer sk-read-2"u8, [vault.Tpm], PolicyBinding.Hash(vault.Document, "llm-read"));
+        state.ReplaceVault(vault.Document with { Secrets = [.. vault.Document.Secrets.Where(s => s.Slug != "llm-read"), newer] });
+
+        var reload = state.ReplaceVault(vault.Document);
+
+        Assert.That(reload.Refused, Is.True);
+        Assert.That(reload.RolledBack, Is.EqualTo(new[] { "llm-read" }));
+        Assert.That(AuditLines(), Has.Exactly(1).Contains("secret-rolled-back: llm-read"));
+        Assert.That(state.Authorize($"Bearer {token}", "llm", Get("/v1/models")).Refusal?.Reason, Is.EqualTo("secret-not-leased"),
+            "still the newer vault, waiting for its DEK");
+    }
+
+    [Test]
+    public void A_new_lease_starts_its_own_high_water_mark()
+    {
+        OpenLease();
+        var newer = SecretEnvelope.Seal("llm-read", 2, "Bearer sk-read-2"u8, [vault.Tpm], PolicyBinding.Hash(vault.Document, "llm-read"));
+        state.ReplaceVault(vault.Document with { Secrets = [.. vault.Document.Secrets.Where(s => s.Slug != "llm-read"), newer] });
+        state.End();
+
+        Assert.That(state.ReplaceVault(vault.Document).Refused, Is.False, "without a lease there is nothing to compare with");
+    }
+
+    [Test]
     public void A_re_sealed_secret_loses_its_old_dek_until_the_new_one_is_sealed()
     {
         var offer = OpenLease();
