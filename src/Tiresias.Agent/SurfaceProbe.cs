@@ -157,6 +157,10 @@ static partial class SurfaceProbe
     /// </summary>
     public static IEnumerable<UninstallEntry> UninstallEntries()
     {
+        var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        string[] unseen = [.. TrayPrograms(), .. ServicePrograms(), .. StartupEntries().Select(e => e.Path!),
+            .. (Environment.GetEnvironmentVariable("PATH") ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(Environment.ExpandEnvironmentVariables).Where(Path.IsPathFullyQualified)];
         List<UninstallEntry> entries = [];
         foreach (var (hive, view, prefix) in new[]
         {
@@ -183,11 +187,46 @@ static partial class SurfaceProbe
                     uninstaller = null;
                 var location = key.GetValue("InstallLocation") is string { Length: > 0 } l ? Environment.ExpandEnvironmentVariables(l.Trim().Trim('"')) : null;
                 var folder = location is not null && Path.IsPathFullyQualified(location) ? location : Path.GetDirectoryName(uninstaller);
+                var own = folder is not null && !SameOrUnder(folder, windows) ? folder : null;
                 entries.Add(new($@"{prefix}\{name}", display, key.GetValue("DisplayVersion") as string, uninstaller,
-                    uninstaller is not null && File.Exists(uninstaller), folder is not null && Directory.Exists(folder), command));
+                    uninstaller is not null && File.Exists(uninstaller), folder is not null && Directory.Exists(folder), command,
+                    own, own is not null && (unseen.Any(p => SameOrUnder(p, own)) || HasDriver(own))));
             }
         }
         return entries;
+    }
+
+    static bool SameOrUnder(string path, string folder) =>
+        path.TrimEnd('\\').Equals(folder.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase) || Tiresias.UserSecrets.ProjectIndex.IsUnder(path, folder);
+
+    /// <summary>Whether a folder holds a driver package, which Windows loads without anyone opening it.</summary>
+    static bool HasDriver(string folder)
+    {
+        try
+        {
+            return Directory.Exists(folder) && (Directory.EnumerateFiles(folder, "*.sys").Any() || Directory.EnumerateFiles(folder, "*.inf").Any());
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return true;
+        }
+    }
+
+    /// <summary>The programs Windows services run, from their <c>ImagePath</c>; readable without admin.</summary>
+    static IEnumerable<string> ServicePrograms()
+    {
+        using var services = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services");
+        if (services is null)
+            return [];
+        List<string> paths = [];
+        foreach (var name in services.GetSubKeyNames())
+        {
+            using var service = services.OpenSubKey(name);
+            if (service?.GetValue("ImagePath") is string image && Doctor.ExecutableIn(Environment.ExpandEnvironmentVariables(image)) is { } path
+                && Path.IsPathFullyQualified(path))
+                paths.Add(path);
+        }
+        return paths;
     }
 
     public static IEnumerable<DecoyUseRecord> DecoyUses() => Doctor.DecoyUses(Lines(AgentHost.ActivityPath));
