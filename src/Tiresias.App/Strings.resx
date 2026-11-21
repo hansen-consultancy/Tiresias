@@ -2172,4 +2172,8 @@ Store them in clear?</value>
     <value>Couldn't remove: {0}</value>
     <comment>{0}: paths or variable names</comment>
   </data>
+  <data name="Decoys_RemoveKept" xml:space="preserve">
+    <value>Kept {0}: changed since Tiresias placed it, so it is yours now.</value>
+    <comment>{0}: paths or variable names</comment>
+  </data>
 </root>

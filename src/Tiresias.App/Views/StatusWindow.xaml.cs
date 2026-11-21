@@ -90,9 +90,13 @@ public partial class StatusWindow : Window
     {
         if (!AskWindow.Confirm(this, Text.Get("Decoys_RemoveHeading"), Text.Get("Decoys_RemoveBody"), Text.Get("Decoys_RemoveAction")))
             return;
-        var left = DecoyStore.RemoveAll();
-        AppLog.Info($"removed the decoys; {left.Count} left");
-        model.ShowDecoys(left.Count == 0 ? "" : Text.Format("Decoys_RemoveLeft", string.Join(", ", left)));
+        var (left, kept) = DecoyStore.RemoveAll();
+        AppLog.Info($"removed the decoys; {left.Count} left, {kept.Count} kept as changed");
+        model.ShowDecoys(string.Join(" ", new[]
+        {
+            kept.Count == 0 ? "" : Text.Format("Decoys_RemoveKept", string.Join(", ", kept)),
+            left.Count == 0 ? "" : Text.Format("Decoys_RemoveLeft", string.Join(", ", left)),
+        }.Where(m => m.Length > 0)));
         model.Refresh();
     }
 
