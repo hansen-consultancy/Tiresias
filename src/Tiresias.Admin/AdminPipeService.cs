@@ -31,6 +31,7 @@ sealed class AdminPipeService(ILogger<AdminPipeService> logger) : BackgroundServ
     ActionLog? log;
     DecoyHold? decoys;
     Freezer? freezer;
+    readonly LastRunReader lastRuns = new();
 
     protected override async Task ExecuteAsync(CancellationToken stop)
     {
@@ -155,6 +156,8 @@ sealed class AdminPipeService(ILogger<AdminPipeService> logger) : BackgroundServ
             case AdminOps.Thaw:
                 var (thawed, notThawed) = freezer!.Thaw(user, args["program"]!.GetValue<string>());
                 return thawed is not null ? AdminReply.Ok(thawed) : AdminReply.Refused(notThawed!);
+            case AdminOps.LastRun:
+                return AdminReply.Ok(lastRuns.Read(user, AdminWire.FromNode<string[]>(args["paths"]) ?? []));
             case AdminOps.Teardown:
                 var all = freezer!.ThawAll();
                 await decoys!.TearDownAsync();
