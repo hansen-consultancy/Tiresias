@@ -127,7 +127,15 @@ sealed class AdminPipeService(ILogger<AdminPipeService> logger) : BackgroundServ
                 }
                 var reply = await AnswerAsync(request, client, stop);
                 Record(request.Op, client, reply.Status, reply.Message);
-                await AdminWire.WriteAsync(pipe, reply, stop);
+                try
+                {
+                    await AdminWire.WriteAsync(pipe, reply, stop);
+                }
+                catch (Exception e) when (e is IOException or OperationCanceledException or ObjectDisposedException)
+                {
+                    HoldUnsent(request.Op, reply);
+                    throw;
+                }
             }
             catch (Exception e) when (e is IOException or InvalidDataException or System.Text.Json.JsonException or OperationCanceledException or EndOfStreamException)
             {
@@ -172,6 +180,13 @@ sealed class AdminPipeService(ILogger<AdminPipeService> logger) : BackgroundServ
                 // The policy refuses every op not built yet; reaching here is a bug, not a request to act on.
                 return new AdminReply(AdminStatus.Error, Message: "not built");
         }
+    }
+
+    /// <summary>A released set whose reply never reached the caller is held again: otherwise it would be nowhere.</summary>
+    void HoldUnsent(string op, AdminReply reply)
+    {
+        if (op == AdminOps.DecoysRelease && reply.ResultAs<AdminDecoysRelease>() is { Set: { } set } released)
+            decoys!.Adopt(released.UserSid, new(set, DecoyPlan.Files(set)));
     }
 
     /// <summary>The wire's set, read back as <c>decoys.json</c> is, so <see cref="DecoySet.Parse"/> judges it as it judges that file.</summary>
