@@ -161,6 +161,42 @@ public class AdminInstallPlanTests
         Assert.That(AdminFolders.Trusted(reparse, owner), Is.EqualTo(trusted));
 }
 
+public class AdminCopySourceTests
+{
+    const string Root = @"C:\Users\alice\AppData\Local\TiresiasApp\current\admin";
+
+    [Test]
+    public void A_plain_file_in_the_source_folder_is_copied()
+    {
+        Assert.That(AdminCopySource.Refusal(Root, FileAttributes.Archive, 1, $@"\\?\{Root}\tiresias-admin.exe"), Is.Null);
+        Assert.That(AdminCopySource.Refusal(Root + "\\", FileAttributes.Normal, 1, $@"{Root}\sub\x.dll"), Is.Null);
+        Assert.That(AdminCopySource.Refusal($@"\\?\{Root}", FileAttributes.Normal, 1, Root.ToUpperInvariant() + @"\x.dll"), Is.Null);
+    }
+
+    [Test]
+    public void A_link_is_refused() =>
+        Assert.That(AdminCopySource.Refusal(Root, FileAttributes.ReparsePoint | FileAttributes.Archive, 1, $@"{Root}\x.dll"), Is.EqualTo("is a link"));
+
+    [TestCase(0u)]
+    [TestCase(2u)]
+    public void A_file_with_other_hard_links_is_refused(uint links) =>
+        Assert.That(AdminCopySource.Refusal(Root, FileAttributes.Normal, links, $@"{Root}\x.dll"), Does.Contain("hard links"));
+
+    [TestCase(@"\\?\C:\Windows\System32\config\SAM")]
+    [TestCase(@"C:\Users\alice\AppData\Local\TiresiasApp\current\admin2\x.dll")]
+    [TestCase(@"\\?\UNC\host\share\x.dll")]
+    public void A_file_resolving_outside_the_source_folder_is_refused(string final) =>
+        Assert.That(AdminCopySource.Refusal(Root, FileAttributes.Normal, 1, final), Is.EqualTo("resolves outside the source folder"));
+
+    [Test]
+    public void A_folder_is_walked_only_when_it_is_no_link()
+    {
+        Assert.That(AdminCopySource.FolderRefusal(FileAttributes.Directory), Is.Null);
+        Assert.That(AdminCopySource.FolderRefusal(FileAttributes.Directory | FileAttributes.ReparsePoint), Is.EqualTo("is a link"));
+        Assert.That(AdminCopySource.Refusal(Root, FileAttributes.Directory, 1, Root + @"\x"), Does.Contain("folder"));
+    }
+}
+
 public class AdminTierStateTests
 {
     static AdminStatusResult Answer(string version) => new(version, AdminWire.ProtocolVersion, new());

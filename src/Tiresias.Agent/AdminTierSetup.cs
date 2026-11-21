@@ -91,15 +91,48 @@ public static class AdminTierSetup
         return true;
     }
 
+    /// <summary>
+    /// Copies the source tree without following anything: the user can write to it, and this runs
+    /// elevated. Any link in it fails the install (<see cref="AdminCopySource"/>); each file is
+    /// checked on its open handle and copied from that handle, so it can't be swapped in between.
+    /// </summary>
     static void CopyFiles(string from, string to)
     {
-        DeleteTree(to);
-        foreach (var file in Directory.EnumerateFiles(from, "*", SearchOption.AllDirectories))
+        string root;
+        using (var folder = SourceHandle.Open(from, directory: true))
         {
-            var target = Path.Combine(to, Path.GetRelativePath(from, file));
-            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-            File.Copy(file, target, overwrite: true);
+            Refuse(from, AdminCopySource.FolderRefusal(folder.Attributes));
+            root = folder.FinalPath;
         }
+        DeleteTree(to);
+        CopyTree(from, to, root);
+    }
+
+    static void CopyTree(string from, string to, string root)
+    {
+        Directory.CreateDirectory(to);
+        var options = new EnumerationOptions { AttributesToSkip = 0, RecurseSubdirectories = false, IgnoreInaccessible = false };
+        foreach (var entry in new DirectoryInfo(from).EnumerateFileSystemInfos("*", options))
+        {
+            var target = Path.Combine(to, entry.Name);
+            if (entry.Attributes.HasFlag(FileAttributes.Directory))
+            {
+                Refuse(entry.FullName, AdminCopySource.FolderRefusal(entry.Attributes));
+                CopyTree(entry.FullName, target, root);
+                continue;
+            }
+            using var file = SourceHandle.Open(entry.FullName, directory: false);
+            Refuse(entry.FullName, AdminCopySource.Refusal(root, file.Attributes, file.Links, file.FinalPath));
+            using var source = new FileStream(file.Handle, FileAccess.Read);
+            using var copy = new FileStream(target, FileMode.CreateNew, FileAccess.Write);
+            source.CopyTo(copy);
+        }
+    }
+
+    static void Refuse(string path, string? reason)
+    {
+        if (reason is not null)
+            throw new InvalidOperationException($"Not copied, the install stops: {path} {reason}.");
     }
 
     /// <summary>
