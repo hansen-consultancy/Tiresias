@@ -12,7 +12,11 @@ namespace Tiresias.Client;
 /// <param name="UninstallerExists">Whether <paramref name="Uninstaller"/> is on disk.</param>
 /// <param name="FolderExists">Whether its <c>InstallLocation</c>, or the uninstaller's folder when it names none, is on disk.</param>
 /// <param name="Command">Its whole <c>UninstallString</c>, what the Uninstall button runs.</param>
-public sealed record UninstallEntry(string Key, string Name, string? Version, string? Uninstaller, bool UninstallerExists, bool FolderExists, string? Command = null)
+/// <param name="Folder">Its <c>InstallLocation</c>, or the uninstaller's folder when it names none; <c>null</c> when that is in Windows' own folder.</param>
+/// <param name="RunsUnseen">Part of it runs without the user opening it (a tray icon, a service, a driver, a log-on entry, a
+/// folder on <c>PATH</c>), which Windows doesn't record, so its last use is unknown.</param>
+public sealed record UninstallEntry(string Key, string Name, string? Version, string? Uninstaller, bool UninstallerExists, bool FolderExists,
+    string? Command = null, string? Folder = null, bool RunsUnseen = false)
 {
     /// <summary>A machine-wide entry, which only an administrator can change.</summary>
     public bool Machine => Key.StartsWith(@"HKLM\", StringComparison.OrdinalIgnoreCase);
@@ -68,8 +72,18 @@ public sealed partial record Repair(string Name, string? Version, string? Winget
     private static partial Regex Token();
 }
 
+/// <summary>
+/// Uninstall a program in Settings, Apps, Installed apps, which runs its own uninstaller and asks
+/// for an administrator where it needs one. Nothing runs from the entry's own command line.
+/// </summary>
+public sealed record UninstallApp(string Name, bool Machine) : DoctorFix
+{
+    public override string Instruction => $"uninstall {Name} in Settings, Apps, Installed apps{(Machine ? " (needs an administrator)" : "")}";
+}
+
 public static partial class Doctor
 {
+    public const string UnusedAppKind = "programs you haven't opened in 90 days";
     public const string GoneEntryKind = "uninstall entries for software that is gone";
     public const string NoUninstallerKind = "programs that can't be uninstalled";
     public const string StaleEntryKind = "stale uninstall entries";
@@ -115,6 +129,39 @@ public static partial class Doctor
                     RemoveFix(stale), Kind: StaleEntryKind);
         }
     }
+
+    /// <summary>
+    /// Installed programs the user last opened over 90 days ago (docs/attack-surface.md, "Not used in
+    /// 90 days"): the latest UserAssist run of anything under the program's folder. Never for a
+    /// program with no recorded run, one that <see cref="UninstallEntry.RunsUnseen"/>, one that used a
+    /// credential in that time, or one already reported as broken. Hygiene, not a warning: the
+    /// status is <see cref="DoctorStatus.Ok"/>, so the lines sort last and don't count for the badge.
+    /// </summary>
+    public static IEnumerable<DoctorCheck> UnusedApplications(IEnumerable<UninstallEntry> entries, IEnumerable<ProgramRun> runs,
+        IEnumerable<CredentialUse> uses, DateTimeOffset now)
+    {
+        var allRuns = runs.ToArray();
+        var recent = uses.Where(u => now - u.At <= ReachWindow).ToArray();
+        var candidates = entries
+            .Where(e => e is { FolderExists: true, RunsUnseen: false, Folder: { } folder } && Deep(folder) && (e.Uninstaller is null || e.UninstallerExists))
+            .DistinctBy(e => e.Name, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in candidates)
+        {
+            var lastRun = allRuns.Where(r => IsUnder(r.Path, entry.Folder!)).Select(r => (DateTimeOffset?)r.LastRun).Max();
+            if (lastRun is not { } last || now - last <= ReachWindow || recent.Any(u => IsUnder(u.Program, entry.Folder!)))
+                continue;
+            yield return new($"{Label(entry)} not opened since {last:yyyy-MM-dd}", DoctorStatus.Ok,
+                $"Nothing in {entry.Folder} has been opened from the Start menu, the taskbar or Explorer in 90 days. "
+                + "Uninstall it if you don't need it: software you don't use still gets updates, or doesn't, and runs as you when something opens it",
+                new UninstallApp(entry.Name, entry.Machine), Kind: UnusedAppKind);
+        }
+    }
+
+    /// <summary>A program's own folder, not a root such as <c>C:\Program Files</c> that holds everyone's.</summary>
+    static bool Deep(string folder) => folder.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries).Length >= 3;
+
+    static bool IsUnder(string path, string folder) => Tiresias.UserSecrets.ProjectIndex.IsUnder(path, folder);
 
     /// <summary>
     /// The fix for an entry to remove; none for a key whose name isn't plain, which no command is

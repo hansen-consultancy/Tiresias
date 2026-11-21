@@ -279,6 +279,9 @@ public partial class StatusWindow : Window
             case RemoveEntry or Repair { Command: not null }:
                 model.CopyFix(fix.Instruction);
                 break;
+            case UninstallApp:
+                Desktop.Open("ms-settings:appsfeatures");
+                break;
             case UnblockProgram { Path: var program }:
                 AppLog.Info($"unblocked {program}: the decoy use was the user's");
                 App.Current.Guard.Unblock(program);
