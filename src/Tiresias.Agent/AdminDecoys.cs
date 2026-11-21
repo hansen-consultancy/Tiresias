@@ -59,7 +59,9 @@ public static partial class AdminDecoys
     /// <summary>
     /// Run elevated (<c>tir decoys release</c>, <c>Tiresias.exe --admin-tier release-decoys</c>):
     /// takes the session user's set back from the admin tier and writes it to that user's
-    /// <c>decoys.json</c>. When it can't be written, the set is handed to the admin tier again.
+    /// <c>decoys.json</c>. When it can't be written, the set is handed to the admin tier again; when
+    /// the tier doesn't take it (stopped meanwhile), it is written to the tier's state folder, which
+    /// the service holds again at its next start. The set is never only in this process.
     /// </summary>
     public static AdminSetupResult Release()
     {
@@ -69,7 +71,8 @@ public static partial class AdminDecoys
             return AdminSetupResult.Done;
         if (HandBack(released.UserSid, set))
             return AdminSetupResult.Done;
-        Send(AdminOps.DecoysAdopt, AdminArgs.Adopt(set));
+        if (Send(AdminOps.DecoysAdopt, AdminArgs.Adopt(set)) is not { Status: AdminStatus.Ok })
+            AdminTierSetup.KeepHeld(released.UserSid, new(set, DecoyPlan.Files(set)));
         return AdminSetupResult.Failed;
     }
 

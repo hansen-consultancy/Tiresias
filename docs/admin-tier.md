@@ -72,7 +72,8 @@ broker.
 of SYSTEM full control, Authenticated Users read and write (not create), and NETWORK denied:
 Authenticated Users includes callers over SMB, whose process ids mean nothing here. The next
 instance is created before a connected one is served, so the name is never free for another
-process to take.
+process to take. At most 32 connections are served at once; past that, callers wait, so long polls
+held open by a program can't run the service out of handles.
 
 **Both ends check the other.**
 
@@ -144,7 +145,9 @@ writes the set to the session user's `decoys.json` (their profile's `AppData\Loc
 the profile list when it runs as an administrator over the user's shoulder) as a **new file
 only**, and checks the file's final path on its open handle: a link anywhere on the way, which the
 user can make in their own profile, would steer an administrator's write, so such a file is
-deleted again and the set is offered back to the service. The unelevated agent then removes the
+deleted again and the set is offered back to the service; if the service doesn't take it (stopped
+meanwhile), the elevated process writes it to the state folder, where the service holds it again at
+its next start. The unelevated agent then removes the
 decoys as it always has. Not built: listing places elevated.
 
 **Doctor.** With the set held, the decoys check counts the service as the listener (or warns

@@ -38,6 +38,8 @@ static class DecoysCommand
 
     static int List()
     {
+        if (DecoyStore.Current is null && Unanswered())
+            return 1;
         if (DecoyStore.Current is null && AdminDecoys.Status() is { Held: true } held)
         {
             Console.WriteLine($"Held by the admin tier: {string.Join(", ", held.Kinds)}; {held.Files} file(s).");
@@ -57,6 +59,8 @@ static class DecoysCommand
 
     static int Remove()
     {
+        if (DecoyStore.Current is null && Unanswered())
+            return 1;
         if (DecoyStore.Current is null && AdminDecoys.Status() is { Held: true })
         {
             Console.WriteLine("The admin tier holds the decoys; giving them back takes an administrator (UAC).");
@@ -76,6 +80,15 @@ static class DecoysCommand
         }
         Console.Error.WriteLine($"Couldn't remove: {string.Join(", ", left)}. Close what holds them and run this again.");
         return 1;
+    }
+
+    /// <summary>Whether the admin tier is installed but doesn't answer: it may hold decoys that can't be listed or given back now.</summary>
+    static bool Unanswered()
+    {
+        if (!AdminClient.Installed || AdminDecoys.Status() is not null)
+            return false;
+        Console.Error.WriteLine("The admin tier is installed but didn't answer, so decoys it may hold can't be seen or given back. Set it up again on the Tiresias app's About page to start it, then run this again.");
+        return true;
     }
 
     /// <summary><c>tir decoys release</c>, elevated: this process when it already is, otherwise a copy started through UAC.</summary>

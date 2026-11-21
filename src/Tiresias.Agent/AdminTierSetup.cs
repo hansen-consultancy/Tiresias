@@ -166,6 +166,23 @@ public static class AdminTierSetup
 
     static readonly SecurityIdentifier Administrators = new(WellKnownSidType.BuiltinAdministratorsSid, null);
 
+    /// <summary>
+    /// Run elevated: records a held set in the service's state folder, as the service writes it, for
+    /// it to hold again at its next start. For a set taken back that could be neither handed to its
+    /// user nor adopted again.
+    /// </summary>
+    /// <returns>Whether it was written; not when the state folder is missing or not the service's.</returns>
+    public static bool KeepHeld(string sid, AdminHeldDecoys held)
+    {
+        var folder = Path.Combine(StateFolder, "decoys");
+        if (!AdminArgs.UserSid(sid) || !Trusted(StateRoot) || !Trusted(StateFolder) || !Directory.Exists(folder))
+            return false;
+        var path = Path.Combine(folder, sid + ".json");
+        File.WriteAllText(path + ".tmp", held.ToJson());
+        File.Move(path + ".tmp", path, overwrite: true);
+        return true;
+    }
+
     static bool Trusted(string folder)
     {
         var info = new DirectoryInfo(folder);

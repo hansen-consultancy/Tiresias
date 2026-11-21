@@ -21,6 +21,14 @@ sealed class AdminPipeService(ILogger<AdminPipeService> logger) : BackgroundServ
     /// <summary>A client that connects and then says nothing is dropped after this.</summary>
     static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(10);
 
+    /// <summary>
+    /// Connections served at once. An <c>events.wait</c> holds one for up to 30 s, so without a cap a
+    /// local program could pile them up until the service runs out of handles; past it, callers wait.
+    /// </summary>
+    const int MaxConnections = 32;
+
+    readonly SemaphoreSlim slots = new(MaxConnections);
+
     static readonly string Version =
         (typeof(AdminPipeService).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0")
         .Split('+', 2)[0];
@@ -49,6 +57,7 @@ sealed class AdminPipeService(ILogger<AdminPipeService> logger) : BackgroundServ
             {
                 try
                 {
+                    await slots.WaitAsync(stop);
                     await listening.WaitForConnectionAsync(stop);
                 }
                 catch (OperationCanceledException)
@@ -59,7 +68,7 @@ sealed class AdminPipeService(ILogger<AdminPipeService> logger) : BackgroundServ
                 var connectedUtc = DateTime.UtcNow;
                 listening = Create(first: false);
                 running.RemoveAll(t => t.IsCompleted);
-                running.Add(ServeAsync(connected, connectedUtc, stop));
+                running.Add(ServeThenFreeAsync(connected, connectedUtc, stop));
             }
         }
         finally
@@ -89,6 +98,18 @@ sealed class AdminPipeService(ILogger<AdminPipeService> logger) : BackgroundServ
         var options = PipeOptions.Asynchronous | (first ? PipeOptions.FirstPipeInstance : PipeOptions.None);
         return NamedPipeServerStreamAcl.Create(AdminWire.PipeName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances,
             PipeTransmissionMode.Byte, options, 0, 0, security);
+    }
+
+    async Task ServeThenFreeAsync(NamedPipeServerStream pipe, DateTime connectedUtc, CancellationToken stop)
+    {
+        try
+        {
+            await ServeAsync(pipe, connectedUtc, stop);
+        }
+        finally
+        {
+            slots.Release();
+        }
     }
 
     async Task ServeAsync(NamedPipeServerStream pipe, DateTime connectedUtc, CancellationToken stop)
