@@ -334,8 +334,9 @@ dotnet run --project src/Tiresias.App -- --demo everyday
 
 - The data comes from a scenario, `src/Tiresias.App/Demo/<name>.json` (default `everyday`): files
   in the made-up user's profile (projects, `projects.json`, a vault's services, activity, NuGet and
-  git config), vault secrets, sealed user secrets, Windows and sealed environment variables, all
-  in plain text. The app seals them at start. `{{profile}}` in a file is the profile's path,
+  git config, installed programs' folders), vault secrets, sealed user secrets, Windows and sealed
+  environment variables, `HKCU` keys (`registry`: the Installed page's uninstall entries) and when
+  each program was last opened (`programRuns`), all in plain text. The app seals them at start. `{{profile}}` in a file is the profile's path,
   `{{now-2h}}` a time two hours ago. Add a scenario for any case you want to see or reproduce.
 - The made-up user is `alice`, with her profile in `%PUBLIC%\Tiresias-demo\alice` and her `HKCU`
   in `HKCU\Software\Tiresias\Demo`. Both are emptied at start and when the demo quits, so what you
@@ -343,12 +344,14 @@ dotnet run --project src/Tiresias.App -- --demo everyday
   outside the profile, and deleting ("move to the Recycle Bin") works only inside it.
 - Every button works, against that machine. Your vault, profile, environment, Hello credential
   and running app are never touched: the demo runs beside the real app and serves nothing (no
-  user-secrets pipe, broker or `tir` control pipe), and checks for no updates.
+  user-secrets pipe, broker or `tir` control pipe), checks for no updates, and leaves the admin
+  tier alone: it reads as not installed, and installing it does nothing.
 - Titles say "(demo)" and windows can be captured, except the recovery-key, SQL Server and RavenDB
   windows, which still take real input. About names the scenario and the made-up machine's folder.
 - A Release build has no demo mode and ships no scenarios.
 - Not faked yet: the consent dialog (nothing asks), the SQL Server and RavenDB setup windows
-  (they connect for real, and the SQL one names your Windows account), and the Installed page.
+  (they connect for real, and the SQL one names your Windows account). The Installed page lists
+  only the scenario's per-user programs: a demo has no machine-wide ones.
 
 ## What you can't test yet
 

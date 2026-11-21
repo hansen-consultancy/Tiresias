@@ -15,7 +15,60 @@
     "AppData/Local/Tiresias/activity.jsonl": "{\"prevHash\":\"0\",\"time\":\"{{now-3d}}\",\"kind\":\"Allow\",\"consumer\":\"usersecrets\",\"service\":\"usersecrets/5f0c2a6e-0b1d-4c55-9a51-0d3e7c1f2a10\",\"process\":\"{{profile}}\\\\source\\\\ShopApi\\\\bin\\\\Debug\\\\net10.0\\\\ShopApi.exe\"}\n{\"prevHash\":\"0\",\"time\":\"{{now-26h}}\",\"kind\":\"Allow\",\"consumer\":\"usersecrets\",\"service\":\"usersecrets/a7d41f0b-6c2e-4f8a-b3a9-61c0e5d2b7c4\",\"process\":\"{{profile}}\\\\source\\\\BillingWorker\\\\bin\\\\Debug\\\\net10.0\\\\BillingWorker.exe\"}\n{\"prevHash\":\"0\",\"time\":\"{{now-3h}}\",\"kind\":\"Allow\",\"consumer\":\"usersecrets\",\"service\":\"usersecrets/5f0c2a6e-0b1d-4c55-9a51-0d3e7c1f2a10\",\"process\":\"{{profile}}\\\\source\\\\ShopApi\\\\bin\\\\Debug\\\\net10.0\\\\ShopApi.exe\"}\n{\"prevHash\":\"0\",\"time\":\"{{now-2h}}\",\"kind\":\"Deny\",\"consumer\":\"usersecrets\",\"service\":\"usersecrets/5f0c2a6e-0b1d-4c55-9a51-0d3e7c1f2a10\",\"reason\":\"denied by you\",\"process\":\"C:\\\\Tools\\\\unknown-sync.exe\"}\n{\"prevHash\":\"0\",\"time\":\"{{now-40m}}\",\"kind\":\"Allow\",\"consumer\":\"usersecrets\",\"service\":\"usersecrets/a7d41f0b-6c2e-4f8a-b3a9-61c0e5d2b7c4\",\"process\":\"{{profile}}\\\\source\\\\BillingWorker\\\\bin\\\\Debug\\\\net10.0\\\\BillingWorker.exe\"}\n",
     "AppData/Roaming/NuGet/NuGet.Config": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<configuration>\n  <packageSources>\n    <add key=\"nuget.org\" value=\"https://api.nuget.org/v3/index.json\" />\n    <add key=\"team\" value=\"https://pkgs.example.com/team/nuget/v3/index.json\" />\n  </packageSources>\n  <packageSourceCredentials>\n    <team>\n      <add key=\"Username\" value=\"alice\" />\n      <add key=\"ClearTextPassword\" value=\"demo-feed-token-0123456789\" />\n    </team>\n  </packageSourceCredentials>\n</configuration>\n",
     ".gitconfig": "[user]\n\tname = Alice\n\temail = alice@example.com\n[credential]\n\thelper = store\n",
-    ".git-credentials": "https://alice:ghp_demo0000000000000000000000000000000000@github.com\n"
+    ".git-credentials": "https://alice:ghp_demo0000000000000000000000000000000000@github.com\n",
+    "AppData/Local/Programs/Microsoft VS Code/Code.exe": "demo",
+    "AppData/Local/Programs/Microsoft VS Code/unins000.exe": "demo",
+    "AppData/Local/Programs/Docker/Docker/Docker Desktop.exe": "demo",
+    "AppData/Local/Programs/Docker/Docker/Docker Desktop Installer.exe": "demo",
+    "AppData/Local/Programs/Azure Data Studio/azuredatastudio.exe": "demo",
+    "AppData/Local/Programs/Azure Data Studio/unins000.exe": "demo",
+    "AppData/Local/Programs/ShopTools/shoptools.exe": "demo",
+    "AppData/Local/Programs/ShopTools/uninstall.exe": "demo"
+  },
+  // The Installed page: per-user programs (a demo has no machine-wide ones). VS Code and Docker are
+  // in use, Azure Data Studio hasn't been opened in 140 days, ShopTools has no recorded run, and
+  // FtpSync's folder and uninstaller are gone.
+  "registry": {
+    "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{771FD6B0-FA20-440A-A002-3B3BAC16DC50}_is1": {
+      "DisplayName": "Microsoft Visual Studio Code (User)",
+      "DisplayVersion": "1.106.2",
+      "Publisher": "Microsoft Corporation",
+      "InstallLocation": "{{profile}}\\AppData\\Local\\Programs\\Microsoft VS Code\\",
+      "UninstallString": "\"{{profile}}\\AppData\\Local\\Programs\\Microsoft VS Code\\unins000.exe\""
+    },
+    "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Docker Desktop": {
+      "DisplayName": "Docker Desktop",
+      "DisplayVersion": "4.52.0",
+      "Publisher": "Docker Inc.",
+      "InstallLocation": "{{profile}}\\AppData\\Local\\Programs\\Docker\\Docker",
+      "UninstallString": "\"{{profile}}\\AppData\\Local\\Programs\\Docker\\Docker\\Docker Desktop Installer.exe\" uninstall"
+    },
+    "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{4F2C8B9A-7D31-4E6B-9C05-1A8E3D72B6F4}_is1": {
+      "DisplayName": "Azure Data Studio",
+      "DisplayVersion": "1.49.1",
+      "Publisher": "Microsoft Corporation",
+      "InstallLocation": "{{profile}}\\AppData\\Local\\Programs\\Azure Data Studio\\",
+      "UninstallString": "\"{{profile}}\\AppData\\Local\\Programs\\Azure Data Studio\\unins000.exe\""
+    },
+    "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ShopTools": {
+      "DisplayName": "ShopTools CLI",
+      "DisplayVersion": "0.9.3",
+      "Publisher": "Example Shop",
+      "InstallLocation": "{{profile}}\\AppData\\Local\\Programs\\ShopTools",
+      "UninstallString": "\"{{profile}}\\AppData\\Local\\Programs\\ShopTools\\uninstall.exe\""
+    },
+    "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\FtpSync": {
+      "DisplayName": "FtpSync",
+      "DisplayVersion": "2.1",
+      "Publisher": "Example Tools",
+      "InstallLocation": "{{profile}}\\AppData\\Local\\Programs\\FtpSync",
+      "UninstallString": "\"{{profile}}\\AppData\\Local\\Programs\\FtpSync\\unins000.exe\""
+    }
+  },
+  "programRuns": {
+    "{{profile}}\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe": "{{now-2h}}",
+    "{{profile}}\\AppData\\Local\\Programs\\Docker\\Docker\\Docker Desktop.exe": "{{now-1d}}",
+    "{{profile}}\\AppData\\Local\\Programs\\Azure Data Studio\\azuredatastudio.exe": "{{now-140d}}"
   },
   "secrets": {
     "llm-key": "sk-demo-0000000000000000000000000000",

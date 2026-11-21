@@ -1,5 +1,7 @@
 #if DEBUG
+using System.Globalization;
 using System.Security.Cryptography;
+using Microsoft.Win32;
 using System.Text;
 using Tiresias.Agent;
 using Tiresias.App.Logic;
@@ -59,6 +61,23 @@ static class Demo
             var path = DemoScenario.Target(profile, relative);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             File.WriteAllText(path, DemoScenario.Expand(content, path, profile, now));
+        }
+        foreach (var (path, values) in scenario.Registry)
+        {
+            using var key = UserMachine.CurrentUser.CreateSubKey(path, writable: true);
+            foreach (var (name, value) in values)
+                if (value is string text)
+                    key.SetValue(name, DemoScenario.Expand(text, "", profile, now));
+                else
+                    key.SetValue(name, (int)value, RegistryValueKind.DWord);
+        }
+        if (scenario.ProgramRuns.Count > 0)
+        {
+            using var runs = UserMachine.CurrentUser.CreateSubKey(DemoScenario.UserAssistKey, writable: true);
+            foreach (var (path, at) in scenario.ProgramRuns)
+                runs.SetValue(DemoScenario.UserAssistName(DemoScenario.Expand(path, "", profile, now)),
+                    DemoScenario.UserAssistValue(DateTimeOffset.Parse(DemoScenario.Expand(at, "", profile, now), CultureInfo.InvariantCulture)),
+                    RegistryValueKind.Binary);
         }
         foreach (var (name, value) in scenario.Variables)
             UserMachine.SetUserVariable(name, value);

@@ -18,6 +18,8 @@ namespace Tiresias.App.Logic;
 /// <param name="UserSecrets">Sealed <c>secrets.json</c> documents, by user-secrets id. A plain one is a file like any other.</param>
 /// <param name="Variables">The user's Windows environment variables.</param>
 /// <param name="SealedVariables">The sealed environment's global variables.</param>
+/// <param name="Registry">Keys under the made-up <c>HKCU</c>, by path (<c>Software\Microsoft\...\Uninstall\app</c>), with their values: text (with <see cref="Expand"/>'s tokens) or a whole number.</param>
+/// <param name="ProgramRuns">When each program was last opened from Explorer, the Start menu or the taskbar, by path; both with <see cref="Expand"/>'s tokens.</param>
 public sealed partial record DemoScenario(
     string Description,
     bool SetUp,
@@ -26,7 +28,9 @@ public sealed partial record DemoScenario(
     IReadOnlyDictionary<string, string> Secrets,
     IReadOnlyDictionary<string, JsonObject> UserSecrets,
     IReadOnlyDictionary<string, string> Variables,
-    IReadOnlyDictionary<string, string> SealedVariables)
+    IReadOnlyDictionary<string, string> SealedVariables,
+    IReadOnlyDictionary<string, IReadOnlyDictionary<string, object>> Registry,
+    IReadOnlyDictionary<string, string> ProgramRuns)
 {
     static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { ReadCommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true };
 
@@ -36,8 +40,42 @@ public sealed partial record DemoScenario(
         var dto = JsonSerializer.Deserialize<Dto>(json, Json) ?? throw new JsonException("The scenario is empty.");
         if (dto.UserSecrets?.Keys.FirstOrDefault(id => !UserSecretsId().IsMatch(id) || id.Trim('.').Length == 0) is { } bad)
             throw new JsonException($"'{bad}' is not a user-secrets id: it names a folder, so it takes letters, digits, '.', '_' and '-' only.");
+        var registry = (dto.Registry ?? []).ToDictionary(k => k.Key,
+            k => (IReadOnlyDictionary<string, object>)k.Value.ToDictionary(v => v.Key, v => RegistryValue(k.Key, v.Key, v.Value)));
         return new(dto.Description ?? "", dto.SetUp ?? true, dto.Unlocked ?? false,
-            dto.Files ?? [], dto.Secrets ?? [], dto.UserSecrets ?? [], dto.Variables ?? [], dto.SealedVariables ?? []);
+            dto.Files ?? [], dto.Secrets ?? [], dto.UserSecrets ?? [], dto.Variables ?? [], dto.SealedVariables ?? [],
+            registry, dto.ProgramRuns ?? []);
+    }
+
+    static object RegistryValue(string key, string name, JsonElement value) => value.ValueKind switch
+    {
+        JsonValueKind.String => value.GetString()!,
+        JsonValueKind.Number when value.TryGetInt32(out var number) => number,
+        _ => throw new JsonException($"{key}\\{name}: a registry value is text or a whole number."),
+    };
+
+    /// <summary>Where Windows records the programs started from Explorer, the Start menu or the taskbar, under <c>HKCU</c>.</summary>
+    public const string UserAssistKey = @"Software\Microsoft\Windows\CurrentVersion\Explorer\UserAssist\{CEBFF5CD-ACE2-4F4F-9178-9926F41749EA}\Count";
+
+    /// <summary>A program's UserAssist value name: its path in ROT13, as Windows writes it.</summary>
+    public static string UserAssistName(string path) => string.Create(path.Length, path, (span, source) =>
+    {
+        for (var i = 0; i < source.Length; i++)
+            span[i] = source[i] switch
+            {
+                >= 'a' and <= 'z' and var c => (char)('a' + (c - 'a' + 13) % 26),
+                >= 'A' and <= 'Z' and var c => (char)('A' + (c - 'A' + 13) % 26),
+                var c => c,
+            };
+    });
+
+    /// <summary>A UserAssist value saying the program was last opened at <paramref name="lastRun"/>: 72 bytes, the time a FILETIME at 60.</summary>
+    public static byte[] UserAssistValue(DateTimeOffset lastRun)
+    {
+        var value = new byte[72];
+        BitConverter.GetBytes(1).CopyTo(value, 4);
+        BitConverter.GetBytes(lastRun.ToFileTime()).CopyTo(value, 60);
+        return value;
     }
 
     /// <summary>
@@ -104,5 +142,7 @@ public sealed partial record DemoScenario(
         Dictionary<string, string>? Secrets,
         Dictionary<string, JsonObject>? UserSecrets,
         Dictionary<string, string>? Variables,
-        Dictionary<string, string>? SealedVariables);
+        Dictionary<string, string>? SealedVariables,
+        Dictionary<string, Dictionary<string, JsonElement>>? Registry,
+        Dictionary<string, string>? ProgramRuns);
 }

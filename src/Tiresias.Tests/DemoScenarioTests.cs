@@ -89,6 +89,47 @@ public class DemoScenarioTests
     public void Only_a_path_inside_the_profile_is_the_demos_to_delete(string path, bool inside) =>
         Assert.That(DemoScenario.Inside(Profile, path), Is.EqualTo(inside));
 
+    static IEnumerable<string> Scenarios()
+    {
+        for (var dir = new DirectoryInfo(TestContext.CurrentContext.TestDirectory); dir is not null; dir = dir.Parent)
+            if (File.Exists(Path.Combine(dir.FullName, "Tiresias.slnx")))
+                return Directory.EnumerateFiles(Path.Combine(dir.FullName, "src", "Tiresias.App", "Demo"), "*.json");
+        throw new DirectoryNotFoundException("Tiresias.slnx not found above the test directory.");
+    }
+
+    [TestCaseSource(nameof(Scenarios))]
+    public void Every_shipped_scenario_parses_and_stays_in_its_profile(string file)
+    {
+        var scenario = DemoScenario.Parse(File.ReadAllText(file));
+
+        Assert.That(scenario.Description, Is.Not.Empty);
+        foreach (var relative in scenario.Files.Keys)
+            Assert.That(() => DemoScenario.Target(Profile, relative), Throws.Nothing, relative);
+    }
+
+    [Test]
+    public void Registry_values_are_text_or_whole_numbers()
+    {
+        var scenario = DemoScenario.Parse("""{ "registry": { "Software\\App": { "DisplayName": "App", "NoRepair": 1 } } }""");
+
+        Assert.That(scenario.Registry[@"Software\App"]["DisplayName"], Is.EqualTo("App"));
+        Assert.That(scenario.Registry[@"Software\App"]["NoRepair"], Is.EqualTo(1));
+        Assert.That(() => DemoScenario.Parse("""{ "registry": { "Software\\App": { "Size": 1.5 } } }"""),
+            Throws.InstanceOf<System.Text.Json.JsonException>());
+    }
+
+    [Test]
+    public void A_program_run_reads_back_as_windows_records_it()
+    {
+        var path = Profile + @"\AppData\Local\Programs\Editor\Editor.exe";
+        var lastRun = Now.AddDays(-120);
+
+        var runs = Tiresias.Client.Doctor.UserAssistRuns([(DemoScenario.UserAssistName(path), DemoScenario.UserAssistValue(lastRun))], _ => null);
+
+        Assert.That(runs.Single().Path, Is.EqualTo(path));
+        Assert.That(runs.Single().LastRun, Is.EqualTo(lastRun));
+    }
+
     [Test]
     public void The_profile_token_is_escaped_in_json_only()
     {
