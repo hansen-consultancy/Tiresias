@@ -2,8 +2,9 @@
 
 Status: **phase 1 built** (#39): `tir decoys place|list|remove`, the agent's loopback endpoints,
 the activity record, the doctor's line, the app's response (block, notify, finding), and Home's
-**Decoys** card. The read tripwire is next. Its alerts land as findings in [guided setup](guided-setup.md)
-and use the program block list that **This wasn't me** already fills.
+**Decoys** card. **Read tripwire built**: the agent holds an oplock on every decoy file and names
+the program that opens one (layer 2). Alerts land as findings in [guided setup](guided-setup.md);
+a use fills the program block list that **This wasn't me** fills, an open never does.
 
 Consent stops a program using a credential through Tiresias without asking. It does nothing about
 a program that searches the disk for credentials Tiresias never saw: malware, a compromised
@@ -126,11 +127,35 @@ process woke, it says it can't tell rather than guess.
 - An attacker can force "can't tell" by waking a helper at the same moment; it can't make Tiresias
   name the wrong program. Each break uses the oplock up; it is taken again within about 0.15 s.
 
+**What is built.** While the app or `tir agent` runs, the agent holds an oplock on each decoy
+file placed (`passwords.txt`, the decoy project's `appsettings.Production.json` and `.env`; the
+variables have no file), and names openers as above: settle 20 ms, two snapshots, release, a look
+3 ms later. Each file has its own thread, which takes the oplock again as soon as the opener's
+handle allows. A file that is gone or can't be opened is logged and left unwatched until
+`decoys.json` changes. The opener's full path is read while it waits, by pid
+(`SystemProcessIdInformation`, which works for services and Defender too); one whose path can't be
+read keeps the thread list's file name. Each open:
+
+- is in the activity log (`consumer: decoy`, `service: opened the decoy file passwords.txt`, the
+  file's path, `{image} (pid N)` or no process when Tiresias can't tell), once per program and file
+  a minute;
+- raises a finding on Home and in `tir doctor`: a warning per program that opened one in the last
+  30 days ("*program* opened the decoy file .env"), with **Show file** when its path is
+  known; opens Tiresias couldn't name are one warning. A program already blocked for using a decoy
+  gets no second finding;
+- shows a notification in the app when a named program that isn't routine opened it. An open
+  **never blocks** a program by itself; the block needs the user.
+
 **False positives** are the cost of this layer: Windows Search, Defender, OneDrive and backup tools
-open files they find. Decoys go in a folder those tools are told to skip where possible, and an
-opener whose image is signed by a known indexer, antivirus or backup publisher is recorded, not
-alerted on. A read alert never blocks a program by itself; it raises a finding, and the block
-needs the user.
+open files they find. A routine opener is recorded but raises nothing: Windows Search
+(`SearchProtocolHost`, `SearchIndexer`, `SearchFilterHost`) and Explorer (`explorer`, `prevhost`)
+under `%WINDIR%`, Defender (`MsMpEng`, `MpDefenderCoreService`) under `%ProgramFiles%` or
+`%ProgramData%\Microsoft\Windows Defender`, OneDrive's machine-wide install under `%ProgramFiles%`,
+and Tiresias's own `tir` and app (removing decoys reads them). A per-user OneDrive runs from a folder
+any program can write to, so its opens are findings: keep decoys out of synced folders. Both the
+file name and the folder must match; an opener whose path couldn't be read is not routine. Checking
+the publisher's signature, and backup tools, are not built yet. Decoys go in a folder those tools
+are told to skip where possible.
 
 An AI agent listing and reading files in the home folder will trip this layer. That is a reason to
 have it, and a reason the wording must stay factual.
@@ -213,6 +238,6 @@ sets audit rules; Tiresias watches use and needs no admin rights. What fits Tire
 
 1. **Decoy credentials with loopback endpoints:** files, listeners, process identification, activity,
    block list, finding.
-2. **Read tripwire:** an oplock on each decoy file, naming the reader by the thread that wakes
-   (proven without admin rights). With admin rights, auditing names every read as well (#91).
+2. **Read tripwire** (built): an oplock on each decoy file, naming the reader by the thread that
+   wakes, activity, finding, notification. With admin rights, auditing names every read as well (#91).
 3. **External canaries** (opt-in): decoys registered with a canary service, for use off the machine.

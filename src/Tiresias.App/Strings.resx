@@ -1893,6 +1893,13 @@ Store them in clear?</value>
     <value>{0} connected with {1}. Tiresias blocked it until you review it on Home.</value>
     <comment>{0}: program file name; {1}: which decoy, e.g. "the decoy admin token"</comment>
   </data>
+  <data name="Notify_DecoyRead_Title" xml:space="preserve">
+    <value>A program opened a decoy file</value>
+  </data>
+  <data name="Notify_DecoyRead_Body" xml:space="preserve">
+    <value>{0} opened the decoy file {1}. That may be harmless; Tiresias blocked nothing. See Home.</value>
+    <comment>{0}: program file name; {1}: decoy file name, e.g. "passwords.txt"</comment>
+  </data>
   <data name="Notify_Decoy_Unknown" xml:space="preserve">
     <value>A program connected with {0}, but it couldn't be named. See Home.</value>
     <comment>{0}: which decoy</comment>

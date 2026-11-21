@@ -184,7 +184,7 @@ public static partial class Doctor
         checks.AddRange(Decoys(decoyUses, blocked, DateTimeOffset.UtcNow));
         checks.AddRange(CliSignIns(probe.CliConfigs, probe.GitHubAppService));
         var (uses, runs, installed, now) = (probe.CredentialUses().ToArray(), probe.ProgramRuns().ToArray(), probe.UninstallEntries().ToArray(), DateTimeOffset.UtcNow);
-        checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), uses, blocked.Where(b => !decoyUses.Any(u => SamePath(u.Program, b))), now, runs));
+        checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), uses, blocked.Where(b => !decoyUses.Any(u => !u.IsRead && SamePath(u.Program, b))), now, runs));
         checks.AddRange(UninstallEntries(installed));
         checks.AddRange(UnusedApplications(installed, runs, uses, now));
         return checks;
