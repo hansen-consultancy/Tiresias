@@ -79,6 +79,24 @@ public class SignatureDerivedWrapperTests
     }
 
     [Test]
+    public void Service_revision_signatures_verify_across_unlocks_only_for_the_enrolled_signer()
+    {
+        using var enrollment = new SignatureDerivedWrapper("hello", Deterministic(SignerKey));
+        using var session = new SignatureDerivedWrapper("hello", Deterministic(SignerKey));
+        using var otherUser = new SignatureDerivedWrapper("hello", Deterministic(RandomNumberGenerator.GetBytes(32)));
+        using var enrolled = enrollment.RevisionKey();
+        using var signer = session.RevisionKey();
+        using var other = otherUser.RevisionKey();
+        using var approval = session.ApprovalKey("lease");
+        var algorithm = NSec.Cryptography.SignatureAlgorithm.Ed25519;
+        var signature = algorithm.Sign(signer, "revision"u8);
+
+        Assert.That(algorithm.Verify(enrolled.PublicKey, "revision"u8, signature), Is.True);
+        Assert.That(algorithm.Verify(other.PublicKey, "revision"u8, signature), Is.False);
+        Assert.That(algorithm.Verify(approval.PublicKey, "revision"u8, signature), Is.False);
+    }
+
+    [Test]
     public void Works_as_a_vault_wrapper()
     {
         using var hello = new SignatureDerivedWrapper("hello", Deterministic(SignerKey));

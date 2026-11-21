@@ -1,3 +1,5 @@
+using Tiresias.UserSecrets;
+
 namespace Tiresias.EnvironmentVariables;
 
 /// <summary>A terminal's shell process. The start time tells it apart from a later process given the same id.</summary>
@@ -22,15 +24,15 @@ public enum ShellAnswer
 public sealed class ShellConsent
 {
     readonly Lock gate = new();
-    readonly Dictionary<(int, DateTime), (HashSet<string> Allowed, bool Refused)> shells = [];
+    readonly Dictionary<(int, DateTime, ReleaseScope), (HashSet<string> Allowed, bool Refused)> shells = [];
 
     /// <param name="askAgain">The user asked for the prompt again, overriding an earlier no.</param>
     /// <returns>What to do, and the names the shell hasn't been allowed yet (empty for <see cref="ShellAnswer.Give"/>).</returns>
-    public (ShellAnswer Answer, IReadOnlyList<string> New) Check(ShellIdentity shell, IEnumerable<string> names, bool askAgain = false)
+    public (ShellAnswer Answer, IReadOnlyList<string> New) Check(ShellIdentity shell, IEnumerable<string> names, bool askAgain = false, ReleaseScope scope = default)
     {
         lock (gate)
         {
-            var known = shells.GetValueOrDefault(Key(shell));
+            var known = shells.GetValueOrDefault(Key(shell, scope));
             var allowed = known.Allowed ?? [];
             string[] fresh = [.. names.Where(n => !allowed.Contains(n))];
             if (fresh.Length == 0)
@@ -39,28 +41,28 @@ public sealed class ShellConsent
         }
     }
 
-    public void Allow(ShellIdentity shell, IEnumerable<string> names)
+    public void Allow(ShellIdentity shell, IEnumerable<string> names, ReleaseScope scope = default)
     {
         lock (gate)
         {
-            var allowed = shells.GetValueOrDefault(Key(shell)).Allowed ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var allowed = shells.GetValueOrDefault(Key(shell, scope)).Allowed ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             allowed.UnionWith(names);
-            shells[Key(shell)] = (allowed, false);
+            shells[Key(shell, scope)] = (allowed, false);
         }
     }
 
     /// <summary>Remembers the no; what the shell was allowed before stays allowed.</summary>
-    public void Refuse(ShellIdentity shell)
+    public void Refuse(ShellIdentity shell, ReleaseScope scope = default)
     {
         lock (gate)
-            shells[Key(shell)] = (shells.GetValueOrDefault(Key(shell)).Allowed ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase), true);
+            shells[Key(shell, scope)] = (shells.GetValueOrDefault(Key(shell, scope)).Allowed ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase), true);
     }
 
     /// <summary>Whether this shell said no, for a check made before anything is unlocked.</summary>
-    public bool HasRefused(ShellIdentity shell)
+    public bool HasRefused(ShellIdentity shell, ReleaseScope scope = default)
     {
         lock (gate)
-            return shells.GetValueOrDefault(Key(shell)).Refused;
+            return shells.GetValueOrDefault(Key(shell, scope)).Refused;
     }
 
     /// <summary>The agent locked: every terminal asks again.</summary>
@@ -68,6 +70,16 @@ public sealed class ShellConsent
     {
         lock (gate)
             shells.Clear();
+    }
+
+    /// <summary>Checks the program before preparing credentials and again after any asynchronous placeholder mint.</summary>
+    public static async Task<(Delivery? Delivery, string? Refusal)> ReleaseAsync(ReleasePolicy approved, Func<Task<ReleasePolicy>> check,
+        Func<Task<Delivery>> prepare)
+    {
+        if ((await check()).RefusalSince(approved) is { } refused)
+            return (null, refused);
+        var prepared = await prepare();
+        return (await check()).RefusalSince(approved) is { } changed ? (null, changed) : (prepared, null);
     }
 
     /// <summary>Drops shells that have exited, so the table doesn't grow and a reused process id starts afresh.</summary>
@@ -87,5 +99,5 @@ public sealed class ShellConsent
         }
     }
 
-    static (int, DateTime) Key(ShellIdentity shell) => (shell.ProcessId, shell.Started);
+    static (int, DateTime, ReleaseScope) Key(ShellIdentity shell, ReleaseScope scope) => (shell.ProcessId, shell.Started, scope);
 }

@@ -12,7 +12,8 @@ namespace Tiresias.AdminTier;
 /// <param name="Op">The op, or <c>unknown</c>.</param>
 /// <param name="CallerSid">The caller's user SID; <c>null</c> when it couldn't be read.</param>
 /// <param name="Image">The caller's image path, from its process.</param>
-/// <param name="Result"><c>ok</c>, <c>refused</c> or <c>error</c>.</param>
+/// <param name="Result"><c>requested</c> before an authorized change, then <c>ok</c>, <c>refused</c> or <c>error</c>.</param>
+/// <param name="ActingFor">The session user whose state an authorized operation addresses.</param>
 /// <param name="Reason">Why it was refused or failed, in the service's own words.</param>
 public sealed record AdminAction(
     int V,
@@ -22,7 +23,8 @@ public sealed record AdminAction(
     int? Pid,
     string? Image,
     string Result,
-    string? Reason)
+    string? Reason,
+    string? ActingFor = null)
 {
     public const int Format = 1;
 
@@ -31,8 +33,8 @@ public sealed record AdminAction(
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
-    public static AdminAction Of(DateTimeOffset at, string? op, AdminCaller? caller, int? pid, string? image, string result, string? reason) =>
-        new(Format, at, AdminCallerPolicy.KnownOp(op) ?? "unknown", caller?.UserSid, pid, image, result, reason);
+    public static AdminAction Of(DateTimeOffset at, string? op, AdminCaller? caller, int? pid, string? image, string result, string? reason, string? actingFor = null) =>
+        new(Format, at, AdminCallerPolicy.KnownOp(op) ?? "unknown", caller?.UserSid, pid, image, result, reason, actingFor);
 
     /// <summary>The record as one JSON line, without the newline.</summary>
     public string ToLine() => JsonSerializer.Serialize(this, Json);

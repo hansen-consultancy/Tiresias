@@ -10,6 +10,8 @@ public enum ActivitySource
     UserSecrets,
     /// <summary>The solo broker's audit log: leases, placeholders, requests.</summary>
     Broker,
+    /// <summary>Per-user broker records from before the Windows service took over.</summary>
+    LegacyBroker,
 }
 
 public enum ActivityOutcome
@@ -120,6 +122,6 @@ public static class ActivityQuery
 
     static IEnumerable<string?> Fields(ActivityEntry e) => [e.Consumer, e.Service, e.Process, e.Reason, e.Method, e.Path, e.Kind.ToString()];
 
-    sealed record Line(DateTimeOffset Time, AuditKind Kind, string? Consumer, string? Service, string? Process, string? Reason, string? Method,
+    sealed record Line([property: JsonRequired] DateTimeOffset Time, [property: JsonRequired] AuditKind Kind, string? Consumer, string? Service, string? Process, string? Reason, string? Method,
         string? Path, int? Status);
 }

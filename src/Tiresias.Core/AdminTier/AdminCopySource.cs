@@ -29,7 +29,7 @@ public static class AdminCopySource
         attributes.HasFlag(FileAttributes.ReparsePoint) ? "is a link" : null;
 
     /// <summary><c>\\?\C:\x</c> and <c>C:\x</c> are one path; <c>\\?\UNC\host\share</c> is <c>\\host\share</c>.</summary>
-    static string Normal(string path) =>
+    internal static string Normal(string path) =>
         path.StartsWith(@"\\?\UNC\", StringComparison.OrdinalIgnoreCase) ? @"\\" + path[8..]
         : path.StartsWith(@"\\?\", StringComparison.Ordinal) ? path[4..]
         : path;

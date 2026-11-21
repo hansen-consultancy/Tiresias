@@ -68,6 +68,9 @@ public sealed partial class HelloKeyWrapper : IKeyWrapper, IDisposable
     /// <summary>The lease's approval key; no extra prompt once this wrapper has derived its wrap key.</summary>
     public NSec.Cryptography.Key ApprovalKey(string leaseId) => inner.ApprovalKey(leaseId);
 
+    /// <summary>The vault revision signer enrolled with this user's broker service.</summary>
+    public NSec.Cryptography.Key RevisionKey() => inner.RevisionKey();
+
     /// <summary>
     /// The same credential as a trust-chain link key (docs/trust-links.md): its public key, and a
     /// signer that shows a Hello prompt for every link it signs.
@@ -179,24 +182,4 @@ public sealed partial class HelloKeyWrapper : IKeyWrapper, IDisposable
         KeyCredentialStatus.UserPrefersPassword => HelloProblem.Cancelled,
         _ => HelloProblem.Unavailable,
     };
-}
-
-public enum HelloProblem
-{
-    /// <summary>No PIN, face or fingerprint is set up for this Windows account.</summary>
-    NotSetUp,
-    /// <summary>The user closed the Hello prompt.</summary>
-    Cancelled,
-    /// <summary>The prompt was answered too late, typically after waiting unseen behind other windows.</summary>
-    Expired,
-    /// <summary>The Tiresias credential is gone (Hello reset, new PC): the recovery key re-wraps.</summary>
-    CredentialMissing,
-    /// <summary>Anything else Windows reported, e.g. the TPM is busy or locked out.</summary>
-    Unavailable,
-}
-
-/// <summary>Windows Hello failed for a reason the caller may explain differently; still an <see cref="InvalidOperationException"/>.</summary>
-public sealed class HelloException(HelloProblem problem, string message, Exception? inner = null) : InvalidOperationException(message, inner)
-{
-    public HelloProblem Problem { get; } = problem;
 }
