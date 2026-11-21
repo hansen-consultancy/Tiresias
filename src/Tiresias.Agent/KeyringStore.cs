@@ -34,7 +34,7 @@ public static class KeyringStore
     static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
     static readonly byte[] DeviceKeyEntropy = "tiresias/v1/device-key"u8.ToArray();
 
-    public static string Directory { get; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Tiresias");
+    public static string Directory => Path.Combine(UserMachine.Folder(Environment.SpecialFolder.LocalApplicationData), "Tiresias");
 
     public const string DefaultTenant = "default";
 

@@ -14,6 +14,9 @@ its section below.
   its own account, so programs running as you can't read its memory or rewrite the files it
   trusts, and an older `vault.json` restored while locked is refused. `tir solo service uninstall`
   moves it back into the app.
+- `Tiresias.Core` and `Tiresias.Protocol` carry the groundwork for out-of-band alerts: the
+  `tiresias.alert/v1` payload and the planner that decides, per sink, what to send, with dedupe,
+  rate limits and redaction. Nothing sends alerts yet.
 - Home and `tir doctor` list programs you haven't opened in 90 days. A program that works without
   being opened (a tray icon, a service, a driver, something that starts at log-on, a command on
   `PATH`) is never counted, nor one that used a credential. On Home they are one line, last, that
@@ -90,6 +93,8 @@ its section below.
 - An app loading its user secrets through `Tiresias.Extensions.Configuration` now lets the
   consent dialog and Windows Hello prompt come to the front, as `tir` already did, instead of
   opening behind the IDE.
+- Microsoft Defender for Endpoint's sensor opening a decoy file during a scan is recorded as a
+  routine open, like Defender's own, instead of raising a warning on Home.
 
 ## [0.2.1] - 2026-11-20
 
