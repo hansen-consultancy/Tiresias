@@ -178,6 +178,9 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public IEnumerable<string> BlockedPrograms() => SurfaceProbe.BlockedPrograms();
 
+    /// <inheritdoc cref="SurfaceProbe.Signature"/>
+    public static (bool? Valid, string? Signer) Signature(string path) => SurfaceProbe.Signature(path);
+
     public IEnumerable<ProgramRun> ProgramRuns() => SurfaceProbe.ProgramRuns();
 
     /// <summary>Everything the attack surface checks read, plus the global tools, which take seconds to list.</summary>
