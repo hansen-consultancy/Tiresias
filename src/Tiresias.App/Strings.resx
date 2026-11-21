@@ -1909,6 +1909,36 @@ Store them in clear?</value>
   <data name="Finding_FixReveal" xml:space="preserve">
     <value>Show file</value>
   </data>
+  <data name="Finding_FixDisableStartup" xml:space="preserve">
+    <value>Turn off at log-on...</value>
+  </data>
+  <data name="Finding_FixStartupSettings" xml:space="preserve">
+    <value>Open Startup apps</value>
+  </data>
+  <data name="Finding_DisableStartupHeading" xml:space="preserve">
+    <value>Stop starting {0} at log-on?</value>
+  </data>
+  <data name="Finding_DisableStartupBody" xml:space="preserve">
+    <value>It stays installed and you can open it whenever you need it. Turn it back on in Settings, Apps, Startup.</value>
+  </data>
+  <data name="Finding_TurnOff" xml:space="preserve">
+    <value>Turn off</value>
+  </data>
+  <data name="Finding_StartupOff" xml:space="preserve">
+    <value>{0} no longer starts at log-on. Turn it back on in Settings, Apps, Startup.</value>
+  </data>
+  <data name="Finding_FixRemoveEntry" xml:space="preserve">
+    <value>Remove entry...</value>
+  </data>
+  <data name="Finding_RemoveEntryHeading" xml:space="preserve">
+    <value>Remove the entry for {0}?</value>
+  </data>
+  <data name="Finding_RemoveEntryBody" xml:space="preserve">
+    <value>Tiresias saves the entry to a .reg file first, then removes it from the installed apps list. Nothing on disk is deleted. Open the saved file to put the entry back.</value>
+  </data>
+  <data name="Finding_EntryRemoved" xml:space="preserve">
+    <value>Removed the entry for {0}. It is saved in {1}; open that file to put it back.</value>
+  </data>
   <data name="Finding_FixUnblock" xml:space="preserve">
     <value>Unblock (that was me)</value>
   </data>

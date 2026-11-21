@@ -15,7 +15,35 @@ public sealed record InstalledExtension(ExtensionHost Host, string Id, string? V
 /// <param name="Where">Where the entry is: <c>Run key</c>, <c>machine Run key</c> or <c>Startup folder</c>.</param>
 /// <param name="Path">The executable it starts, or <c>null</c> when it couldn't be resolved.</param>
 /// <param name="Signed">Whether the file has a valid Authenticode signature; <c>null</c> when it couldn't be checked.</param>
-public sealed record StartupEntry(string Name, string Where, string? Path, bool? Signed);
+/// <param name="Item">What Windows calls the entry to turn it off: the Run value's name, or the Startup folder file's name.</param>
+/// <param name="InTray">Whether the program has an icon in the notification area: used from there, which Windows doesn't record, so its last use is unknown.</param>
+public sealed record StartupEntry(string Name, string Where, string? Path, bool? Signed, string? Item = null, bool InTray = false)
+{
+    public const string RunKey = "Run key";
+    public const string MachineRunKey = "machine Run key";
+    public const string StartupFolder = "Startup folder";
+}
+
+/// <summary>When the user last started a program themselves, as Windows records it (UserAssist).</summary>
+public sealed record ProgramRun(string Path, DateTimeOffset LastRun);
+
+/// <summary>
+/// Turn off a log-on entry the way Task Manager and Settings do, keeping the program: Settings,
+/// Apps, Startup turns it back on. The app does it for the user's own entries; a machine-wide one
+/// needs an administrator, so it opens that page.
+/// </summary>
+public sealed record DisableStartup(string Name, string Where, string Item) : DoctorFix
+{
+    /// <summary>Where Task Manager and Settings record a log-on entry turned off, under <c>Run</c> or <c>StartupFolder</c>.</summary>
+    public const string ApprovedKey = @"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\";
+
+    public bool Machine => Where == StartupEntry.MachineRunKey;
+
+    public override string Instruction => $"turn off {Name} in Settings, Apps, Startup{(Machine ? " (needs an administrator)" : "")}";
+
+    /// <summary>Whether <paramref name="item"/> names one value and nothing else: it comes from the registry or a folder any program can write.</summary>
+    public static bool IsSafeItem(string item) => item.Length is > 0 and < 260 && item.IndexOfAny(['\\', '/', '\0']) < 0;
+}
 
 /// <summary>A program that asked Tiresias for a credential and got it, from the local activity and audit logs.</summary>
 /// <param name="Program">The program's image path.</param>
@@ -52,16 +80,19 @@ public static partial class Doctor
     public const string ExtensionKind = "extensions with a reason to doubt them, in programs that use credentials";
     public const string UnsignedStartupKind = "unsigned programs that start at log-on";
     public const string BlockedKind = "blocked programs still on this PC";
+    public const string IdleStartupKind = "programs that start at log-on but you haven't opened in 90 days";
 
     /// <summary>
     /// Guided setup phase 5's first slice (docs/attack-surface.md): installed code that can reach a
     /// credential and has a reason to be doubted. Each finding has a fix and no position, since
     /// removing code changes who can reach a credential, not how it is held. Blocked programs come
-    /// first, then extensions by how many services their host reached, then unsigned startup entries.
+    /// first, then extensions by how many services their host reached, then unsigned startup entries,
+    /// then log-on entries for programs the user hasn't opened in 90 days.
     /// </summary>
     /// <param name="blocked">Programs on the "This wasn't me" blocklist whose file is still there.</param>
+    /// <param name="runs">When the user last started each program; a program missing here has an unknown last use, never "unused".</param>
     public static IEnumerable<DoctorCheck> AttackSurface(IEnumerable<InstalledExtension> extensions, IEnumerable<StartupEntry> startup,
-        IEnumerable<CredentialUse> uses, IEnumerable<string> blocked, DateTimeOffset now)
+        IEnumerable<CredentialUse> uses, IEnumerable<string> blocked, DateTimeOffset now, IEnumerable<ProgramRun>? runs = null)
     {
         var recent = uses.Where(u => now - u.At <= ReachWindow).ToArray();
         var startupEntries = startup.ToArray();
@@ -98,7 +129,62 @@ public static partial class Doctor
                 + ". Check where it came from",
                 new RevealFile(entry.Path!), Kind: UnsignedStartupKind);
         }
+
+        var lastRuns = (runs ?? []).GroupBy(r => r.Path, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Max(r => r.LastRun), StringComparer.OrdinalIgnoreCase);
+        // Tiresias's own entry is left alone: a tray app is used without being opened again, and it is what is asking.
+        foreach (var entry in startupEntries.Where(e => e is { Path: not null, Item: not null, InTray: false } && DisableStartup.IsSafeItem(e.Item)
+                     && !(e.Where == StartupEntry.RunKey && e.Item == "Tiresias") && !blockedPaths.Any(b => SamePath(b, e.Path))))
+        {
+            if (!lastRuns.TryGetValue(entry.Path!, out var lastRun) || now - lastRun <= ReachWindow || recent.Any(u => SamePath(u.Program, entry.Path)))
+                continue;
+            yield return new($"{entry.Name} starts at log-on, unused", DoctorStatus.Warn,
+                $"Windows starts {entry.Path} at every log-on, from the {entry.Where}, but you last opened it yourself on {lastRun:yyyy-MM-dd}. "
+                + "Turn it off at log-on; the program stays installed and you can still open it when you need it",
+                new DisableStartup(entry.Name, entry.Where, entry.Item!), Kind: IdleStartupKind);
+        }
     }
+
+    /// <summary>Whether a <c>StartupApproved</c> value says the entry is turned off: Task Manager and Settings set the first byte odd.</summary>
+    public static bool StartupTurnedOff(byte[]? approved) => approved is { Length: > 0 } && (approved[0] & 1) == 1;
+
+    /// <summary>
+    /// The programs in a UserAssist <c>Count</c> key: value names are ROT13 paths, some starting with
+    /// a known folder's id, which <paramref name="knownFolder"/> resolves; the data holds the last run
+    /// as a FILETIME at byte 60. Shortcuts, entries never run and unresolved folders are skipped.
+    /// </summary>
+    public static IEnumerable<ProgramRun> UserAssistRuns(IEnumerable<(string Name, byte[]? Data)> values, Func<Guid, string?> knownFolder)
+    {
+        foreach (var (name, data) in values)
+        {
+            if (data is not { Length: >= 68 })
+                continue;
+            var path = Rot13(name);
+            if (path.StartsWith('{') && path.IndexOf('}') is > 0 and var close)
+            {
+                if (!Guid.TryParse(path[..(close + 1)], out var folder) || knownFolder(folder) is not { } resolved)
+                    continue;
+                path = resolved.TrimEnd('\\') + path[(close + 1)..];
+            }
+            if (!path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) || path.Length < 4 || path[1] != ':')
+                continue;
+            var fileTime = BitConverter.ToInt64(data, 60);
+            if (fileTime <= 0 || fileTime >= DateTime.MaxValue.ToFileTimeUtc())
+                continue;
+            yield return new(path, DateTimeOffset.FromFileTime(fileTime).ToUniversalTime());
+        }
+    }
+
+    static string Rot13(string text) => string.Create(text.Length, text, (span, source) =>
+    {
+        for (var i = 0; i < source.Length; i++)
+            span[i] = source[i] switch
+            {
+                >= 'a' and <= 'z' and var c => (char)('a' + (c - 'a' + 13) % 26),
+                >= 'A' and <= 'Z' and var c => (char)('A' + (c - 'A' + 13) % 26),
+                var c => c,
+            };
+    });
 
     /// <summary>Why an extension deserves doubt, in words that go into the finding's name: a new reason is a new finding.</summary>
     static List<string> Reasons(InstalledExtension extension, DateTimeOffset now)
