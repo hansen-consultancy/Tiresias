@@ -71,6 +71,8 @@ a new action with effects outside those (a shell command, the Recycle Bin, a net
 
 ## Conventions
 
+- CI treats warnings as errors (`Directory.Build.props`); a local build only reports them. Build
+  clean before pushing.
 - Central package management: versions only in `Directory.Packages.props`, never on a
   `PackageReference`. A project uses a package only if it references it directly — don't rely on
   a transitive one.
