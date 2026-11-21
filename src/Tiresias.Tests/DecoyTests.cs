@@ -73,7 +73,7 @@ public class DecoyTests
         var kind = $"\"kind\": {(int)DecoyKind.PasswordsFile}";
         Assert.That(json, Does.Contain(kind));
 
-        var read = DecoySet.Parse(json.Replace(kind, "\"kind\": 99"))!;
+        var read = DecoySet.Parse(json.Replace(kind, "\"kind\": 99", StringComparison.Ordinal))!;
 
         Assert.That(read.Placed, Is.Empty);
         Assert.That(DecoyPlan.Files(read), Is.Empty);
