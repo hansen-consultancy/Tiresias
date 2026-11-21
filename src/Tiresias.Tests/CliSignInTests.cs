@@ -74,6 +74,10 @@ public class CliSignInTests
     [TestCase("{}")]
     [TestCase("{\"subscriptions\":[{\"user\":null}]}")]
     [TestCase("not json")]
+    [TestCase("[]")]
+    [TestCase("null")]
+    [TestCase("\"x\"")]
+    [TestCase("{\"subscriptions\":[1,\"x\",{\"user\":{\"name\":3}}]}")]
     public void Az_signed_out_or_unreadable_is_no_finding(string profile) =>
         Assert.That(Checks(profile: profile), Is.Empty);
 

@@ -105,7 +105,7 @@ static class AzureCliProfile
         try
         {
             using var json = JsonDocument.Parse(text.TrimStart('﻿'));
-            if (!json.RootElement.TryGetProperty("subscriptions", out var subscriptions) || subscriptions.ValueKind != JsonValueKind.Array)
+            if (json.RootElement.ValueKind != JsonValueKind.Object || !json.RootElement.TryGetProperty("subscriptions", out var subscriptions) || subscriptions.ValueKind != JsonValueKind.Array)
                 return [];
             return [.. subscriptions.EnumerateArray()
                 .Select(s => s.ValueKind == JsonValueKind.Object && s.TryGetProperty("user", out var user) && user.ValueKind == JsonValueKind.Object
