@@ -149,7 +149,12 @@ code settled what this page left open:
   when any line of the last run has a fix that opens it, dismissed or not. Home re-reads the facts
   when it is activated, so an area added elsewhere shows on return. The tray asks the same planner
   when its menu opens; of the areas only Activity is still in it.
-- **Findings badge** in the tray: not built.
+- **Findings badge** in the tray (`FindingBadge`, run by `FindingWatch`): the app runs the checks
+  a minute after it starts and every four hours, unless Home is open. Findings Home shows open
+  (not dismissed) that it hasn't shown since put a dot on the tray icon, "(*n* new)" on
+  **Status...** and a tooltip line. Opening Home clears it: the keys it showed
+  (`Dismissals.KeyOf`, hashed) are kept in `seen-findings.json` beside the keyring, so one that
+  comes back changed is new again. A missing or damaged file counts every finding as new.
 
 ## Tests
 
