@@ -18,6 +18,8 @@ its section below.
   running as you can use unasked. For `gh`, **Add a GitHub App...** sets up the service `tir exec`
   mints a token per run from, after you allow it. Read from each tool's own config, offline; never
   a token.
+- The app checks for findings in the background, a minute after it starts and every four hours.
+  New ones put a dot on the tray icon and "(*n* new)" on **Status...** until you open Home.
 
 ### Changed
 
