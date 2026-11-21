@@ -295,6 +295,36 @@ public class BrokerStateTests
     }
 
     [Test]
+    public void Persisted_marks_refuse_an_older_vault_without_a_lease_and_after_a_restart()
+    {
+        var marksPath = auditPath + ".marks";
+        try
+        {
+            var newer = SecretEnvelope.Seal("llm-read", 2, "Bearer sk-read-2"u8, [vault.Tpm], PolicyBinding.Hash(vault.Document, "llm-read"));
+            var newerVault = vault.Document with { Secrets = [.. vault.Document.Secrets.Where(s => s.Slug != "llm-read"), newer] };
+            BrokerState Start(VaultDocument document) => new(document, LeaseTerms.Workday(TimeZoneInfo.FindSystemTimeZoneById("Europe/Brussels")),
+                new AuditLog(auditPath, time), Key.Create(SignatureAlgorithm.Ed25519), time, new HighWaterMarks(marksPath));
+
+            using (var first = Start(vault.Document))
+            {
+                Assert.That(first.ReplaceVault(newerVault).Refused, Is.False);
+                Assert.That(first.ReplaceVault(vault.Document).RolledBack, Is.EqualTo(new[] { "llm-read" }), "no lease, still refused");
+            }
+
+            using var restarted = Start(vault.Document);
+            Assert.That(AuditLines(), Has.Some.Contains("secret-rolled-back: llm-read; left out"));
+            var offer = restarted.BeginLease("laptop").Offer;
+            var sealedResult = restarted.Seal(offer.LeaseId, vault.SealTo(offer), vault.ApprovalKey(offer.LeaseId)).Result!;
+            Assert.That(sealedResult.Accepted, Does.Not.Contain("llm-read"), "the older secret was left out");
+            Assert.That(restarted.ReplaceVault(newerVault).Refused, Is.False, "the newer one comes back");
+        }
+        finally
+        {
+            File.Delete(marksPath);
+        }
+    }
+
+    [Test]
     public void A_re_sealed_secret_loses_its_old_dek_until_the_new_one_is_sealed()
     {
         var offer = OpenLease();

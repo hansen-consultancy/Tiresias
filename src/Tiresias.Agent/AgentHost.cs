@@ -1,4 +1,6 @@
 using Tiresias.Audit;
+using Tiresias.Client;
+using Tiresias.Vault;
 using Tiresias.EnvironmentVariables;
 using Tiresias.Protocol;
 using Tiresias.UserSecrets;
@@ -19,6 +21,8 @@ public sealed class AgentHost : IAsyncDisposable
     readonly DecoyWatch decoys = new();
     readonly AuditLog activity;
     readonly List<Task> running = [];
+    FileSystemWatcher? vaultWatcher;
+    Dictionary<string, int> vaultVersions = [];
 
     public AgentHost(IUserSecretsConsentPrompt prompt)
     {
@@ -83,8 +87,8 @@ public sealed class AgentHost : IAsyncDisposable
     /// <summary>Whether the decoys' listeners are up (decoys are placed and their ports were free).</summary>
     public bool DecoysListening => decoys.Listening;
 
-    /// <summary>Solo mode: whether the broker this agent hosts is up.</summary>
-    public bool SoloBrokerRunning => solo.Running;
+    /// <summary>Solo mode: whether the broker is up, in this agent or as the Windows service.</summary>
+    public bool SoloBrokerRunning => solo.Running || vaultWatcher is not null && SoloBrokerProblem is null;
 
     /// <summary>Solo mode: why the broker could not start, until it does.</summary>
     public string? SoloBrokerProblem { get; private set; }
@@ -115,8 +119,17 @@ public sealed class AgentHost : IAsyncDisposable
     /// <summary>Starts the solo broker when this device uses one and it isn't up; a failure is kept in <see cref="SoloBrokerProblem"/>, not thrown.</summary>
     async Task StartSoloBrokerAsync()
     {
-        if (KeyringStore.Tenant is not { Solo: true })
+        if (KeyringStore.Tenant is not { Solo: true } tenant)
             return;
+        if (BrokerService.State() is not BrokerServiceState.NotInstalled and var service)
+        {
+            SoloBrokerProblem = service == BrokerServiceState.Stopped
+                ? "The Tiresias service is stopped: start it in Windows Services, or run tir solo service install again."
+                : null;
+            WatchVault(tenant.VaultPath);
+            StateChanged?.Invoke();
+            return;
+        }
         try
         {
             await solo.StartAsync();
@@ -148,6 +161,46 @@ public sealed class AgentHost : IAsyncDisposable
         Say(result.Message);
         StateChanged?.Invoke();
         return result;
+    }
+
+    /// <summary>
+    /// With the broker in the Windows service, which can't call back into this process: seals each
+    /// secret whose version changed on disk into the open lease, as the in-app broker asks for
+    /// through <see cref="SoloBroker.SecretsUnleased"/>. The service reloads the vault before it
+    /// handles the seal.
+    /// </summary>
+    void WatchVault(string vaultPath)
+    {
+        if (vaultWatcher is not null)
+            return;
+        vaultVersions = Versions(vaultPath);
+        var full = Path.GetFullPath(vaultPath);
+        vaultWatcher = new FileSystemWatcher(Path.GetDirectoryName(full)!, Path.GetFileName(full)) { NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName };
+        FileSystemEventHandler changed = (_, _) => _ = Task.Run(async () =>
+        {
+            await Task.Delay(300);
+            var now = Versions(vaultPath);
+            var slugs = now.Where(v => !vaultVersions.TryGetValue(v.Key, out var was) || was != v.Value).Select(v => v.Key).ToArray();
+            vaultVersions = now;
+            if (slugs.Length > 0)
+                await SealIntoLeaseAsync(slugs);
+        });
+        vaultWatcher.Changed += changed;
+        vaultWatcher.Created += changed;
+        vaultWatcher.Renamed += (s, e) => changed(s, e);
+        vaultWatcher.EnableRaisingEvents = true;
+    }
+
+    static Dictionary<string, int> Versions(string vaultPath)
+    {
+        try
+        {
+            return VaultFile.Load(vaultPath).Secrets.ToDictionary(s => s.Slug, s => s.Version);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or System.Text.Json.JsonException)
+        {
+            return [];
+        }
     }
 
     /// <summary>Solo mode: seals secrets added to the vault since the unlock into the open lease, when unlocked; locked, the next unlock seals them.</summary>
@@ -208,6 +261,7 @@ public sealed class AgentHost : IAsyncDisposable
         {
         }
         await solo.DisposeAsync();
+        vaultWatcher?.Dispose();
         decoys.Dispose();
         Keys.Dispose();
         UserSecrets.Dispose();

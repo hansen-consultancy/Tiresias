@@ -39,6 +39,13 @@ public sealed class BrokerOptions
     /// </summary>
     public bool IdentifyLoopbackCaller { get; set; }
 
+    /// <summary>
+    /// Where to keep each secret's highest version across restarts, so an older vault is refused
+    /// even with no lease open. Set by the Windows service, whose folder the user can't write; unset,
+    /// the marks last one lease.
+    /// </summary>
+    public string? HighWaterPath { get; set; }
+
     /// <summary>RFC 3161 TSA that anchors the audit log's head (e.g. <c>http://timestamp.digicert.com</c>). Unset, nothing is anchored.</summary>
     public string? TimestampAuthorityUrl { get; set; }
 }

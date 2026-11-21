@@ -37,7 +37,8 @@ public static class BrokerHost
                 LeaseTerms.Workday(TimeZoneInfo.FindSystemTimeZoneById(options.TimeZone)),
                 sp.GetRequiredService<AuditLog>(),
                 BrokerIdentity.LoadOrCreate(sp.GetRequiredService<IIdentityKeyStore>(), sp.GetRequiredService<ILogger<BrokerState>>()),
-                time);
+                time,
+                options.HighWaterPath is { } marks ? new HighWaterMarks(marks) : null);
         });
         builder.Services.TryAddSingleton(sp => IdentityKeyStore.ForPlatform(
             sp.GetRequiredService<IOptions<BrokerOptions>>().Value.IdentityKeyPath, sp.GetRequiredService<ILogger<IIdentityKeyStore>>()));

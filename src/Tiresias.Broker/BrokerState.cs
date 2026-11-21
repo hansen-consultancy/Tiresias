@@ -77,20 +77,40 @@ public sealed class BrokerState : IDisposable
     readonly Dictionary<string, DateTimeOffset> usedNonces = [];
 
     /// <summary>
-    /// The highest version of each secret this lease has seen. A vault that goes below it is a
-    /// rollback to an older, once-approved policy (docs/policy-integrity.md, *Rollback*).
+    /// The highest version of each secret this lease has seen, or, with <see cref="marks"/>, this
+    /// broker ever loaded. A vault that goes below it is a rollback to an older, once-approved
+    /// policy (docs/policy-integrity.md, *Rollback*).
     /// </summary>
     readonly Dictionary<string, int> highWater = [];
 
-    public BrokerState(VaultDocument vault, LeaseTerms terms, AuditLog audit, Key identity, TimeProvider time)
+    readonly HighWaterMarks? marks;
+
+    /// <param name="marks">Keeps the marks across restarts and locks; without it they last one lease.</param>
+    public BrokerState(VaultDocument vault, LeaseTerms terms, AuditLog audit, Key identity, TimeProvider time, HighWaterMarks? marks = null)
     {
-        this.vault = vault;
         this.terms = terms;
         this.audit = audit;
         this.identity = identity;
         this.time = time;
+        this.marks = marks;
         placeholders = new(time);
+        if (marks is not null)
+        {
+            foreach (var (slug, version) in marks.Load())
+                highWater[slug] = version;
+            var below = RolledBack(vault);
+            foreach (var slug in below)
+                audit.Append(new(AuditKind.Deny, Reason: $"secret-rolled-back: {slug}; left out until a newer version is saved"));
+            vault = vault with { Secrets = [.. vault.Secrets.Where(s => !below.Contains(s.Slug))] };
+            RaiseHighWater(vault);
+        }
+        this.vault = vault;
     }
+
+    string[] RolledBack(VaultDocument next) => next.Secrets
+        .Where(s => highWater.TryGetValue(s.Slug, out var seen) && s.Version < seen)
+        .Select(s => s.Slug)
+        .ToArray();
 
     /// <summary>
     /// Raised with the lease id after a lease ended, for whatever holds per-lease resources outside
@@ -188,10 +208,7 @@ public sealed class BrokerState : IDisposable
     {
         lock (gate)
         {
-            var rolledBack = lease is null ? Array.Empty<string>() : next.Secrets
-                .Where(s => highWater.TryGetValue(s.Slug, out var seen) && s.Version < seen)
-                .Select(s => s.Slug)
-                .ToArray();
+            var rolledBack = lease is null && marks is null ? [] : RolledBack(next);
             if (rolledBack.Length > 0)
             {
                 foreach (var slug in rolledBack)
@@ -223,18 +240,24 @@ public sealed class BrokerState : IDisposable
             }
             RetireChangedServices(next);
             vault = next;
-            if (lease is not null)
+            if (lease is not null || marks is not null)
                 RaiseHighWater(next);
             return new(CurrentLease(time.GetUtcNow()) is null ? [] : next.Secrets.Where(s => !deks.ContainsKey(s.Slug)).Select(s => s.Slug).ToArray(), []);
         }
     }
 
-    /// <summary>Call under <see cref="gate"/>, with a lease open.</summary>
+    /// <summary>Call under <see cref="gate"/> (or from the constructor), with a lease open or <see cref="marks"/> set.</summary>
     void RaiseHighWater(VaultDocument accepted)
     {
+        var raised = false;
         foreach (var secret in accepted.Secrets)
             if (!highWater.TryGetValue(secret.Slug, out var seen) || secret.Version > seen)
+            {
                 highWater[secret.Slug] = secret.Version;
+                raised = true;
+            }
+        if (raised)
+            marks?.Save(highWater);
     }
 
     /// <summary>Ends the placeholders and elevations of every service whose policy differs in <paramref name="next"/>. Call under <see cref="gate"/>.</summary>
@@ -628,7 +651,8 @@ public sealed class BrokerState : IDisposable
         leaseKey = null;
         approvalKey = null;
         usedNonces.Clear();
-        highWater.Clear();
+        if (marks is null)
+            highWater.Clear();
         placeholders.RevokeLease(id);
         audit.Append(new(AuditKind.LeaseEnd, id, leaseDevice, Reason: reason));
         lease = null;

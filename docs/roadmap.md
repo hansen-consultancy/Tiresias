@@ -12,7 +12,7 @@ public.
 - [x] Local activity log and the app's activity window
 - [ ] `tir activity`
 - [x] Solo mode, with the broker hosted in the app ([design](desktop-app.md#solo-mode))
-- [ ] Solo mode: local broker as a Windows service
+- [x] Solo mode: local broker as a Windows service
 - [x] Step-up at the broker: minting, elevation and tokens need an approval only the vault can
       produce ([design](step-up.md), #23)
 - [x] Trust-chain links that add a key need a Windows Hello signature ([design](trust-links.md), #41)
