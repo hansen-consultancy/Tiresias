@@ -25,20 +25,20 @@ public static partial class AdminClient
         (typeof(AdminClient).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0").Split('+', 2)[0];
 
     /// <summary>Whether the service exists, from the Service Control Manager alone: no pipe, no wait.</summary>
-    public static bool Installed
+    public static bool Installed => ServiceInstalled() == true;
+
+    /// <summary>Null when the Service Control Manager cannot confirm the service's presence or absence.</summary>
+    public static bool? ServiceInstalled()
     {
-        get
+        if (DemoMode.On)
+            return false;
+        try
         {
-            if (DemoMode.On)
-                return false;
-            try
-            {
-                return AdminService.Query().Exists;
-            }
-            catch (Win32Exception)
-            {
-                return false;
-            }
+            return AdminService.Query().Exists;
+        }
+        catch (Exception e) when (e is Win32Exception or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            return null;
         }
     }
 
@@ -92,12 +92,12 @@ public static partial class AdminClient
         try
         {
             await pipe.ConnectAsync(ConnectTimeout, timeout.Token);
-            if (!GetNamedPipeServerProcessId(pipe.SafePipeHandle, out var server) || server != serviceProcessId)
+            if (!GetNamedPipeServerProcessId(pipe.SafePipeHandle, out var server) || server != serviceProcessId || AdminService.Query().ProcessId != serviceProcessId)
                 return null;
             await AdminWire.WriteAsync(pipe, request, timeout.Token);
             return await AdminWire.ReadAsync<AdminReply>(pipe, timeout.Token);
         }
-        catch (Exception e) when (e is IOException or TimeoutException or OperationCanceledException or UnauthorizedAccessException
+        catch (Exception e) when (e is IOException or TimeoutException or OperationCanceledException or UnauthorizedAccessException or Win32Exception
             or InvalidDataException or System.Text.Json.JsonException)
         {
             return null;

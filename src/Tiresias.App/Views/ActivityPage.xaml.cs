@@ -17,9 +17,12 @@ public partial class ActivityPage : UserControl
         InitializeComponent();
         var model = new ActivityViewModel();
         DataContext = model;
+        Loaded += (_, _) => Incidents.Visibility = AdminClient.ServiceInstalled() == false ? Visibility.Collapsed : Visibility.Visible;
         Loaded += async (_, _) => await model.LoadCommand.ExecuteAsync(null);
     }
 
+    void OnIncidents(object sender, RoutedEventArgs e) =>
+        new ServiceIncidentsWindow { Owner = Window.GetWindow(this) }.ShowDialog();
 }
 
 public sealed record Choice<T>(string Label, T Value);

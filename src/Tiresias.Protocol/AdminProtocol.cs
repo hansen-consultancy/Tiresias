@@ -38,16 +38,23 @@ public static class AdminOps
 {
     public const string Status = "status";
     public const string EventsWait = "events.wait";
+    public const string EventsHistory = "events.history";
+    public const string EventsReview = "events.review";
+    public const string BlocksCheck = "blocks.check";
+    public const string BlocksList = "blocks.list";
+    public const string BlocksUnblock = "blocks.unblock";
     public const string DecoysAdopt = "decoys.adopt";
     public const string DecoysStatus = "decoys.status";
     public const string Freeze = "freeze";
     public const string Thaw = "thaw";
     public const string DecoysRelease = "decoys.release";
+    public const string DecoysReleaseCommit = "decoys.release.commit";
     public const string LastRun = "lastrun";
     public const string Teardown = "teardown";
 
     public static IReadOnlyList<string> All { get; } =
-        [Status, EventsWait, DecoysAdopt, DecoysStatus, Freeze, Thaw, DecoysRelease, LastRun, Teardown];
+        [Status, EventsWait, EventsHistory, EventsReview, BlocksCheck, BlocksList, BlocksUnblock,
+         DecoysAdopt, DecoysStatus, Freeze, Thaw, DecoysRelease, DecoysReleaseCommit, LastRun, Teardown];
 }
 
 /// <summary>What <see cref="AdminOps.Status"/> answers: versions and which features are on, never more.</summary>
@@ -65,7 +72,7 @@ public static class AdminWire
     /// <summary>Machine-wide on purpose: one service serves every user, each keyed by the caller's SID.</summary>
     public const string PipeName = "tiresias.admin";
 
-    public const int ProtocolVersion = 1;
+    public const int ProtocolVersion = 2;
 
     /// <summary>The Windows service's name; the client trusts the pipe only when its server is this service's process.</summary>
     public const string ServiceName = "TiresiasAdmin";
@@ -82,6 +89,14 @@ public static class AdminWire
 
     public static Task WriteAsync<T>(Stream stream, T message, CancellationToken ct) =>
         LengthPrefixedJson.WriteAsync(stream, message, Json, ct);
+
+    /// <summary>A reader that stops accepting its reply can hold a service connection only until this deadline.</summary>
+    public static async Task WriteReplyAsync(Stream stream, AdminReply reply, TimeSpan timeout, CancellationToken stop)
+    {
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(stop);
+        deadline.CancelAfter(timeout);
+        await WriteAsync(stream, reply, deadline.Token).ConfigureAwait(false);
+    }
 
     public static Task<T> ReadAsync<T>(Stream stream, CancellationToken ct) =>
         LengthPrefixedJson.ReadAsync<T>(stream, Json, MaxMessageBytes, "Admin", ct);

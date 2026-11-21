@@ -120,8 +120,9 @@ public class DoctorTests
         public DoctorDecoys? Decoys { get; set; }
         public List<string> Blocked { get; } = [];
         public List<DecoyUseRecord> Uses { get; } = [];
+        public bool IncidentsUnavailable { get; set; }
         public IEnumerable<string> BlockedPrograms() => Blocked;
-        public IEnumerable<DecoyUseRecord> DecoyUses() => Uses;
+        public IEnumerable<DecoyUseRecord> DecoyUses() => IncidentsUnavailable ? throw new IOException() : Uses;
 
         public Task<int?> BrokerStatusAsync() => Task.FromResult(BrokerStatus);
         public Task<bool> ForwarderListeningAsync() => Task.FromResult(Forwarder);
@@ -139,6 +140,14 @@ public class DoctorTests
             return Task.FromResult<DoctorBrokerAnswer?>(new(200, System.Text.Encoding.UTF8.GetBytes("""{"clearance":"Operator","databases":{}}""")));
         }
         public AdminTierFacts? AdminTier { get; set; }
+    }
+
+    [Test]
+    public async Task An_unavailable_incident_history_is_reported_alongside_the_other_checks()
+    {
+        var checks = await Doctor.RunAsync(new FakeProbe { IncidentsUnavailable = true });
+        Assert.That(checks.Any(c => c.Name == "decoy incidents and program blocks" && c.Status == DoctorStatus.Warn), Is.True);
+        Assert.That(checks.Any(c => c.Name == Doctor.VariablesCheck), Is.True);
     }
 
     static AdminStatusResult Answer(string version) => new(version, AdminWire.ProtocolVersion, new());

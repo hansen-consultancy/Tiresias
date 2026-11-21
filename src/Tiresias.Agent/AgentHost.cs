@@ -20,11 +20,12 @@ public sealed class AgentHost : IAsyncDisposable
     readonly AuditLog activity;
     readonly List<Task> running = [];
 
-    public AgentHost(IUserSecretsConsentPrompt prompt)
+    public AgentHost(IUserSecretsConsentPrompt prompt, Func<string?, CancellationToken, Task<ReleasePolicy>>? checkProgram = null)
     {
         System.IO.Directory.CreateDirectory(KeyringStore.Directory);
         activity = new AuditLog(ActivityPath, TimeProvider.System);
-        UserSecrets = new UserSecretsService(UserSecretsFiles.Root, Keys, prompt, TimeProvider.System, activity, new BrokerSecretReferences(Keys));
+        UserSecrets = new UserSecretsService(UserSecretsFiles.Root, Keys, prompt, TimeProvider.System, activity, new BrokerSecretReferences(Keys),
+            checkProgram ?? AdminProgramBlocks.CheckAsync);
         UserSecrets.Log += Say;
         keeper.Log += Say;
         keeper.Locked += reason => Lock(reason);
@@ -44,34 +45,25 @@ public sealed class AgentHost : IAsyncDisposable
     }
 
     /// <summary>
-    /// With the admin tier installed: hands it the decoys placed before it was (the agent then stops
-    /// listening, the tier listens), and takes each use it saw, including those while no agent ran,
-    /// through the same path as a use the agent saw itself. A use is acknowledged once recorded.
+    /// The service owns incident history and enforces its blocks even when the desktop is closed.
+    /// The position here belongs to this running agent. Restarting resumes at the last explicit review.
     /// </summary>
     async Task FollowAdminTierAsync(CancellationToken ct)
     {
-        if (!AdminClient.Installed)
-            return;
-        try
-        {
-            await Task.Run(AdminDecoys.Adopt, ct);
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            Say($"The admin tier couldn't take the decoys ({e.Message}); the agent listens for them.");
-        }
-        IReadOnlyList<long> ack = [];
+        long after = 0;
         while (!ct.IsCancellationRequested)
         {
-            if (await AdminDecoys.WaitAsync(ack, ct) is not { } events)
+            if (await AdminIncidents.WaitAsync(after, ct) is not { } page)
             {
-                // Stopped, updating or not answering: look again later; its queue keeps meanwhile.
                 await Task.Delay(TimeSpan.FromSeconds(30), ct);
                 continue;
             }
-            foreach (var e in events)
-                OnDecoyTouched(new(e.Hit, e.Parents));
-            ack = [.. events.Select(e => e.Id)];
+            if (page.Events.Count > 0)
+            {
+                Say("The admin service has decoy incidents awaiting review. See Service incidents in Activity.");
+                ServiceIncidentsReceived?.Invoke();
+            }
+            after = page.LastId;
         }
     }
 
@@ -91,6 +83,10 @@ public sealed class AgentHost : IAsyncDisposable
     /// <summary>Records how a NuGet credential request for a mapped feed was answered: program, feed and variable, never the token.</summary>
     public void RecordNuGet(NuGetOutcome outcome, string program, int processId, string source, string variable) =>
         activity.Append(NuGetActivity.Record(outcome, program, processId, source, variable));
+
+    public void RecordPolicyRefusal(string consumer, string service, string program, string? peer, string reason) =>
+        activity.Append(new(AuditKind.Deny, Consumer: consumer, Service: service, Process: program,
+            Reason: string.Equals(program, peer, StringComparison.OrdinalIgnoreCase) ? reason : $"{reason} Pipe client: {peer ?? "unidentified"}."));
 
     /// <summary>
     /// Records "This wasn't me" in the activity log: what was asked, the program and the processes
@@ -113,6 +109,8 @@ public sealed class AgentHost : IAsyncDisposable
     /// app blocks the program and raises a finding, <c>tir agent</c> only prints it.
     /// </summary>
     public event Action<DecoyTouch>? DecoyTouched;
+
+    public event Action? ServiceIncidentsReceived;
 
     /// <summary>Whether the decoys' listeners are up (decoys are placed and their ports were free).</summary>
     public bool DecoysListening => decoys.Listening;

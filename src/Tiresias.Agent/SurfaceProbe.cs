@@ -231,13 +231,22 @@ static partial class SurfaceProbe
         return paths;
     }
 
-    public static IEnumerable<DecoyUseRecord> DecoyUses() => Doctor.DecoyUses(Lines(AgentHost.ActivityPath));
+    public static IEnumerable<DecoyUseRecord> DecoyUses()
+    {
+        var service = AdminIncidents.History() ?? throw new IOException("The admin service incident history is unavailable.");
+        return Doctor.DecoyUses(Lines(AgentHost.ActivityPath)).Concat(service.Events.Select(e =>
+            new DecoyUseRecord(e.Hit.Program, new DecoyTouch(e.Hit, e.Parents).What, e.Hit.At)));
+    }
 
     public static IEnumerable<CredentialUse> CredentialUses() =>
         Doctor.CredentialUses(Lines(AgentHost.ActivityPath).Concat(Lines(SoloBroker.AuditPath)));
 
-    public static IEnumerable<string> BlockedPrograms() =>
-        Doctor.BlockedPaths(ReadOrNull(Path.Combine(KeyringStore.Directory, "blocklist.json"))).Where(File.Exists);
+    public static IEnumerable<string> BlockedPrograms()
+    {
+        var service = AdminProgramBlocks.ListAsync().GetAwaiter().GetResult();
+        var local = Doctor.BlockedPaths(ReadOrNull(Path.Combine(KeyringStore.Directory, "blocklist.json")));
+        return (service ?? []).Select(p => p.Path).Concat(local).Distinct(StringComparer.OrdinalIgnoreCase).Where(File.Exists);
+    }
 
     static string? ReadOrNull(string path)
     {

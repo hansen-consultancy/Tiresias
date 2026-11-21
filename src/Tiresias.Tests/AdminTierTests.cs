@@ -21,7 +21,7 @@ public class AdminCallerPolicyTests
         Assert.That(AdminCallerPolicy.Decide(Ask(AdminOps.Status), User).Allowed, Is.True);
 
     [TestCase(0)]
-    [TestCase(2)]
+    [TestCase(3)]
     public void Another_protocol_version_is_refused(int version)
     {
         var decision = AdminCallerPolicy.Decide(new AdminRequest(version, AdminOps.Status), User);
@@ -64,6 +64,10 @@ public class AdminCallerPolicyTests
 
     [TestCase(AdminOps.Thaw)]
     [TestCase(AdminOps.DecoysRelease)]
+    [TestCase(AdminOps.DecoysReleaseCommit)]
+    [TestCase(AdminOps.DecoysAdopt)]
+    [TestCase(AdminOps.EventsReview)]
+    [TestCase(AdminOps.BlocksUnblock)]
     [TestCase(AdminOps.Teardown)]
     public void Ops_that_weaken_protection_need_an_elevated_caller(string op)
     {
@@ -76,9 +80,10 @@ public class AdminCallerPolicyTests
     [Test]
     public void Only_the_ops_that_weaken_protection_need_elevation() =>
         Assert.That(AdminOps.All.Where(AdminCallerPolicy.NeedsElevation),
-            Is.EquivalentTo(new[] { AdminOps.Thaw, AdminOps.DecoysRelease, AdminOps.Teardown }));
+            Is.EquivalentTo(new[] { AdminOps.Thaw, AdminOps.DecoysRelease, AdminOps.DecoysReleaseCommit, AdminOps.DecoysAdopt, AdminOps.EventsReview, AdminOps.BlocksUnblock, AdminOps.Teardown }));
 
-    static readonly string[] Built = [AdminOps.Status, AdminOps.EventsWait, AdminOps.DecoysAdopt, AdminOps.DecoysStatus, AdminOps.DecoysRelease];
+    static readonly string[] Built = [AdminOps.Status, AdminOps.EventsWait, AdminOps.EventsHistory, AdminOps.EventsReview,
+        AdminOps.BlocksCheck, AdminOps.BlocksList, AdminOps.BlocksUnblock, AdminOps.DecoysAdopt, AdminOps.DecoysStatus, AdminOps.DecoysRelease, AdminOps.DecoysReleaseCommit];
 
     [Test]
     public void Ops_not_built_yet_are_refused_even_when_the_caller_qualifies()
@@ -137,9 +142,12 @@ public class AdminCallerPolicyTests
     public void The_agents_adopt_arguments_pass_and_read_back_as_the_set()
     {
         var set = Placed();
-        var args = AdminArgs.Adopt(set);
+        var args = AdminArgs.Adopt(set, Alice);
 
-        Assert.That(AdminCallerPolicy.Decide(Ask(AdminOps.DecoysAdopt, args), User).Allowed, Is.True);
+        Assert.That(AdminCallerPolicy.Decide(Ask(AdminOps.DecoysAdopt, args), User).Allowed, Is.False);
+        Assert.That(AdminCallerPolicy.Decide(Ask(AdminOps.DecoysAdopt, args), ElevatedUser).Allowed, Is.True);
+        Assert.That(AdminCallerPolicy.Decide(Ask(AdminOps.DecoysAdopt, args), ElevatedUser with { UserSid = Bob }).Allowed, Is.True);
+        Assert.That(AdminCallerPolicy.Decide(Ask(AdminOps.DecoysAdopt, AdminArgs.Adopt(set, Bob)), ElevatedUser).Allowed, Is.False);
         var back = AdminWire.FromNode<DecoySet>(args["set"])!;
         Assert.That((back.HttpPort, back.SqlPort, back.Values), Is.EqualTo((set.HttpPort, set.SqlPort, set.Values)));
         Assert.That(back.Placed, Is.EqualTo(set.Placed));
@@ -172,31 +180,37 @@ public class AdminCallerPolicyTests
     {
         for (var i = 0; i < BadAdopts.Length; i++)
         {
-            var decision = AdminCallerPolicy.Decide(Ask(AdminOps.DecoysAdopt, BadAdopts[i](AdminArgs.Adopt(Placed()))), User);
+            var decision = AdminCallerPolicy.Decide(Ask(AdminOps.DecoysAdopt, BadAdopts[i](AdminArgs.Adopt(Placed(), Alice))), ElevatedUser);
             Assert.That(decision.Allowed, Is.False, $"case {i}");
             Assert.That(decision.Reason, Does.Not.Contain("C:\\").And.Not.Contain("31000"), $"case {i}");
         }
     }
 
-    [TestCase("[]", 30, true)]
-    [TestCase("[1, 2, 3]", 0, true)]
-    [TestCase("[0]", 30, false)]
-    [TestCase("[-4]", 30, false)]
-    [TestCase("[\"1\"]", 30, false)]
-    [TestCase("[1.5]", 30, false)]
-    [TestCase("[]", 31, false)]
-    [TestCase("[]", -1, false)]
-    public void Events_wait_takes_ids_to_acknowledge_and_at_most_thirty_seconds(string ack, int wait, bool allowed) =>
-        Assert.That(AdminCallerPolicy.Decide(Ask(AdminOps.EventsWait, new JsonObject { ["ack"] = JsonNode.Parse(ack), ["wait"] = wait }), User).Allowed,
+    [TestCase("0", 30, true)]
+    [TestCase("17", 0, true)]
+    [TestCase("-1", 30, false)]
+    [TestCase("[]", 30, false)]
+    [TestCase("1.5", 30, false)]
+    [TestCase("0", 31, false)]
+    [TestCase("0", -1, false)]
+    public void Events_wait_takes_a_read_position_and_a_bounded_wait(string after, int wait, bool allowed) =>
+        Assert.That(AdminCallerPolicy.Decide(Ask(AdminOps.EventsWait, new JsonObject { ["after"] = JsonNode.Parse(after), ["wait"] = wait }), User).Allowed,
             Is.EqualTo(allowed));
 
     [Test]
-    public void Events_wait_refuses_too_many_ids() =>
-        Assert.That(AdminCallerPolicy.Decide(Ask(AdminOps.EventsWait, new JsonObject
-        {
-            ["ack"] = new JsonArray([.. Enumerable.Range(1, AdminArgs.MaxAck + 1).Select(i => (JsonNode)i)]),
-            ["wait"] = 1,
-        }), User).Allowed, Is.False);
+    public void Read_progress_and_protection_changes_are_separate_operations()
+    {
+        var after = new JsonObject { ["after"] = 1L };
+        var review = new JsonObject { ["through"] = 1L };
+        var program = new JsonObject { ["program"] = @"C:\Tools\a.exe" };
+        Assert.That(AdminCallerPolicy.Decide(Ask(AdminOps.EventsHistory, after), User).Allowed, Is.True);
+        Assert.That(AdminCallerPolicy.Decide(Ask(AdminOps.EventsWait, new() { ["ack"] = new JsonArray(), ["wait"] = 0 }), User).Allowed, Is.False);
+        Assert.That(AdminCallerPolicy.Decide(Ask(AdminOps.EventsReview, review), User).Allowed, Is.False);
+        Assert.That(AdminCallerPolicy.Decide(Ask(AdminOps.EventsReview, review), ElevatedUser).ActingFor, Is.EqualTo(Alice));
+        Assert.That(AdminCallerPolicy.Decide(Ask(AdminOps.BlocksUnblock, program), User).Allowed, Is.False);
+        Assert.That(AdminCallerPolicy.Decide(Ask(AdminOps.BlocksUnblock, program), ElevatedUser).ActingFor, Is.EqualTo(Alice));
+        Assert.That(AdminCallerPolicy.Decide(Ask(AdminOps.BlocksCheck, new() { ["program"] = null, ["sha256"] = null }), User).Allowed, Is.True);
+    }
 
     [TestCase("S-1-5-21-1000-1000-1000-1001", true)]
     [TestCase("S-1-12-1-1000-1000-1000-1001", true)]
@@ -416,10 +430,41 @@ public class AdminActionLogTests
     public void An_unknown_op_is_logged_as_unknown_never_as_sent() =>
         Assert.That(AdminAction.Of(At, "secret-looking\nop", Alice, 1, null, "refused", "unknown op").ToLine(),
             Does.Contain("\"op\":\"unknown\"").And.Not.Contain("secret-looking"));
+
+    [TestCase(AdminOps.DecoysAdopt)]
+    [TestCase(AdminOps.DecoysRelease)]
+    [TestCase(AdminOps.DecoysReleaseCommit)]
+    [TestCase(AdminOps.EventsReview)]
+    [TestCase(AdminOps.BlocksUnblock)]
+    public void Authorized_changes_distinguish_the_elevated_account_from_the_session_owner(string op)
+    {
+        var elevated = Alice with { UserSid = "S-1-5-21-1000-1000-1000-1002", Elevated = true };
+        var action = AdminAction.Of(At, op, elevated, 42, null, "ok", null, elevated.SessionUserSid);
+        var row = JsonNode.Parse(action.ToLine())!;
+        Assert.That((string?)row["callerSid"], Is.EqualTo(elevated.UserSid));
+        Assert.That((string?)row["actingFor"], Is.EqualTo(Alice.UserSid));
+        var refused = AdminAction.Of(At, op, Alice, 42, null, "refused", "needs elevation");
+        Assert.That(refused.ActingFor, Is.Null);
+        Assert.That(refused.Reason, Is.EqualTo("needs elevation"));
+    }
 }
 
 public class AdminWireTests
 {
+    sealed class StalledWriter : MemoryStream
+    {
+        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) =>
+            new(Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken));
+    }
+
+    [Test]
+    public void A_stalled_reader_cannot_hold_its_service_reply_open()
+    {
+        using var stalled = new StalledWriter();
+        Assert.CatchAsync<OperationCanceledException>(() => AdminWire.WriteReplyAsync(stalled, AdminReply.Ok(new { }),
+            TimeSpan.FromMilliseconds(25), CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5)));
+    }
+
     [Test]
     public async Task A_request_and_a_reply_round_trip_in_the_agent_pipes_framing()
     {
@@ -431,13 +476,13 @@ public class AdminWireTests
         stream.Position = 0;
         var length = BitConverter.ToInt32(stream.GetBuffer(), 0);
         var firstJson = System.Text.Encoding.UTF8.GetString(stream.GetBuffer(), 4, length);
-        Assert.That(firstJson, Is.EqualTo("{\"version\":1,\"op\":\"status\",\"args\":null}"));
+        Assert.That(firstJson, Is.EqualTo("{\"version\":2,\"op\":\"status\",\"args\":null}"));
 
         var request = await AdminWire.ReadAsync<AdminRequest>(stream, CancellationToken.None);
         var back = await AdminWire.ReadAsync<AdminReply>(stream, CancellationToken.None);
         Assert.That(request.Op, Is.EqualTo(AdminOps.Status));
         Assert.That(back.Status, Is.EqualTo(AdminStatus.Ok));
-        Assert.That(back.ResultAs<AdminStatusResult>(), Is.EqualTo(new AdminStatusResult("0.3.0", 1, new(Listening: true))));
+        Assert.That(back.ResultAs<AdminStatusResult>(), Is.EqualTo(new AdminStatusResult("0.3.0", AdminWire.ProtocolVersion, new(Listening: true))));
     }
 
     [Test]
@@ -479,6 +524,37 @@ public class AdminHeldDecoysTests
         .With(new(DecoyKind.Variables, "user environment", Now));
 
     [Test]
+    public void Verified_enrollment_requires_each_claimed_file_and_variable_to_match()
+    {
+        var set = Set();
+        var candidate = new AdminHeldDecoys(set, AdminHeldDecoys.FilesFor(set));
+        var checkedSteps = new List<DecoyStep>();
+        Assert.That(candidate.IsPlaced(step => { checkedSteps.Add(step); return true; }), Is.True);
+        Assert.That(checkedSteps.OfType<WriteDecoyFile>().Count(), Is.EqualTo(2));
+        Assert.That(checkedSteps.OfType<SetDecoyVariable>().Count(), Is.EqualTo(2));
+        foreach (var missing in checkedSteps)
+            Assert.That(candidate.IsPlaced(step => step != missing), Is.False);
+        Assert.That((candidate with { Files = [] }).IsPlaced(_ => true), Is.False);
+        Assert.That((candidate with { Files = [candidate.Files[0], candidate.Files[0]] }).MatchesManifest(), Is.False);
+        var variables = set with { Placed = [set.Placed.Single(p => p.Kind == DecoyKind.Variables)] };
+        Assert.That(new AdminHeldDecoys(variables, []).IsPlaced(step => step is SetDecoyVariable), Is.True);
+        Assert.That(new AdminHeldDecoys(variables with { HttpPort = DecoySet.MinPort - 1 }, []).MatchesManifest(), Is.False);
+        Assert.That(new AdminHeldDecoys(variables with { SqlPort = DecoySet.MaxPort + 1 }, []).MatchesManifest(), Is.False);
+    }
+
+    [Test]
+    public void A_previous_registration_waits_for_verification_before_reporting_any_protection()
+    {
+        var legacy = new AdminHeldDecoys(Set(), [], Verified: false);
+        var record = AdminHeldDecoys.Parse(legacy.ToJson())!;
+        var status = record.Status(listening: true);
+        Assert.That(status.NeedsVerification, Is.True);
+        Assert.That(status.Held || status.Listening, Is.False);
+        Assert.That(status.Kinds, Is.Empty);
+        Assert.That(new AdminDecoysStatus(true, true, [DecoyKind.Project], 2).ConfirmedStatus(), Is.EqualTo(status));
+    }
+
+    [Test]
     public void A_held_set_reads_back_and_tells_kinds_and_file_count_only()
     {
         var held = new AdminHeldDecoys(Set(), [@"C:\Users\alice\source\billing-api-old\.env", @"C:\Users\alice\source\billing-api-old\appsettings.Production.json"]);
@@ -501,50 +577,7 @@ public class AdminHeldDecoysTests
     [TestCase("{\"v\":1,\"set\":null,\"files\":[]}")]
     public void A_damaged_or_newer_file_holds_nothing(string? json) => Assert.That(AdminHeldDecoys.Parse(json), Is.Null);
 
-    static DecoyHit Hit(string program) => new(DecoyUse.AdminToken, "HTTP GET /admin", 4242, program, Now);
 
-    [Test]
-    public void Events_wait_until_acknowledged_and_survive_a_restart()
-    {
-        var (queue, first) = AdminEventQueue.Empty.Add(Hit(@"C:\Tools\a.exe"), [@"C:\Windows\explorer.exe (100)"]);
-        (queue, var second) = queue.Add(Hit(@"C:\Tools\b.exe"), []);
-
-        var restarted = AdminEventQueue.Parse(queue.ToJson());
-        Assert.That(restarted.Pending.Select(e => e.Id), Is.EqualTo(new[] { first.Id, second.Id }));
-        Assert.That(restarted.Pending[0].Hit, Is.EqualTo(first.Hit));
-        Assert.That(restarted.Pending[0].Parents, Is.EqualTo(first.Parents));
-
-        var acked = restarted.Ack([first.Id, 999]);
-        Assert.That(acked.Pending.Select(e => e.Id), Is.EqualTo(new[] { second.Id }));
-        Assert.That(acked.Add(Hit("c.exe"), []).Added.Id, Is.GreaterThan(second.Id), "an id is never given twice");
-    }
-
-    [Test]
-    public void The_queue_keeps_the_newest_when_full()
-    {
-        var queue = AdminEventQueue.Empty;
-        for (var i = 0; i < AdminEventQueue.Capacity + 5; i++)
-            queue = queue.Add(Hit($"p{i}.exe"), []).Queue;
-
-        Assert.That(queue.Pending, Has.Count.EqualTo(AdminEventQueue.Capacity));
-        Assert.That(queue.Pending[^1].Hit.Program, Is.EqualTo($"p{AdminEventQueue.Capacity + 4}.exe"));
-    }
-
-    [TestCase(null)]
-    [TestCase("not json")]
-    [TestCase("{\"v\":9,\"nextId\":3,\"pending\":[]}")]
-    public void A_damaged_queue_starts_empty(string? json) => Assert.That(AdminEventQueue.Parse(json), Is.EqualTo(AdminEventQueue.Empty));
-
-    [Test]
-    public void Events_cross_the_wire_as_the_app_reads_them()
-    {
-        var (_, added) = AdminEventQueue.Empty.Add(Hit(@"C:\Tools\a.exe"), ["parent (1)"]);
-
-        var back = AdminReply.Ok(new AdminEvents([added])).ResultAs<AdminEvents>()!;
-
-        Assert.That(back.Events.Single().Hit, Is.EqualTo(added.Hit));
-        Assert.That(back.Events.Single().Parents, Is.EqualTo(added.Parents));
-    }
 
     [TestCase(@"C:\Users\alice\AppData\Local\Tiresias\decoys.json", @"\\?\C:\Users\alice\AppData\Local\Tiresias\decoys.json", true)]
     [TestCase(@"C:\Users\alice\AppData\Local\Tiresias\decoys.json", @"\\?\c:\users\ALICE\appdata\local\tiresias\decoys.json", true)]

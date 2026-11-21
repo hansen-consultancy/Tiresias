@@ -200,12 +200,21 @@ public static partial class Doctor
         checks.AddRange(RavenClearance(clearances));
         checks.AddRange(KeysAsValues(probe.SealedEnvironment));
         // A program blocked for using a decoy is that finding, not "This wasn't me"'s.
-        var decoyUses = probe.DecoyUses().ToArray();
-        var blocked = probe.BlockedPrograms().ToArray();
-        checks.AddRange(Decoys(decoyUses, blocked, DateTimeOffset.UtcNow));
+        string[] otherBlocks = [];
+        try
+        {
+            var decoyUses = probe.DecoyUses().ToArray();
+            var blocked = probe.BlockedPrograms().ToArray();
+            checks.AddRange(Decoys(decoyUses, blocked, DateTimeOffset.UtcNow));
+            otherBlocks = [.. blocked.Where(b => !decoyUses.Any(u => !u.IsRead && SamePath(u.Program, b)))];
+        }
+        catch (IOException)
+        {
+            checks.Add(new("decoy incidents and program blocks", DoctorStatus.Warn, "The admin service could not supply its incident history and block list."));
+        }
         checks.AddRange(CliSignIns(probe.CliConfigs, probe.GitHubAppService));
         var (uses, runs, installed, now) = (probe.CredentialUses().ToArray(), probe.ProgramRuns().ToArray(), probe.UninstallEntries().ToArray(), DateTimeOffset.UtcNow);
-        checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), uses, blocked.Where(b => !decoyUses.Any(u => !u.IsRead && SamePath(u.Program, b))), now, runs));
+        checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), uses, otherBlocks, now, runs));
         checks.AddRange(UninstallEntries(installed));
         checks.AddRange(UnusedApplications(installed, runs, uses, now));
         return checks;

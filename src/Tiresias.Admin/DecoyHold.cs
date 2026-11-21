@@ -10,10 +10,11 @@ namespace Tiresias.Admin;
 /// <summary>
 /// The decoy sets the service holds, one per user (<c>decoys\&lt;sid&gt;.json</c> in its state
 /// folder), each listened for on loopback from start (<see cref="DecoyListener"/>), and each use
-/// queued for its user (<c>events\&lt;sid&gt;.json</c>) until that user's app acknowledges it. A
+/// recorded for its user in the protected incident journal. A
 /// set whose ports are taken is tried again every few seconds: the user's agent may still hold them
 /// for a moment after adopting.
 /// </summary>
+[System.Runtime.Versioning.SupportedOSPlatform("windows")]
 sealed class DecoyHold : IAsyncDisposable
 {
     static readonly TimeSpan Retry = TimeSpan.FromSeconds(5);
@@ -23,9 +24,14 @@ sealed class DecoyHold : IAsyncDisposable
     readonly ILogger logger;
     readonly Lock gate = new();
     readonly Dictionary<string, Held> held = new(StringComparer.OrdinalIgnoreCase);
-    readonly Dictionary<string, AdminEventQueue> queues = new(StringComparer.OrdinalIgnoreCase);
-    readonly Dictionary<string, TaskCompletionSource> arrived = new(StringComparer.OrdinalIgnoreCase);
+    readonly System.Collections.Concurrent.ConcurrentDictionary<string, Incidents> incidents = new(StringComparer.OrdinalIgnoreCase);
     readonly Timer retry;
+
+    sealed class Incidents(string folder, string sid)
+    {
+        public readonly Lazy<AdminIncidentJournal> Journal = new(() => new(folder, sid));
+        public TaskCompletionSource? Arrived;
+    }
 
     sealed class Held(AdminHeldDecoys decoys)
     {
@@ -54,8 +60,10 @@ sealed class DecoyHold : IAsyncDisposable
     {
         lock (gate)
         {
-            if (held.ContainsKey(sid))
-                return "the admin tier already holds decoys for this user; release them first";
+            if (!decoys.MatchesManifest())
+                return "the files do not match the placed decoys";
+            if (held.TryGetValue(sid, out var existing) && existing.Decoys.Verified)
+                return existing.Decoys.Set.ToJson() == decoys.Set.ToJson() ? null : "the admin tier already holds decoys for this user; release them first";
             Write(SetPath(sid), decoys.ToJson());
             held[sid] = new(decoys);
         }
@@ -69,58 +77,75 @@ sealed class DecoyHold : IAsyncDisposable
             return held.TryGetValue(sid, out var h) ? h.Decoys.Status(h.Listener is not null) : new(false, false, [], 0);
     }
 
-    /// <summary>Stops listening for the user's set and forgets it; <c>null</c> when none is held.</summary>
-    public async Task<DecoySet?> ReleaseAsync(string sid)
+    public AdminDecoysRelease PrepareRelease(string sid)
+    {
+        lock (gate)
+            return held.TryGetValue(sid, out var h) ? new(sid, h.Decoys.Set, h.Decoys.ReleaseReceipt()) : new(sid, null);
+    }
+
+    /// <summary>Forgets only the exact protected snapshot the elevated helper handed back.</summary>
+    public async Task<bool> CommitReleaseAsync(string sid, string receipt)
     {
         Held? released;
         lock (gate)
         {
-            if (!held.Remove(sid, out released))
-                return null;
+            if (!held.TryGetValue(sid, out released))
+                return true;
+            if (released.Decoys.ReleaseReceipt() != receipt)
+                return false;
             File.Delete(SetPath(sid));
+            held.Remove(sid);
         }
         if (released.Listener is { } listener)
             await listener.DisposeAsync();
-        return released.Decoys.Set;
+        return true;
     }
 
-    /// <summary>
-    /// Drops the acknowledged events, then answers what is queued for the user, waiting up to
-    /// <paramref name="wait"/> for one when nothing is.
-    /// </summary>
-    public async Task<IReadOnlyList<AdminEvent>> WaitAsync(string sid, IReadOnlyList<long> ack, TimeSpan wait, CancellationToken ct)
+    Incidents For(string sid) => incidents.GetOrAdd(sid, id => new(eventsFolder, id));
+
+    public async Task<AdminEvents> WaitAsync(string sid, long after, TimeSpan wait, CancellationToken ct)
     {
+        var account = For(sid);
         Task signal;
-        lock (gate)
+        lock (account)
         {
-            var queue = Queue(sid);
-            if (ack.Count > 0)
-            {
-                queue = queue.Ack(ack);
-                Save(sid, queue);
-            }
-            if (queue.Pending.Count > 0 || wait <= TimeSpan.Zero)
-                return queue.Pending;
-            if (!arrived.TryGetValue(sid, out var waiting))
-                arrived[sid] = waiting = new(TaskCreationOptions.RunContinuationsAsynchronously);
-            signal = waiting.Task;
+            var page = account.Journal.Value.Read(after, pendingOnly: true);
+            if (page.Events.Count != 0 || wait <= TimeSpan.Zero)
+                return page;
+            account.Arrived ??= new(TaskCreationOptions.RunContinuationsAsynchronously);
+            signal = account.Arrived.Task;
         }
         try
         {
             await signal.WaitAsync(wait, ct);
         }
-        catch (TimeoutException)
-        {
-        }
-        lock (gate)
-            return Queue(sid).Pending;
+        catch (TimeoutException) { }
+        lock (account)
+            return account.Journal.Value.Read(after, pendingOnly: true);
+    }
+
+    public AdminEvents History(string sid, long after) => WithJournal(sid, j => j.Read(after, pendingOnly: false));
+
+    public AdminEvents Review(string sid, long through) => WithJournal(sid, j => j.Review(through));
+
+    public AdminBlockStatus Check(string sid, string? program, string? sha256) => WithJournal(sid, j => j.Check(program, sha256));
+
+    public AdminBlocks Blocks(string sid, string? after) => WithJournal(sid, j => j.List(after));
+
+    public AdminBlockStatus Unblock(string sid, string program) => WithJournal(sid, j => j.Unblock(program));
+
+    T WithJournal<T>(string sid, Func<AdminIncidentJournal, T> action)
+    {
+        var account = For(sid);
+        lock (account)
+            return action(account.Journal.Value);
     }
 
     void ListenAll()
     {
         List<(string Sid, Held Held)> idle;
         lock (gate)
-            idle = [.. held.Where(h => h.Value.Listener is null).Select(h => (h.Key, h.Value))];
+            idle = [.. held.Where(h => h.Value.Decoys.Verified && h.Value.Listener is null).Select(h => (h.Key, h.Value))];
         foreach (var (sid, h) in idle)
         {
             var set = h.Decoys.Set;
@@ -150,50 +175,38 @@ sealed class DecoyHold : IAsyncDisposable
 
     void Queue(string sid, DecoyHit hit)
     {
-        IReadOnlyList<string> parents = hit.ProcessId is { } pid
-            ? [.. ProcessTree.Ancestry(pid).Skip(1).Select(p => $"{p.Program} ({p.ProcessId})")]
-            : [];
-        lock (gate)
+        // Once a hit is received, this user's decisions wait for its measurement and durable commit.
+        var account = For(sid);
+        lock (account)
         {
-            var (queue, _) = Queue(sid).Add(hit, parents);
-            Save(sid, queue);
-            if (arrived.Remove(sid, out var waiting))
-                waiting.TrySetResult();
-        }
-    }
-
-    AdminEventQueue Queue(string sid)
-    {
-        if (!queues.TryGetValue(sid, out var queue))
-        {
-            var path = EventsPath(sid);
-            queues[sid] = queue = AdminEventQueue.Parse(File.Exists(path) ? File.ReadAllText(path) : null);
-        }
-        return queue;
-    }
-
-    void Save(string sid, AdminEventQueue queue)
-    {
-        queues[sid] = queue;
-        try
-        {
-            Write(EventsPath(sid), queue.ToJson());
-        }
-        catch (IOException e)
-        {
-            // Still queued in memory: only a restart before the app reads it loses it.
-            logger.LogError("An event queue can't be written: {Kind}", e.GetType().Name);
+            try
+            {
+                IReadOnlyList<string> parents = hit.ProcessId is { } pid
+                    ? [.. ProcessTree.Ancestry(pid).Skip(1).Select(p => $"{p.Program} ({p.ProcessId})")]
+                    : [];
+                account.Journal.Value.Record(hit, parents, PipeCallerIdentity.ImageDigest(hit));
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidDataException)
+            {
+                logger.LogError("An incident could not be recorded: {Kind}", e.GetType().Name);
+            }
+            account.Arrived?.TrySetResult();
+            account.Arrived = null;
         }
     }
 
     string SetPath(string sid) => Path.Combine(decoysFolder, sid + ".json");
 
-    string EventsPath(string sid) => Path.Combine(eventsFolder, sid + ".json");
+
 
     static void Write(string path, string text)
     {
         var temp = path + ".tmp";
-        File.WriteAllText(temp, text);
+        using (var file = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None))
+        {
+            file.Write(System.Text.Encoding.UTF8.GetBytes(text));
+            file.Flush(flushToDisk: true);
+        }
         File.Move(temp, path, overwrite: true);
     }
 

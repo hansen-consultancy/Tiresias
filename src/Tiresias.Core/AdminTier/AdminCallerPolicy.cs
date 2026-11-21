@@ -41,12 +41,22 @@ public static class AdminCallerPolicy
     static readonly Dictionary<string, OpRule> Rules = new(StringComparer.Ordinal)
     {
         [AdminOps.Status] = new(false, NoArgs),
-        [AdminOps.EventsWait] = new(false, new Dictionary<string, ArgCheck> { ["ack"] = AdminArgs.Ack, ["wait"] = AdminArgs.Wait }),
-        [AdminOps.DecoysAdopt] = new(false, new Dictionary<string, ArgCheck> { ["set"] = AdminArgs.Set, ["files"] = AdminArgs.Files }),
+        [AdminOps.EventsWait] = new(false, new Dictionary<string, ArgCheck> { ["after"] = AdminArgs.Cursor, ["wait"] = AdminArgs.Wait }),
+        [AdminOps.EventsHistory] = new(false, new Dictionary<string, ArgCheck> { ["after"] = AdminArgs.Cursor }),
+        [AdminOps.EventsReview] = new(true, new Dictionary<string, ArgCheck> { ["through"] = AdminArgs.Cursor }),
+        [AdminOps.BlocksCheck] = new(false, new Dictionary<string, ArgCheck>
+        {
+            ["program"] = value => value is null || AdminArgs.Program(value),
+            ["sha256"] = value => value is null || AdminArgs.Digest(value),
+        }),
+        [AdminOps.BlocksList] = new(false, new Dictionary<string, ArgCheck> { ["after"] = value => value is null || AdminArgs.Program(value) }),
+        [AdminOps.BlocksUnblock] = new(true, new Dictionary<string, ArgCheck> { ["program"] = AdminArgs.Program }),
+        [AdminOps.DecoysAdopt] = new(true, new Dictionary<string, ArgCheck> { ["owner"] = AdminArgs.Owner, ["set"] = AdminArgs.Set, ["files"] = AdminArgs.Files }),
         [AdminOps.DecoysStatus] = new(false, NoArgs),
         [AdminOps.Freeze] = new(false, null),
         [AdminOps.Thaw] = new(true, null),
         [AdminOps.DecoysRelease] = new(true, NoArgs),
+        [AdminOps.DecoysReleaseCommit] = new(true, new Dictionary<string, ArgCheck> { ["receipt"] = AdminArgs.Digest }),
         [AdminOps.LastRun] = new(false, null),
         [AdminOps.Teardown] = new(true, null),
     };
@@ -78,6 +88,9 @@ public static class AdminCallerPolicy
         if (rule.Args is null)
             return AdminDecision.Refuse($"{request.Op} isn't available in this version of the service");
         var decision = Validate(request.Args, rule.Args);
+        if (decision.Allowed && request.Op == AdminOps.DecoysAdopt &&
+            !string.Equals(request.Args!["owner"]!.GetValue<string>(), caller.SessionUserSid, StringComparison.OrdinalIgnoreCase))
+            return AdminDecision.Refuse("the enrollment belongs to another session user");
         return decision.Allowed ? decision with { ActingFor = caller.SessionUserSid.ToUpperInvariant() } : decision;
     }
 

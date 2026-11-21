@@ -96,6 +96,7 @@ static class CliUsage
         tir decoys place <passwords|project|variables> [<path>]
         tir decoys list
         tir decoys remove
+        tir decoys adopt
             Decoy credentials that open nothing and point to a port only Tiresias listens on, so a
             program that finds and uses one is named in the activity log (and blocked by the app).
             passwords: a passwords.txt (Documents by default); project: a new folder with an

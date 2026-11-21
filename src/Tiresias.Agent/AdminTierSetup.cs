@@ -49,6 +49,8 @@ public static class AdminTierSetup
                     return handedBack ? AdminSetupResult.Done : AdminSetupResult.Failed;
                 case "release-decoys":
                     return AdminDecoys.Release();
+                case "adopt-decoys":
+                    return AdminDecoys.Adopt();
                 default:
                     return AdminSetupResult.Usage;
             }
@@ -166,21 +168,13 @@ public static class AdminTierSetup
 
     static readonly SecurityIdentifier Administrators = new(WellKnownSidType.BuiltinAdministratorsSid, null);
 
-    /// <summary>
-    /// Run elevated: records a held set in the service's state folder, as the service writes it, for
-    /// it to hold again at its next start. For a set taken back that could be neither handed to its
-    /// user nor adopted again.
-    /// </summary>
-    /// <returns>Whether it was written; not when the state folder is missing or not the service's.</returns>
-    public static bool KeepHeld(string sid, AdminHeldDecoys held)
+    /// <summary>Reads a previous registration so the administrator can verify its surviving placements.</summary>
+    internal static AdminHeldDecoys? LegacyDecoys(string sid)
     {
-        var folder = Path.Combine(StateFolder, "decoys");
-        if (!AdminArgs.UserSid(sid) || !Trusted(StateRoot) || !Trusted(StateFolder) || !Directory.Exists(folder))
-            return false;
-        var path = Path.Combine(folder, sid + ".json");
-        File.WriteAllText(path + ".tmp", held.ToJson());
-        File.Move(path + ".tmp", path, overwrite: true);
-        return true;
+        if (!AdminArgs.UserSid(sid) || !Trusted(StateRoot) || !Trusted(StateFolder))
+            return null;
+        var path = Path.Combine(StateFolder, "decoys", sid + ".json");
+        return File.Exists(path) && AdminHeldDecoys.Parse(File.ReadAllText(path)) is { Verified: false } legacy ? legacy : null;
     }
 
     static bool Trusted(string folder)
