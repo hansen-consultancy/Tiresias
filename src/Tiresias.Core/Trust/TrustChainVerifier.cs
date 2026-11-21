@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using NSec.Cryptography;
 
 namespace Tiresias.Trust;
@@ -18,6 +19,8 @@ public enum TrustFailureKind
     RevokedSigner,
     /// <summary>Signatures are fine but the link makes no sense: unknown user, reused id, impossible threshold.</summary>
     InvalidLink,
+    /// <summary>A link that adds trust lacks a Hello signature from a device that signed it or that it adds.</summary>
+    PresenceRequired,
 }
 
 public sealed record TrustFailure(TrustFailureKind Kind, long Seq, string Detail);
@@ -26,7 +29,8 @@ public sealed record ChainHead(long Seq, string Hash);
 
 public sealed record TrustedUser(string Name, bool Admin);
 
-public sealed record TrustedDevice(string Id, string User, PublicKey Key, bool Paper);
+/// <param name="Hello">The device's Hello key (RSA SubjectPublicKeyInfo); <c>null</c> for a paper key or a device not bound yet.</param>
+public sealed record TrustedDevice(string Id, string User, PublicKey Key, bool Paper, byte[]? Hello = null);
 
 /// <summary>A paper key authorized a link. Callers must alert on every one.</summary>
 public sealed record BreakGlassUse(long Seq, string DeviceId, string User);
@@ -60,6 +64,13 @@ public sealed record TrustVerification(TrustState? State, TrustFailure? Failure)
 /// to sign that kind of link: add-device by the user's own devices; revoke-device by the target's
 /// user or an admin; the admin links by admins, counting distinct admin users against the policy
 /// threshold in force before the link. Any other signer fails the link.
+/// <para>
+/// Links that add trust (add-device, add-user, add-broker, set-policy, bind-hello) also need
+/// presence (docs/trust-links.md): every device that signs them, and every device they add, signs
+/// with its Hello key too, which the chain anchors from genesis on. Paper keys sign without one.
+/// A genesis without a Hello key stays valid, for chains made before this rule, but its device
+/// authorizes no such link until a bind-hello names its Hello key.
+/// </para>
 /// </remarks>
 public static class TrustChainVerifier
 {
@@ -132,14 +143,29 @@ public static class TrustChainVerifier
                     return Failed(TrustFailureKind.InvalidLink, $"device id '{r.Id}' already used");
                 if (!PublicKey.TryImport(Ed25519, r.PublicKey, KeyBlobFormat.RawPublicKey, out var key))
                     return Failed(TrustFailureKind.InvalidLink, $"device '{r.Id}' has no valid Ed25519 key");
-                introduced[r.Id] = new(r.Id, owner, key!, r.Paper);
+                if (r.Hello is not null && (r.Paper || !IsHelloKey(r.Hello)))
+                    return Failed(TrustFailureKind.InvalidLink, $"device '{r.Id}' has an invalid Hello key");
+                if (r is { Paper: false, Hello: null } && link.Body is not Genesis)
+                    return Failed(TrustFailureKind.PresenceRequired, $"new device '{r.Id}' brings no Hello key");
+                introduced[r.Id] = new(r.Id, owner, key!, r.Paper, r.Hello);
+            }
+            if (link.Body is BindHello bind)
+            {
+                if (!devices.TryGetValue(bind.DeviceId, out var target) || target.Paper)
+                    return Failed(TrustFailureKind.InvalidLink, $"'{bind.DeviceId}' is not an active device");
+                if (target.Hello is not null)
+                    return Failed(TrustFailureKind.InvalidLink, $"'{bind.DeviceId}' already has a Hello key");
+                if (!IsHelloKey(bind.Hello))
+                    return Failed(TrustFailureKind.InvalidLink, $"invalid Hello key for '{bind.DeviceId}'");
             }
             if (link.Body is Genesis { PaperKey.Paper: false } or Genesis { Device.Paper: true } or AddUser { Device.Paper: true } or AddUser { PaperKey.Paper: false })
                 return Failed(TrustFailureKind.InvalidLink, "paper key flags do not match their roles");
 
             // Every signature is a countersignature or an active device's authorization.
             var signed = TrustChain.SignedBytes(link);
+            var presence = TrustChain.PresenceBytes(link);
             var countersigned = new HashSet<string>();
+            var present = new HashSet<string>();
             var authorizers = new Dictionary<string, TrustedDevice>();
             foreach (var sig in link.Signatures)
             {
@@ -150,6 +176,13 @@ public static class TrustChainVerifier
                         : Failed(TrustFailureKind.UnauthorizedSigner, $"'{sig.DeviceId}' is not a device of this chain");
                 if (!Ed25519.Verify(device!.Key, signed, sig.Signature))
                     return Failed(TrustFailureKind.BadSignature, $"signature by '{sig.DeviceId}' does not verify");
+                if (sig.Hello is not null)
+                {
+                    var hello = link.Body is BindHello b && b.DeviceId == sig.DeviceId ? b.Hello : device.Hello;
+                    if (hello is null || !VerifyHello(hello, presence, sig.Hello))
+                        return Failed(TrustFailureKind.BadSignature, $"Hello signature by '{sig.DeviceId}' does not verify");
+                    present.Add(sig.DeviceId);
+                }
                 if (isNew)
                     countersigned.Add(sig.DeviceId);
                 else
@@ -157,9 +190,17 @@ public static class TrustChainVerifier
             }
             if (introduced.Keys.FirstOrDefault(id => !countersigned.Contains(id)) is { } missing)
                 return Failed(TrustFailureKind.MissingCountersignature, $"new key '{missing}' did not sign");
+            if (introduced.Values.FirstOrDefault(d => d.Hello is not null && !present.Contains(d.Id)) is { } absent)
+                return Failed(TrustFailureKind.PresenceRequired, $"new device '{absent.Id}' did not sign with its Hello key");
 
             if (Authorize(link.Body, authorizers.Values) is { } refusal)
                 return refusal with { Seq = seq };
+
+            if (link.Body is AddDevice or AddUser or AddBroker or SetPolicy or BindHello
+                && authorizers.Values.FirstOrDefault(a => !a.Paper && !present.Contains(a.Id)) is { } unseen)
+                return Failed(TrustFailureKind.PresenceRequired, unseen.Hello is null
+                    ? $"'{unseen.Id}' has no Hello key in the chain yet: bind one first"
+                    : $"'{unseen.Id}' signed without its Hello key");
 
             foreach (var paper in authorizers.Values.Where(d => d.Paper))
                 breakGlass.Add(new(seq, paper.Id, paper.User));
@@ -198,6 +239,9 @@ public static class TrustChainVerifier
                         return impossible;
                     policy = p.Policy;
                     break;
+                case BindHello h:
+                    devices[h.DeviceId] = devices[h.DeviceId] with { Hello = h.Hello };
+                    break;
             }
             foreach (var d in introduced.Values)
                 devices[d.Id] = d;
@@ -218,6 +262,12 @@ public static class TrustChainVerifier
                         return Failed(TrustFailureKind.InvalidLink, $"unknown user '{d.User}'");
                     if (authorizers.Count == 0 || authorizers.Any(a => a.User != d.User))
                         return Failed(TrustFailureKind.UnauthorizedSigner, $"add-device for '{d.User}' must be signed by their own devices only");
+                    return null;
+                case BindHello h:
+                    var owner = devices[h.DeviceId].User;
+                    if (!authorizers.Any(a => a.Id == h.DeviceId) || !authorizers.Any(a => a.Paper)
+                        || authorizers.Any(a => a.User != owner || (!a.Paper && a.Id != h.DeviceId)))
+                        return Failed(TrustFailureKind.UnauthorizedSigner, "bind-hello must be signed by the device itself and a paper key of its user");
                     return null;
                 case RevokeDevice r:
                     if (!devices.TryGetValue(r.DeviceId, out var target))
@@ -242,6 +292,27 @@ public static class TrustChainVerifier
         }
 
         bool IsAdmin(TrustedDevice device) => users.TryGetValue(device.User, out var user) && user.Admin;
+
+        static bool IsHelloKey(byte[] spki)
+        {
+            using var rsa = RSA.Create();
+            try
+            {
+                rsa.ImportSubjectPublicKeyInfo(spki, out var read);
+                return read == spki.Length && rsa.KeySize >= 2048;
+            }
+            catch (CryptographicException)
+            {
+                return false;
+            }
+        }
+
+        static bool VerifyHello(byte[] spki, byte[] data, byte[] signature)
+        {
+            using var rsa = RSA.Create();
+            rsa.ImportSubjectPublicKeyInfo(spki, out _);
+            return rsa.VerifyData(data, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        }
 
         /// <summary>A threshold above the admin count would leave the chain unable to change again.</summary>
         TrustFailure? CheckThreshold(TrustPolicy candidate, long seq)

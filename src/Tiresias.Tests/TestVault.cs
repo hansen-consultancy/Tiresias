@@ -91,24 +91,60 @@ sealed class TestVault : IDisposable
     /// <param name="changes">The grant also opens WebSockets (the Changes API).</param>
     public static TestVault CreateWithRaven(byte[] pfx, bool changes = false) => new(tpm =>
     (
-        [SecretEnvelope.Seal("raven-read", 1, System.Text.Encoding.ASCII.GetBytes(Convert.ToBase64String(pfx)), [tpm])],
-        [new Service("ravendb", new Uri("https://a.raven.example/"), [new Grant("read", "raven-read",
+        [SecretEnvelope.Seal("ravendb-certificate", 1, System.Text.Encoding.ASCII.GetBytes(Convert.ToBase64String(pfx)), [tpm])],
+        [new Service("ravendb", new Uri("https://a.raven.example/"), [new Grant(RavenSetupPlanner.GrantName, "ravendb-certificate",
             changes ? new(new HashSet<string> { "GET", "WEBSOCKET" }, [VaultFile.Compile("^/")]) : Rule("GET", "^/"))])]
     ));
 
-    public Dictionary<string, byte[]> SealTo(LeaseOffer offer) =>
-        Document.Secrets.ToDictionary(s => s.Slug, s =>
+    /// <summary>Stands in for the approval root the Hello wrap derives.</summary>
+    readonly byte[] approvalRoot = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
+
+    /// <summary>The lease <see cref="SealTo"/> last sealed to, which the approval helpers sign for.</summary>
+    public string? LeaseId { get; private set; }
+
+    /// <summary>The raw public approval key for <paramref name="leaseId"/>, as <c>/lease/seal</c> carries it.</summary>
+    public byte[] ApprovalKey(string leaseId)
+    {
+        using var key = Access.ApprovalKey.Derive(approvalRoot, leaseId);
+        return Access.ApprovalKey.Public(key);
+    }
+
+    public Access.SignedApproval Approve(Access.Approval approval)
+    {
+        using var key = Access.ApprovalKey.Derive(approvalRoot, approval.LeaseId);
+        return approval.Sign(key);
+    }
+
+    public Access.SignedApproval MintApproval(Access.AccessRequest request, DateTimeOffset? now = null) =>
+        Approve(Access.Approval.ForMint(LeaseId!, request, now ?? DateTimeOffset.UtcNow));
+
+    public Access.SignedApproval ElevateApproval(string service, string grant, TimeSpan duration, DateTimeOffset? now = null) =>
+        Approve(Access.Approval.ForElevate(LeaseId!, service, grant, duration, "test", now ?? DateTimeOffset.UtcNow));
+
+    public Access.SignedApproval TokenApproval(string service, DateTimeOffset? now = null) =>
+        Approve(Access.Approval.ForToken(LeaseId!, service, "exec:test", "testing", now ?? DateTimeOffset.UtcNow));
+
+    /// <summary>The <c>/lease/seal</c> body for <paramref name="offer"/>.</summary>
+    public object SealBody(LeaseOffer offer) => new { offer.LeaseId, deks = SealTo(offer), approvalKey = ApprovalKey(offer.LeaseId) };
+
+    public Dictionary<string, byte[]> SealTo(LeaseOffer offer)
+    {
+        LeaseId = offer.LeaseId;
+        return Document.Secrets.ToDictionary(s => s.Slug, s => SealDek(offer, s.Slug, SecretEnvelope.UnwrapDek(s, Tpm)!));
+    }
+
+    /// <summary>Seals <paramref name="dek"/> to the lease for <paramref name="slug"/>, with this vault's approval key, and zeroes it.</summary>
+    public byte[] SealDek(LeaseOffer offer, string slug, byte[] dek)
+    {
+        try
         {
-            var dek = SecretEnvelope.UnwrapDek(s, Tpm)!;
-            try
-            {
-                return SealedBox.Seal(offer.LeaseKey, dek, LeaseOffer.DekContext(offer.LeaseId, s.Slug));
-            }
-            finally
-            {
-                Array.Clear(dek);
-            }
-        });
+            return SealedBox.Seal(offer.LeaseKey, dek, LeaseOffer.DekContext(offer.LeaseId, slug, ApprovalKey(offer.LeaseId)));
+        }
+        finally
+        {
+            Array.Clear(dek);
+        }
+    }
 
     public void Dispose() => tpmKey.Dispose();
 

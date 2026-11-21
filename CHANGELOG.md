@@ -51,6 +51,9 @@ its section below.
   a token.
 - The app checks for findings in the background, a minute after it starts and every four hours.
   New ones put a dot on the tray icon and "(*n* new)" on **Status...** until you open Home.
+- Home and `tir doctor` ask RavenDB, through the broker, what each RavenDB service's certificate may
+  do, and warn when it can change the server (Cluster Admin, Operator), reaches more than one
+  database, or is Admin on its database. **Edit...** on the service swaps in a narrower one.
 - An optional admin tier: with one Windows admin prompt, the app sets up a small Tiresias service
   that runs from Program Files. First run offers it once (**Not now** changes nothing); About shows
   whether it runs and offers **Set up**, **Update** or **Remove**, and `tir doctor` reports it.
@@ -62,6 +65,17 @@ its section below.
 
 ### Changed
 
+- Trust-chain links that add a device, user or broker, or change the admin threshold, now need a
+  Windows Hello signature from each device that signs them and each device they add. Setting up
+  solo mode asks for Windows Hello once more, to put this PC's Hello key in the chain. A chain made
+  earlier keeps working; `tir trust bind-hello` (with the recovery key) adds the key to it, and
+  `tir doctor` says when that is needed.
+- While unlocked, the broker refuses a `vault.json` holding older versions of secrets than it
+  already saw, as when an older copy is restored, and keeps the newer one.
+- The broker now checks that you approved each placeholder, elevation and GitHub App token itself,
+  instead of trusting any program that can sign as this PC. Approvals are signed with a key only
+  the unlocked app or a Windows Hello prompt can derive; prompts are unchanged. Update `tir` and
+  the app together: an older `tir` gets `approval-required`.
 - The secrets editor hides user-secrets folders that hold no keys behind a line, "*N* empty
   folders", with **Move *N* empty to Recycle Bin**. Folders holding only settings (flags, numbers,
   plain URLs) say "(settings only)" and are listed after those holding secrets. Saving an empty file

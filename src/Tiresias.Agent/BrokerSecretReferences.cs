@@ -12,7 +12,8 @@ namespace Tiresias.Agent;
 /// client is given (<c>http://127.0.0.1:7781/raven/{service}/tirph_…</c>), and dies with the lease.</item>
 /// </list>
 /// </summary>
-public sealed class BrokerSecretReferences : ISecretReferenceResolver
+/// <param name="keys">The agent's unlocked state, whose Hello wrapper signs each placeholder's approval.</param>
+public sealed class BrokerSecretReferences(AgentKeys keys) : ISecretReferenceResolver
 {
     public async Task<ResolvedSecret> ResolveAsync(SecretReference reference, string? caller, string userSecretsId, CancellationToken ct)
     {
@@ -21,9 +22,12 @@ public sealed class BrokerSecretReferences : ISecretReferenceResolver
         if (KeyringStore.Tenant is { Solo: true } && !await SoloBroker.ReachableAsync())
             throw new InvalidOperationException($"{reference}: the solo broker isn't running.");
 
+        if (keys.Hello is not { } hello)
+            throw new InvalidOperationException($"{reference}: Tiresias is locked.");
+
         using var client = BrokerClient.For(broker);
-        var response = await client.PostAsync("/placeholder",
-            new AccessRequest($"usersecrets:{userSecretsId}", caller, reference.Service, reference.Grant, $"{userSecretsId} user secrets", Consent.MaxDuration));
+        var response = await client.PostAsync("/placeholder", Approvals.Mint(hello,
+            new AccessRequest($"usersecrets:{userSecretsId}", caller, reference.Service, reference.Grant, $"{userSecretsId} user secrets", Consent.MaxDuration)));
         if (response is not { Ok: true, Body: { } body } || !body.TryGetProperty("token", out var token) || token.GetString() is not { } placeholder)
             throw new InvalidOperationException($"{reference}: {response.Describe()}");
         if (reference.Kind == SecretReference.Raven)

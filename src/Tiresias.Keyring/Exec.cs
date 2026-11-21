@@ -45,9 +45,14 @@ static class Exec
             Console.WriteLine(line);
         if (!await AppLink.ApproveAsync($"tir exec {Path.GetFileName(args.Rest[0])}", lines))
             return Fail("Not approved.");
-        HelloKeyWrapper.ConfirmPresence($"exec\n{string.Join(',', slugs)}\n{consumer}");
-
         using var client = BrokerClient.For(await Commands.ReachableBrokerAsync());
+        // One Hello prompt signs an approval per service, each exactly as shown above.
+        var approvals = new Dictionary<Tiresias.Policy.Service, SignedApproval>();
+        using (var hello = HelloKeyWrapper.Open(create: false))
+            foreach (var service in services)
+                approvals[service] = ExecPlan.IsGitHubApp(service)
+                    ? Approvals.Sign(hello, (lease, now) => Approval.ForToken(lease, service.Slug, consumer, purpose, now))
+                    : Approvals.Mint(hello, requests.Single(r => r.Service == service).Request);
         var credentials = new List<ExecCredential>();
         var minted = new List<string>();
         try
@@ -55,8 +60,8 @@ static class Exec
             foreach (var service in services)
             {
                 var response = ExecPlan.IsGitHubApp(service)
-                    ? await client.PostAsync($"/token/{service.Slug}")
-                    : await client.PostAsync("/placeholder", requests.Single(r => r.Service == service).Request);
+                    ? await client.PostAsync($"/token/{service.Slug}", approvals[service])
+                    : await client.PostAsync("/placeholder", approvals[service]);
                 if (!response.Ok || response.Body is not { } body)
                     return Fail($"{service.Slug}: {response.Describe()}");
                 var token = body.GetProperty("token").GetString()!;

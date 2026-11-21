@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using System.Text.RegularExpressions;
 using Tiresias.Access;
 using Tiresias.Agent;
@@ -131,6 +131,24 @@ static class Commands
         }
         Console.WriteLine("Solo mode is set up. The broker runs inside the Tiresias app; start the app (or tir agent) and unlock.");
         Console.WriteLine("Trade-off: no fixed egress IP, and secrets stay on this machine. tir doctor lists what that means.");
+        return 0;
+    }
+
+    /// <summary>Binds this device's Hello key into the trust chain with the paper key (docs/trust-links.md).</summary>
+    public static async Task<int> TrustBindHelloAsync()
+    {
+        Console.WriteLine("Type the recovery key to sign the trust chain (spaces and case don't matter). Windows Hello asks next.");
+        var raw = PaperKey.Parse(Console.ReadLine() ?? "")
+            ?? throw new InvalidOperationException("That is not a recovery key: it should be 13 groups of four letters and digits 2-7.");
+        try
+        {
+            await TrustLinks.BindHelloAsync(raw);
+        }
+        finally
+        {
+            Array.Clear(raw);
+        }
+        Console.WriteLine("This PC's Windows Hello key is in the trust chain. Adding a device or changing trust now asks for it.");
         return 0;
     }
 
@@ -361,10 +379,11 @@ static class Commands
             Console.WriteLine(line);
         if (!await AppLink.ApproveAsync($"tir grant {serviceSlug}", lines))
             return Fail("Not approved.");
-        HelloKeyWrapper.ConfirmPresence($"grant\n{serviceSlug}\n{request.Consumer}");
-
         using var client = BrokerClient.For(await ReachableBrokerAsync());
-        var minted = await client.PostAsync("/placeholder", request);
+        SignedApproval approval;
+        using (var hello = HelloKeyWrapper.Open(create: false))
+            approval = Approvals.Mint(hello, request);
+        var minted = await client.PostAsync("/placeholder", approval);
         if (!minted.Ok || minted.Body is not { } body)
             return Fail($"Not minted: {minted.Describe()}");
         Console.WriteLine($"Expires {body.GetProperty("expiresAt").GetDateTimeOffset().ToLocalTime():HH:mm}. Placeholder:");
@@ -379,10 +398,11 @@ static class Commands
         var duration = Terminal.ParseDuration(args.Option("--for") ?? "15m");
 
         Console.WriteLine($"Elevating {service}/{grant} for {duration.TotalMinutes:0} min; confirm with Windows Hello.");
-        HelloKeyWrapper.ConfirmPresence($"elevate\n{service}\n{grant}");
-
         using var client = BrokerClient.For(await ReachableBrokerAsync());
-        var elevated = await client.PostAsync("/elevate", new { service, grant, minutes = (int)Math.Ceiling(duration.TotalMinutes) });
+        SignedApproval approval;
+        using (var hello = HelloKeyWrapper.Open(create: false))
+            approval = Approvals.Sign(hello, (lease, now) => Approval.ForElevate(lease, service, grant, duration, "tir elevate", now));
+        var elevated = await client.PostAsync("/elevate", approval);
         if (!elevated.Ok || elevated.Body is not { } body)
             return Fail($"Not elevated: {elevated.Describe()}");
         Console.WriteLine($"Elevated until {body.GetProperty("expiresAt").GetDateTimeOffset().ToLocalTime():HH:mm}.");

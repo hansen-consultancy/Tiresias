@@ -37,6 +37,24 @@ All projects live in `src/`; `Tiresias.slnx` is hand-written (add new projects t
 | `Tiresias.App` | net11.0-windows, WPF | The tray app (`Tiresias.exe`): agent host, consent dialog, editor, activity, status, first run. Its pure decisions live in `Logic/`, compiled into the tests by link; every string is in `Strings.resx` |
 | `Tiresias.Tests` | net11.0 | NUnit, covers all of the above |
 
+## Seeing the app
+
+A Debug build started with `--demo [scenario]` runs on a made-up machine filled from
+`src/Tiresias.App/Demo/<scenario>.json` (default `everyday`), beside the installed app and without
+touching it: every window but the recovery-key and server-setup ones can be captured, every button
+acts on the made-up machine only, and Windows Hello never prompts. Use it to check a UI change by
+eye or screenshot:
+
+```bash
+dotnet run --project src/Tiresias.App -- --demo
+```
+
+Need another state (fresh install, locked, many findings)? Add a scenario, with made-up names only.
+New code that reads or writes the user's folders, `HKCU` or environment goes through `UserMachine`;
+a new action with effects outside those (a shell command, the Recycle Bin, a network call) checks
+`DemoMode.On`. While a demo runs it locks the App's Debug output: build elsewhere with
+`--artifacts-path`. Details: docs/testing-on-windows.md.
+
 ## Invariants
 
 - **Core and Protocol never reference `Tiresias.Extensions.Configuration`.** Doing so flows the
@@ -53,6 +71,8 @@ All projects live in `src/`; `Tiresias.slnx` is hand-written (add new projects t
 
 ## Conventions
 
+- CI treats warnings as errors (`Directory.Build.props`); a local build only reports them. Build
+  clean before pushing.
 - Central package management: versions only in `Directory.Packages.props`, never on a
   `PackageReference`. A project uses a package only if it references it directly — don't rely on
   a transitive one.

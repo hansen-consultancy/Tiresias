@@ -56,7 +56,7 @@ public static partial class EnvironmentStore
     /// <summary>The user's own variables (not the machine's), by name, each with its length and whether it looks like a secret.</summary>
     public static IReadOnlyList<UserVariable> UserVariables()
     {
-        using var key = Registry.CurrentUser.OpenSubKey(RegistryKey);
+        using var key = UserMachine.CurrentUser.OpenSubKey(RegistryKey);
         if (key is null)
             return [];
         return [.. key.GetValueNames()
@@ -75,7 +75,7 @@ public static partial class EnvironmentStore
     /// <returns>The names moved; a name that isn't a user variable is passed over.</returns>
     public static IReadOnlyList<string> Protect(IEnumerable<string> names, IKeyWrapper hello)
     {
-        using var key = Registry.CurrentUser.OpenSubKey(RegistryKey, writable: true)
+        using var key = UserMachine.CurrentUser.OpenSubKey(RegistryKey, writable: true)
             ?? throw new InvalidOperationException("This Windows account has no user environment.");
         var moving = names.Distinct(StringComparer.OrdinalIgnoreCase)
             .Select(name => (Name: name, Value: Raw(key, name)))
@@ -113,7 +113,7 @@ public static partial class EnvironmentStore
             return false;
         if (Open(hello).Environment.Global.FirstOrDefault(v => string.Equals(v.Name, variable.Name, StringComparison.OrdinalIgnoreCase)) != variable)
             throw new InvalidOperationException("The sealed copy didn't read back the same.");
-        using var key = Registry.CurrentUser.OpenSubKey(RegistryKey, writable: true);
+        using var key = UserMachine.CurrentUser.OpenSubKey(RegistryKey, writable: true);
         if (key is null || Raw(key, variable.Name) is null)
             return false;
         key.DeleteValue(variable.Name, throwOnMissingValue: false);
@@ -130,7 +130,7 @@ public static partial class EnvironmentStore
         var returning = sealedNow.Global.Where(v => wanted.Contains(v.Name)).ToArray();
         if (returning.Length == 0)
             return [];
-        using (var key = Registry.CurrentUser.CreateSubKey(RegistryKey, writable: true))
+        using (var key = UserMachine.CurrentUser.CreateSubKey(RegistryKey, writable: true))
             foreach (var variable in returning)
                 key.SetValue(variable.Name, variable.Value, variable.Expandable ? RegistryValueKind.ExpandString : RegistryValueKind.String);
         AnnounceChange();
@@ -143,8 +143,11 @@ public static partial class EnvironmentStore
         key.GetValue(name, null, RegistryValueOptions.DoNotExpandEnvironmentNames) as string;
 
     /// <summary>Tells Explorer, and through it every program it starts later, that the environment changed (as <c>setx</c> does).</summary>
-    static void AnnounceChange() =>
-        SendMessageTimeoutW(HwndBroadcast, WmSettingChange, 0, RegistryKey, SmtoAbortIfHung, 5000, out _);
+    static void AnnounceChange()
+    {
+        if (!DemoMode.On)
+            SendMessageTimeoutW(HwndBroadcast, WmSettingChange, 0, RegistryKey, SmtoAbortIfHung, 5000, out _);
+    }
 
     static readonly nint HwndBroadcast = 0xffff;
     const uint WmSettingChange = 0x001A;

@@ -30,7 +30,8 @@ public static class PlaceholderMinter
 
     /// <param name="consumer">Who the placeholder is for, as the audit log shows it, e.g. <c>terminal:pwsh</c>.</param>
     /// <param name="observed">The process the app identified, which the requester can't choose.</param>
-    public static async Task<MintedPlaceholder> MintAsync(EnvironmentPlaceholder placeholder, string consumer, string? observed)
+    /// <param name="hello">The open Hello wrapper whose approval key signs the request (<see cref="Approvals"/>).</param>
+    public static async Task<MintedPlaceholder> MintAsync(HelloKeyWrapper hello, EnvironmentPlaceholder placeholder, string consumer, string? observed)
     {
         try
         {
@@ -39,8 +40,8 @@ public static class PlaceholderMinter
             if (KeyringStore.Tenant is { Solo: true } && !await SoloBroker.ReachableAsync())
                 return new(null, "the solo broker isn't running");
             using var client = BrokerClient.For(broker);
-            var response = await client.PostAsync("/placeholder",
-                new AccessRequest(consumer, observed, placeholder.Service, null, $"{placeholder.Variable} in the environment", Consent.MaxDuration));
+            var response = await client.PostAsync("/placeholder", Approvals.Mint(hello,
+                new AccessRequest(consumer, observed, placeholder.Service, null, $"{placeholder.Variable} in the environment", Consent.MaxDuration)));
             if (response is not { Ok: true, Body: { } body } || !body.TryGetProperty("token", out var token) || token.GetString() is not { } value)
                 return new(null, response.Describe());
             return new(value, ExpiresAt: body.TryGetProperty("expiresAt", out var expires) && expires.TryGetDateTimeOffset(out var at) ? at : null);

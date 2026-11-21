@@ -15,6 +15,11 @@ static class AdminTierElevation
     /// <returns>The step's result, or <c>null</c> when the UAC prompt was declined.</returns>
     public static async Task<AdminSetupResult?> RunAsync(string verb)
     {
+        if (Tiresias.Agent.DemoMode.On)
+        {
+            AppLog.Info($"admin tier: {verb} left alone in demo mode");
+            return null;
+        }
         AppLog.Info($"admin tier: {verb} asked for (UAC)");
         var result = await Task.Run(() => Run(verb, TimeSpan.FromMinutes(5)));
         AppLog.Info($"admin tier: {verb} {(result is null ? "declined at the UAC prompt" : result.ToString())}");

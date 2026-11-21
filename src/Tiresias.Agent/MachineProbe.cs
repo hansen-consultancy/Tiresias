@@ -6,8 +6,8 @@ using Tiresias.Client;
 using Tiresias.Decoys;
 using Tiresias.EnvironmentVariables;
 using Tiresias.Protocol;
+using Tiresias.Trust;
 using Tiresias.Vault;
-using Microsoft.Extensions.Configuration.UserSecrets;
 
 namespace Tiresias.Agent;
 
@@ -35,6 +35,21 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     public bool Solo => KeyringStore.Tenant is { Solo: true };
     public bool HasDeviceKey => KeyringStore.HasDeviceKey;
     public bool RecoveryKeySet => KeyringStore.Settings.RecoveryPublicKey is not null;
+
+    /// <summary>Read from the solo broker's chain file; a remote broker's chain isn't fetched here.</summary>
+    public bool? HelloBound
+    {
+        get
+        {
+            if (KeyringStore.Tenant is not { Solo: true, GenesisHash: { } genesis } || !File.Exists(SoloBroker.TrustChainPath))
+                return null;
+            var chain = TrustLinkJson.ParseChain(File.ReadAllBytes(SoloBroker.TrustChainPath));
+            return chain is not null && TrustChainVerifier.Verify(chain, genesis).State is { } state
+                && state.Devices.TryGetValue(KeyringStore.Settings.DeviceId, out var device)
+                    ? device.Hello is not null
+                    : null;
+        }
+    }
 
     public DoctorVault? Vault
     {
@@ -69,6 +84,8 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public async Task<bool> ForwarderListeningAsync()
     {
+        if (DemoMode.On)
+            return false;
         using var tcp = new TcpClient();
         try
         {
@@ -83,9 +100,8 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public IEnumerable<DoctorFile> UserSecretsFiles()
     {
-        // %APPDATA%\Microsoft\UserSecrets\<id>\secrets.json: the root is two levels up from any id's file.
-        var root = Path.GetDirectoryName(Path.GetDirectoryName(PathHelper.GetSecretsPathFromSecretsId("x")));
-        if (root is null || !Directory.Exists(root))
+        var root = UserMachine.UserSecretsRoot;
+        if (!Directory.Exists(root))
             return [];
         return Directory.EnumerateFiles(root, SecretsFile.FileName, SearchOption.AllDirectories).Select(Read);
     }
@@ -126,15 +142,15 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     {
         get
         {
-            var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            var profile = UserMachine.Folder(Environment.SpecialFolder.UserProfile);
             return DoctorGitCredentials.From(Read(Path.Combine(profile, ".gitconfig")).Text, Read(Path.Combine(profile, ".git-credentials")).Text);
         }
     }
 
     public IEnumerable<DoctorToolFile> ToolFiles()
     {
-        var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        var own = NuGetConfig.Files(null, Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData))
+        var profile = UserMachine.Folder(Environment.SpecialFolder.UserProfile);
+        var own = NuGetConfig.Files(null, UserMachine.Folder(Environment.SpecialFolder.ApplicationData))
             .Append(Path.Combine(profile, ".npmrc")).Append(Path.Combine(profile, ".pypirc")).Where(File.Exists).ToArray();
         return own.Select(path => (Path: path, InProfile: true))
             .Concat(Found.Tools.Where(path => !own.Contains(path, StringComparer.OrdinalIgnoreCase)).Select(path => (Path: path, InProfile: false)))
@@ -144,6 +160,23 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     public IReadOnlyCollection<string> UserVariableNames => [.. EnvironmentStore.UserVariables().Select(v => v.Name)];
 
     public IEnumerable<DoctorRavenCertificate> RavenCertificates() => RavenCertificateStore.ForVault();
+
+    /// <summary>Asks the broker's <c>/clearance</c>, which needs the lease the unlocked agent holds. Waits longer than the broker waits on RavenDB.</summary>
+    public async Task<DoctorBrokerAnswer?> RavenClearanceAsync(string service)
+    {
+        if (KeyringStore.Broker is not { } broker)
+            return null;
+        try
+        {
+            using var client = BrokerClient.For(broker);
+            var (status, body) = await client.GetAsync($"/clearance/{Uri.EscapeDataString(service)}").WaitAsync(TimeSpan.FromSeconds(15));
+            return new((int)status, body);
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or TimeoutException)
+        {
+            return null;
+        }
+    }
 
     /// <summary>The unlocked key, for the checks that need the sealed environment's names; <c>null</c> skips them. Never prompts.</summary>
     public IKeyWrapper? Hello { get; init; }
@@ -187,10 +220,10 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     {
         get
         {
-            var gh = Environment.GetEnvironmentVariable("GH_CONFIG_DIR") is { Length: > 0 } ghDir ? ghDir
-                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GitHub CLI");
-            var az = Environment.GetEnvironmentVariable("AZURE_CONFIG_DIR") is { Length: > 0 } azDir ? azDir
-                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".azure");
+            var gh = !DemoMode.On && Environment.GetEnvironmentVariable("GH_CONFIG_DIR") is { Length: > 0 } ghDir ? ghDir
+                : Path.Combine(UserMachine.Folder(Environment.SpecialFolder.ApplicationData), "GitHub CLI");
+            var az = !DemoMode.On && Environment.GetEnvironmentVariable("AZURE_CONFIG_DIR") is { Length: > 0 } azDir ? azDir
+                : Path.Combine(UserMachine.Folder(Environment.SpecialFolder.UserProfile), ".azure");
             return new(Existing(Path.Combine(gh, "hosts.yml")), Existing(Path.Combine(az, "azureProfile.json")));
 
             static DoctorFile? Existing(string path) => File.Exists(path) ? Read(path) : null;

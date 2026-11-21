@@ -35,7 +35,7 @@ public class SqlAuthorizationTests
         state = new BrokerState(vault.Document, LeaseTerms.Workday(TimeZoneInfo.FindSystemTimeZoneById("Europe/Brussels")),
             new AuditLog(auditPath, time), identity, time);
         var (offer, _) = state.BeginLease("laptop");
-        state.Seal(offer.LeaseId, vault.SealTo(offer));
+        state.Seal(offer.LeaseId, vault.SealTo(offer), vault.ApprovalKey(offer.LeaseId));
     }
 
     [TearDown]
@@ -48,7 +48,7 @@ public class SqlAuthorizationTests
     }
 
     string Mint(string service = "appdb", string? ceiling = null) =>
-        state.Mint(new AccessRequest("claude:test", null, service, ceiling, "testing", TimeSpan.FromHours(1))).Minted!.Token;
+        state.Mint(vault.MintApproval(new AccessRequest("claude:test", null, service, ceiling, "testing", TimeSpan.FromHours(1)), time.GetUtcNow())).Minted!.Token;
 
     string Audit() => File.ReadAllText(auditPath);
 
@@ -224,9 +224,9 @@ public class SqlEndpointTests
         var offer = new LeaseOffer(offerJson.GetProperty("leaseId").GetString()!,
             Convert.FromBase64String(offerJson.GetProperty("leaseKey").GetString()!),
             DateTimeOffset.FromUnixTimeSeconds(offerJson.GetProperty("hardCapAt").GetInt64()));
-        await client.SendAsync(Signed("/lease/seal", new { offer.LeaseId, deks = vault.SealTo(offer) }));
+        await client.SendAsync(Signed("/lease/seal", vault.SealBody(offer)));
         var mint = await client.SendAsync(Signed("/placeholder",
-            new { consumer = "claude:test", serviceSlug = "appdb", purpose = "testing", duration = "01:00:00" }));
+            vault.MintApproval(new("claude:test", null, "appdb", null, "testing", TimeSpan.FromHours(1)))));
         return (offer.LeaseId, (await mint.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("token").GetString()!);
     }
 

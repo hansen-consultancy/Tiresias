@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Tiresias.AdminTier;
@@ -54,6 +54,9 @@ public interface IDoctorProbe
     /// <summary><c>null</c> when the vault file is missing.</summary>
     DoctorVault? Vault { get; }
 
+    /// <summary>Whether the trust chain names this device's Windows Hello key (docs/trust-links.md); <c>null</c> when there is no chain to read.</summary>
+    bool? HelloBound => null;
+
     /// <summary>The HTTP status of an unsigned call to the broker (401 means up), or <c>null</c> when unreachable.</summary>
     Task<int?> BrokerStatusAsync();
 
@@ -89,6 +92,9 @@ public interface IDoctorProbe
 
     /// <summary>The vault's RavenDB services with their certificates as recorded at setup. Never the certificate.</summary>
     IEnumerable<DoctorRavenCertificate> RavenCertificates() => [];
+
+    /// <summary>The broker's answer to <c>/clearance</c> for the service; <c>null</c> when it didn't answer. Never prompts.</summary>
+    Task<DoctorBrokerAnswer?> RavenClearanceAsync(string service) => Task.FromResult<DoctorBrokerAnswer?>(null);
 
     /// <summary>The sealed environment's deliveries, by name; <c>null</c> while locked. See <see cref="Doctor.KeysAsValues"/>.</summary>
     DoctorEnvironment? SealedEnvironment => null;
@@ -148,10 +154,15 @@ public static partial class Doctor
             Vault(probe.Vault),
         };
 
+        if (probe.HelloBound is { } bound)
+            checks.Add(bound
+                ? new("trust chain", DoctorStatus.Ok, "this device's Windows Hello key signs the links that add trust")
+                : new("trust chain", DoctorStatus.Warn, "this device's Windows Hello key isn't in the trust chain yet, so it can't add a device or change trust: run tir trust bind-hello"));
         if (probe.Solo)
             checks.AddRange(SoloTradeOffs);
+        var brokerStatus = probe.Enrolled ? await probe.BrokerStatusAsync() : null;
         if (probe.Enrolled)
-            checks.Add(await probe.BrokerStatusAsync() switch
+            checks.Add(brokerStatus switch
             {
                 null when probe.Solo => new("broker reachable", DoctorStatus.Fail, "no answer: the broker runs inside the Tiresias app; start the app (or tir agent)"),
                 null => new("broker reachable", DoctorStatus.Fail, "no answer (NetBird down, or the broker stopped)"),
@@ -181,7 +192,12 @@ public static partial class Doctor
         checks.AddRange(ConfigChecks(probe.UserSecretsFiles(), probe.ConfigFiles(), probe.KeyFiles()));
         checks.AddRange(GitTokens(probe.GitConfigs(), probe.GitCredentials));
         checks.AddRange(PublishingKeys(probe.ToolFiles(), probe.UserVariableNames));
-        checks.AddRange(RavenExpiry(probe.RavenCertificates(), DateTimeOffset.UtcNow));
+        var ravenCertificates = probe.RavenCertificates().ToArray();
+        checks.AddRange(RavenExpiry(ravenCertificates, DateTimeOffset.UtcNow));
+        var clearances = new List<(DoctorRavenCertificate, DoctorBrokerAnswer?)>();
+        foreach (var certificate in ravenCertificates)
+            clearances.Add((certificate, brokerStatus is null ? null : await probe.RavenClearanceAsync(certificate.Service)));
+        checks.AddRange(RavenClearance(clearances));
         checks.AddRange(KeysAsValues(probe.SealedEnvironment));
         // A program blocked for using a decoy is that finding, not "This wasn't me"'s.
         var decoyUses = probe.DecoyUses().ToArray();

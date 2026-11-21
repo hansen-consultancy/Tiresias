@@ -13,9 +13,9 @@ public.
 - [ ] `tir activity`
 - [x] Solo mode, with the broker hosted in the app ([design](desktop-app.md#solo-mode))
 - [ ] Solo mode: local broker as a Windows service
-- [ ] Step-up at the broker: minting, elevation and tokens need an approval only the vault can
+- [x] Step-up at the broker: minting, elevation and tokens need an approval only the vault can
       produce ([design](step-up.md), #23)
-- [ ] Trust-chain links that add a key need a Windows Hello signature ([design](trust-links.md), #41)
+- [x] Trust-chain links that add a key need a Windows Hello signature ([design](trust-links.md), #41)
 - [ ] Seal user environment variables and hand them back per shell session ([design](environment-variables.md))
 - [x] Databases for applications: SQL Server logins per lease, RavenDB through the broker ([design](databases.md))
 - [ ] RavenDB subscriptions through the broker (the TCP relay, [phase 3](databases.md#phases))
@@ -25,6 +25,7 @@ public.
       credentials ([design](attack-surface.md), #34)
 - [ ] Decoys: canary credentials that point home, and tripwires on decoy files
       ([design](decoys.md), #39)
+- [ ] Out-of-band alerts: ntfy, LcdHub and a webhook, public by default ([design](alerts.md), #101)
 - [x] Velopack installer and auto-update from GitHub Releases (`app-release.yml`)
 - [ ] Signed with Azure Artifact Signing (the workflow is ready; it needs the Azure setup in
       [releasing.md](releasing.md))
