@@ -21,6 +21,8 @@ public enum FixAction
     RemoveExtension,
     /// <summary>Show a file in Explorer.</summary>
     RevealFile,
+    /// <summary>The Services page's add form, its address filled in.</summary>
+    AddService,
 }
 
 /// <summary>
@@ -78,6 +80,8 @@ public static class FindingView
         UsePlaceholder => (FixAction.UsePlaceholder, "Finding_FixPlaceholder"),
         RemoveExtension => (FixAction.RemoveExtension, "Finding_FixRemoveExtension"),
         RevealFile => (FixAction.RevealFile, "Finding_FixReveal"),
+        RunThroughExec { Setup: not null } => (FixAction.AddService, "Finding_FixGitHubApp"),
+        RunThroughExec => (FixAction.CopyCommand, "Finding_FixCopy"),
         _ => null,
     };
 
