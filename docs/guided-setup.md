@@ -148,7 +148,8 @@ enough at first; nothing typed there leaves the machine.
 - **What is in use**: the areas that apply to this machine, e.g. Services once a service exists,
   Environment variables once one is sealed. An area with nothing in it isn't on the home screen;
   it is reached through *What do you need?*.
-- The tray menu stays short: Unlock/Lock, Home, and a badge when there are new findings.
+- The tray menu stays short: Unlock/Lock, Home, and a badge when there are new findings (built: a
+  dot on the icon, from checks the app runs in the background; [as built](what-do-you-need.md#as-built)).
 
 Existing windows remain the places where the work happens; this changes how people get to them.
 
