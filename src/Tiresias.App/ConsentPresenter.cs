@@ -1,6 +1,7 @@
 using System.Windows.Threading;
 using Tiresias.App.Logic;
 using Tiresias.App.Views;
+using Tiresias.EnvironmentVariables;
 using Tiresias.UserSecrets;
 
 namespace Tiresias.App;
@@ -102,15 +103,15 @@ sealed class ConsentPresenter(Dispatcher dispatcher) : IUserSecretsConsentPrompt
     }
 
     /// <summary>A NuGet feed's token for one program (<paramref name="program"/> is its image path), allowed once or until the agent locks.</summary>
-    public async Task<ConsentAnswer> AskNuGetAsync(string program, int processId, string source, string variable, CancellationToken ct)
+    public async Task<ConsentAnswer> AskNuGetAsync(string program, int processId, NuGetSource source, CancellationToken ct)
     {
         try
         {
             return await ShowAsync(new ConsentView(
                 Text.Format("Consent_NuGet_Heading", System.IO.Path.GetFileNameWithoutExtension(program)),
                 program,
-                Text.Format("Consent_NuGet_ListLabel", source),
-                [variable],
+                Text.Format("Consent_NuGet_ListLabel", source.Source, source.Username),
+                [source.Variable],
                 Text.Get("Consent_NuGet_Note"),
                 AllowSession: true), new(program, processId), UserSecretsService.ConsentTimeout, ct);
         }

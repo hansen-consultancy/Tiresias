@@ -139,8 +139,8 @@ static class EnvCommand
             case "add":
                 var url = args.Require(3, "source-url");
                 var name = args.Require(4, "NAME");
-                if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
-                    throw new UsageException("The source must be an https URL, as in NuGet.Config: https://pkgs.dev.azure.com/example/_packaging/feed/nuget/v3/index.json.");
+                if (NuGetSource.ParseUrl(url) is null)
+                    throw new UsageException(NuGetSource.UrlRequirement + ".");
                 if (!sealedNow.Global.Any(v => string.Equals(v.Name, name, StringComparison.OrdinalIgnoreCase)))
                     throw new UsageException($"{name} is not a sealed variable. Seal the token first: tir env set {name} (or tir env protect {name}).");
                 EnvironmentStore.Save(sealedNow.WithNuGetSource(new(url, name, args.Option("--username") ?? SealedEnvironment.NuGetDefaultUsername)), version, hello);
@@ -179,7 +179,7 @@ static class EnvCommand
         }
         foreach (var step in steps)
         {
-            Console.WriteLine($"  {step.Credential.Key}  {step.Credential.Source ?? "(no URL)"}  ({step.File})");
+            Console.WriteLine($"  {step.Credential.Key}  {step.DisplayUrl}  ({step.File})");
             Console.WriteLine(step.Skip is { } why ? $"    left as is: {why}." : $"    {Holds(step)}: {Action(step)}, user name {step.Username}");
         }
         var acting = steps.Where(s => s.Acts).ToArray();
@@ -193,7 +193,7 @@ static class EnvCommand
             Console.WriteLine($"Took the credentials out of {file}.");
         if (result.Sealed.Count > 0)
             Console.WriteLine($"Sealed {string.Join(", ", result.Sealed)}. A variable moved from Windows is gone from it; programs already running keep their copy until they restart.");
-        Console.WriteLine("NuGet now asks Tiresias for these feeds, and you allow each program once. Needs the .NET 9.0.200 SDK or later.");
+        Console.WriteLine("NuGet now asks Tiresias for these feeds. Each approval covers a program, the exact feed URL, a username and a variable. Needs the .NET 9.0.200 SDK or later.");
         return steps.Count == acting.Length ? 0 : 1;
     }
 
@@ -328,7 +328,7 @@ static class EnvCommand
 
     /// <summary>
     /// <c>tir env shell</c>, run by the hook: a script that brings the terminal's environment up to
-    /// date for its directory. Asks the app, which asks the user once per terminal; hints go to the
+    /// date for its directory. The app remembers each approved delivery for this terminal; hints go to the
     /// error stream so the hook doesn't run them. Without the app nothing changes, so a <c>cd</c>
     /// never raises a Windows Hello prompt of its own.
     /// </summary>
@@ -356,17 +356,17 @@ static class EnvCommand
         }
         if (reply.Message is { } note)
             Console.Error.WriteLine($"Tiresias: {note}");
-        if (!reply.Ok || !reply.Approved || reply.Variables is null)
-            return reply.Ok ? 0 : 1;
-        var variables = reply.Variables.Select(pair => new SealedVariable(pair.Key, pair.Value)).ToArray();
+        // A refused refresh must also take the previous folder's injected values out of the shell.
+        var variables = reply is { Ok: true, Approved: true, Variables: { } given }
+            ? given.Select(pair => new SealedVariable(pair.Key, pair.Value)).ToArray() : [];
         Console.Write(ShellScript.PowerShell(ShellScript.Names(Environment.GetEnvironmentVariable(ShellScript.NamesVariable)), variables));
-        return 0;
+        return reply.Ok ? 0 : 1;
     }
 
     /// <summary>
     /// <c>tir run -- &lt;command&gt;</c>: the sealed variables for the current directory in that one
     /// process's environment. With the app running it asks there (and unlocks if needed); without
-    /// it, the Windows Hello prompt is the consent.
+    /// it, Windows Hello opens the policy and a Windows dialog asks for this one delivery.
     /// </summary>
     public static async Task<int> RunCommandAsync(CommandLine args)
     {
@@ -375,7 +375,21 @@ static class EnvCommand
         var program = Path.GetFileName(args.Rest[0]);
         var directory = Directory.GetCurrentDirectory();
         var only = args.Option("--only")?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        var variables = await FromAppAsync(program, args.Rest, directory, only) ?? await FromTerminalAsync(program, directory, only);
+        var variables = await FromAppAsync(program, args.Rest, directory, only);
+        if (variables is null)
+        {
+            try
+            {
+                variables = await FromTerminalAsync(program, args.Rest, directory, only);
+            }
+            catch (InvalidOperationException e) when (e is EnvironmentIntegrityException or HelloException { PromptRefusal: not null })
+            {
+                var reason = e is HelloException hello ? hello.PromptRefusal : e.Message;
+                using var activity = new AuditLog(AgentHost.ActivityPath, TimeProvider.System);
+                activity.Append(new(AuditKind.Deny, Consumer: "environment", Service: ControlRequest.Environment, Reason: reason, Process: "tir run (Windows Hello)"));
+                throw;
+            }
+        }
         if (ReferenceEquals(variables, Denied))
         {
             Console.Error.WriteLine("Not approved.");
@@ -414,20 +428,20 @@ static class EnvCommand
     /// <returns>The variables, <see cref="Denied"/> for a denial, or <c>null</c> when the app isn't running.</returns>
     static async Task<IReadOnlyDictionary<string, string>?> FromAppAsync(string program, IReadOnlyList<string> commandLine, string directory, IReadOnlyList<string>? only)
     {
+        if (await AppLink.StateAsync() is null)
+            return null;
+        Console.WriteLine("Waiting for your answer in the Tiresias app...");
         ControlReply? reply;
         try
         {
-            if (await AppLink.StateAsync() is null)
-                return null;
-            Console.WriteLine("Waiting for your answer in the Tiresias app...");
             reply = await ControlClient.TryAsync(new(ControlRequest.Environment, commandLine, program, Directory: directory, Names: only), ConsentWait);
         }
         catch (Exception e) when (e is IOException or OperationCanceledException)
         {
-            return null;
+            reply = null;
         }
         if (reply is null)
-            return null;
+            throw new InvalidOperationException("No decision came back from the Tiresias app. The command was stopped.");
         if (!reply.Ok)
             throw new InvalidOperationException(reply.Message ?? "The Tiresias app couldn't hand over the environment.");
         if (reply.Message is { } note)
@@ -437,21 +451,24 @@ static class EnvCommand
 
     static readonly IReadOnlyDictionary<string, string> Denied = new Dictionary<string, string>();
 
-    static async Task<IReadOnlyDictionary<string, string>> FromTerminalAsync(string program, string directory, IReadOnlyList<string>? only)
+    static async Task<IReadOnlyDictionary<string, string>> FromTerminalAsync(string program, IReadOnlyList<string> commandLine,
+        string directory, IReadOnlyList<string>? only)
     {
-        Console.WriteLine("Windows Hello will ask you to confirm it's you.");
+        Console.WriteLine("Opening the sealed environment with Windows Hello...");
         using var hello = HelloKeyWrapper.Open(create: false);
-        var sealedNow = EnvironmentStore.Open(hello).Environment;
-        var (variables, missing) = SealedVariables.Pick(sealedNow.Resolve(directory), only);
+        var snapshot = EnvironmentStore.ReadForDelivery(hello);
+        var endpoint = PlaceholderMinter.Endpoint;
+        var (variables, missing, terms) = snapshot.SelectForCommand(directory, only, endpoint);
         if (missing.Count > 0)
             throw new UsageException($"Not sealed for this folder: {string.Join(", ", missing)}. See tir env list.");
-        if (variables.Count > 0)
-            Console.WriteLine($"With {string.Join(", ", variables.Select(v => EnvironmentDelivery.Describe(sealedNow, v.Name)))}.");
-        // The app isn't running, so tir records the hand-over itself.
-        using (var activity = new AuditLog(AgentHost.ActivityPath, TimeProvider.System))
-            activity.Append(AgentHost.EnvironmentRecord(true, program, variables.Select(v => EnvironmentDelivery.Describe(sealedNow, v.Name)), "tir run (Windows Hello)"));
-        var delivery = await EnvironmentDelivery.DeliverAsync(sealedNow, variables, PlaceholderMinter.Endpoint,
-            (placeholder, _) => PlaceholderMinter.MintAsync(hello, placeholder, $"run:{program}", null), CancellationToken.None);
+        using var activity = new AuditLog(AgentHost.ActivityPath, TimeProvider.System);
+        var delivery = await StandaloneEnvironmentConsent.RequestAsync(commandLine, terms,
+            message => NativeConsent.Ask("Tiresias — Allow this command once?", message),
+            () => snapshot.DeliverAsync(variables, endpoint,
+                (placeholder, _) => PlaceholderMinter.MintAsync(hello, placeholder, $"run:{program}", null), PlaceholderMinter.RevokeAsync, CancellationToken.None),
+            allowed => activity.Append(AgentHost.EnvironmentRecord(allowed, program, terms, "tir run (Windows Hello)")));
+        if (delivery is null)
+            return Denied;
         foreach (var problem in delivery.Problems)
             Console.Error.WriteLine(problem);
         return delivery.Variables;
