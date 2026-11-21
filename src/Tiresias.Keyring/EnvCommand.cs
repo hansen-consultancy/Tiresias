@@ -440,9 +440,8 @@ static class EnvCommand
     static async Task<IReadOnlyDictionary<string, string>> FromTerminalAsync(string program, string directory, IReadOnlyList<string>? only)
     {
         Console.WriteLine("Windows Hello will ask you to confirm it's you.");
-        SealedEnvironment sealedNow;
-        using (var hello = HelloKeyWrapper.Open(create: false))
-            sealedNow = EnvironmentStore.Open(hello).Environment;
+        using var hello = HelloKeyWrapper.Open(create: false);
+        var sealedNow = EnvironmentStore.Open(hello).Environment;
         var (variables, missing) = SealedVariables.Pick(sealedNow.Resolve(directory), only);
         if (missing.Count > 0)
             throw new UsageException($"Not sealed for this folder: {string.Join(", ", missing)}. See tir env list.");
@@ -452,7 +451,7 @@ static class EnvCommand
         using (var activity = new AuditLog(AgentHost.ActivityPath, TimeProvider.System))
             activity.Append(AgentHost.EnvironmentRecord(true, program, variables.Select(v => EnvironmentDelivery.Describe(sealedNow, v.Name)), "tir run (Windows Hello)"));
         var delivery = await EnvironmentDelivery.DeliverAsync(sealedNow, variables, PlaceholderMinter.Endpoint,
-            (placeholder, _) => PlaceholderMinter.MintAsync(placeholder, $"run:{program}", null), CancellationToken.None);
+            (placeholder, _) => PlaceholderMinter.MintAsync(hello, placeholder, $"run:{program}", null), CancellationToken.None);
         foreach (var problem in delivery.Problems)
             Console.Error.WriteLine(problem);
         return delivery.Variables;

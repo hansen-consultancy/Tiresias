@@ -13,7 +13,7 @@ public.
 - [ ] `tir activity`
 - [x] Solo mode, with the broker hosted in the app ([design](desktop-app.md#solo-mode))
 - [ ] Solo mode: local broker as a Windows service
-- [ ] Step-up at the broker: minting, elevation and tokens need an approval only the vault can
+- [x] Step-up at the broker: minting, elevation and tokens need an approval only the vault can
       produce ([design](step-up.md), #23)
 - [ ] Trust-chain links that add a key need a Windows Hello signature ([design](trust-links.md), #41)
 - [ ] Seal user environment variables and hand them back per shell session ([design](environment-variables.md))
