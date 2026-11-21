@@ -44,7 +44,7 @@ public sealed record UninstallEntry(string Key, string Name, string? Version, st
                     System.Globalization.CultureInfo.InvariantCulture, out var parsed))
                 (icon, index) = (icon[..comma], parsed);
             var path = icon.Trim().Trim('"');
-            return path.Length > 3 && path[1] == ':' && path[2] == '\\' && System.IO.Path.IsPathFullyQualified(path) ? (path, index) : null;
+            return path.Length > 3 && path[1] == ':' && path[2] == '\\' && char.IsAsciiLetter(path[0]) ? (path, index) : null;
         }
     }
 
