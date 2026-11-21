@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using Tiresias.AdminTier;
 using Tiresias.Protocol;
 using Tiresias.UserSecrets;
 
@@ -121,6 +122,9 @@ public interface IDoctorProbe
 
     /// <summary>The slug of a vault GitHub App service, for <c>tir exec gh</c>; <c>null</c> when there is none.</summary>
     string? GitHubAppService => null;
+
+    /// <summary>The optional admin tier (docs/admin-tier.md); <c>null</c> when it isn't installed.</summary>
+    AdminTierFacts? AdminTier => null;
 }
 
 /// <summary>How many decoys are placed, and whether something listens on their endpoints (checked without connecting, which would be a hit).</summary>
@@ -164,6 +168,8 @@ public static partial class Doctor
             checks.Add(decoys.Listening
                 ? new("decoys", DoctorStatus.Ok, $"{decoys.Placed} placed; a program that uses one is named")
                 : new("decoys", DoctorStatus.Warn, $"{decoys.Placed} placed, but nothing listens on their endpoints, so a use goes unseen: start the app or tir agent"));
+        if (probe.AdminTier is { Installed: true } adminTier)
+            checks.Add(AdminTierLine(adminTier));
         checks.AddRange(probe.UserSecretsFiles().Select(UserSecretsFile).OfType<DoctorCheck>());
         checks.AddRange(probe.Projects().Select(Project).OfType<DoctorCheck>());
         checks.Add(probe.ExposedVariables switch
@@ -201,6 +207,20 @@ public static partial class Doctor
         new("isolation", DoctorStatus.Warn, "Solo: secrets live on the same machine as your agents and are not protected from code running as admin"),
         new("broker process", DoctorStatus.Warn, "Broker runs inside the app: install the service for process isolation (not built yet)"),
     ];
+
+    public const string AdminTierCheck = "admin tier";
+
+    /// <summary>The admin tier, when installed: running and which version, or a failure when nothing it does happens.</summary>
+    static DoctorCheck AdminTierLine(AdminTierFacts tier) => tier.State switch
+    {
+        AdminTierState.Stopped => new(AdminTierCheck, DoctorStatus.Fail,
+            "installed but stopped, so nothing it does happens: Set up again in the app's About page"),
+        AdminTierState.NotAnswering => new(AdminTierCheck, DoctorStatus.Fail,
+            "the service runs, but no answer came from it: it hung, or another program holds its pipe's name. Restart the PC; if it stays, Remove and Set up again in About"),
+        AdminTierState.Older => new(AdminTierCheck, DoctorStatus.Warn,
+            $"running version {tier.Status!.Version}, older than this Tiresias ({tier.AppVersion}): Update in the app's About page"),
+        _ => new(AdminTierCheck, DoctorStatus.Ok, $"running, version {tier.Status!.Version}; features on: {tier.Features}"),
+    };
 
     static DoctorCheck Vault(DoctorVault? vault)
     {

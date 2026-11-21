@@ -51,6 +51,11 @@ its section below.
   a token.
 - The app checks for findings in the background, a minute after it starts and every four hours.
   New ones put a dot on the tray icon and "(*n* new)" on **Status...** until you open Home.
+- An optional admin tier: with one Windows admin prompt, the app sets up a small Tiresias service
+  that runs from Program Files. First run offers it once (**Not now** changes nothing); About shows
+  whether it runs and offers **Set up**, **Update** or **Remove**, and `tir doctor` reports it.
+  This release sets up the service only; what it does (holding decoys out of reach, noticing
+  them used from boot) comes in the next ones.
 
 ### Changed
 
