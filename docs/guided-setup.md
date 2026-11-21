@@ -200,7 +200,10 @@ Existing windows remain the places where the work happens; this changes how peop
    approval), an unsigned program that starts at log-on, and a blocked program still on the PC
    (both **Show file**). A program that starts at log-on but that the user hasn't opened in 90
    days (UserAssist; unknown for a program with a tray icon) gets **Turn off at log-on...**, the
-   same switch as Task Manager's. A finding's reasons are in its name, so a dismissal survives a version
+   same switch as Task Manager's. Uninstall entries are checked against the disk: an entry for
+   software that is gone and an older version's stale duplicate (**Remove entry...** saves it to a
+   `.reg` file first), and a program whose uninstaller is missing (reinstall it over itself). A
+   finding's reasons are in its name, so a dismissal survives a version
    update and a new reason brings it back. Still design: the opt-in trust lookups (OSV,
    deps.dev, marketplaces, winget-pkgs) and the vulnerability and unverified-publisher findings
    they raise; **Update** and `winget`/`dotnet tool`/`npm` uninstalls; "not used in 90 days" for

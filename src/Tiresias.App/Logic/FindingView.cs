@@ -25,6 +25,8 @@ public enum FixAction
     DisableStartup,
     /// <summary>Settings, Apps, Startup, for a machine-wide entry only an administrator can turn off.</summary>
     OpenStartupSettings,
+    /// <summary>Save one of the user's uninstall entries to a <c>.reg</c> file and delete it, after the user approves.</summary>
+    RemoveEntry,
     /// <summary>The Services page's add form, its address filled in.</summary>
     AddService,
 }
@@ -86,6 +88,8 @@ public static class FindingView
         RevealFile => (FixAction.RevealFile, "Finding_FixReveal"),
         DisableStartup { Machine: false } => (FixAction.DisableStartup, "Finding_FixDisableStartup"),
         DisableStartup => (FixAction.OpenStartupSettings, "Finding_FixStartupSettings"),
+        RemoveEntry { Machine: false } => (FixAction.RemoveEntry, "Finding_FixRemoveEntry"),
+        RemoveEntry or Repair { Command: not null } => (FixAction.CopyCommand, "Finding_FixCopy"),
         RunThroughExec { Setup: not null } => (FixAction.AddService, "Finding_FixGitHubApp"),
         RunThroughExec => (FixAction.CopyCommand, "Finding_FixCopy"),
         _ => null,

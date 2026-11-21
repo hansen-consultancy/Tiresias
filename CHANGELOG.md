@@ -14,6 +14,11 @@ its section below.
   days, with **Turn off at log-on...**: the same switch as Task Manager's Startup tab, so Settings,
   Apps, Startup turns it back on. Programs with a tray icon are never counted as unused, and
   entries already turned off there are no longer reported.
+- Home and `tir doctor` check the installed-apps list against the disk: an entry for an app that
+  is gone, an app whose uninstaller is missing (reinstall it over itself), and an older version's
+  entry left after an update, whose **Uninstall** would remove the current version's files.
+  **Remove entry...** saves the entry to a `.reg` file before removing it; machine-wide entries
+  get the commands to run as an administrator.
 - Home and `tir doctor` find the GitHub CLI or the Azure CLI signed in as you, which any program
   running as you can use unasked. For `gh`, **Add a GitHub App...** sets up the service `tir exec`
   mints a token per run from, after you allow it. Read from each tool's own config, offline; never

@@ -107,6 +107,9 @@ public interface IDoctorProbe
     /// <summary>When the user last started each program themselves, where Windows records it (UserAssist).</summary>
     IEnumerable<ProgramRun> ProgramRuns() => [];
 
+    /// <summary>The uninstall registry entries, machine and user, each with whether its uninstaller and folder are on disk.</summary>
+    IEnumerable<UninstallEntry> UninstallEntries() => [];
+
     /// <summary>The config files of the CLIs that sign in as the user. See <see cref="Doctor.CliSignIns"/>.</summary>
     DoctorCliConfigs CliConfigs => new(null, null);
 
@@ -164,6 +167,7 @@ public static partial class Doctor
         checks.AddRange(KeysAsValues(probe.SealedEnvironment));
         checks.AddRange(CliSignIns(probe.CliConfigs, probe.GitHubAppService));
         checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), probe.CredentialUses(), probe.BlockedPrograms(), DateTimeOffset.UtcNow, probe.ProgramRuns()));
+        checks.AddRange(UninstallEntries(probe.UninstallEntries()));
         return checks;
     }
 
