@@ -23,6 +23,19 @@
         <TextBlock x:Name="StartWithWindowsNote" Style="{StaticResource CaptionText}" />
       </StackPanel>
     </Border>
+    <!-- The optional admin tier (docs/admin-tier.md): its state, and set up, update or remove, each behind a UAC prompt. -->
+    <Border Style="{StaticResource Card}">
+      <StackPanel>
+        <TextBlock Text="{l:S About_AdminTier_Heading}" Style="{StaticResource SubtitleText}" AutomationProperties.HeadingLevel="Level2" />
+        <TextBlock x:Name="AdminTierText" Text="{l:S About_AdminTier_Checking}" Style="{StaticResource BodyText}" />
+        <TextBlock x:Name="AdminTierOutcome" Style="{StaticResource CaptionText}" AutomationProperties.LiveSetting="Polite" />
+        <StackPanel Orientation="Horizontal">
+          <Button x:Name="AdminTierSetUp" Content="{l:S About_AdminTier_SetUp}" Padding="12,6" Margin="0,0,8,0" Visibility="Collapsed" Click="OnAdminTierInstall" />
+          <Button x:Name="AdminTierUpdate" Content="{l:S About_AdminTier_Update}" Padding="12,6" Margin="0,0,8,0" Visibility="Collapsed" Click="OnAdminTierInstall" />
+          <Button x:Name="AdminTierRemove" Content="{l:S About_AdminTier_Remove}" Padding="12,6" Visibility="Collapsed" Click="OnAdminTierRemove" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
     <Border Style="{StaticResource Card}">
       <ItemsControl x:Name="Facts" Focusable="False">
         <ItemsControl.ItemTemplate>

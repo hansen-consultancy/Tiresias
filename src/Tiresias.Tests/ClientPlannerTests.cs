@@ -1,9 +1,11 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Tiresias.AdminTier;
 using Tiresias.Client;
 using Tiresias.GitHub;
 using Tiresias.Policy;
+using Tiresias.Protocol;
 using NSec.Cryptography;
 
 namespace Tiresias.Tests;
@@ -135,6 +137,28 @@ public class DoctorTests
             ClearanceAsked.Add(service);
             return Task.FromResult<DoctorBrokerAnswer?>(new(200, System.Text.Encoding.UTF8.GetBytes("""{"clearance":"Operator","databases":{}}""")));
         }
+        public AdminTierFacts? AdminTier { get; set; }
+    }
+
+    static AdminStatusResult Answer(string version) => new(version, AdminWire.ProtocolVersion, new());
+
+    [Test]
+    public async Task The_admin_tier_has_a_line_only_when_installed_and_fails_when_stopped()
+    {
+        Assert.That((await Doctor.RunAsync(new FakeProbe())).Any(c => c.Name == Doctor.AdminTierCheck), Is.False);
+        Assert.That((await Doctor.RunAsync(new FakeProbe { AdminTier = new(false, false, null, "0.3.0") })).Any(c => c.Name == Doctor.AdminTierCheck), Is.False);
+
+        async Task<DoctorCheck> Line(AdminTierFacts facts) =>
+            (await Doctor.RunAsync(new FakeProbe { AdminTier = facts })).Single(c => c.Name == Doctor.AdminTierCheck);
+
+        var running = await Line(new(true, true, Answer("0.3.0"), "0.3.0"));
+        Assert.That(running.Status, Is.EqualTo(DoctorStatus.Ok));
+        Assert.That(running.Detail, Does.Contain("0.3.0").And.Contain("none yet"));
+        Assert.That((await Line(new(true, false, null, "0.3.0"))).Status, Is.EqualTo(DoctorStatus.Fail));
+        Assert.That((await Line(new(true, true, null, "0.3.0"))).Status, Is.EqualTo(DoctorStatus.Fail));
+        var older = await Line(new(true, true, Answer("0.2.1"), "0.3.0"));
+        Assert.That(older.Status, Is.EqualTo(DoctorStatus.Warn));
+        Assert.That(older.Detail, Does.Contain("Update"));
     }
 
     [Test]

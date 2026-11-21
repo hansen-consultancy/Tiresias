@@ -66,6 +66,8 @@ jobs:
 
       # Self-contained: installing the app doesn't need a .NET runtime. tir ships in the same folder.
       # Once per architecture: x64, and Arm64 so Windows on Arm runs it natively, not emulated.
+      # The admin tier's service goes in its own admin\ folder, which its install step copies to
+      # %ProgramFiles% (docs/admin-tier.md): self-contained, it needs nothing else from the app's folder.
       - name: Publish
         shell: bash
         run: |
@@ -74,6 +76,7 @@ jobs:
             dotnet publish src/Tiresias.App -c Release -r $rid --self-contained -p:Version="$v" -o publish/$rid
             dotnet publish src/Tiresias.Keyring -c Release -r $rid --self-contained -p:Version="$v" -o publish/$rid
             dotnet publish src/Tiresias.NuGetPlugin -c Release -r $rid --self-contained -p:Version="$v" -o publish/$rid
+            dotnet publish src/Tiresias.Admin -c Release -r $rid --self-contained -p:PublishSingleFile=true -p:Version="$v" -o publish/$rid/admin
           done
 
       - name: Azure sign-in (OIDC)

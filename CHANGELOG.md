@@ -54,6 +54,11 @@ its section below.
 - Home and `tir doctor` ask RavenDB, through the broker, what each RavenDB service's certificate may
   do, and warn when it can change the server (Cluster Admin, Operator), reaches more than one
   database, or is Admin on its database. **Edit...** on the service swaps in a narrower one.
+- An optional admin tier: with one Windows admin prompt, the app sets up a small Tiresias service
+  that runs from Program Files. First run offers it once (**Not now** changes nothing); About shows
+  whether it runs and offers **Set up**, **Update** or **Remove**, and `tir doctor` reports it.
+  This release sets up the service only; what it does (holding decoys out of reach, noticing
+  them used from boot) comes in the next ones.
 
 ### Changed
 

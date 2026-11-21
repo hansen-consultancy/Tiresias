@@ -1,6 +1,8 @@
 # The admin tier: a privileged service, optional
 
-Status: **design** (#91). Nothing here is built yet.
+Status: **step 1 built** (#91): the service, its pipe and `status`, install, update and remove,
+the first-run and About offers, the doctor line and the action log ([Build order](#build-order)).
+None of the features is built yet; the service answers `status` and refuses every other action.
 
 Tiresias works for an ordinary user account and keeps doing so. A user who can approve one UAC
 prompt can add a small Windows service that does what an ordinary account can't: hold the decoys
@@ -30,8 +32,8 @@ escalation. So the design starts from what it must never do.
 |---|---|
 | Service | `TiresiasAdmin`, display name "Tiresias admin tier", automatic start, restart on failure |
 | Account | `LocalSystem`, with only `SeSecurityPrivilege` and `SeChangeNotifyPrivilege` kept (`sc privs`). A virtual account can't do any of the jobs: suspending a user's process, adding firewall filters, setting audit rules and reading the Security log all need SYSTEM or an administrator |
-| Binary | `%ProgramFiles%\Tiresias\Admin\tiresias-admin.exe`, copied there from the app's own folder by the install step. The app installs per user, in a folder the user can write to: a service started from there would run whatever replaced it as SYSTEM |
-| State | `%ProgramData%\Tiresias\Admin\`, inheritance off, SYSTEM and Administrators only: the decoy sets, the event queue, the action log |
+| Binary | `%ProgramFiles%\Tiresias\Admin\tiresias-admin.exe`, copied there by the install step from the app's own `admin\` folder (published self-contained into it). The app installs per user, in a folder the user can write to: a service started from there would run whatever replaced it as SYSTEM |
+| State | `%ProgramData%\Tiresias\Admin\`, and `%ProgramData%\Tiresias` above it, inheritance off, owned by Administrators, SYSTEM and Administrators only: the decoy sets, the event queue, the action log. A user can create folders in `%ProgramData%`, so a folder already there under either name that isn't owned by SYSTEM or Administrators, or is a link, is moved aside (`….untrusted-<time>`) and made again, never used: its owner could change its ACL back. The service refuses to start while either folder isn't so |
 | Pipe | `\\.\pipe\tiresias.admin`, see below |
 
 The broker's own service (desktop-app.md, *What runs where*) is a different thing: it runs under a
@@ -51,18 +53,31 @@ broker.
 - **Remove** (About): `Tiresias.exe --admin-tier remove`, elevated. It asks the service to undo
   everything (thaw, lift filters, remove audit rules, restore the audit policy it changed, hand the
   decoys back to the user's agent), then stops and deletes the service and both folders.
-  Uninstalling the app runs it too, when the service exists, behind its own UAC prompt.
+  Uninstalling the app runs it too, when the service exists, behind its own UAC prompt; Velopack
+  gives an uninstall hook only seconds, so the app waits 20 s for it and uninstalls anyway.
+  Until `teardown` is built (step 2 onwards, as each feature lands) there is nothing to undo, and
+  remove only stops and deletes.
+- The elevated process reports back by exit code (`AdminSetupResult`): done, failed, files missing
+  (a development build without the `admin\` folder), or set up but stopped again at once (the
+  service found its state folder or pipe name not its own; the Windows event log says which).
 
 ## The pipe
 
 `\\.\pipe\tiresias.admin`. The service creates it with `FILE_FLAG_FIRST_PIPE_INSTANCE` and a DACL
-of SYSTEM full control, Authenticated Users read and write (not create).
+of SYSTEM full control, Authenticated Users read and write (not create), and NETWORK denied:
+Authenticated Users includes callers over SMB, whose process ids mean nothing here. The next
+instance is created before a connected one is served, so the name is never free for another
+process to take.
 
 **Both ends check the other.**
 
 - The service names the caller from the pipe (`GetNamedPipeClientProcessId`, then the process's
   token): its user SID, session, whether the token is elevated, and its image path. Callers that
-  are services or another session's are refused.
+  are services (SYSTEM, LocalService, NetworkService, the SERVICE group, session 0) or another
+  session's (the token's user isn't the user signed in to its session) are refused. A process
+  created after the connection was accepted is refused too: a client that connects and exits
+  can't hand its process id to whatever takes it next. The client connects at identification
+  level, so the service can read who is asking but never act as them.
 - The client checks the server: the pipe's server process (`GetNamedPipeServerProcessId`) must be
   the process the Service Control Manager says runs `TiresiasAdmin`. A program that created the pipe
   first, before the service started, is not the service, and the app says so instead of talking to it.
@@ -76,7 +91,12 @@ connection, each a little-endian int32 length then UTF-8 JSON, at most 1 MiB.
 ```
 
 An unknown op or version, a missing or extra argument, or a value out of range is refused before
-anything is done.
+anything is done (`AdminCallerPolicy`, in order: version, op, caller, elevation, whether this
+service has the op yet, arguments). A refusal never repeats the caller's text.
+
+The action log, `actions.jsonl` in the state folder, gets one line per request: format version,
+time, op (or `unknown`), caller SID, process id, image path, result and the reason for a refusal.
+Never an argument. It rolls over at 10 MB.
 
 ### Actions
 
@@ -160,7 +180,21 @@ asked. [Attack surface](attack-surface.md) uses it for "last used"; a decoy find
 - **About**: the tier's state (not installed, running, stopped, older than the app), with **Set up**,
   **Update** or **Remove**.
 - **Doctor**: one line when installed: running, version, which features are on. When the service
-  is installed but stopped, a failing check.
+  is installed but stopped, or runs but gives no answer from its own process, a failing check;
+  older than the app, a warning.
+
+Built in step 1, the first-run offer names the features to come and says they aren't in this
+version yet. The Home finding **Update the admin tier** is not built yet: About and the doctor
+line say when the service is older.
+
+## Open questions
+
+- **Over-the-shoulder elevation.** A standard user approves a UAC prompt with an administrator's
+  password: the elevated caller is then the administrator, in the user's session, so the session
+  rule refuses it, and its SID isn't the user's anyway. Install and remove don't use the pipe, so
+  step 1 is unaffected; `thaw` and `decoys.release` (steps 2 and 4) need an answer, such as the
+  elevated caller naming the user it acts for, accepted only from an administrator in that user's
+  session.
 
 ## Build order
 
