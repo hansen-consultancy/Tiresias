@@ -98,16 +98,22 @@ public sealed class AuditLog : IDisposable
     /// <summary>Short reference to a placeholder for audit records: the first 8 hex digits of its hash.</summary>
     public static string TokenRef(byte[] tokenHash) => Convert.ToHexStringLower(tokenHash)[..8];
 
+    /// <summary>Raised after a record is written, outside the log's lock, on the writer's thread. The app alerts on some (docs/alerts.md).</summary>
+    public event Action<AuditRecord, DateTimeOffset>? Appended;
+
     public void Append(AuditRecord record)
     {
+        DateTimeOffset at;
         lock (gate)
         {
             ObjectDisposedException.ThrowIf(disposed, this);
-            var line = JsonSerializer.Serialize(new Line(lastHash, time.GetUtcNow(), record.Kind, record.LeaseId, record.Consumer,
+            at = time.GetUtcNow();
+            var line = JsonSerializer.Serialize(new Line(lastHash, at, record.Kind, record.LeaseId, record.Consumer,
                 record.Service, record.Grant, record.Method, record.Path, record.Status, record.Reason, record.Token, record.Process, record.Evidence), Json);
             File.AppendAllText(path, line + "\n");
             lastHash = Hash(line);
         }
+        Appended?.Invoke(record, at);
     }
 
     /// <summary>Waits for a line in progress; every later <see cref="Append"/> throws.</summary>

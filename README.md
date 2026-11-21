@@ -85,7 +85,7 @@ unlock.
 
 The tray app can push serious events to your phone through [ntfy](https://ntfy.sh), post them
 to a webhook of your choice, or show them on an [LcdHub](https://github.com/stevehansen/LcdHub)
-screen beside the PC, so a used decoy credential reaches you when you aren't looking. In
+screen beside the PC, so a used decoy reaches you when you aren't looking. In
 **About**, **Alerts**, the first one you add asks for a name for this PC (it goes with every alert,
 so pick one that says nothing more).
 
@@ -106,8 +106,12 @@ Topics, tokens, URLs and headers are sealed like your secrets and saving needs W
 muting or removing one doesn't. **Send a test alert** checks it arrives. One you mark trusted also
 gets program paths and names (ntfy: the program's file name only); nothing ever gets a value or a
 token. Alerts open at the first unlock after the app starts, then keep working while the session is
-locked. Today only a used decoy credential raises one; more events are planned (see
-[docs/alerts.md](docs/alerts.md)).
+locked. What raises one: a decoy credential used or a decoy file read; a blocked program asking
+again, a request refused in lockdown, "This wasn't me", and a program asking for a secret while
+the PC is locked; the solo broker rejecting the trust chain, a paper key used, the vault rolled back
+or changed without your approval, and an unapproved broker request; and new findings the background
+checks turn up that Home hasn't shown. A program asking while you're at the PC doesn't: you are at
+the dialog (see [docs/alerts.md](docs/alerts.md)).
 
 ## AI coding agents
 

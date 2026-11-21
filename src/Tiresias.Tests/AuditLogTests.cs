@@ -20,6 +20,20 @@ public class AuditLogTests
     }
 
     [Test]
+    public void Appended_reports_each_record_once_it_is_written()
+    {
+        var at = new DateTimeOffset(2026, 11, 17, 9, 0, 0, TimeSpan.Zero);
+        var log = new AuditLog(path, new ManualTime(at));
+        var seen = new List<(AuditRecord, DateTimeOffset, int)>();
+        log.Appended += (record, when) => seen.Add((record, when, File.ReadAllLines(path).Length));
+        var written = new AuditRecord(AuditKind.TrustRejected, Consumer: "startup", Reason: "Fork at seq 2: x");
+
+        log.Append(written);
+
+        Assert.That(seen, Is.EqualTo(new[] { (written, at, 1) }));
+    }
+
+    [Test]
     public void A_valid_chain_verifies()
     {
         Write(4);

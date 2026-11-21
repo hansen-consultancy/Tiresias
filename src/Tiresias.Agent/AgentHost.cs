@@ -30,6 +30,7 @@ public sealed class AgentHost : IAsyncDisposable
         keeper.Locked += reason => Lock(reason);
         solo.Log += Say;
         solo.SecretsUnleased = SealIntoLeaseAsync;
+        solo.Audited += (record, at) => BrokerAudited?.Invoke(record, at);
         decoys.Log += Say;
         decoys.Touched += touch =>
         {
@@ -79,6 +80,9 @@ public sealed class AgentHost : IAsyncDisposable
     /// app blocks the program and raises a finding, <c>tir agent</c> only prints it.
     /// </summary>
     public event Action<DecoyTouch>? DecoyTouched;
+
+    /// <summary>Solo mode: a record the broker this agent hosts wrote to its audit log, on the broker's thread. A handler must not throw.</summary>
+    public event Action<AuditRecord, DateTimeOffset>? BrokerAudited;
 
     /// <summary>Whether the decoys' listeners are up (decoys are placed and their ports were free).</summary>
     public bool DecoysListening => decoys.Listening;

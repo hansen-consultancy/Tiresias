@@ -9,6 +9,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSec.Cryptography;
+using Tiresias.Audit;
 using Tiresias.Broker;
 using Tiresias.Client;
 using Tiresias.Trust;
@@ -43,6 +44,9 @@ public sealed class SoloBroker : IAsyncDisposable
 
     /// <summary>One line per vault reload, or why one failed. Never a value.</summary>
     public event Action<string>? Log;
+
+    /// <summary>Every record the broker writes to its audit log, with when, after it is written, on the writer's thread.</summary>
+    public event Action<AuditRecord, DateTimeOffset>? Audited;
 
     /// <summary>
     /// Called with the open lease's secrets that have no DEK after a reload (a secret just added or
@@ -90,6 +94,8 @@ public sealed class SoloBroker : IAsyncDisposable
         builder.Logging.ClearProviders();
 
         var built = BrokerHost.Build(builder);
+        // Before anything resolves the trust chain, which audits a chain rejected at startup.
+        built.Services.GetRequiredService<AuditLog>().Appended += (record, at) => Audited?.Invoke(record, at);
         var state = built.Services.GetRequiredService<BrokerState>();
         built.Use(async (context, next) =>
         {

@@ -10,6 +10,11 @@ its section below.
 
 ### Added
 
+- More events raise an alert: a decoy file read, a blocked program asking again, a request refused
+  in lockdown, "This wasn't me", a program asking for a secret while the PC is locked, the solo
+  broker rejecting the trust chain, a paper key used, the vault rolled back or changed without your
+  approval, an unapproved broker request, and new findings Home hasn't shown (a warning when one
+  fails, info when they only warn). A program asking while you're at the PC still doesn't alert.
 - Alerts on an LcdHub screen: **About**, **Alerts**, **Add LcdHub...** shows serious events as a
   line in the status strip of the LcdHub running on this PC, such as "Decoy credential used ×1",
   until Home shows your findings or for 24 hours. It shows only the event and its count.

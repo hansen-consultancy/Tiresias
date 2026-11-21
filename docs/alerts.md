@@ -1,6 +1,6 @@
 # Out-of-band alerts
 
-Status: **phase 4 built**: webhook, ntfy and LcdHub end to end, with `decoy.used` the only event wired so far. Tracks issue #101. This page designs how Tiresias tells you about a
+Status: **phase 5 built**: webhook, ntfy and LcdHub end to end, with every event in the table wired but the failing-sink alert (phase 6). Tracks issue #101. This page designs how Tiresias tells you about a
 serious event when you aren't looking at the app: a push to your phone through
 [ntfy](https://ntfy.sh), a line on a [LcdHub](https://github.com/stevehansen/LcdHub) screen beside
 the machine, or a JSON POST to a webhook of your choice.
@@ -43,7 +43,7 @@ to explain. The title a sink shows comes from this table, never from the event's
 | Event | Severity | Title | Source today |
 |---|---|---|---|
 | `decoy.used` | critical | Decoy credential used | `AgentHost.DecoyTouched` ([decoys.md](decoys.md), layer 1) |
-| `decoy.read` | critical | Decoy file read | The read tripwire (decoys.md layer 2, #97), once it lands |
+| `decoy.read` | critical | Decoy file read | The read tripwire (decoys.md layer 2, #97), for a program that isn't a routine opener |
 | `trust.rejected` | critical | Trust chain rejected | Broker audit `TrustRejected` |
 | `vault.rolled-back` | critical | Vault rolled back | Broker audit `secret-rolled-back` (#83) |
 | `trust.break-glass` | high | Paper key used | Broker audit `BreakGlass` |
@@ -358,8 +358,36 @@ leaving.
    - A demo (`--demo`) leaves the real LcdHub alone.
    - The canary runs through the decoy mapping, the planner and the link into the bytes a fake hub
      received, for a public and a trusted sink: no canary, no user name, no machine label.
-5. **The other events.** Blocklist and lockdown refusals, "This wasn't me", `consent.while-locked`,
-   broker audit events from the solo broker, `findings.new`.
+5. **The other events. Done.** Every source in the events table but `alerts.*` is wired, each a thin
+   mapping in `AlertSources` (Core) or `AlertTriggers` (the app's `Logic/`). What it settled or changed:
+   - **`decoy.read`** comes from the read tripwire (#97) through the same `DecoyTouched` as
+     `decoy.used`, but only for a program that isn't a routine opener (an indexer, an antivirus): the
+     same programs the app notifies of. Otherwise every scan would be a critical alert.
+   - **Consent alerts are decided at the gate**, when a request's turn comes: `Blocked` is
+     `program.blocked`, `LockedDown` is `lockdown.refused`, and a request the gate lets through while
+     the Windows session is locked is `consent.while-locked`. One request raises one alert at most. A
+     request asked with someone at the machine raises none.
+   - **"The session is locked"** means locked, logged off or disconnected (locally or over Remote
+     Desktop) since the last session switch, until it is unlocked, logged on or connected again. The
+     app assumes unlocked when it starts.
+   - **Consent and incident subjects** carry the program, its process id, the processes that started
+     it, and the secret or variable names asked for. A `tir` placeholder or `tir exec` approval
+     carries no names: its lines are `tir`'s own text, which can hold a command. The request's heading
+     and command line never go.
+   - **Broker events come from the solo broker's audit log as it writes it** (`AuditLog.Appended`),
+     only in the app's own broker. `trust.rejected` carries the verifier's failure kind (`Fork`,
+     `Rollback`...), `trust.break-glass` nothing, `vault.rolled-back` and `vault.unapproved` the
+     secret's name (`policy-not-approved: <slug>` is the refused reload's record), `approval.invalid`
+     the service and the calling process. The record's free-text reason never goes whole. A reload
+     that refuses several secrets writes a record, and so an alert, per secret.
+   - **`findings.new` is one event per background check run**, naming each new finding by its title,
+     never its detail: a warning when any of them fails, info when they only warn. New means open, not
+     shown on Home (`seen-findings.json`) and not alerted on before by this run of the app; a finding
+     that goes away and comes back alerts again. After a restart, findings still unshown alert once
+     more. Home running the checks itself raises nothing: you are looking at them.
+   - The canary runs every source's event, built from inputs with a value and a placeholder token
+     beside the names, through the planner into the webhook's, ntfy's and a fake LcdHub's captured
+     bytes, public and trusted.
 6. **Failing sinks.** The finding on Home, `alerts.failing`, D-alerts-silenced updated.
 7. **Later.** An LcdHub alert frame for `critical`; heartbeat; a signed webhook payload.
 
