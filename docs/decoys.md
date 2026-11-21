@@ -101,6 +101,26 @@ needs the user.
 An AI agent listing and reading files in the home folder will trip this layer. That is a reason to
 have it, and a reason the wording must stay factual.
 
+## With admin rights (optional)
+
+Everything above works for an ordinary user, and stays that way. A user who can approve one UAC
+prompt gets more, through the same step that installs the broker as a Windows service
+([desktop app](desktop-app.md#what-runs-where)): one service, not a second installer.
+
+| Gain | Why it needs admin |
+|---|---|
+| **The decoys' secrets stay out of reach.** Malware running as the user can read `decoys.json` today, learn the two ports and the values, and steer around them. Held by the service, under its own account, it can't | A service account's files and memory are closed to the user's processes |
+| **Listening while the app is closed**, from boot: no "nothing listens" gap | Installing a service |
+| **Every read named, every time**, by auditing: an audit rule on each decoy file, read from the Security log (event 4663). Repeatable where the oplock fires once, and it covers openers that avoid an oplock break. The log keeps what happened while Tiresias wasn't running | Setting audit rules and the audit policy, and reading the Security log |
+| **Stopping the program, not only refusing it**: suspend it and what it started in a job object the user can't thaw, and cut its network (Windows Filtering Platform) until the user decides | Suspending another process and adding firewall filters, from a privileged service |
+| Richer facts for the finding: process start history (Prefetch, Background Activity Moderator), as [attack surface](attack-surface.md) wants too | Both need admin to read |
+
+**The cost.** A privileged service is the most valuable thing on the machine to attack: a bug in it
+is a privilege escalation. It stays small, takes requests only from the app, does only the
+actions above, and the parts that read or suspend user processes run as SYSTEM only if the
+virtual account can't do them. Every action it takes is in the activity log and undoable from
+Home.
+
 ## Prior art: A Better Antivirus
 
 [A Better Antivirus](https://github.com/vulnix0x4/a-better-antivirus) (MIT) plants bait files for
@@ -114,7 +134,7 @@ sets audit rules; Tiresias watches use and needs no admin rights. What fits Tire
 | Different file names per install, from the names grabbers search for | Yes: `passwords.txt` is one fixed name today | Placement, next |
 | A program using **several** decoys is a sweep: say so | Yes, as a fact in the finding ("used 3 decoys in 2 minutes") | Finding, next |
 | Say whether the program is signed and where it runs from (Downloads, Temp) | Yes: the activity record has the signature; the finding should too | Finding, next |
-| Freeze the process tree, cut its network, isolate the PC | Not now: Tiresias refuses its own leases, it doesn't police the machine. Revisit with layer 2 | Considered |
+| Freeze the process tree, cut its network | With admin rights only (above), undoable from Home; isolating the whole PC is not taken | Admin tier |
 | Canary tokens registered with a public service | Yes, opt-in | Phase 3 |
 | A fake browser profile, fake wallets and chat sessions | No: outside developer credentials | Not taken |
 
@@ -146,5 +166,5 @@ sets audit rules; Tiresias watches use and needs no admin rights. What fits Tire
 1. **Decoy credentials with loopback endpoints:** files, listeners, process identification, activity,
    block list, finding.
 2. **Read tripwire:** naming the reader through Restart Manager is dropped; naming it through the
-   thread that wakes is the second spike. SACL auditing, for administrators only, is the fallback.
+   thread that wakes is the second spike. With admin rights, auditing names every read (above).
 3. **External canaries** (opt-in): decoys registered with a canary service, for use off the machine.
