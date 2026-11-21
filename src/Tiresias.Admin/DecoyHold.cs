@@ -12,7 +12,8 @@ namespace Tiresias.Admin;
 /// folder), each listened for on loopback from start (<see cref="DecoyListener"/>), and each use
 /// queued for its user (<c>events\&lt;sid&gt;.json</c>) until that user's app acknowledges it. A
 /// set whose ports are taken is tried again every few seconds: the user's agent may still hold them
-/// for a moment after adopting.
+/// for a moment after adopting. Reads of each set's files are audited (<see cref="ReadAudit"/>)
+/// and queued the same way.
 /// </summary>
 sealed class DecoyHold : IAsyncDisposable
 {
@@ -26,6 +27,7 @@ sealed class DecoyHold : IAsyncDisposable
     readonly Dictionary<string, AdminEventQueue> queues = new(StringComparer.OrdinalIgnoreCase);
     readonly Dictionary<string, TaskCompletionSource> arrived = new(StringComparer.OrdinalIgnoreCase);
     readonly Timer retry;
+    readonly ReadAudit audit;
 
     sealed class Held(AdminHeldDecoys decoys)
     {
@@ -46,6 +48,10 @@ sealed class DecoyHold : IAsyncDisposable
             if (AdminArgs.UserSid(sid) && AdminHeldDecoys.Parse(File.ReadAllText(file)) is { } decoys)
                 held[sid] = new(decoys);
         }
+        audit = new(stateFolder, logger, Queue);
+        foreach (var (sid, h) in held)
+            audit.Hold(sid, h.Decoys.Files);
+        audit.Settle(held.Count);
         retry = new(_ => ListenAll(), null, TimeSpan.Zero, Retry);
     }
 
@@ -59,6 +65,7 @@ sealed class DecoyHold : IAsyncDisposable
             Write(SetPath(sid), decoys.ToJson());
             held[sid] = new(decoys);
         }
+        audit.Hold(sid, decoys.Files);
         ListenAll();
         return null;
     }
@@ -66,19 +73,22 @@ sealed class DecoyHold : IAsyncDisposable
     public AdminDecoysStatus Status(string sid)
     {
         lock (gate)
-            return held.TryGetValue(sid, out var h) ? h.Decoys.Status(h.Listener is not null) : new(false, false, [], 0);
+            return held.TryGetValue(sid, out var h) ? h.Decoys.Status(h.Listener is not null, audit.Auditing(sid)) : new(false, false, [], 0);
     }
 
     /// <summary>Stops listening for the user's set and forgets it; <c>null</c> when none is held.</summary>
     public async Task<DecoySet?> ReleaseAsync(string sid)
     {
         Held? released;
+        int left;
         lock (gate)
         {
             if (!held.Remove(sid, out released))
                 return null;
             File.Delete(SetPath(sid));
+            left = held.Count;
         }
+        audit.Release(sid, released.Decoys.Files, left);
         if (released.Listener is { } listener)
             await listener.DisposeAsync();
         return released.Decoys.Set;
@@ -148,14 +158,14 @@ sealed class DecoyHold : IAsyncDisposable
         }
     }
 
-    void Queue(string sid, DecoyHit hit)
+    void Queue(string sid, DecoyHit hit) =>
+        Queue(sid, hit, hit.ProcessId is { } pid ? [.. ProcessTree.Ancestry(pid).Skip(1).Select(p => $"{p.Program} ({p.ProcessId})")] : [], null);
+
+    void Queue(string sid, DecoyHit hit, IReadOnlyList<string> parents, string? routine)
     {
-        IReadOnlyList<string> parents = hit.ProcessId is { } pid
-            ? [.. ProcessTree.Ancestry(pid).Skip(1).Select(p => $"{p.Program} ({p.ProcessId})")]
-            : [];
         lock (gate)
         {
-            var (queue, _) = Queue(sid).Add(hit, parents);
+            var (queue, _) = Queue(sid).Add(hit, parents, routine);
             Save(sid, queue);
             if (arrived.Remove(sid, out var waiting))
                 waiting.TrySetResult();
@@ -200,6 +210,7 @@ sealed class DecoyHold : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await retry.DisposeAsync();
+        audit.Dispose();
         List<DecoyListener> listeners;
         lock (gate)
         {

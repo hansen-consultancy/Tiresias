@@ -130,7 +130,7 @@ sealed class AdminPipeService(ILogger<AdminPipeService> logger) : BackgroundServ
         {
             case AdminOps.Status:
                 var held = decoys!.Status(user);
-                return AdminReply.Ok(new AdminStatusResult(Version, AdminWire.ProtocolVersion, new AdminFeatures(held.Held, held.Listening)));
+                return AdminReply.Ok(new AdminStatusResult(Version, AdminWire.ProtocolVersion, new AdminFeatures(held.Held, held.Listening, held.Auditing)));
             case AdminOps.DecoysStatus:
                 return AdminReply.Ok(decoys!.Status(user));
             case AdminOps.DecoysAdopt:

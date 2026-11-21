@@ -180,7 +180,10 @@ listens on its ports from boot and queues each use until the app (or `tir agent`
 then blocks, notifies, records and raises the finding as for a use it saw itself. Home and
 `tir decoys list` show the kinds held, not the places. `tir decoys remove` and **Remove decoys**
 take the set back through a UAC prompt, then remove the decoys as always. While a set is held, no
-other is placed beside it. Auditing reads and stopping the program are later steps.
+other is placed beside it. **Step 3**: the service puts an audit rule on each held decoy file and
+reads every read of one from the Security log, including reads while the app or the service was
+stopped; each comes to the app as a read the tripwire saw (recorded, notified, never blocked).
+Stopping the program is a later step.
 
 **The cost.** A privileged service is the most valuable thing on the machine to attack: a bug in it
 is a privilege escalation. It stays small, takes requests only from the app, does only the

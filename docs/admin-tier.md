@@ -1,10 +1,10 @@
 # The admin tier: a privileged service, optional
 
-Status: **steps 1 and 2 built** (#91): the service, its pipe and `status`, install, update and
-remove, the first-run and About offers, the doctor line and the action log; and the decoys held
-and listened for from boot (`decoys.adopt`, `decoys.status`, `decoys.release`, `events.wait`)
-([Build order](#build-order)). Auditing, freezing and `lastrun` are not built yet; the service
-refuses those actions.
+Status: **steps 1 to 3 built** (#91): the service, its pipe and `status`, install, update and
+remove, the first-run and About offers, the doctor line and the action log; the decoys held and
+listened for from boot (`decoys.adopt`, `decoys.status`, `decoys.release`, `events.wait`); and
+every read of a held decoy file audited ([Build order](#build-order)). Freezing and `lastrun` are
+not built yet; the service refuses those actions.
 
 Tiresias works for an ordinary user account and keeps doing so. A user who can approve one UAC
 prompt can add a small Windows service that does what an ordinary account can't: hold the decoys
@@ -57,11 +57,13 @@ broker.
   decoys back to the user's agent), then stops and deletes the service and both folders.
   Uninstalling the app runs it too, when the service exists, behind its own UAC prompt; Velopack
   gives an uninstall hook only seconds, so the app waits 20 s for it and uninstalls anyway.
-  In step 2 the only thing to undo is the held decoys: remove stops the service, then hands each
-  user's set back to that user's `decoys.json` (as `decoys.release` does, below) before deleting.
-  A set that can't go back stays in the state folder, which is then kept, and the step reports
-  failure; installing again picks the set up. `teardown` is built when there is more to undo
-  (step 3 onwards).
+  Built so far, the things to undo are the held decoys and their auditing: remove stops the
+  service, then hands each user's set back to that user's `decoys.json` (as `decoys.release` does,
+  below) and takes the audit rules off its files, then turns *File System* success auditing off
+  again if the service turned it on and every set went back (`audit.json`), before deleting. The
+  elevated remove process does this itself (`SeSecurityPrivilege`), so it works with the service
+  stopped. A set that can't go back stays in the state folder, which is then kept, and the step
+  reports failure; installing again picks the set up. `teardown` is built with step 4.
 - The elevated process reports back by exit code (`AdminSetupResult`): done, failed, files missing
   (a development build without the `admin\` folder), or set up but stopped again at once (the
   service found its state folder or pipe name not its own; the Windows event log says which).
@@ -167,15 +169,39 @@ listen.
 
 ### Every read named: auditing
 
-On `decoys.adopt` the service adds a SACL entry to each decoy file (Everyone, `FILE_READ_DATA`,
-success), opening it with `FILE_FLAG_OPEN_REPARSE_POINT` and checking it is a regular file owned by
-the caller. It turns on the *File System* audit subcategory for success if it was off, and
-remembers that so teardown can turn it off again.
+**Rules.** On `decoys.adopt`, and again at each start for every held set, the service adds an
+audit entry to each decoy file's SACL (Everyone, `FILE_READ_DATA`, success). It opens the file
+with `FILE_FLAG_OPEN_REPARSE_POINT` and decides on that handle (`AdminAudit.RuleRefusal`): only a
+regular file with one name, owned by the user whose set it is. A link, a folder, a hard link or
+another owner's file (something the user swapped in to have SYSTEM change) gets no rule; the
+service logs it and `decoys.status` reports `auditing` false for that user. Only Tiresias's own
+entry is added or taken away; any other entry in the SACL stays.
 
-It subscribes to the Security log for event 4663 on those paths. The event carries the process id
-and image, so every read is named, every time, including the reads made while the app was closed
-(the log keeps them). Routine openers (`DecoyReads.RoutineOpener`) are dropped as today. With
-auditing on, the agent's oplock tripwire stands down for those files.
+**Policy.** The rules log nothing unless the *File System* audit subcategory audits success. The
+service turns that on when it was off and remembers it did (`audit.json` in its state folder).
+When the last set is released, or at start with no set held, it turns it off again, only if it
+turned it on; one that was on before stays on. While on, any other SACL on the machine logs too:
+that is Windows' setting, not Tiresias's, and it ends with the last set.
+
+**Reading.** The service reads event 4663 from the Security log (`EventLogWatcher`) from the last
+record it handled, kept in `audit.json`: reads made while the service was stopped (or the machine
+off) are read at its next start, as long as the log still has them. The first time, it starts at
+the log's end. An event is a read when its mask has `FILE_READ_DATA` and it names a held file; it
+becomes a `Read` event for that file's user, queued and fetched through `events.wait` like a
+use, so the app does what it does for a read the tripwire saw: activity record and notification,
+never a block. It names the process by the event's id and image; the processes that started it
+only when the process now under that id started before the read (a later one has the id since).
+Each program and file is reported once a minute (`DecoyHitFilter`).
+
+**Routine openers.** `DecoyReads.RoutineOpener` decides as the agent does: Windows Search,
+Defender, Explorer and machine-wide OneDrive by name and folder, recorded and raising nothing. For
+Tiresias's own programs (`tir.exe`, `Tiresias.exe`) the folder is the decoy owner's
+`%LOCALAPPDATA%\Tiresias`, from the profile list: that is where the app installs, and the folder
+the agent vouches for when it watches itself. A program running as the user can write there, so
+one named `Tiresias.exe` placed there reads unflagged; it is still in the activity log.
+
+**The tripwire.** With the set held, `decoys.json` is gone and the agent's oplock tripwire
+watches no file: the audit takes its place, and names every read where the oplock fired once.
 
 ### Stopping the program
 

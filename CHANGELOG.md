@@ -52,8 +52,9 @@ its section below.
   With it, your decoys are held by the service: programs running as you can no longer read which
   files are decoys or their values, a decoy used while the app is closed is caught from boot and
   shown when the app next runs, and Home and `tir decoys list` show the kinds held. Removing the
-  decoys, or the admin tier, gives them back first (one more admin prompt). Auditing reads and
-  stopping the program come in the next releases.
+  decoys, or the admin tier, gives them back first (one more admin prompt). Every read of a held
+  decoy file is seen through Windows auditing, even one made while the app was closed, and is
+  shown as a read the app saw itself. Stopping the program comes in a next release.
 
 ### Changed
 
