@@ -8,6 +8,14 @@ its section below.
 
 ## [Unreleased]
 
+### Added
+
+- Home and `tir doctor` check the installed-apps list against the disk: an entry for an app that
+  is gone, an app whose uninstaller is missing (reinstall it over itself), and an older version's
+  entry left after an update, whose **Uninstall** would remove the current version's files.
+  **Remove entry...** saves the entry to a `.reg` file before removing it; machine-wide entries
+  get the commands to run as an administrator.
+
 ### Changed
 
 - The secrets editor hides user-secrets folders that hold no keys behind a line, "*N* empty

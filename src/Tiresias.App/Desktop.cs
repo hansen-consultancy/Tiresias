@@ -84,6 +84,44 @@ static partial class Desktop
         }
     }
 
+    /// <summary>
+    /// Saves one of the user's own uninstall entries to a <c>.reg</c> file beside the keyring, then
+    /// deletes it. The key comes from the registry, so it is checked to be an Uninstall subkey first.
+    /// </summary>
+    /// <returns>The backup that puts it back; <c>null</c> when nothing was deleted.</returns>
+    public static async Task<string?> RemoveEntryAsync(Tiresias.Client.RemoveEntry remove)
+    {
+        const string prefix = @"HKCU";
+        if (remove.Machine || !Tiresias.Client.RemoveEntry.IsSafeKey(remove.Key))
+            return null;
+        var folder = Path.Combine(KeyringStore.Directory, "removed-entries");
+        var backup = Path.Combine(folder, $"{DateTime.Now:yyyyMMdd-HHmmss} {remove.BackupName}");
+        var start = new ProcessStartInfo("reg.exe") { UseShellExecute = false, CreateNoWindow = true };
+        foreach (var argument in new[] { "export", remove.Key, backup, "/y" })
+            start.ArgumentList.Add(argument);
+        try
+        {
+            Directory.CreateDirectory(folder);
+            using (var process = Process.Start(start))
+            {
+                if (process is null)
+                    return null;
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                await process.WaitForExitAsync(timeout.Token);
+                if (process.ExitCode != 0 || !File.Exists(backup))
+                    return null;
+            }
+            Registry.CurrentUser.DeleteSubKeyTree(remove.Key[prefix.Length..], throwOnMissingSubKey: false);
+            return backup;
+        }
+        catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException or OperationCanceledException
+                                      or IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            AppLog.Error(e, $"could not remove the uninstall entry for {remove.Name}");
+            return null;
+        }
+    }
+
     public static void OpenHelloSettings() => Open("ms-settings:signinoptions");
 
     public static void OpenDataFolder() => Open(KeyringStore.Directory);

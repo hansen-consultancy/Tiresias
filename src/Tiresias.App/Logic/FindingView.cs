@@ -21,6 +21,8 @@ public enum FixAction
     RemoveExtension,
     /// <summary>Show a file in Explorer.</summary>
     RevealFile,
+    /// <summary>Save one of the user's uninstall entries to a <c>.reg</c> file and delete it, after the user approves.</summary>
+    RemoveEntry,
 }
 
 /// <summary>
@@ -78,6 +80,8 @@ public static class FindingView
         UsePlaceholder => (FixAction.UsePlaceholder, "Finding_FixPlaceholder"),
         RemoveExtension => (FixAction.RemoveExtension, "Finding_FixRemoveExtension"),
         RevealFile => (FixAction.RevealFile, "Finding_FixReveal"),
+        RemoveEntry { Machine: false } => (FixAction.RemoveEntry, "Finding_FixRemoveEntry"),
+        RemoveEntry or Repair { WingetId: not null } => (FixAction.CopyCommand, "Finding_FixCopy"),
         _ => null,
     };
 

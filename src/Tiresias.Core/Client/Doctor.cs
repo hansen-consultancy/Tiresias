@@ -103,6 +103,9 @@ public interface IDoctorProbe
 
     /// <summary>Paths of blocked programs whose file still exists.</summary>
     IEnumerable<string> BlockedPrograms() => [];
+
+    /// <summary>The uninstall registry entries, machine and user, each with whether its uninstaller and folder are on disk.</summary>
+    IEnumerable<UninstallEntry> UninstallEntries() => [];
 }
 
 /// <summary>
@@ -154,6 +157,7 @@ public static partial class Doctor
         checks.AddRange(RavenExpiry(probe.RavenCertificates(), DateTimeOffset.UtcNow));
         checks.AddRange(KeysAsValues(probe.SealedEnvironment));
         checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), probe.CredentialUses(), probe.BlockedPrograms(), DateTimeOffset.UtcNow));
+        checks.AddRange(UninstallEntries(probe.UninstallEntries()));
         return checks;
     }
 
