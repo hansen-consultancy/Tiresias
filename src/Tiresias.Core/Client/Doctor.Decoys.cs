@@ -7,7 +7,8 @@ namespace Tiresias.Client;
 /// A use of a decoy, or an open of a decoy file, from the activity log: the program's path (or its
 /// file name when only that was known; <c>null</c> when only a pid, or nothing, was), what it did, and when.
 /// </summary>
-public sealed record DecoyUseRecord(string? Program, string What, DateTimeOffset At)
+/// <param name="Frozen">The admin tier froze the program for this use and blocked its network.</param>
+public sealed record DecoyUseRecord(string? Program, string What, DateTimeOffset At, bool Frozen = false)
 {
     /// <summary>An open of a decoy file (layer 2), not a use: it never blocks, and its finding says "opened".</summary>
     public bool IsRead => DecoyReads.IsRead(What);
@@ -19,8 +20,17 @@ public sealed record UnblockProgram(string Path) : DoctorFix
     public override string Instruction => $"if that was you, unblock {Path} on the Tiresias app's Home; otherwise dismiss this to keep it blocked";
 }
 
+/// <summary>Thaw the program the admin tier froze (UAC), then take it off the blocklist: the user says the decoy use was theirs.</summary>
+public sealed record ThawProgram(string Path) : DoctorFix
+{
+    public override string Instruction => $"if that was you, thaw {Path} on the Tiresias app's Home (an administrator prompt); otherwise dismiss this to keep it frozen and blocked";
+}
+
 public static partial class Doctor
 {
+    /// <summary>Ends a decoy use's activity record when the admin tier froze the program: what the finding reads to offer Thaw.</summary>
+    public const string FrozenNote = "frozen, network blocked, by the admin tier";
+
     public const string DecoyKind = "programs that used a decoy credential";
 
     public const string DecoyReadKind = "programs that opened a decoy file";
@@ -46,7 +56,8 @@ public static partial class Doctor
                 continue;
             }
             if (record is { Consumer: "decoy", Service: { } what } && record.Reason?.StartsWith(DecoyReads.RoutineReason, StringComparison.Ordinal) != true)
-                yield return new(record.Process is { } process ? ImagePath(process) : null, what, record.Time);
+                yield return new(record.Process is { } process ? ImagePath(process) : null, what, record.Time,
+                    record.Reason?.EndsWith(FrozenNote, StringComparison.Ordinal) == true);
         }
     }
 
@@ -67,10 +78,14 @@ public static partial class Doctor
         foreach (var group in users)
         {
             var last = group.MaxBy(u => u.At)!;
+            // Frozen by any use still listed: thawing undoes every freeze of the program at once.
+            var frozen = group.Any(u => u.Frozen);
             yield return new($"{FileName(group.Key)} used a decoy credential", DoctorStatus.Fail,
                 $"{group.Key} connected with {last.What} on {last.At.ToLocalTime():g}{Times(group.Count())}. Nothing legitimate knows that credential, "
-                + "so Tiresias blocked the program: no lease, placeholder or consent dialog until you say. Unblock it if that was you",
-                new UnblockProgram(group.Key), Kind: DecoyKind, Subject: group.Key);
+                + (frozen
+                    ? "so Tiresias froze the program and blocked its network, and refuses it any lease, placeholder or consent dialog until you say. Thaw it if that was you"
+                    : "so Tiresias blocked the program: no lease, placeholder or consent dialog until you say. Unblock it if that was you"),
+                frozen ? new ThawProgram(group.Key) : new UnblockProgram(group.Key), Kind: DecoyKind, Subject: group.Key);
         }
         // One finding for them all, about the latest: dismissing it holds until the next unnamed use.
         var unnamed = all.Where(u => u.Program is null && now - u.At <= UnnamedDecoyWindow).ToArray();

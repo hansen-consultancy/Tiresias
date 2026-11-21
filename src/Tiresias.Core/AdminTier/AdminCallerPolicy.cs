@@ -44,11 +44,11 @@ public static class AdminCallerPolicy
         [AdminOps.EventsWait] = new(false, new Dictionary<string, ArgCheck> { ["ack"] = AdminArgs.Ack, ["wait"] = AdminArgs.Wait }),
         [AdminOps.DecoysAdopt] = new(false, new Dictionary<string, ArgCheck> { ["set"] = AdminArgs.Set, ["files"] = AdminArgs.Files }),
         [AdminOps.DecoysStatus] = new(false, NoArgs),
-        [AdminOps.Freeze] = new(false, null),
-        [AdminOps.Thaw] = new(true, null),
+        [AdminOps.Freeze] = new(false, new Dictionary<string, ArgCheck> { ["pid"] = AdminArgs.Pid }),
+        [AdminOps.Thaw] = new(true, new Dictionary<string, ArgCheck> { ["program"] = AdminArgs.Program }),
         [AdminOps.DecoysRelease] = new(true, NoArgs),
         [AdminOps.LastRun] = new(false, null),
-        [AdminOps.Teardown] = new(true, null),
+        [AdminOps.Teardown] = new(true, NoArgs),
     };
 
     /// <summary>The op, if it is one of <see cref="AdminOps"/>; otherwise <c>null</c>, so a caller's text never reaches a log.</summary>

@@ -78,7 +78,11 @@ public class AdminCallerPolicyTests
         Assert.That(AdminOps.All.Where(AdminCallerPolicy.NeedsElevation),
             Is.EquivalentTo(new[] { AdminOps.Thaw, AdminOps.DecoysRelease, AdminOps.Teardown }));
 
-    static readonly string[] Built = [AdminOps.Status, AdminOps.EventsWait, AdminOps.DecoysAdopt, AdminOps.DecoysStatus, AdminOps.DecoysRelease];
+    static readonly string[] Built =
+    [
+        AdminOps.Status, AdminOps.EventsWait, AdminOps.DecoysAdopt, AdminOps.DecoysStatus, AdminOps.DecoysRelease,
+        AdminOps.Freeze, AdminOps.Thaw, AdminOps.Teardown,
+    ];
 
     [Test]
     public void Ops_not_built_yet_are_refused_even_when_the_caller_qualifies()
@@ -198,6 +202,27 @@ public class AdminCallerPolicyTests
             ["wait"] = 1,
         }), User).Allowed, Is.False);
 
+    [TestCase("4242", true)]
+    [TestCase("4", false)]
+    [TestCase("0", false)]
+    [TestCase("-8", false)]
+    [TestCase("\"4242\"", false)]
+    [TestCase("4242.5", false)]
+    [TestCase("4294967296", false)]
+    public void Freeze_takes_a_process_id(string pid, bool allowed) =>
+        Assert.That(AdminCallerPolicy.Decide(Ask(AdminOps.Freeze, new JsonObject { ["pid"] = JsonNode.Parse(pid) }), User).Allowed, Is.EqualTo(allowed));
+
+    [TestCase(@"C:\Users\alice\Downloads\tool.exe", true)]
+    [TestCase("tool.exe", false)]
+    [TestCase(@"\\203.0.113.5\share\tool.exe", false)]
+    [TestCase(@"C:\Users\alice\..\bob\tool.exe", false)]
+    public void Thaw_takes_the_programs_full_path(string program, bool allowed) =>
+        Assert.That(AdminCallerPolicy.Decide(Ask(AdminOps.Thaw, new JsonObject { ["program"] = program }), ElevatedUser).Allowed, Is.EqualTo(allowed));
+
+    [Test]
+    public void Teardown_takes_nothing() =>
+        Assert.That(AdminCallerPolicy.Decide(Ask(AdminOps.Teardown), ElevatedUser).Allowed, Is.True);
+
     [TestCase("S-1-5-21-1000-1000-1000-1001", true)]
     [TestCase("S-1-12-1-1000-1000-1000-1001", true)]
     [TestCase("S-1-5-18", false)]
@@ -249,12 +274,12 @@ public class AdminInstallPlanTests
     {
         Assert.That(AdminInstallPlan.Remove(new(Exists: true, Running: true)), Is.EqualTo(new[]
         {
-            AdminInstallStep.StopService, AdminInstallStep.HandBackDecoys, AdminInstallStep.DeleteService, AdminInstallStep.DeleteFiles,
-            AdminInstallStep.DeleteStateFolder,
+            AdminInstallStep.Teardown, AdminInstallStep.StopService, AdminInstallStep.HandBackDecoys, AdminInstallStep.UndoFreezes,
+            AdminInstallStep.DeleteService, AdminInstallStep.DeleteFiles, AdminInstallStep.DeleteStateFolder,
         }));
         Assert.That(AdminInstallPlan.Remove(new(Exists: false, Running: false)), Is.EqualTo(new[]
         {
-            AdminInstallStep.HandBackDecoys, AdminInstallStep.DeleteFiles, AdminInstallStep.DeleteStateFolder,
+            AdminInstallStep.HandBackDecoys, AdminInstallStep.UndoFreezes, AdminInstallStep.DeleteFiles, AdminInstallStep.DeleteStateFolder,
         }));
     }
 

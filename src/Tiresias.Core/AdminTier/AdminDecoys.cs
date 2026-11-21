@@ -16,7 +16,8 @@ public sealed record AdminDecoysRelease(string UserSid, DecoySet? Set);
 
 /// <summary>A decoy used or a decoy file read, queued for its user until the app acknowledges it: <see cref="DecoyHit"/> and the processes that started the program, nearest first.</summary>
 /// <param name="Routine">A read by a routine opener (<see cref="DecoyReads.RoutineOpener"/>): recorded, raising nothing.</param>
-public sealed record AdminEvent(long Id, DecoyHit Hit, IReadOnlyList<string> Parents, string? Routine = null);
+/// <param name="Frozen">The service froze the program for this use and blocked its network, until <c>thaw</c>.</param>
+public sealed record AdminEvent(long Id, DecoyHit Hit, IReadOnlyList<string> Parents, string? Routine = null, bool Frozen = false);
 
 /// <summary>What <c>events.wait</c> answers: the caller's events not yet acknowledged, oldest first.</summary>
 public sealed record AdminEvents(IReadOnlyList<AdminEvent> Events);
@@ -158,9 +159,9 @@ public sealed record AdminEventQueue(long NextId, IReadOnlyList<AdminEvent> Pend
 
     public static readonly AdminEventQueue Empty = new(1, []);
 
-    public (AdminEventQueue Queue, AdminEvent Added) Add(DecoyHit hit, IReadOnlyList<string> parents, string? routine = null)
+    public (AdminEventQueue Queue, AdminEvent Added) Add(DecoyHit hit, IReadOnlyList<string> parents, string? routine = null, bool frozen = false)
     {
-        var added = new AdminEvent(NextId, hit, parents, routine);
+        var added = new AdminEvent(NextId, hit, parents, routine, frozen);
         return (new(NextId + 1, [.. Pending.Append(added).TakeLast(Capacity)]), added);
     }
 
