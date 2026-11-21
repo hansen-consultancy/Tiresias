@@ -108,6 +108,7 @@ public class DoctorTests
         public IReadOnlyList<string> ExposedVariables { get; set; } = [];
         public bool Solo { get; set; }
         public bool? HelloBound { get; set; }
+        public BrokerServiceState BrokerService { get; set; }
         public DoctorVault? Vault { get; set; } = new(2, [], []);
         public int? BrokerStatus { get; set; } = 401;
         public bool Forwarder { get; set; } = true;
@@ -168,6 +169,14 @@ public class DoctorTests
         Assert.That(unbound.Detail, Does.Contain("tir trust bind-hello"));
         Assert.That((await Check(new FakeProbe { HelloBound = true }, "trust chain")).Status, Is.EqualTo(DoctorStatus.Ok));
         Assert.That((await Doctor.RunAsync(new FakeProbe())).Select(c => c.Name), Does.Not.Contain("trust chain"), "no chain to read");
+    }
+
+    [Test]
+    public async Task The_broker_process_line_follows_the_service()
+    {
+        Assert.That((await Check(new FakeProbe { Solo = true, BrokerService = BrokerServiceState.Running }, "broker process")).Status, Is.EqualTo(DoctorStatus.Ok));
+        Assert.That((await Check(new FakeProbe { Solo = true, BrokerService = BrokerServiceState.Stopped }, "broker process")).Status, Is.EqualTo(DoctorStatus.Fail));
+        Assert.That((await Check(new FakeProbe { Solo = true }, "broker process")).Detail, Does.Contain("tir solo service install"));
     }
 
     [Test]

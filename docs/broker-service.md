@@ -58,8 +58,8 @@ B can't be hardened: a process can't keep its memory from another process of the
 - `tir solo service install` (elevated): checks solo mode is set up, copies the binaries, creates
   the state folder with its ACL, copies and verifies the chain, writes `service.json`, grants read
   on the vault folder, creates and starts the service (`sc.exe`, start `auto`), and re-pins the
-  Keyring to the identity the service creates on first start (`GET /` until it answers, then the
-  identity from its offer signature, read back from the state folder's public key file).
+  Keyring to the identity the service creates on first start, which it writes as `identity.pub`
+  in its state folder.
 - `tir solo service run`: what the service manager starts. Reads `service.json`, hosts
   `BrokerHost` with `UseWindowsService`, reloads the vault when it changes (as the app does) and
   persists the marks (`Broker:HighWaterPath`).
@@ -80,5 +80,5 @@ B can't be hardened: a process can't keep its memory from another process of the
 - `BrokerStateTests`: persisted marks survive a new `BrokerState`; a vault below them is refused
   without a lease; a secret below its mark at start is left out and audited.
 - `DoctorTests`: the three "broker process" lines.
-- `ServiceLayoutTests`: paths, the `service.json` round trip, and the `sc.exe` arguments
+- `BrokerServiceLayoutTests`: paths, the `service.json` round trip, and the `sc.exe` arguments
   (binary path quoted, virtual account).

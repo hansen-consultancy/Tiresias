@@ -110,7 +110,7 @@ CI and people who prefer it, and it talks to the same agent.
   the code in step. The exception is the doctor checks, whose text comes from `Tiresias.Core` so
   that `tir doctor` and the status page say the same thing.
 
-**Not built yet:** the Windows service for the solo broker, and the "Move to a broker" wizard. The
+**Not built yet:** the "Move to a broker" wizard. The
 wizard doesn't enrol you with a broker either: use `tir enroll`, which the wizard points to. Other
 gaps: the full-JSON editor view, scanning the machine for plaintext secrets, and toasts. winget is
 also not built: install from source.
@@ -233,10 +233,11 @@ need nothing but the app.
 - The **trust chain** has one device and a genesis created on this machine. The paper recovery key
   exists as in every mode; genesis is co-signed by an Ed25519 key derived from it (HKDF, label
   `tiresias/v1/paper-signing-key`), so one sheet of paper serves both.
-- **Built so far:** `tir solo init`, the broker hosted inside the agent on `127.0.0.1:7780`, and
-  the doctor lines below. **Not built yet:** the Windows service; the broker always runs inside the
-  agent, and it restarts at unlock when the vault changed (a new secret), which ends open
-  placeholders.
+- **Built:** `tir solo init`, the broker on `127.0.0.1:7780`, and the doctor lines below. From an
+  administrator terminal, `tir solo service install` moves the broker into the service and
+  `tir solo service uninstall` moves it back ([broker-service.md](broker-service.md)). Without the
+  service the broker runs inside the agent, and restarts at unlock when the vault changed (a new
+  secret), which ends open placeholders.
 - The **control plane** is optional, exactly as with a hosted broker.
 
 ### What it keeps and what it gives up

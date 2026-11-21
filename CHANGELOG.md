@@ -8,6 +8,13 @@ its section below.
 
 ## [Unreleased]
 
+### Added
+
+- `tir solo service install` (as administrator) runs solo mode's broker as a Windows service under
+  its own account, so programs running as you can't read its memory or rewrite the files it
+  trusts, and an older `vault.json` restored while locked is refused. `tir solo service uninstall`
+  moves it back into the app.
+
 ### Changed
 
 - Trust-chain links that add a device, user or broker, or change the admin threshold, now need a

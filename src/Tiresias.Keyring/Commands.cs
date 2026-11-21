@@ -134,6 +134,27 @@ static class Commands
         return 0;
     }
 
+    /// <summary>Installs, removes or (for the service manager) runs the solo broker as a Windows service (docs/broker-service.md).</summary>
+    public static async Task<int> SoloServiceAsync(CommandLine line)
+    {
+        switch (line.At(2))
+        {
+            case "install":
+                await BrokerService.InstallAsync();
+                Console.WriteLine("The broker now runs as the Tiresias service. Start the Tiresias app again and unlock.");
+                return 0;
+            case "uninstall":
+                BrokerService.Uninstall();
+                Console.WriteLine("The Tiresias service is removed. The broker runs inside the app again from its next start.");
+                return 0;
+            case "run":
+                await BrokerService.RunAsync();
+                return 0;
+            default:
+                throw new UsageException("tir solo service install | uninstall");
+        }
+    }
+
     /// <summary>Binds this device's Hello key into the trust chain with the paper key (docs/trust-links.md).</summary>
     public static async Task<int> TrustBindHelloAsync()
     {
