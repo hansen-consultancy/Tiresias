@@ -10,6 +10,28 @@ its section below.
 
 ### Added
 
+- `tir doctor --surface` also lists what is installed: each editor's extensions with the
+  credentials that editor used through Tiresias in the last 90 days, global `dotnet`, `npm`, `pipx`
+  and `cargo` tools, and what starts at log-on with its signature and when you last opened it.
+
+- Home and `tir doctor` point out programs that start at log-on but that you haven't opened in 90
+  days, with **Turn off at log-on...**: the same switch as Task Manager's Startup tab, so Settings,
+  Apps, Startup turns it back on. Programs with a tray icon are never counted as unused, and
+  entries already turned off there are no longer reported.
+- Home and `tir doctor` check the installed-apps list against the disk: an entry for an app that
+  is gone, an app whose uninstaller is missing (reinstall it over itself), and an older version's
+  entry left after an update, whose **Uninstall** would remove the current version's files.
+  **Remove entry...** saves the entry to a `.reg` file before removing it; machine-wide entries
+  get the commands to run as an administrator.
+- Decoy credentials: `tir decoys place passwords|project|variables` puts a `passwords.txt`, an old
+  project's `appsettings.Production.json` and `.env`, or two user variables on disk, holding
+  credentials that open nothing and point to ports only Tiresias listens on. A program that finds
+  and uses one is named in the activity log while the app or `tir agent` runs. `tir decoys remove`
+  takes them all away, and `tir doctor` warns when nothing listens.
+- When a program uses a decoy credential, the app blocks it (no lockdown), shows a notification,
+  and raises a finding on Home naming the program, with **Unblock (that was me)**.
+- Home has a **Decoys** card: place `passwords.txt`, a decoy project or the decoy variables at
+  their default places, each after asking first, see what is placed, and **Remove decoys**.
 - Home and `tir doctor` find the GitHub CLI or the Azure CLI signed in as you, which any program
   running as you can use unasked. For `gh`, **Add a GitHub App...** sets up the service `tir exec`
   mints a token per run from, after you allow it. Read from each tool's own config, offline; never
@@ -29,6 +51,12 @@ its section below.
 - Home and `tir doctor` list a settings-only `secrets.json` as passing ("holds settings, not
   secrets") instead of warning that it is in plain text. Dismissing a plain-text secrets file now
   lasts only until a key is added to it.
+
+### Fixed
+
+- An app loading its user secrets through `Tiresias.Extensions.Configuration` now lets the
+  consent dialog and Windows Hello prompt come to the front, as `tir` already did, instead of
+  opening behind the IDE.
 
 ## [0.2.1] - 2026-11-20
 

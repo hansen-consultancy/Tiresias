@@ -1841,6 +1841,50 @@ Store them in clear?</value>
   <data name="Finding_FixReveal" xml:space="preserve">
     <value>Show file</value>
   </data>
+  <data name="Finding_FixDisableStartup" xml:space="preserve">
+    <value>Turn off at log-on...</value>
+  </data>
+  <data name="Finding_FixStartupSettings" xml:space="preserve">
+    <value>Open Startup apps</value>
+  </data>
+  <data name="Finding_DisableStartupHeading" xml:space="preserve">
+    <value>Stop starting {0} at log-on?</value>
+  </data>
+  <data name="Finding_DisableStartupBody" xml:space="preserve">
+    <value>It stays installed and you can open it whenever you need it. Turn it back on in Settings, Apps, Startup.</value>
+  </data>
+  <data name="Finding_TurnOff" xml:space="preserve">
+    <value>Turn off</value>
+  </data>
+  <data name="Finding_StartupOff" xml:space="preserve">
+    <value>{0} no longer starts at log-on. Turn it back on in Settings, Apps, Startup.</value>
+  </data>
+  <data name="Finding_FixRemoveEntry" xml:space="preserve">
+    <value>Remove entry...</value>
+  </data>
+  <data name="Finding_RemoveEntryHeading" xml:space="preserve">
+    <value>Remove the entry for {0}?</value>
+  </data>
+  <data name="Finding_RemoveEntryBody" xml:space="preserve">
+    <value>Tiresias saves the entry to a .reg file first, then removes it from the installed apps list. Nothing on disk is deleted. Open the saved file to put the entry back.</value>
+  </data>
+  <data name="Finding_EntryRemoved" xml:space="preserve">
+    <value>Removed the entry for {0}. It is saved in {1}; open that file to put it back.</value>
+  </data>
+  <data name="Finding_FixUnblock" xml:space="preserve">
+    <value>Unblock (that was me)</value>
+  </data>
+  <data name="Notify_Decoy_Title" xml:space="preserve">
+    <value>A program used a decoy credential</value>
+  </data>
+  <data name="Notify_Decoy_Body" xml:space="preserve">
+    <value>{0} connected with {1}. Tiresias blocked it until you review it on Home.</value>
+    <comment>{0}: program file name; {1}: which decoy, e.g. "the decoy admin token"</comment>
+  </data>
+  <data name="Notify_Decoy_Unknown" xml:space="preserve">
+    <value>A program connected with {0}, but it couldn't be named. See Home.</value>
+    <comment>{0}: which decoy</comment>
+  </data>
   <data name="Finding_RemoveExtensionHeading" xml:space="preserve">
     <value>Remove {0} from {1}?</value>
   </data>
@@ -2107,5 +2151,68 @@ Store them in clear?</value>
   </data>
   <data name="Secrets_NothingToSeal" xml:space="preserve">
     <value>Nothing to seal: this file holds no keys.</value>
+  </data>
+  <data name="Decoys_Title" xml:space="preserve">
+    <value>Decoys</value>
+  </data>
+  <data name="Decoys_Intro" xml:space="preserve">
+    <value>Fake credentials that work nowhere. A program that uses one is named and blocked until you say it was you.</value>
+  </data>
+  <data name="Decoys_Since" xml:space="preserve">
+    <value>Placed {0:g}</value>
+    <comment>{0}: when it was placed</comment>
+  </data>
+  <data name="Decoys_Passwords" xml:space="preserve">
+    <value>passwords.txt</value>
+  </data>
+  <data name="Decoys_Passwords_Place" xml:space="preserve">
+    <value>Place passwords.txt</value>
+  </data>
+  <data name="Decoys_Project" xml:space="preserve">
+    <value>Decoy project</value>
+  </data>
+  <data name="Decoys_Project_Place" xml:space="preserve">
+    <value>Place a decoy project</value>
+  </data>
+  <data name="Decoys_Variables" xml:space="preserve">
+    <value>Decoy environment variables</value>
+  </data>
+  <data name="Decoys_Variables_Place" xml:space="preserve">
+    <value>Set decoy variables</value>
+  </data>
+  <data name="Decoys_WhereProject" xml:space="preserve">
+    <value>{0}, a new folder with an appsettings.Production.json and a .env</value>
+    <comment>{0}: the folder</comment>
+  </data>
+  <data name="Decoys_WhereVariables" xml:space="preserve">
+    <value>the user environment variables {0}</value>
+    <comment>{0}: the variable names</comment>
+  </data>
+  <data name="Decoys_PlaceBody" xml:space="preserve">
+    <value>Tiresias creates {0}, holding a fake database password, admin token and API key that work nowhere. Nothing that exists is changed. A program that uses one is named and blocked. Remove decoys takes it away again.</value>
+    <comment>{0}: the file, folder or variables</comment>
+  </data>
+  <data name="Decoys_PlaceAction" xml:space="preserve">
+    <value>Place</value>
+  </data>
+  <data name="Decoys_Remove" xml:space="preserve">
+    <value>Remove decoys</value>
+  </data>
+  <data name="Decoys_RemoveHeading" xml:space="preserve">
+    <value>Remove every decoy?</value>
+  </data>
+  <data name="Decoys_RemoveBody" xml:space="preserve">
+    <value>Tiresias deletes the files and variables it placed, and a decoy folder when nothing else is in it.</value>
+  </data>
+  <data name="Decoys_RemoveAction" xml:space="preserve">
+    <value>Remove</value>
+  </data>
+  <data name="Decoys_RemoveLeft" xml:space="preserve">
+    <value>Couldn't remove: {0}</value>
+    <comment>{0}: paths or variable names</comment>
+  </data>
+  <data name="Decoys_RemoveKept" xml:space="preserve">
+    <value>Kept {0}: changed since Tiresias placed it, so it is yours now.</value>
+    <comment>{0}: paths or variable names</comment>
   </data>
 </root>
