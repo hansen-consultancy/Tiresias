@@ -19,7 +19,7 @@ public static class AlertSources
 
 /// <summary>
 /// The app's alerting, sources to sinks (docs/alerts.md): events go through <see cref="AlertPlanner"/>
-/// into the <see cref="AlertSender"/>. Until the first <see cref="Use"/> (the first unlock opens
+/// into the <see cref="AlertSender"/>, or to the <see cref="LcdHubLink"/> for an LcdHub sink. Until the first <see cref="Use"/> (the first unlock opens
 /// <c>alerts.json</c>) events wait here; after that the configuration stays in memory, locked or not,
 /// until the app exits.
 /// </summary>
@@ -30,7 +30,11 @@ public sealed class AlertCenter : IAsyncDisposable
 
     static readonly TimeSpan TickEvery = TimeSpan.FromMinutes(1);
 
+    /// <summary>How long <b>Send a test alert</b> waits for an LcdHub to take the item.</summary>
+    static readonly TimeSpan HubTestWait = TimeSpan.FromSeconds(3);
+
     readonly HttpAlertTransport transport;
+    readonly LcdHubLink? hub;
     readonly TimeProvider time;
     readonly Lock gate = new();
     readonly Queue<AlertEvent> waiting = new();
@@ -40,9 +44,11 @@ public sealed class AlertCenter : IAsyncDisposable
     AlertState state = AlertState.Empty;
     bool opened;
 
-    public AlertCenter(HttpAlertTransport transport, TimeProvider time, Action<string> log)
+    /// <param name="hub">Where LcdHub sinks show; <c>null</c> drops their deliveries.</param>
+    public AlertCenter(HttpAlertTransport transport, TimeProvider time, Action<string> log, LcdHubLink? hub = null)
     {
         this.transport = transport;
+        this.hub = hub;
         this.time = time;
         Sender = new AlertSender(transport, time, log);
     }
@@ -73,7 +79,10 @@ public sealed class AlertCenter : IAsyncDisposable
             config = current;
             setup = current?.Setup(narrowing);
             opened = true;
-            Sender.Configure(current?.Live(narrowing) ?? []);
+            var live = current?.Live(narrowing) ?? [];
+            Sender.Configure(live.Where(s => s is not LcdHubSink));
+            if (!live.Any(s => s is LcdHubSink))
+                hub?.ClearAll();
             while (waiting.TryDequeue(out var e))
                 Plan(e);
         }
@@ -108,11 +117,22 @@ public sealed class AlertCenter : IAsyncDisposable
         var only = new AlertSetup(current.Machine, current.InstallKey, [new SinkDefinition(sink.Id, AlertSeverity.Info, sink.Redaction)]);
         var now = time.GetUtcNow();
         var plan = AlertPlanner.Plan(new(AlertKind.AlertsTest, AlertSubject.None, now), only, AlertState.Empty, now);
-        var result = await transport.DeliverAsync(plan.Now.Single().Payload, sink, ct);
+        var payload = plan.Now.Single().Payload;
+        if (sink is LcdHubSink)
+            return hub is not null && await hub.ShowAndWaitAsync(payload, HubTestWait, ct)
+                ? new(DeliveryStatus.Delivered)
+                : new(DeliveryStatus.Retry, Error: NoHub);
+        var result = await transport.DeliverAsync(payload, sink, ct);
         if (result.Status == DeliveryStatus.Delivered)
             Sender.Resume(sinkId);
         return result;
     }
+
+    /// <summary><see cref="DeliveryResult.Error"/> when no LcdHub took a test alert.</summary>
+    public const string NoHub = "NoHub";
+
+    /// <summary>Home showed the findings: the user is back, so the LcdHub's "while you were away" items go.</summary>
+    public void FindingsShown() => hub?.ClearAll();
 
     /// <summary>Releases what time alone sends: dedupe <c>count</c> summaries and <c>alerts.suppressed</c>.</summary>
     public void Tick()
@@ -134,7 +154,12 @@ public sealed class AlertCenter : IAsyncDisposable
     {
         state = plan.Next;
         foreach (var delivery in plan.Now)
-            Sender.Enqueue(delivery);
+        {
+            if (config?.Sinks.FirstOrDefault(s => s.Id == delivery.SinkId) is LcdHubSink)
+                hub?.Show(delivery.Payload);
+            else
+                Sender.Enqueue(delivery);
+        }
     }
 
     public async ValueTask DisposeAsync()
@@ -142,5 +167,7 @@ public sealed class AlertCenter : IAsyncDisposable
         if (ticker is not null)
             await ticker.DisposeAsync();
         await Sender.DisposeAsync();
+        if (hub is not null)
+            await hub.DisposeAsync();
     }
 }

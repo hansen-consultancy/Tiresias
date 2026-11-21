@@ -16,7 +16,9 @@ internal sealed class AppAlerts : IAsyncDisposable
 
     public AppAlerts()
     {
-        Center = new AlertCenter(new HttpAlertTransport(), TimeProvider.System, AppLog.Info);
+        // A demo runs beside the installed app, so it leaves the real LcdHub to that app.
+        Center = new AlertCenter(new HttpAlertTransport(), TimeProvider.System, AppLog.Info,
+            DemoMode.On ? null : new LcdHubLink(TimeProvider.System, AppLog.Info));
         Center.Start();
     }
 

@@ -5,8 +5,16 @@ using Tiresias.Protocol;
 
 namespace Tiresias.App.Views;
 
+/// <summary>Which sink <see cref="AlertSinkWindow"/> adds.</summary>
+public enum SinkForm
+{
+    Webhook,
+    Ntfy,
+    LcdHub,
+}
+
 /// <summary>
-/// <b>Add a webhook</b> or <b>Add ntfy</b> (docs/alerts.md): a sealed save of <c>alerts.json</c> with the
+/// <b>Add a webhook</b>, <b>Add ntfy</b> or <b>Add LcdHub</b> (docs/alerts.md): a sealed save of <c>alerts.json</c> with the
 /// unlocked Windows Hello wrapper. The first sink also asks for the machine label. Kept out of screen
 /// capture: the URL, header, topic and token can be credentials.
 /// </summary>
@@ -15,22 +23,25 @@ public partial class AlertSinkWindow : Window
     static readonly AlertSeverity[] Thresholds = [AlertSeverity.Critical, AlertSeverity.High, AlertSeverity.Warning, AlertSeverity.Info];
 
     readonly bool needsMachine;
-    readonly bool ntfy;
+    readonly SinkForm form;
 
-    /// <param name="ntfy">The ntfy form; otherwise the webhook form.</param>
-    public AlertSinkWindow(bool ntfy)
+    public AlertSinkWindow(SinkForm form)
     {
         InitializeComponent();
         Desktop.ExcludeFromCapture(this);
-        this.ntfy = ntfy;
-        Title = Heading.Text = Text.Get(ntfy ? "Alerts_NtfyWindowTitle" : "Alerts_WindowTitle");
-        Intro.Text = Text.Get(ntfy ? "Alerts_NtfyWindowIntro" : "Alerts_WindowIntro");
-        WebhookFields.Visibility = ntfy ? Visibility.Collapsed : Visibility.Visible;
-        NtfyFields.Visibility = ntfy ? Visibility.Visible : Visibility.Collapsed;
+        this.form = form;
+        Title = Heading.Text = Text.Get(form switch { SinkForm.Ntfy => "Alerts_NtfyWindowTitle", SinkForm.LcdHub => "Alerts_LcdHubWindowTitle", _ => "Alerts_WindowTitle" });
+        Intro.Text = Text.Get(form switch { SinkForm.Ntfy => "Alerts_NtfyWindowIntro", SinkForm.LcdHub => "Alerts_LcdHubWindowIntro", _ => "Alerts_WindowIntro" });
+        WebhookFields.Visibility = form == SinkForm.Webhook ? Visibility.Visible : Visibility.Collapsed;
+        NtfyFields.Visibility = form == SinkForm.Ntfy ? Visibility.Visible : Visibility.Collapsed;
+        TrustedField.Visibility = form == SinkForm.LcdHub ? Visibility.Collapsed : Visibility.Visible;
         needsMachine = App.Current.Alerts.Center.Config is null;
         MachineField.Visibility = needsMachine ? Visibility.Visible : Visibility.Collapsed;
         ThresholdBox.ItemsSource = new[] { Text.Get("Alerts_Critical"), Text.Get("Alerts_High"), Text.Get("Alerts_Warning"), Text.Get("Alerts_Info") };
-        ThresholdBox.SelectedIndex = 1;
+        // Defaults per docs/alerts.md: LcdHub warning, the others high.
+        ThresholdBox.SelectedIndex = form == SinkForm.LcdHub ? 2 : 1;
+        if (form == SinkForm.LcdHub)
+            IdBox.Text = "desk";
         Loaded += (_, _) => (needsMachine ? MachineBox : IdBox).Focus();
     }
 
@@ -39,13 +50,17 @@ public partial class AlertSinkWindow : Window
 
     async void OnSave(object sender, RoutedEventArgs e)
     {
-        var existing = App.Current.Alerts.Center.Config?.Sinks.Select(s => s.Id) ?? [];
+        var sinks = App.Current.Alerts.Center.Config?.Sinks ?? [];
+        var existing = sinks.Select(s => s.Id);
         var threshold = Thresholds[Math.Max(0, ThresholdBox.SelectedIndex)];
         var trusted = TrustedBox.IsChecked == true;
-        var (sink, problem) = ntfy
-            ? AlertsCard.BuildNtfy(needsMachine, MachineBox.Text, IdBox.Text, ServerBox.Text, TopicBox.Text, TokenBox.Password, threshold, trusted, existing)
-            : ((AlertSink?, Phrase?))AlertsCard.Build(needsMachine, MachineBox.Text, IdBox.Text, UrlBox.Text, HeaderNameBox.Text, HeaderValueBox.Password,
-                threshold, trusted, existing);
+        var (sink, problem) = form switch
+        {
+            SinkForm.Ntfy => AlertsCard.BuildNtfy(needsMachine, MachineBox.Text, IdBox.Text, ServerBox.Text, TopicBox.Text, TokenBox.Password, threshold, trusted, existing),
+            SinkForm.LcdHub => AlertsCard.BuildLcdHub(needsMachine, MachineBox.Text, IdBox.Text, threshold, sinks),
+            _ => ((AlertSink?, Phrase?))AlertsCard.Build(needsMachine, MachineBox.Text, IdBox.Text, UrlBox.Text, HeaderNameBox.Text, HeaderValueBox.Password,
+                threshold, trusted, existing),
+        };
         if (problem is not null)
         {
             Message.Text = Text.Of(problem);

@@ -84,7 +84,7 @@
           <ComboBox x:Name="ThresholdBox" HorizontalAlignment="Left" MinWidth="220" AutomationProperties.LabeledBy="{Binding ElementName=ThresholdLabel}" />
         </StackPanel>
 
-        <StackPanel Style="{StaticResource Field}">
+        <StackPanel x:Name="TrustedField" Style="{StaticResource Field}">
           <CheckBox x:Name="TrustedBox" Content="{l:S Alerts_Trusted}" />
           <TextBlock Text="{l:S Alerts_TrustedHint}" Style="{StaticResource Hint}" Margin="28,0,0,0" />
         </StackPanel>

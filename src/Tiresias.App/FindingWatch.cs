@@ -39,7 +39,7 @@ static class FindingWatch
 
     public static void Stop() => timer?.Stop();
 
-    /// <summary>Home showed these checks' findings: they are seen, and the badge clears.</summary>
+    /// <summary>Home showed these checks' findings: they are seen, the badge clears, and so do the LcdHub's alert items.</summary>
     public static void Shown(IReadOnlyList<DoctorCheck> checks)
     {
         var open = FindingBadge.Open(checks, DismissalStore.Load());
@@ -55,6 +55,7 @@ static class FindingWatch
             AppLog.Error(e, "seen findings");
         }
         Set(0);
+        App.Current.Alerts.Center.FindingsShown();
     }
 
     /// <summary>Runs the checks off the UI thread, unless Home is running them itself.</summary>

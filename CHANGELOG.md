@@ -10,6 +10,9 @@ its section below.
 
 ### Added
 
+- Alerts on an LcdHub screen: **About**, **Alerts**, **Add LcdHub...** shows serious events as a
+  line in the status strip of the LcdHub running on this PC, such as "Decoy credential used ×1",
+  until Home shows your findings or for 24 hours. It shows only the event and its count.
 - Alerts to your phone through ntfy: **About**, **Alerts**, **Add ntfy...** pushes the same events
   to an ntfy topic on ntfy.sh or your own server, with the severity as the notification's priority.
   The topic and an optional access token are sealed like a webhook's URL and saving needs Windows
