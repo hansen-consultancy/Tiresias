@@ -31,6 +31,8 @@ public enum FixAction
     Unblock,
     /// <summary>The Services page's add form, its address filled in.</summary>
     AddService,
+    /// <summary>Settings, Apps, Installed apps, where the user uninstalls a program.</summary>
+    OpenInstalledApps,
 }
 
 /// <summary>
@@ -95,6 +97,7 @@ public static class FindingView
         UnblockProgram => (FixAction.Unblock, "Finding_FixUnblock"),
         RunThroughExec { Setup: not null } => (FixAction.AddService, "Finding_FixGitHubApp"),
         RunThroughExec => (FixAction.CopyCommand, "Finding_FixCopy"),
+        UninstallApp => (FixAction.OpenInstalledApps, "Finding_FixInstalledApps"),
         _ => null,
     };
 

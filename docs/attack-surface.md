@@ -1,6 +1,6 @@
 # Attack surface: less software, less to trust
 
-Status: **first slice, log-on use, uninstall-entry checks and `tir doctor --surface` built** (#34, #55); the rest is design. [Guided setup](guided-setup.md) phase 5: it builds on the
+Status: **first slice, log-on use, uninstall-entry checks, unused applications and `tir doctor --surface` built** (#34, #55); the rest is design. [Guided setup](guided-setup.md) phase 5: it builds on the
 findings `tir doctor` reports since phase 1 and the findings section, fixes and dismissals the app
 gets in phase 2.
 
@@ -304,11 +304,16 @@ offline Authenticode check, the blocklist, and reach from the activity and audit
 the extension, unsigned-at-startup and blocked-program findings with **Remove...** and **Show
 file**. **Log-on use is built** too: last use from UserAssist, and the "starts at log-on, rarely
 used" finding with `DisableStartup`, never for a program whose last use is unknown, one with a tray
-icon, or Tiresias itself. **Uninstall entries are checked** too: user and machine entries against the disk, raising
-the gone, can't-be-uninstalled and stale-duplicate findings, with **Remove entry...** for the
-user's own entries and the commands for machine-wide ones; `Repair` names winget's command once
-the inventory knows the package id, and the steps until then. [Guided setup](guided-setup.md#phases)
-lists what is still design.
+icon, or Tiresias itself. **Uninstall entries are checked** as well: user and machine entries
+against the disk, raising the gone, can't-be-uninstalled and stale-duplicate findings, with
+**Remove entry...** for the user's own entries and the commands for machine-wide ones; `Repair`
+names winget's command once the inventory knows the package id, and the steps until then.
+**Unused applications are found**: an installed program whose folder had nothing opened in 90
+days (UserAssist), never one with no recorded run or one that runs unseen (a tray icon, a service,
+a driver, a log-on entry, a folder on `PATH`), nor one that used a credential. It is a finding with
+status `ok`, so it sorts last and doesn't count for the badge, and its fix, `UninstallApp`, opens
+Settings, Apps, Installed apps until the inventory knows each program's installer command.
+[Guided setup](guided-setup.md#phases) lists what is still design.
 
 1. **Inventory**: applications, extensions, global tools and startup entries, with last use where
    known, as `tir doctor --surface` facts and the app's **Installed** list. No online lookups.
