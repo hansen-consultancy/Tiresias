@@ -186,7 +186,7 @@ When the last set is released, or at start with no set held, it turns it off aga
 turned it on; one that was on before stays on. While on, any other SACL on the machine logs too:
 that is Windows' setting, not Tiresias's, and it ends with the last set.
 
-**Reading.** The service reads event 4663 from the Security log (`EventLogWatcher`) from the last
+**Reading.** The service reads event 4663 from the Security log every 2 s (an `EventLogReader`: a subscription ignores the query's record id) from the last
 record it handled, kept in `audit.json`: reads made while the service was stopped (or the machine
 off) are read at its next start, as long as the log still has them. The first time, it starts at
 the log's end. An event is a read when its mask has `FILE_READ_DATA` and it names a held file; it
