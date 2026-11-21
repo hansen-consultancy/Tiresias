@@ -1,0 +1,43 @@
+// A developer's laptop a few weeks in: three projects, two of them protected, a vault with two
+// services, recent activity, and the findings a busy machine has (a plain secrets.json, a key in
+// the Windows environment, a NuGet password in clear, a stored git token). Everything is made up.
+{
+  "description": "A developer's laptop a few weeks in, with a few findings",
+  "setUp": true,
+  "unlocked": true,
+  "files": {
+    "source/ShopApi/ShopApi.csproj": "<Project Sdk=\"Microsoft.NET.Sdk.Web\">\n  <PropertyGroup>\n    <TargetFramework>net10.0</TargetFramework>\n    <UserSecretsId>5f0c2a6e-0b1d-4c55-9a51-0d3e7c1f2a10</UserSecretsId>\n  </PropertyGroup>\n</Project>\n",
+    "source/BillingWorker/BillingWorker.csproj": "<Project Sdk=\"Microsoft.NET.Sdk.Worker\">\n  <PropertyGroup>\n    <TargetFramework>net10.0</TargetFramework>\n    <UserSecretsId>a7d41f0b-6c2e-4f8a-b3a9-61c0e5d2b7c4</UserSecretsId>\n  </PropertyGroup>\n</Project>\n",
+    "source/LegacyPortal/LegacyPortal.csproj": "<Project Sdk=\"Microsoft.NET.Sdk.Web\">\n  <PropertyGroup>\n    <TargetFramework>net8.0</TargetFramework>\n    <UserSecretsId>c3e9b812-47d5-4a0e-8f6b-2b1a9e0d5f37</UserSecretsId>\n  </PropertyGroup>\n</Project>\n",
+    "AppData/Roaming/Microsoft/UserSecrets/c3e9b812-47d5-4a0e-8f6b-2b1a9e0d5f37/secrets.json": "{\n  \"ConnectionStrings:Portal\": \"Server=sql.example.com;Database=portal;User Id=portal;Password=Demo-Passw0rd!\",\n  \"Smtp:Password\": \"demo-smtp-password\"\n}\n",
+    "AppData/Local/Tiresias/projects.json": "{\n  \"folders\": [\"{{profile}}\\\\source\"],\n  \"projects\": [\n    { \"path\": \"{{profile}}\\\\source\\\\ShopApi\\\\ShopApi.csproj\", \"id\": \"5f0c2a6e-0b1d-4c55-9a51-0d3e7c1f2a10\" },\n    { \"path\": \"{{profile}}\\\\source\\\\BillingWorker\\\\BillingWorker.csproj\", \"id\": \"a7d41f0b-6c2e-4f8a-b3a9-61c0e5d2b7c4\" },\n    { \"path\": \"{{profile}}\\\\source\\\\LegacyPortal\\\\LegacyPortal.csproj\", \"id\": \"c3e9b812-47d5-4a0e-8f6b-2b1a9e0d5f37\" }\n  ]\n}\n",
+    "AppData/Local/Tiresias/vault.json": "{\n  \"version\": 1,\n  \"secrets\": [],\n  \"services\": [\n    { \"slug\": \"llm\", \"upstream\": \"https://llm.example.com/\", \"grants\": [\n      { \"name\": \"default\", \"secretSlug\": \"llm-key\", \"requiresElevation\": false, \"methods\": [\"GET\", \"POST\"], \"allow\": [\"^/v1/.*\"], \"deny\": [], \"maxBodyBytes\": null }\n    ] },\n    { \"slug\": \"payments\", \"upstream\": \"https://api.payments.example.com/\", \"grants\": [\n      { \"name\": \"read\", \"secretSlug\": \"payments-read\", \"requiresElevation\": false, \"methods\": [\"GET\"], \"allow\": [\"^/v2/.*\"], \"deny\": [], \"maxBodyBytes\": null },\n      { \"name\": \"refunds\", \"secretSlug\": \"payments-admin\", \"requiresElevation\": true, \"methods\": [\"POST\"], \"allow\": [\"^/v2/refunds$\"], \"deny\": [], \"maxBodyBytes\": 65536 }\n    ] }\n  ]\n}\n",
+    "AppData/Local/Tiresias/activity.jsonl": "{\"prevHash\":\"0\",\"time\":\"{{now-3d}}\",\"kind\":\"Allow\",\"consumer\":\"usersecrets\",\"service\":\"usersecrets/5f0c2a6e-0b1d-4c55-9a51-0d3e7c1f2a10\",\"process\":\"{{profile}}\\\\source\\\\ShopApi\\\\bin\\\\Debug\\\\net10.0\\\\ShopApi.exe\"}\n{\"prevHash\":\"0\",\"time\":\"{{now-26h}}\",\"kind\":\"Allow\",\"consumer\":\"usersecrets\",\"service\":\"usersecrets/a7d41f0b-6c2e-4f8a-b3a9-61c0e5d2b7c4\",\"process\":\"{{profile}}\\\\source\\\\BillingWorker\\\\bin\\\\Debug\\\\net10.0\\\\BillingWorker.exe\"}\n{\"prevHash\":\"0\",\"time\":\"{{now-3h}}\",\"kind\":\"Allow\",\"consumer\":\"usersecrets\",\"service\":\"usersecrets/5f0c2a6e-0b1d-4c55-9a51-0d3e7c1f2a10\",\"process\":\"{{profile}}\\\\source\\\\ShopApi\\\\bin\\\\Debug\\\\net10.0\\\\ShopApi.exe\"}\n{\"prevHash\":\"0\",\"time\":\"{{now-2h}}\",\"kind\":\"Deny\",\"consumer\":\"usersecrets\",\"service\":\"usersecrets/5f0c2a6e-0b1d-4c55-9a51-0d3e7c1f2a10\",\"reason\":\"denied by you\",\"process\":\"C:\\\\Tools\\\\unknown-sync.exe\"}\n{\"prevHash\":\"0\",\"time\":\"{{now-40m}}\",\"kind\":\"Allow\",\"consumer\":\"usersecrets\",\"service\":\"usersecrets/a7d41f0b-6c2e-4f8a-b3a9-61c0e5d2b7c4\",\"process\":\"{{profile}}\\\\source\\\\BillingWorker\\\\bin\\\\Debug\\\\net10.0\\\\BillingWorker.exe\"}\n",
+    "AppData/Roaming/NuGet/NuGet.Config": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<configuration>\n  <packageSources>\n    <add key=\"nuget.org\" value=\"https://api.nuget.org/v3/index.json\" />\n    <add key=\"team\" value=\"https://pkgs.example.com/team/nuget/v3/index.json\" />\n  </packageSources>\n  <packageSourceCredentials>\n    <team>\n      <add key=\"Username\" value=\"alice\" />\n      <add key=\"ClearTextPassword\" value=\"demo-feed-token-0123456789\" />\n    </team>\n  </packageSourceCredentials>\n</configuration>\n",
+    ".gitconfig": "[user]\n\tname = Alice\n\temail = alice@example.com\n[credential]\n\thelper = store\n",
+    ".git-credentials": "https://alice:ghp_demo0000000000000000000000000000000000@github.com\n"
+  },
+  "secrets": {
+    "llm-key": "sk-demo-0000000000000000000000000000",
+    "payments-read": "rk_demo_read_000000000000",
+    "payments-admin": "sk_demo_admin_000000000000"
+  },
+  "userSecrets": {
+    "5f0c2a6e-0b1d-4c55-9a51-0d3e7c1f2a10": {
+      "ConnectionStrings": { "Shop": "Server=db.example.com;Database=shop;User Id=shop;Password=Demo-Shop-1!" },
+      "Payments": { "ApiKey": "sk_demo_shop_000000000000" }
+    },
+    "a7d41f0b-6c2e-4f8a-b3a9-61c0e5d2b7c4": {
+      "ConnectionStrings": { "Billing": "Server=db.example.com;Database=billing;User Id=billing;Password=Demo-Bill-1!" },
+      "Queue": { "ConnectionString": "Endpoint=sb://queue.example.com/;SharedAccessKeyName=worker;SharedAccessKey=ZGVtbw==" }
+    }
+  },
+  "variables": {
+    "OPENAI_API_KEY": "sk-demo-1111111111111111111111111111",
+    "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+    "JAVA_HOME": "C:\\Program Files\\Java\\jdk-21"
+  },
+  "sealedVariables": {
+    "GITHUB_TOKEN": "ghp_demo1111111111111111111111111111111111"
+  }
+}

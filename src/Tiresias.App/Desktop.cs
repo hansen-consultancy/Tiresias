@@ -18,10 +18,13 @@ static partial class Desktop
 
     /// <summary>
     /// Keeps a window out of screenshots, screen recordings and screen sharing (it shows as black),
-    /// for windows that can show a secret value or the recovery key.
+    /// for windows that can show a secret value or the recovery key. Not in demo mode: its values are made up.
     /// </summary>
-    public static void ExcludeFromCapture(Window window) =>
-        window.SourceInitialized += (_, _) => SetWindowDisplayAffinity(new WindowInteropHelper(window).Handle, WdaExcludeFromCapture);
+    public static void ExcludeFromCapture(Window window)
+    {
+        if (!DemoMode.On)
+            window.SourceInitialized += (_, _) => SetWindowDisplayAffinity(new WindowInteropHelper(window).Handle, WdaExcludeFromCapture);
+    }
 
     /// <summary>Whether the taskbar is light, which picks the tray icon that stays visible on it.</summary>
     public static bool TaskbarIsLight()
@@ -65,6 +68,9 @@ static partial class Desktop
     {
         if (!Tiresias.Client.RemoveExtension.IsSafeId(remove.Id))
             return false;
+        // The host's CLI would remove it from the real machine.
+        if (DemoMode.On)
+            return true;
         var start = new ProcessStartInfo("cmd.exe") { UseShellExecute = false, CreateNoWindow = true };
         foreach (var argument in new[] { "/d", "/c", remove.Host.Cli, "--uninstall-extension", remove.Id })
             start.ArgumentList.Add(argument);
@@ -106,6 +112,15 @@ static partial class Desktop
     /// <returns>Whether it went; one open in another program stays where it is.</returns>
     public static unsafe bool Recycle(string directory)
     {
+        // The demo's files would land in the real Recycle Bin.
+        if (DemoMode.On)
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+            else
+                File.Delete(directory);
+            return true;
+        }
         const uint Delete = 3;
         const ushort AllowUndo = 0x40, NoConfirmation = 0x10, Silent = 0x4, NoErrorUi = 0x400;
         // The shell takes a list of paths ended by an empty one.

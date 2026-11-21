@@ -22,7 +22,7 @@ static partial class SurfaceProbe
 
     public static IEnumerable<InstalledExtension> Extensions()
     {
-        var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var profile = UserMachine.Folder(Environment.SpecialFolder.UserProfile);
         return Hosts.SelectMany(h => Doctor.Extensions(h.Host, ReadOrNull(Path.Combine(profile, h.Folder, "extensions", "extensions.json"))));
     }
 
@@ -31,16 +31,16 @@ static partial class SurfaceProbe
     public static IEnumerable<StartupEntry> StartupEntries()
     {
         List<StartupEntry> entries = [];
-        foreach (var (hive, where) in new[] { (Registry.CurrentUser, "Run key"), (Registry.LocalMachine, "machine Run key") })
+        foreach (var (hive, where) in new[] { (UserMachine.CurrentUser, "Run key"), (UserMachine.LocalMachine, "machine Run key") })
         {
-            using var key = hive.OpenSubKey(RunKey);
+            using var key = hive?.OpenSubKey(RunKey);
             if (key is null)
                 continue;
             foreach (var name in key.GetValueNames())
                 if (key.GetValue(name) is string command && Doctor.ExecutableIn(Environment.ExpandEnvironmentVariables(command)) is { } path)
                     entries.Add(Entry(name, where, path));
         }
-        var folder = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
+        var folder = UserMachine.Folder(Environment.SpecialFolder.Startup);
         if (Directory.Exists(folder))
             foreach (var file in Directory.EnumerateFiles(folder))
                 if (Path.GetExtension(file).Equals(".exe", StringComparison.OrdinalIgnoreCase))

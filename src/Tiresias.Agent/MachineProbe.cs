@@ -6,7 +6,6 @@ using Tiresias.Decoys;
 using Tiresias.EnvironmentVariables;
 using Tiresias.Protocol;
 using Tiresias.Vault;
-using Microsoft.Extensions.Configuration.UserSecrets;
 
 namespace Tiresias.Agent;
 
@@ -68,6 +67,8 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public async Task<bool> ForwarderListeningAsync()
     {
+        if (DemoMode.On)
+            return false;
         using var tcp = new TcpClient();
         try
         {
@@ -82,9 +83,8 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public IEnumerable<DoctorFile> UserSecretsFiles()
     {
-        // %APPDATA%\Microsoft\UserSecrets\<id>\secrets.json: the root is two levels up from any id's file.
-        var root = Path.GetDirectoryName(Path.GetDirectoryName(PathHelper.GetSecretsPathFromSecretsId("x")));
-        if (root is null || !Directory.Exists(root))
+        var root = UserMachine.UserSecretsRoot;
+        if (!Directory.Exists(root))
             return [];
         return Directory.EnumerateFiles(root, SecretsFile.FileName, SearchOption.AllDirectories).Select(Read);
     }
@@ -116,15 +116,15 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     {
         get
         {
-            var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            var profile = UserMachine.Folder(Environment.SpecialFolder.UserProfile);
             return DoctorGitCredentials.From(Read(Path.Combine(profile, ".gitconfig")).Text, Read(Path.Combine(profile, ".git-credentials")).Text);
         }
     }
 
     public IEnumerable<DoctorToolFile> ToolFiles()
     {
-        var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        var own = NuGetConfig.Files(null, Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData))
+        var profile = UserMachine.Folder(Environment.SpecialFolder.UserProfile);
+        var own = NuGetConfig.Files(null, UserMachine.Folder(Environment.SpecialFolder.ApplicationData))
             .Append(Path.Combine(profile, ".npmrc")).Append(Path.Combine(profile, ".pypirc")).Where(File.Exists).ToArray();
         return own.Select(path => (Path: path, InProfile: true))
             .Concat(Found.Tools.Where(path => !own.Contains(path, StringComparer.OrdinalIgnoreCase)).Select(path => (Path: path, InProfile: false)))
@@ -166,10 +166,10 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     {
         get
         {
-            var gh = Environment.GetEnvironmentVariable("GH_CONFIG_DIR") is { Length: > 0 } ghDir ? ghDir
-                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GitHub CLI");
-            var az = Environment.GetEnvironmentVariable("AZURE_CONFIG_DIR") is { Length: > 0 } azDir ? azDir
-                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".azure");
+            var gh = !DemoMode.On && Environment.GetEnvironmentVariable("GH_CONFIG_DIR") is { Length: > 0 } ghDir ? ghDir
+                : Path.Combine(UserMachine.Folder(Environment.SpecialFolder.ApplicationData), "GitHub CLI");
+            var az = !DemoMode.On && Environment.GetEnvironmentVariable("AZURE_CONFIG_DIR") is { Length: > 0 } azDir ? azDir
+                : Path.Combine(UserMachine.Folder(Environment.SpecialFolder.UserProfile), ".azure");
             return new(Existing(Path.Combine(gh, "hosts.yml")), Existing(Path.Combine(az, "azureProfile.json")));
 
             static DoctorFile? Existing(string path) => File.Exists(path) ? Read(path) : null;

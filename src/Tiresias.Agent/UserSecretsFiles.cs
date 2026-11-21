@@ -1,5 +1,4 @@
 using System.Text.Json.Nodes;
-using Microsoft.Extensions.Configuration.UserSecrets;
 using Tiresias.Protocol;
 using Tiresias.UserSecrets;
 using Tiresias.Vault;
@@ -24,9 +23,9 @@ public sealed record UserSecretsFolder(string Id, string Directory)
 public static class UserSecretsFiles
 {
     /// <summary><c>%APPDATA%\Microsoft\UserSecrets</c>: where every project's folder lives.</summary>
-    public static string Root { get; } = Path.GetDirectoryName(Path.GetDirectoryName(PathHelper.GetSecretsPathFromSecretsId("x")))!;
+    public static string Root => UserMachine.UserSecretsRoot;
 
-    public static UserSecretsFolder Folder(string id) => new(id, Path.GetDirectoryName(PathHelper.GetSecretsPathFromSecretsId(id))!);
+    public static UserSecretsFolder Folder(string id) => new(id, Path.Combine(Root, id));
 
     /// <summary>Every folder holding a <c>secrets.json</c>, by id.</summary>
     public static IReadOnlyList<UserSecretsFolder> All() =>

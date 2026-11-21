@@ -55,12 +55,24 @@ public partial class App : Application
             args.SetObserved();
         };
 
-        instance = new Mutex(initiallyOwned: true, $@"Local\Tiresias.App.{Environment.UserName}", out var first);
-        if (!first && !await TakeOverAsync())
+        string? demo = null;
+#if DEBUG
+        demo = Demo.Requested(e.Args);
+#endif
+        // Demo mode runs beside the real app, one demo at a time.
+        instance = new Mutex(initiallyOwned: true, demo is null ? $@"Local\Tiresias.App.{Environment.UserName}" : $@"Local\Tiresias.Demo.{Environment.UserName}", out var first);
+        if (!first && (demo is not null || !await TakeOverAsync()))
         {
+            if (demo is not null)
+                AskWindow.Tell(null, null, Text.Get("Startup_AlreadyRunning"));
             Shutdown();
             return;
         }
+        var unlockAtStart = false;
+#if DEBUG
+        if (demo is not null)
+            unlockAtStart = Demo.Start(demo);
+#endif
 
         consent = new ConsentPresenter(Dispatcher);
         host = new AgentHost(consent);
@@ -74,17 +86,21 @@ public partial class App : Application
             _ = Dispatcher.InvokeAsync(() => NotMeAsync(asker, asked)).Task.Unwrap();
         };
         host.Log += AppLog.Info;
-        try
+        // A demo serves nothing: no user-secrets pipe, broker or control pipe for tir, whose names the real app's use.
+        if (!DemoMode.On)
         {
-            await host.StartAsync();
+            try
+            {
+                await host.StartAsync();
+            }
+            catch (IOException)
+            {
+                AskWindow.Tell(null, null, Text.Get("Startup_OtherAgent"));
+                Shutdown();
+                return;
+            }
+            StartControlPipe();
         }
-        catch (IOException)
-        {
-            AskWindow.Tell(null, null, Text.Get("Startup_OtherAgent"));
-            Shutdown();
-            return;
-        }
-        StartControlPipe();
         // A development build leaves PATH alone: it would put its own tir ahead of the installed one's.
         if (AppBuild.Current.Installed)
             TirOnPath.Ensure();
@@ -111,8 +127,11 @@ public partial class App : Application
         Refresh();
 
         updates = new AppUpdates(this, tray);
-        updates.Start();
+        if (!DemoMode.On)
+            updates.Start();
         FindingWatch.Start();
+        if (unlockAtStart)
+            _ = UnlockAsync(interactive: true);
 
         if (FirstRunPlan.Needed(SetupFacts()))
             ShowWindow<FirstRunWindow>();
@@ -596,6 +615,9 @@ public partial class App : Application
         consent?.Dispose();
         instance?.ReleaseMutex();
         instance?.Dispose();
+#if DEBUG
+        Demo.End();
+#endif
         Shutdown();
     }
 }

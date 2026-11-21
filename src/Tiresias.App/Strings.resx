@@ -1948,6 +1948,12 @@ Store them in clear?</value>
   <data name="Window_DevTitle" xml:space="preserve">
     <value>{0} (dev)</value>
   </data>
+  <data name="Window_DemoTitle" xml:space="preserve">
+    <value>{0} (demo)</value>
+  </data>
+  <data name="Tray_Demo" xml:space="preserve">
+    <value>Demo mode: made-up data, nothing on this PC changes</value>
+  </data>
   <data name="Status_PassedHeader" xml:space="preserve">
     <value>{0} checks passed</value>
   </data>
