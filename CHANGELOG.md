@@ -33,6 +33,11 @@ its section below.
   takes them all away, and `tir doctor` warns when nothing listens.
 - When a program uses a decoy credential, the app blocks it (no lockdown), shows a notification,
   and raises a finding on Home naming the program, with **Unblock (that was me)**.
+- Decoy files are watched for opens too: while the app or `tir agent` runs, a program that opens
+  `passwords.txt` or a decoy project's files is named in the activity log and raised as a warning
+  on Home, with a notification. An open never blocks the program, and Windows Search, Defender,
+  Explorer and OneDrive installed for all users opening them raise nothing. Openers that can't be told apart are recorded
+  as unknown, never guessed.
 - Home has a **Decoys** card: place `passwords.txt`, a decoy project or the decoy variables at
   their default places, each after asking first, see what is placed, and **Remove decoys**.
 - Home and `tir doctor` find the GitHub CLI or the Azure CLI signed in as you, which any program
