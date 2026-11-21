@@ -1,7 +1,7 @@
 namespace Tiresias.Decoys;
 
 /// <summary>Where routine openers run from on this machine (<c>%WINDIR%</c>, <c>%ProgramFiles%</c> and so on), and Tiresias's own folder.</summary>
-public sealed record RoutineFolders(string Windows, IReadOnlyList<string> ProgramFiles, string ProgramData, string LocalAppData, string? Tiresias);
+public sealed record RoutineFolders(string Windows, IReadOnlyList<string> ProgramFiles, string ProgramData, string? Tiresias);
 
 /// <summary>
 /// The words and rules of a decoy file being opened (layer 2). An open is a fact that may be
@@ -30,7 +30,8 @@ public static class DecoyReads
             f => [.. f.ProgramFiles, Below(f.ProgramData, @"Microsoft\Windows Defender")]),
         new("File Explorer", ["explorer.exe", "prevhost.exe"], f => [f.Windows]),
         new("OneDrive", ["OneDrive.exe", "OneDrive.Sync.Service.exe"],
-            f => [.. f.ProgramFiles, Below(f.LocalAppData, @"Microsoft\OneDrive")]),
+            // Only the machine-wide install: a per-user one runs from a folder any program the user runs can write to.
+            f => [.. f.ProgramFiles]),
     ];
 
     /// <summary>
@@ -43,11 +44,14 @@ public static class DecoyReads
     {
         if (string.IsNullOrEmpty(image) || !image.Contains('\\', StringComparison.Ordinal) || image.Contains(@"\..\", StringComparison.Ordinal))
             return null;
-        if (folders.Tiresias is { Length: > 0 } own && Under(image, own))
-            return "Tiresias";
         var name = FileName(image);
+        // Only Tiresias's own programs: its folder may be the user's to write to, so nothing else there is vouched for.
+        if (folders.Tiresias is { Length: > 0 } own && Under(image, own) && OwnImages.Contains(name, StringComparer.OrdinalIgnoreCase))
+            return "Tiresias";
         return Routines.FirstOrDefault(r => r.Images.Contains(name, StringComparer.OrdinalIgnoreCase) && r.Roots(folders).Any(root => Under(image, root)))?.Label;
     }
+
+    static readonly string[] OwnImages = ["tir.exe", "Tiresias.exe"];
 
     static string Below(string root, string relative) => root.Length == 0 ? "" : $@"{root.TrimEnd('\\')}\{relative}";
 

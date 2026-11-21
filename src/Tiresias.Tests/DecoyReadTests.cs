@@ -86,7 +86,7 @@ public class DecoyReadTests
     }
 
     static readonly RoutineFolders Folders = new(@"C:\Windows", [@"C:\Program Files", @"C:\Program Files (x86)"], @"C:\ProgramData",
-        @"C:\Users\alice\AppData\Local", @"C:\Users\alice\AppData\Local\Programs\Tiresias\");
+        @"C:\Users\alice\AppData\Local\Programs\Tiresias\");
 
     [TestCase(@"C:\Windows\System32\SearchProtocolHost.exe", "Windows Search")]
     [TestCase(@"c:\windows\system32\searchindexer.exe", "Windows Search")]
@@ -94,7 +94,6 @@ public class DecoyReadTests
     [TestCase(@"C:\Program Files\Windows Defender\MpDefenderCoreService.exe", "Microsoft Defender")]
     [TestCase(@"C:\Windows\explorer.exe", "File Explorer")]
     [TestCase(@"C:\Windows\System32\prevhost.exe", "File Explorer")]
-    [TestCase(@"C:\Users\alice\AppData\Local\Microsoft\OneDrive\OneDrive.exe", "OneDrive")]
     [TestCase(@"C:\Program Files\Microsoft OneDrive\OneDrive.Sync.Service.exe", "OneDrive")]
     [TestCase(@"C:\Users\alice\AppData\Local\Programs\Tiresias\tir.exe", "Tiresias")]
     public void A_known_opener_in_its_own_place_is_routine(string image, string label) =>
@@ -103,6 +102,8 @@ public class DecoyReadTests
     [TestCase(@"C:\Users\alice\Downloads\explorer.exe")]
     [TestCase(@"C:\Users\alice\AppData\Local\Temp\MsMpEng.exe")]
     [TestCase(@"C:\Users\alice\AppData\Local\OneDrive.exe")]
+    [TestCase(@"C:\Users\alice\AppData\Local\Microsoft\OneDrive\OneDrive.exe")]
+    [TestCase(@"C:\Users\alice\AppData\Local\Programs\Tiresias\dropped.exe")]
     [TestCase(@"C:\ProgramData\Evil\MsMpEng.exe")]
     [TestCase(@"C:\Windows\..\Users\alice\explorer.exe")]
     [TestCase(@"C:\Windows\System32\cmd.exe")]

@@ -51,7 +51,6 @@ sealed class DecoyWatch : IDisposable
         Environment.GetFolderPath(Environment.SpecialFolder.Windows),
         [Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86)],
         Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         AppContext.BaseDirectory);
     DecoyListener? listener;
     DecoySet? listening;

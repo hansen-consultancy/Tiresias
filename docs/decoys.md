@@ -150,8 +150,9 @@ read keeps the thread list's file name. Each open:
 open files they find. A routine opener is recorded but raises nothing: Windows Search
 (`SearchProtocolHost`, `SearchIndexer`, `SearchFilterHost`) and Explorer (`explorer`, `prevhost`)
 under `%WINDIR%`, Defender (`MsMpEng`, `MpDefenderCoreService`) under `%ProgramFiles%` or
-`%ProgramData%\Microsoft\Windows Defender`, OneDrive under `%ProgramFiles%` or
-`%LOCALAPPDATA%\Microsoft\OneDrive`, and Tiresias itself (removing decoys reads them). Both the
+`%ProgramData%\Microsoft\Windows Defender`, OneDrive's machine-wide install under `%ProgramFiles%`,
+and Tiresias's own `tir` and app (removing decoys reads them). A per-user OneDrive runs from a folder
+any program can write to, so its opens are findings: keep decoys out of synced folders. Both the
 file name and the folder must match; an opener whose path couldn't be read is not routine. Checking
 the publisher's signature, and backup tools, are not built yet. Decoys go in a folder those tools
 are told to skip where possible.
