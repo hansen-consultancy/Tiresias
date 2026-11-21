@@ -131,6 +131,9 @@ public interface IDoctorProbe
 
     /// <summary>The optional admin tier (docs/admin-tier.md); <c>null</c> when it isn't installed.</summary>
     AdminTierFacts? AdminTier => null;
+
+    /// <summary>Alert sinks whose alerts aren't arriving, from the app's sender; empty outside the app.</summary>
+    IReadOnlyList<Alerts.FailingSink> FailingAlertSinks => [];
 }
 
 /// <summary>How many decoys are placed, and whether something listens on their endpoints (checked without connecting, which would be a hit).</summary>
@@ -181,6 +184,7 @@ public static partial class Doctor
                 : new("decoys", DoctorStatus.Warn, $"{decoys.Placed} placed, but nothing listens on their endpoints, so a use goes unseen: start the app or tir agent"));
         if (probe.AdminTier is { Installed: true } adminTier)
             checks.Add(AdminTierLine(adminTier));
+        checks.AddRange(FailingAlerts(probe.FailingAlertSinks));
         checks.AddRange(probe.UserSecretsFiles().Select(UserSecretsFile).OfType<DoctorCheck>());
         checks.AddRange(probe.Projects().Select(Project).OfType<DoctorCheck>());
         checks.Add(probe.ExposedVariables switch

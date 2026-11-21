@@ -33,6 +33,8 @@ public enum FixAction
     AddService,
     /// <summary>The Installed page: the whole list, unused programs first.</summary>
     OpenInstalledList,
+    /// <summary>The About page, where the Alerts card fixes, tests or removes a sink.</summary>
+    OpenAlerts,
 }
 
 /// <summary>
@@ -98,6 +100,7 @@ public static class FindingView
         RunThroughExec { Setup: not null } => (FixAction.AddService, "Finding_FixGitHubApp"),
         RunThroughExec => (FixAction.CopyCommand, "Finding_FixCopy"),
         UninstallApp => (FixAction.OpenInstalledList, "Finding_FixInstalledList"),
+        ReviewAlerts => (FixAction.OpenAlerts, "Finding_FixAlerts"),
         _ => null,
     };
 

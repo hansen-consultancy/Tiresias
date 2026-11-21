@@ -2047,6 +2047,9 @@ Store them in clear?</value>
   <data name="Finding_FixUnblock" xml:space="preserve">
     <value>Unblock (that was me)</value>
   </data>
+  <data name="Finding_FixAlerts" xml:space="preserve">
+    <value>Open Alerts</value>
+  </data>
   <data name="Notify_Decoy_Title" xml:space="preserve">
     <value>A program used a decoy credential</value>
   </data>

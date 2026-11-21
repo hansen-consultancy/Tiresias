@@ -1,6 +1,6 @@
 # Out-of-band alerts
 
-Status: **phase 4 built**: webhook, ntfy and LcdHub end to end, with `decoy.used` the only event wired so far. Tracks issue #101. This page designs how Tiresias tells you about a
+Status: **phases 1 to 4 and 6 built**: webhook, ntfy and LcdHub end to end, failing sinks reported, with `decoy.used` the only event wired so far. Tracks issue #101. This page designs how Tiresias tells you about a
 serious event when you aren't looking at the app: a push to your phone through
 [ntfy](https://ntfy.sh), a line on a [LcdHub](https://github.com/stevehansen/LcdHub) screen beside
 the machine, or a JSON POST to a webhook of your choice.
@@ -283,7 +283,8 @@ leaving.
      the admin tier) are cards on **About**, so **Alerts** is one too. Adding opens a dialog, kept out
      of screen capture.
    - **Sink ids are the user's**: 1 to 32 of `a-z`, `0-9`, `-`, such as `siem`. Logs and (phase 6)
-     findings name them; they never leave the machine.
+     findings name them; they never leave the machine, except as a trusted sink's `detail.what` in
+     `alerts.failing` (phase 6).
    - **The form takes one header.** `alerts.json` holds any number; a second one waits for a need.
    - **Narrowing in `app.json`** is `SinkNarrowing`: muted, a raised threshold (a lower one is
      ignored), removed. The card mutes and removes; a raised threshold has no control yet. A removal
@@ -360,7 +361,29 @@ leaving.
      received, for a public and a trusted sink: no canary, no user name, no machine label.
 5. **The other events.** Blocklist and lockdown refusals, "This wasn't me", `consent.while-locked`,
    broker audit events from the solo broker, `findings.new`.
-6. **Failing sinks.** The finding on Home, `alerts.failing`, D-alerts-silenced updated.
+6. **Failing sinks. Done.** `SinkHealth` (pure), tracked per sink by `AlertSender`; `AlertCenter`
+   raises `alerts.failing` and keeps `Failing`, which Home's doctor run (`Doctor.FailingAlerts`) turns
+   into a finding with an **Open Alerts** button. D-alerts-silenced updated. What it settled or changed:
+   - **Failing** is a stop (a non-429/503 4xx, a 3xx, a sink that fails its rules), at once, or no
+     delivery for 15 minutes since the first failed attempt, checked on the minute tick. A delivery
+     clears it, and so does a test alert that gets through, a changed URL or header, or removing the
+     sink. A **muted** sink is no finding (its queue stays). LcdHub never counts, as phase 4 said.
+   - **`alerts.failing` ignores the other sinks' thresholds**, as `alerts.suppressed` does: ntfy and
+     webhook default to `high`, so with the threshold applied the warning would reach only LcdHub.
+     Mutes still apply. One per sink each time it starts failing, deduped by the planner as usual.
+   - **The planner skips the sink an event is about** (`AlertSubject.Sink`), so the rule is pure and
+     tested there. A trusted sink gets the id as `detail.what`; a public sink gets the event alone; the
+     ntfy body and LcdHub line never show it. `Sink` is hashed into `key` only when set, so every
+     other subject's key is unchanged.
+   - **The finding** is one per sink, `Fail`, of kind "alert sinks that aren't delivering", its
+     dismissal bound to stopped or failing, so a stop after a dismissed failure shows again. It names
+     the sink by id only. `tir doctor` never shows it: the CLI sends no alerts. Home rechecks, and the
+     tray badge updates, when the failing set changes.
+   - The state lives in memory: after the app restarts, a sink counts as failing again only once it
+     fails again.
+   - The canary runs a failing webhook and ntfy sink with canary URL, header and token beside a public
+     and a trusted webhook and ntfy: none of them appears in another sink's request, the log or the
+     finding; the id only in a trusted webhook's `detail`.
 7. **Later.** An LcdHub alert frame for `critical`; heartbeat; a signed webhook payload.
 
 Each phase merges on its own, and only phase 2 onwards is user-facing.

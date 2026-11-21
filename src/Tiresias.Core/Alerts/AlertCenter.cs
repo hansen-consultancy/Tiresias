@@ -15,13 +15,18 @@ public static class AlertSources
     public static AlertEvent? DecoyUsed(DecoyHit hit, IReadOnlyList<string> parents, string what) =>
         hit.Use == DecoyUse.Read ? null
             : new(AlertKind.DecoyUsed, new AlertSubject(Program: hit.Program, ProcessId: hit.ProcessId, Parents: parents, What: what), hit.At);
+
+    /// <summary><c>alerts.failing</c> about <paramref name="sink"/>, for the other sinks: its id only, which a public sink doesn't get.</summary>
+    public static AlertEvent AlertsFailing(FailingSink sink, DateTimeOffset at) => new(AlertKind.AlertsFailing, new AlertSubject(Sink: sink.Id), at);
 }
 
 /// <summary>
 /// The app's alerting, sources to sinks (docs/alerts.md): events go through <see cref="AlertPlanner"/>
 /// into the <see cref="AlertSender"/>, or to the <see cref="LcdHubLink"/> for an LcdHub sink. Until the first <see cref="Use"/> (the first unlock opens
 /// <c>alerts.json</c>) events wait here; after that the configuration stays in memory, locked or not,
-/// until the app exits.
+/// until the app exits. Watches the sender for failing sinks (<see cref="SinkHealth"/>): each one that
+/// starts failing is an <c>alerts.failing</c> to the other sinks, and <see cref="Failing"/> is what
+/// Home shows.
 /// </summary>
 public sealed class AlertCenter : IAsyncDisposable
 {
@@ -42,6 +47,7 @@ public sealed class AlertCenter : IAsyncDisposable
     AlertsConfig? config;
     AlertSetup? setup;
     AlertState state = AlertState.Empty;
+    IReadOnlyList<FailingSink> failing = [];
     bool opened;
 
     /// <param name="hub">Where LcdHub sinks show; <c>null</c> drops their deliveries.</param>
@@ -51,6 +57,7 @@ public sealed class AlertCenter : IAsyncDisposable
         this.hub = hub;
         this.time = time;
         Sender = new AlertSender(transport, time, log);
+        Sender.HealthChanged += () => Notify(CheckHealth);
     }
 
     public AlertSender Sender { get; }
@@ -65,6 +72,19 @@ public sealed class AlertCenter : IAsyncDisposable
         }
     }
 
+    /// <summary>The sinks whose alerts aren't arriving, muted ones left out: Home's finding.</summary>
+    public IReadOnlyList<FailingSink> Failing
+    {
+        get
+        {
+            lock (gate)
+                return failing;
+        }
+    }
+
+    /// <summary>Raised, outside any lock and on no particular thread, when <see cref="Failing"/> changed.</summary>
+    public event Action? FailingChanged;
+
     public void Start()
     {
         Sender.Start();
@@ -72,7 +92,7 @@ public sealed class AlertCenter : IAsyncDisposable
     }
 
     /// <summary>The configuration just opened or saved, narrowed by <c>app.json</c>; plans what waited for it.</summary>
-    public void Use(AlertsConfig? current, IReadOnlyDictionary<string, SinkNarrowing>? narrowing)
+    public void Use(AlertsConfig? current, IReadOnlyDictionary<string, SinkNarrowing>? narrowing) => Notify(() =>
     {
         lock (gate)
         {
@@ -85,8 +105,9 @@ public sealed class AlertCenter : IAsyncDisposable
                 hub?.ClearAll();
             while (waiting.TryDequeue(out var e))
                 Plan(e);
+            return CheckHealth();
         }
-    }
+    });
 
     public void Raise(AlertEvent e)
     {
@@ -135,13 +156,40 @@ public sealed class AlertCenter : IAsyncDisposable
     public void FindingsShown() => hub?.ClearAll();
 
     /// <summary>Releases what time alone sends: dedupe <c>count</c> summaries and <c>alerts.suppressed</c>.</summary>
-    public void Tick()
+    public void Tick() => Notify(() =>
     {
         lock (gate)
         {
             if (setup is not null)
                 Send(AlertPlanner.Tick(setup, state, time.GetUtcNow()));
+            return CheckHealth();
         }
+    });
+
+    /// <summary>
+    /// Takes the sender's failing sinks as <see cref="Failing"/>, and sends <c>alerts.failing</c> about each
+    /// that wasn't failing before. A removed sink has no queue and a fixed one starts again, so both clear.
+    /// </summary>
+    /// <returns>Whether <see cref="Failing"/> changed.</returns>
+    bool CheckHealth()
+    {
+        lock (gate)
+        {
+            var muted = setup?.Sinks.Where(s => s.Muted).Select(s => s.Id).ToHashSet(StringComparer.Ordinal) ?? [];
+            var current = Sender.Failing().Where(f => !muted.Contains(f.Id)).ToList();
+            foreach (var sink in SinkHealth.NewlyFailing(failing, current))
+                Plan(AlertSources.AlertsFailing(sink, time.GetUtcNow()));
+            var changed = !current.SequenceEqual(failing);
+            failing = current;
+            return changed;
+        }
+    }
+
+    /// <summary>Runs <paramref name="change"/>, then raises <see cref="FailingChanged"/> outside the lock if it says so.</summary>
+    void Notify(Func<bool> change)
+    {
+        if (change())
+            FailingChanged?.Invoke();
     }
 
     void Plan(AlertEvent e)

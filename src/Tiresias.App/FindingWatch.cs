@@ -35,6 +35,8 @@ static class FindingWatch
             await CheckAsync();
         };
         timer.Start();
+        // A sink that starts or stops failing is a finding that comes or goes: badge it now, not in hours.
+        App.Current.Alerts.Center.FailingChanged += () => App.Current.Dispatcher.BeginInvoke(async () => await CheckAsync());
     }
 
     public static void Stop() => timer?.Stop();
@@ -66,7 +68,11 @@ static class FindingWatch
         running = true;
         try
         {
-            var probe = new MachineProbe(ProjectIndexStore.Load().Folders) { Hello = App.Current.Host.Keys.Hello };
+            var probe = new MachineProbe(ProjectIndexStore.Load().Folders)
+            {
+                Hello = App.Current.Host.Keys.Hello,
+                FailingAlertSinks = App.Current.Alerts.Center.Failing,
+            };
             var checks = await Task.Run(() => Doctor.RunAsync(probe));
             var dismissals = DismissalStore.Load();
             Home.LastFindings = FindingView.Of(checks, dismissals).Open.Count;
