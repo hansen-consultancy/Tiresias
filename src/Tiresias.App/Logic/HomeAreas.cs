@@ -60,7 +60,7 @@ public static class HomeAreas
     {
         ReviewUserSecrets or SealUserSecrets => HomeArea.UserSecrets,
         ProtectVariables or SealVariable => HomeArea.EnvironmentVariables,
-        SetUpSqlServer or SetUpRaven or AddService => HomeArea.Services,
+        SetUpSqlServer or SetUpRaven or AddService or RunThroughExec { Setup: not null } => HomeArea.Services,
         _ => null,
     };
 
