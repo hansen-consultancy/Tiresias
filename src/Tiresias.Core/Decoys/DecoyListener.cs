@@ -60,7 +60,17 @@ public sealed class DecoyListener : IAsyncDisposable
             {
                 client = await listener.AcceptTcpClientAsync(stop.Token);
             }
-            catch (Exception e) when (e is OperationCanceledException or ObjectDisposedException or SocketException)
+            catch (Exception e) when (e is OperationCanceledException or ObjectDisposedException)
+            {
+                return;
+            }
+            catch (SocketException) when (!stop.IsCancellationRequested)
+            {
+                // A caller that resets mid-accept (a port scanner does) fails only this accept: keep listening.
+                await Task.Delay(TimeSpan.FromMilliseconds(100), stop.Token).ContinueWith(_ => { }, TaskScheduler.Default);
+                continue;
+            }
+            catch (SocketException)
             {
                 return;
             }

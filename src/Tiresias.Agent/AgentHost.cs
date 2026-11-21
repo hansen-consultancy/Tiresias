@@ -34,7 +34,9 @@ public sealed class AgentHost : IAsyncDisposable
         decoys.Touched += touch =>
         {
             activity.Append(touch.Record());
-            Say($"Decoy used: {touch.Hit.Program ?? "an unknown program"} connected with {touch.What}.");
+            Say(touch.Hit.Use == Decoys.DecoyUse.Read
+                ? $"Decoy file opened: {touch.Sentence}{(touch.Routine is { } routine ? $" (routine: {routine})" : "")}."
+                : $"Decoy used: {touch.Sentence}.");
             DecoyTouched?.Invoke(touch);
         };
     }
