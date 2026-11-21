@@ -104,12 +104,18 @@ public interface IDoctorProbe
     /// <summary>Paths of blocked programs whose file still exists.</summary>
     IEnumerable<string> BlockedPrograms() => [];
 
+    /// <summary>The decoys placed (docs/decoys.md), or <c>null</c> when there are none.</summary>
+    DoctorDecoys? Decoys => null;
+
     /// <summary>The config files of the CLIs that sign in as the user. See <see cref="Doctor.CliSignIns"/>.</summary>
     DoctorCliConfigs CliConfigs => new(null, null);
 
     /// <summary>The slug of a vault GitHub App service, for <c>tir exec gh</c>; <c>null</c> when there is none.</summary>
     string? GitHubAppService => null;
 }
+
+/// <summary>How many decoys are placed, and whether something listens on their endpoints (checked without connecting, which would be a hit).</summary>
+public sealed record DoctorDecoys(int Placed, bool Listening);
 
 /// <summary>
 /// The <c>tir doctor</c> checklist: turns probe facts into ok / warn / fail lines. A failure is
@@ -145,6 +151,10 @@ public static partial class Doctor
                 ? new("forwarder", DoctorStatus.Ok, "listening on loopback")
                 : new("forwarder", DoctorStatus.Warn, "not running: placeholders work only against the broker directly"));
 
+        if (probe.Decoys is { Placed: > 0 } decoys)
+            checks.Add(decoys.Listening
+                ? new("decoys", DoctorStatus.Ok, $"{decoys.Placed} placed; a program that uses one is named")
+                : new("decoys", DoctorStatus.Warn, $"{decoys.Placed} placed, but nothing listens on their endpoints, so a use goes unseen: start the app or tir agent"));
         checks.AddRange(probe.UserSecretsFiles().Select(UserSecretsFile).OfType<DoctorCheck>());
         checks.AddRange(probe.Projects().Select(Project).OfType<DoctorCheck>());
         checks.Add(probe.ExposedVariables switch

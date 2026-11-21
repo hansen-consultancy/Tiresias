@@ -88,5 +88,13 @@ static class CliUsage
         tir run [--only NAME[,NAME...]] -- <command> [args...]
             Runs the command with the sealed environment variables, after you allow it (in the app's
             dialog, or with Windows Hello when the app isn't running). --only gives it just those.
+        tir decoys place <passwords|project|variables> [<path>]
+        tir decoys list
+        tir decoys remove
+            Decoy credentials that open nothing and point to a port only Tiresias listens on, so a
+            program that finds and uses one is named in the activity log (and blocked by the app).
+            passwords: a passwords.txt (Documents by default); project: a new folder with an
+            appsettings.Production.json and a .env; variables: ADMIN_API_URL and ADMIN_API_TOKEN.
+            Nothing that exists is overwritten. remove takes away every decoy placed.
         """;
 }
