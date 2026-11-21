@@ -103,6 +103,7 @@ public partial class App : Application
             }
             Dispatcher.BeginInvoke(Refresh);
         };
+        host.DecoyTouched += OnDecoyTouched;
         host.UserSecrets.FirstSealed += id => Dispatcher.BeginInvoke(() =>
             tray?.Notify(Text.Get("Notify_FirstSealed_Title"), Text.Format("Notify_FirstSealed_Body", id)));
         SystemEvents.SessionSwitch += OnSessionSwitch;
@@ -111,6 +112,7 @@ public partial class App : Application
 
         updates = new AppUpdates(this, tray);
         updates.Start();
+        FindingWatch.Start();
 
         if (FirstRunPlan.Needed(SetupFacts()))
             ShowWindow<FirstRunWindow>();
@@ -215,6 +217,8 @@ public partial class App : Application
             KeyringStore.Lease?.HardCapAt, host.SoloBrokerProblem);
 
     internal void Refresh() => tray?.Refresh(Snapshot());
+
+    internal bool IsOpen<T>() where T : Window => windows.ContainsKey(typeof(T));
 
     /// <summary>Opens one window of a kind, or brings the open one forward.</summary>
     internal T ShowWindow<T>() where T : Window, new()
@@ -335,6 +339,20 @@ public partial class App : Application
         host!.RecordIncident(asked, process is null ? asker.Image : $"{process.Program} ({process.ProcessId})", chain, blocked);
         IncidentView view = new(asked, asker.Image, process, chain, blocked);
         IncidentWindow.Show(view);
+    }
+
+    /// <summary>
+    /// A decoy credential was used (docs/decoys.md): block the program, say so, and let Home raise
+    /// the finding where the user says whether it was them. Runs on the listener's thread.
+    /// </summary>
+    void OnDecoyTouched(DecoyTouch touch)
+    {
+        var program = touch.Hit.Program;
+        guard!.BlockForDecoy(program, program is null ? null : guard.Sha256(program));
+        Dispatcher.BeginInvoke(() =>
+            tray?.Notify(Text.Get("Notify_Decoy_Title"), program is null
+                ? Text.Format("Notify_Decoy_Unknown", touch.What)
+                : Text.Format("Notify_Decoy_Body", System.IO.Path.GetFileName(program), touch.What)));
     }
 
     /// <summary>A request that came through <c>tir</c>: the program that ran it is the one asking, not <c>tir</c> itself.</summary>
@@ -570,6 +588,7 @@ public partial class App : Application
         SystemEvents.SessionSwitch -= OnSessionSwitch;
         SystemEvents.PowerModeChanged -= OnPowerModeChanged;
         updates?.Dispose();
+        FindingWatch.Stop();
         tray?.Dispose();
         await stop.CancelAsync();
         if (host is not null)

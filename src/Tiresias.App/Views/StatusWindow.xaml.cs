@@ -9,6 +9,7 @@ using CommunityToolkit.Mvvm.Input;
 using Tiresias.Agent;
 using Tiresias.App.Logic;
 using Tiresias.Client;
+using Tiresias.Decoys;
 using Tiresias.Vault;
 
 namespace Tiresias.App.Views;
@@ -34,14 +35,19 @@ public partial class StatusWindow : Window
         Activated += (_, _) => model.ShowAreas();
         App.Current.Host.StateChanged += OnAgentStateChanged;
         App.Current.Guard.Changed += OnGuardChanged;
+        App.Current.Host.DecoyTouched += OnDecoyTouched;
         Closed += (_, _) =>
         {
             App.Current.Host.StateChanged -= OnAgentStateChanged;
             App.Current.Guard.Changed -= OnGuardChanged;
+            App.Current.Host.DecoyTouched -= OnDecoyTouched;
         };
     }
 
     void OnGuardChanged() => Dispatcher.BeginInvoke(model.ShowGuard);
+
+    /// <summary>A decoy use is a new finding: run the checks again.</summary>
+    void OnDecoyTouched(DecoyTouch _) => Dispatcher.BeginInvoke(model.Refresh);
 
     void OnUnblock(object sender, RoutedEventArgs e)
     {
@@ -50,6 +56,48 @@ public partial class StatusWindow : Window
             AppLog.Info($"unblocked {row.Path}");
             App.Current.Guard.Unblock(row.Path);
         }
+    }
+
+    /// <summary>Places one decoy at its default place, once the user agreed in the ask-first window.</summary>
+    void OnPlaceDecoy(object sender, RoutedEventArgs e)
+    {
+        if (((FrameworkElement)sender).DataContext is not DecoyLink link)
+            return;
+        var where = DecoyStore.DefaultPath(link.Kind);
+        var what = link.Kind switch
+        {
+            DecoyKind.PasswordsFile => where,
+            DecoyKind.Project => Text.Format("Decoys_WhereProject", where),
+            _ => Text.Format("Decoys_WhereVariables", string.Join(" and ", DecoyPlan.VariableNames)),
+        };
+        if (!AskWindow.Confirm(this, link.Label, Text.Format("Decoys_PlaceBody", what), Text.Get("Decoys_PlaceAction")))
+            return;
+        try
+        {
+            var placed = DecoyStore.Place(link.Kind, link.Kind == DecoyKind.Variables ? null : where);
+            AppLog.Info($"placed a decoy ({placed.Kind}) at {placed.Where}");
+            model.ShowDecoys();
+            // The doctor's decoys check says whether they are listened for.
+            model.Refresh();
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
+        {
+            model.ShowDecoys(ex.Message);
+        }
+    }
+
+    void OnRemoveDecoys(object sender, RoutedEventArgs e)
+    {
+        if (!AskWindow.Confirm(this, Text.Get("Decoys_RemoveHeading"), Text.Get("Decoys_RemoveBody"), Text.Get("Decoys_RemoveAction")))
+            return;
+        var (left, kept) = DecoyStore.RemoveAll();
+        AppLog.Info($"removed the decoys; {left.Count} left, {kept.Count} kept as changed");
+        model.ShowDecoys(string.Join(" ", new[]
+        {
+            kept.Count == 0 ? "" : Text.Format("Decoys_RemoveKept", string.Join(", ", kept)),
+            left.Count == 0 ? "" : Text.Format("Decoys_RemoveLeft", string.Join(", ", left)),
+        }.Where(m => m.Length > 0)));
+        model.Refresh();
     }
 
     void OnAgentStateChanged() => Dispatcher.BeginInvoke(model.Refresh);
@@ -218,6 +266,17 @@ public partial class StatusWindow : Window
                 break;
             case RevealFile { Path: var path }:
                 Desktop.Reveal(path);
+                break;
+            case UnblockProgram { Path: var program }:
+                AppLog.Info($"unblocked {program}: the decoy use was the user's");
+                App.Current.Guard.Unblock(program);
+                model.Refresh();
+                break;
+            case RunThroughExec { Setup: { } setup }:
+                Navigate<ServicesPage>()?.Add(setup.Upstream);
+                break;
+            case RunThroughExec exec:
+                model.CopyFix(exec.Instruction);
                 break;
         }
     }
@@ -420,6 +479,12 @@ public sealed record CheckRow(string Name, string StatusText, string Glyph, Brus
     };
 }
 
+/// <summary>A decoy placed, as Home's decoys card lists it.</summary>
+public sealed record DecoyRow(string Name, string Where, string Since);
+
+/// <summary>A link on the decoys card placing one kind at its default place.</summary>
+public sealed record DecoyLink(DecoyKind Kind, string Label);
+
 /// <summary>A program refused without asking since "This wasn't me".</summary>
 public sealed record BlockedRow(string Path, string Since)
 {
@@ -445,6 +510,43 @@ public sealed partial class StatusViewModel : ObservableObject
             Blocked.Add(new(program.Path, Text.Format("Status_BlockedSince", program.Since.ToLocalTime())));
         LockedDownVisibility = list.LockedDown ? Visibility.Visible : Visibility.Collapsed;
         OnPropertyChanged(nameof(GuardVisibility));
+    }
+
+    public ObservableCollection<DecoyRow> Decoys { get; } = [];
+
+    public ObservableCollection<DecoyLink> DecoyLinks { get; } = [];
+
+    [ObservableProperty]
+    public partial Visibility DecoysRemovableVisibility { get; set; } = Visibility.Collapsed;
+
+    /// <summary>Why the last place or remove fell short; empty when it didn't.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DecoyMessageVisibility))]
+    public partial string DecoyMessage { get; set; } = "";
+
+    public Visibility DecoyMessageVisibility => DecoyMessage.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+
+    /// <summary>The decoys as <c>decoys.json</c> has them now.</summary>
+    public void ShowDecoys(string message = "")
+    {
+        DecoySet? set;
+        try
+        {
+            set = DecoyStore.Current;
+        }
+        catch (IOException)
+        {
+            set = null;
+        }
+        var card = DecoyCard.Of(set);
+        Decoys.Clear();
+        foreach (var placed in card.Placed)
+            Decoys.Add(new(Text.Get(DecoyCard.Keys(placed.Kind).Name), placed.Where, Text.Format("Decoys_Since", placed.Placed.ToLocalTime())));
+        DecoyLinks.Clear();
+        foreach (var kind in card.Placeable)
+            DecoyLinks.Add(new(kind, Text.Get(DecoyCard.Keys(kind).Place)));
+        DecoysRemovableVisibility = card.Placed.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        DecoyMessage = message;
     }
 
     [ObservableProperty]
@@ -589,6 +691,7 @@ public sealed partial class StatusViewModel : ObservableObject
     void ShowState()
     {
         ShowGuard();
+        ShowDecoys();
         var view = TrayStatus.Describe(App.Current.Snapshot());
         Headline = Text.Of(view.Headline);
         mode = Text.Get(view.Mode is null ? "Status_ModeNone" : "Status_ModeSolo");
@@ -687,7 +790,10 @@ public sealed partial class StatusViewModel : ObservableObject
         var split = FindingView.Of(last, DismissalStore.Load());
         allFindings = [.. split.Open.Select((group, i) => new FindingRow(group) { IsOpen = i == 0, Number = i + 1 })];
         if (last.Count > 0)
+        {
             Home.LastFindings = allFindings.Count;
+            FindingWatch.Shown(last);
+        }
         ShowFindings();
         Dismissed.Clear();
         foreach (var group in split.Dismissed)

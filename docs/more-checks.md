@@ -1,7 +1,7 @@
 # More checks
 
 Status: **built**: RavenDB certificate expiry, sealed keys handed out as values, publishing keys,
-git tokens. **Design**: a CLI acting as the user, RavenDB clearance. Phase 6 of [guided setup](guided-setup.md) (#32). Phase 1 gave the
+git tokens, a CLI acting as the user. **Design**: RavenDB clearance. Phase 6 of [guided setup](guided-setup.md) (#32). Phase 1 gave the
 doctor its shape: a probe gathers facts, the pure planner in `Doctor` turns them into checks, and
 a check that can go higher carries its `Now` and `Better` positions and a typed `DoctorFix`. Each
 check below adds probe facts, planner cases and at most one fix type, and ships on its own.
@@ -176,10 +176,15 @@ printed URL never holds the user info.
 
 ## A CLI acting as the user
 
-Already listed in guided setup's checks, and small enough to ship here.
+Built (`Doctor.CliSignIns`). Already listed in guided setup's checks, and small enough to ship here.
 
-**Reads.** `gh auth status` and `az account show`, each tool's own status command, which reports
-who is signed in but not the token. Run only when the tool is on PATH, with a short timeout.
+**Reads.** Each tool's own config file, for who is signed in: the GitHub CLI's `hosts.yml`
+(`%APPDATA%\GitHub CLI`, or `GH_CONFIG_DIR`), its hosts and each host's active `user:`, and whether
+an `oauth_token:` key is there (a token in the file rather than Windows Credential Manager; its
+value is never read); the Azure CLI's `azureProfile.json` (`%USERPROFILE%\.azure`, or
+`AZURE_CONFIG_DIR`), the accounts of its subscriptions, which `az logout` empties. Not each tool's
+status command, as first designed: `gh auth status` calls GitHub with the token, which no check
+does, and starting two programs on every run of the checks costs more than reading two files.
 
 **Reports.** `gh` signed in with a stored token: E5/C3. The Azure CLI with a cached session:
 E5/C3, its refresh token as reusable as `gh`'s. Any program running as the user can act as them, unseen.
@@ -189,8 +194,14 @@ which mints a token per run after consent (E2/C1). Keep `gh`'s own sign-in only 
 use, or sign it out with `gh auth logout`. For `az`, no fix yet: Tiresias has no broker-held Entra
 identity. It still carries its `Now` (E5/C3), so it is a finding without a fix, which says so.
 
-**Tests.** The planner gets each tool's exit code and a parsed account summary. Signed in, signed
-out, not installed, timed out.
+**As built.** The `gh` finding's fix is `RunThroughExec("gh", service)`: with no GitHub App
+service in the vault, the app's **Add a GitHub App...** opens the Services add form with
+`https://api.github.com` filled in, and `tir doctor` prints how to add one; with one, the fix is
+the `tir exec` command, copied.
+
+**Tests** (`CliSignInTests`). Signed in with the keyring and with a token in the file (never
+printed), several hosts, signed out, a user named only under `users:`, no file, unreadable files;
+`az` with one account in several subscriptions, signed out, not JSON.
 
 ## Later
 
@@ -208,7 +219,7 @@ without a passphrase in `%USERPROFILE%\.ssh`; `%USERPROFILE%\.aws\credentials`; 
    confirmed against a real server.
 4. **Git tokens in remote URLs**, then the `git-credential-tiresias` helper and the
    `.git-credentials` fix as their own piece of work.
-5. **A CLI acting as the user**, `gh` first.
+5. **A CLI acting as the user**, `gh` first. Built.
 
 ## Not in scope
 

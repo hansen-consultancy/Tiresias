@@ -53,6 +53,8 @@ static partial class SurfaceProbe
     static StartupEntry Entry(string name, string where, string path) =>
         File.Exists(path) ? new(name, where, path, IsSigned(path)) : new(name, where, path, null);
 
+    public static IEnumerable<DecoyUseRecord> DecoyUses() => Doctor.DecoyUses(Lines(AgentHost.ActivityPath));
+
     public static IEnumerable<CredentialUse> CredentialUses() =>
         Doctor.CredentialUses(Lines(AgentHost.ActivityPath).Concat(Lines(SoloBroker.AuditPath)));
 

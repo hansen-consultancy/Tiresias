@@ -8,6 +8,24 @@ its section below.
 
 ## [Unreleased]
 
+### Added
+
+- Decoy credentials: `tir decoys place passwords|project|variables` puts a `passwords.txt`, an old
+  project's `appsettings.Production.json` and `.env`, or two user variables on disk, holding
+  credentials that open nothing and point to ports only Tiresias listens on. A program that finds
+  and uses one is named in the activity log while the app or `tir agent` runs. `tir decoys remove`
+  takes them all away, and `tir doctor` warns when nothing listens.
+- When a program uses a decoy credential, the app blocks it (no lockdown), shows a notification,
+  and raises a finding on Home naming the program, with **Unblock (that was me)**.
+- Home has a **Decoys** card: place `passwords.txt`, a decoy project or the decoy variables at
+  their default places, each after asking first, see what is placed, and **Remove decoys**.
+- Home and `tir doctor` find the GitHub CLI or the Azure CLI signed in as you, which any program
+  running as you can use unasked. For `gh`, **Add a GitHub App...** sets up the service `tir exec`
+  mints a token per run from, after you allow it. Read from each tool's own config, offline; never
+  a token.
+- The app checks for findings in the background, a minute after it starts and every four hours.
+  New ones put a dot on the tray icon and "(*n* new)" on **Status...** until you open Home.
+
 ### Changed
 
 - The secrets editor hides user-secrets folders that hold no keys behind a line, "*N* empty

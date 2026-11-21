@@ -544,6 +544,12 @@ Switch to this copy, {2}, from {3}? The other copy quits first, ending its lease
   <data name="Tray_Status" xml:space="preserve">
     <value>Status...</value>
   </data>
+  <data name="Tray_StatusNew" xml:space="preserve">
+    <value>Status... ({0} new)</value>
+  </data>
+  <data name="Tray_NewFindings" xml:space="preserve">
+    <value>New findings: {0}</value>
+  </data>
   <data name="Tray_Quit" xml:space="preserve">
     <value>Quit Tiresias</value>
   </data>
@@ -1835,6 +1841,20 @@ Store them in clear?</value>
   <data name="Finding_FixReveal" xml:space="preserve">
     <value>Show file</value>
   </data>
+  <data name="Finding_FixUnblock" xml:space="preserve">
+    <value>Unblock (that was me)</value>
+  </data>
+  <data name="Notify_Decoy_Title" xml:space="preserve">
+    <value>A program used a decoy credential</value>
+  </data>
+  <data name="Notify_Decoy_Body" xml:space="preserve">
+    <value>{0} connected with {1}. Tiresias blocked it until you review it on Home.</value>
+    <comment>{0}: program file name; {1}: which decoy, e.g. "the decoy admin token"</comment>
+  </data>
+  <data name="Notify_Decoy_Unknown" xml:space="preserve">
+    <value>A program connected with {0}, but it couldn't be named. See Home.</value>
+    <comment>{0}: which decoy</comment>
+  </data>
   <data name="Finding_RemoveExtensionHeading" xml:space="preserve">
     <value>Remove {0} from {1}?</value>
   </data>
@@ -1918,6 +1938,9 @@ Store them in clear?</value>
   </data>
   <data name="Finding_FixPlaceholder" xml:space="preserve">
     <value>Use a placeholder...</value>
+  </data>
+  <data name="Finding_FixGitHubApp" xml:space="preserve">
+    <value>Add a GitHub App...</value>
   </data>
   <data name="About_Mode" xml:space="preserve">
     <value>Mode</value>
@@ -2098,5 +2121,68 @@ Store them in clear?</value>
   </data>
   <data name="Secrets_NothingToSeal" xml:space="preserve">
     <value>Nothing to seal: this file holds no keys.</value>
+  </data>
+  <data name="Decoys_Title" xml:space="preserve">
+    <value>Decoys</value>
+  </data>
+  <data name="Decoys_Intro" xml:space="preserve">
+    <value>Fake credentials that work nowhere. A program that uses one is named and blocked until you say it was you.</value>
+  </data>
+  <data name="Decoys_Since" xml:space="preserve">
+    <value>Placed {0:g}</value>
+    <comment>{0}: when it was placed</comment>
+  </data>
+  <data name="Decoys_Passwords" xml:space="preserve">
+    <value>passwords.txt</value>
+  </data>
+  <data name="Decoys_Passwords_Place" xml:space="preserve">
+    <value>Place passwords.txt</value>
+  </data>
+  <data name="Decoys_Project" xml:space="preserve">
+    <value>Decoy project</value>
+  </data>
+  <data name="Decoys_Project_Place" xml:space="preserve">
+    <value>Place a decoy project</value>
+  </data>
+  <data name="Decoys_Variables" xml:space="preserve">
+    <value>Decoy environment variables</value>
+  </data>
+  <data name="Decoys_Variables_Place" xml:space="preserve">
+    <value>Set decoy variables</value>
+  </data>
+  <data name="Decoys_WhereProject" xml:space="preserve">
+    <value>{0}, a new folder with an appsettings.Production.json and a .env</value>
+    <comment>{0}: the folder</comment>
+  </data>
+  <data name="Decoys_WhereVariables" xml:space="preserve">
+    <value>the user environment variables {0}</value>
+    <comment>{0}: the variable names</comment>
+  </data>
+  <data name="Decoys_PlaceBody" xml:space="preserve">
+    <value>Tiresias creates {0}, holding a fake database password, admin token and API key that work nowhere. Nothing that exists is changed. A program that uses one is named and blocked. Remove decoys takes it away again.</value>
+    <comment>{0}: the file, folder or variables</comment>
+  </data>
+  <data name="Decoys_PlaceAction" xml:space="preserve">
+    <value>Place</value>
+  </data>
+  <data name="Decoys_Remove" xml:space="preserve">
+    <value>Remove decoys</value>
+  </data>
+  <data name="Decoys_RemoveHeading" xml:space="preserve">
+    <value>Remove every decoy?</value>
+  </data>
+  <data name="Decoys_RemoveBody" xml:space="preserve">
+    <value>Tiresias deletes the files and variables it placed, and a decoy folder when nothing else is in it.</value>
+  </data>
+  <data name="Decoys_RemoveAction" xml:space="preserve">
+    <value>Remove</value>
+  </data>
+  <data name="Decoys_RemoveLeft" xml:space="preserve">
+    <value>Couldn't remove: {0}</value>
+    <comment>{0}: paths or variable names</comment>
+  </data>
+  <data name="Decoys_RemoveKept" xml:space="preserve">
+    <value>Kept {0}: changed since Tiresias placed it, so it is yours now.</value>
+    <comment>{0}: paths or variable names</comment>
   </data>
 </root>

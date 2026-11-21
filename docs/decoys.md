@@ -1,6 +1,8 @@
 # Decoys: catching what goes looking for secrets
 
-Status: **design, not built** (#39). Its alerts land as findings in [guided setup](guided-setup.md)
+Status: **phase 1 built** (#39): `tir decoys place|list|remove`, the agent's loopback endpoints,
+the activity record, the doctor's line, the app's response (block, notify, finding), and Home's
+**Decoys** card. The read tripwire is next. Its alerts land as findings in [guided setup](guided-setup.md)
 and use the program block list that **This wasn't me** already fills.
 
 Consent stops a program using a credential through Tiresias without asking. It does nothing about
@@ -34,22 +36,33 @@ whether or not the app is in front:
 | Decoy | Where it lives | What uses it |
 |---|---|---|
 | A connection string with a password | `passwords.txt`, a decoy `appsettings.Production.json` in a decoy project folder | Connects to a SQL listener on `127.0.0.1` that Tiresias runs |
-| An admin URL with a token | `passwords.txt`, a decoy `.env` (`ADMIN_API_URL`, `ADMIN_API_TOKEN`) | An HTTPS request to the agent's decoy HTTP listener |
+| An admin URL with a token | `passwords.txt`, a decoy `.env` (`ADMIN_API_URL`, `ADMIN_API_TOKEN`) | An HTTP request to the agent's decoy HTTP listener |
 | An API key with its base URL | A decoy `.env` (`OPENAI_API_KEY` beside `OPENAI_BASE_URL` on loopback) | A request to the same listener, on the path the SDK uses |
-| A RavenDB URL | A decoy configuration file | A connection to a loopback port Tiresias listens on |
+| A RavenDB URL | A decoy configuration file | A request to the same HTTP listener |
+
+The URLs are plain `http://127.0.0.1:<port>`: a loopback HTTPS certificate would need trusting,
+and a client that refuses plain HTTP is still seen connecting. The SQL listener answers pre-login
+without encryption (the connection string says `Encrypt=False`), reads the login, and refuses it
+with error 18456 as SQL Server does.
 
 The values look like the real kind (a GitHub token's prefix and checksum, a key's length and
 alphabet), never like a Tiresias placeholder (`tirph_`), which would give them away.
 
 **On a hit**, the listener finds the connecting process from the TCP table, as the solo broker and
-the forwarder already do, and Tiresias:
+the forwarder already do. Any connection to a decoy port is a hit, since only a decoy names it; the
+record says which value was presented (the SQL password, the admin token, the API key) or that none
+was. Repeats by the same program with the same value within a minute are one hit, so a flood of
+connections can't bury the first in the log or the notifications. Tiresias then:
 
-- records it in the activity log, with the decoy, the process path and its signer;
-- shows a notification and badges the tray;
-- adds the program to the block list, so it gets no lease, placeholder or consent dialog until the
-  user reviews it;
-- raises a finding on Home: **Unblock (that was me)** or **Keep blocked**, with the process's path,
-  signature and parent.
+- records it in the activity log (`consumer: decoy`), with the decoy, the endpoint, the process and
+  the processes that started it, never a value (`tir agent` also prints it);
+- in the app, adds the program to the block list, without the lockdown **This wasn't me** brings,
+  so it gets no lease, placeholder or consent dialog until the user reviews it;
+- shows a notification;
+- raises a finding on Home (`tir doctor` too) naming the program and the decoy it used, with
+  **Unblock (that was me)**; dismissing it keeps the program blocked. A process that couldn't be
+  named can't be blocked: its uses in the last 30 days are one warning. The program's signature and parents are
+  in the activity record, not yet in the finding.
 
 The listener answers like the real service would refuse a bad password, so the caller learns
 nothing. Nothing the decoy holds is ever valid anywhere.
@@ -161,22 +174,36 @@ sets audit rules; Tiresias watches use and needs no admin rights. What fits Tire
 
 ## Placement
 
-- **What is placed:** `passwords.txt` in Documents, a decoy project folder with an
-  `appsettings.Production.json` and a `.env`, and optionally a user environment variable with a
-  decoy token. The user picks from a short list; nothing is placed silently.
+- **What is placed:** `passwords.txt` in Documents, a decoy project folder (a new folder,
+  `%USERPROFILE%\source\billing-api-old` by default) with an `appsettings.Production.json` and a
+  `.env`, and optionally the user environment variables `ADMIN_API_URL` and `ADMIN_API_TOKEN`. The user picks
+  from a short list (`tir decoys place passwords|project|variables [<path>]`); nothing is placed
+  silently, and a file, folder or variable that exists is refused.
+- **In the app:** a **Decoys** card on Home, below the blocked programs, lists what is placed and
+  offers each kind not yet placed as a link (**Place passwords.txt**, **Place a decoy project**,
+  **Set decoy variables**) at its default place, plus **Remove decoys**. Each asks first, saying
+  what will be created; the page keeps its one button row (app-design.md, section 11). Another
+  place is `tir decoys place <kind> <path>`'s. Considered and not taken: an entry in **What do you
+  need?** (its catalogue is of things to protect, and a decoy protects nothing, so it doesn't fit
+  the Exposure/Control model), a finding offering decoys (a finding is something wrong, and having
+  none isn't), and the command line only (most users never open it).
 - **Where:** the home folder and Documents by default, and inside the project folders the user
   gave the secrets editor, where an agent working on code is most likely to look.
-- **Bookkeeping:** Tiresias records each decoy's path and value. The doctor's own checks skip
-  them, so a decoy never shows up as a plaintext secret to seal.
-- **Removal:** one action removes every decoy and stops every listener.
+- **Bookkeeping:** Tiresias records each decoy's path, the values and the two ports in
+  `decoys.json` beside the keyring. The doctor's own checks skip them, so a decoy never shows up as
+  a plaintext secret to seal.
+- **Removal:** one action (`tir decoys remove`) removes every decoy and stops every listener. A
+  decoy folder is deleted only when nothing else is in it, and a decoy file or variable changed since
+  it was placed is kept: it is the user's now. A placement that fails partway takes back what it
+  wrote.
 
 ## Open questions
 
-- **Loopback ports.** A fixed port per decoy kind is simpler but recognisable; a random port per
-  install is less so. Where a forwarder runs (with a remote broker), its port could carry the HTTP
-  decoys on decoy paths instead of a listener of their own; in solo mode there is none.
-- **Agent not running.** With the app and `tir agent` both closed, nothing listens and a use goes
-  unseen. The doctor says so while decoys are placed.
+- **Loopback ports** (decided): two random ports per install, one HTTP and one SQL Server, chosen
+  when the first decoy is placed. A fixed port would give Tiresias away.
+- **Agent not running** (decided): with the app and `tir agent` both closed, nothing listens and a
+  use goes unseen. `tir doctor` warns while decoys are placed and nothing listens, checking the
+  listening ports without connecting (a connection would be a hit).
 - **Agents in containers.** A container or WSL distribution reaches the host's loopback only when
   configured to. Decoys inside the container need their own endpoint there.
 - **Sync.** Decoy files in a synced Documents folder reach other devices, where no listener runs.
