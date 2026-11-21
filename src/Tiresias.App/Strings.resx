@@ -2113,4 +2113,63 @@ Store them in clear?</value>
   <data name="Secrets_NothingToSeal" xml:space="preserve">
     <value>Nothing to seal: this file holds no keys.</value>
   </data>
+  <data name="Decoys_Title" xml:space="preserve">
+    <value>Decoys</value>
+  </data>
+  <data name="Decoys_Intro" xml:space="preserve">
+    <value>Fake credentials that work nowhere. A program that uses one is named and blocked until you say it was you.</value>
+  </data>
+  <data name="Decoys_Since" xml:space="preserve">
+    <value>Placed {0:g}</value>
+    <comment>{0}: when it was placed</comment>
+  </data>
+  <data name="Decoys_Passwords" xml:space="preserve">
+    <value>passwords.txt</value>
+  </data>
+  <data name="Decoys_Passwords_Place" xml:space="preserve">
+    <value>Place passwords.txt</value>
+  </data>
+  <data name="Decoys_Project" xml:space="preserve">
+    <value>Decoy project</value>
+  </data>
+  <data name="Decoys_Project_Place" xml:space="preserve">
+    <value>Place a decoy project</value>
+  </data>
+  <data name="Decoys_Variables" xml:space="preserve">
+    <value>Decoy environment variables</value>
+  </data>
+  <data name="Decoys_Variables_Place" xml:space="preserve">
+    <value>Set decoy variables</value>
+  </data>
+  <data name="Decoys_WhereProject" xml:space="preserve">
+    <value>{0}, a new folder with an appsettings.Production.json and a .env</value>
+    <comment>{0}: the folder</comment>
+  </data>
+  <data name="Decoys_WhereVariables" xml:space="preserve">
+    <value>the user environment variables {0}</value>
+    <comment>{0}: the variable names</comment>
+  </data>
+  <data name="Decoys_PlaceBody" xml:space="preserve">
+    <value>Tiresias creates {0}, holding a fake database password, admin token and API key that work nowhere. Nothing that exists is changed. A program that uses one is named and blocked. Remove decoys takes it away again.</value>
+    <comment>{0}: the file, folder or variables</comment>
+  </data>
+  <data name="Decoys_PlaceAction" xml:space="preserve">
+    <value>Place</value>
+  </data>
+  <data name="Decoys_Remove" xml:space="preserve">
+    <value>Remove decoys</value>
+  </data>
+  <data name="Decoys_RemoveHeading" xml:space="preserve">
+    <value>Remove every decoy?</value>
+  </data>
+  <data name="Decoys_RemoveBody" xml:space="preserve">
+    <value>Tiresias deletes the files and variables it placed, and a decoy folder when nothing else is in it.</value>
+  </data>
+  <data name="Decoys_RemoveAction" xml:space="preserve">
+    <value>Remove</value>
+  </data>
+  <data name="Decoys_RemoveLeft" xml:space="preserve">
+    <value>Couldn't remove: {0}</value>
+    <comment>{0}: paths or variable names</comment>
+  </data>
 </root>

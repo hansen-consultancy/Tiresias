@@ -17,6 +17,8 @@ its section below.
   takes them all away, and `tir doctor` warns when nothing listens.
 - When a program uses a decoy credential, the app blocks it (no lockdown), shows a notification,
   and raises a finding on Home naming the program, with **Unblock (that was me)**.
+- Home has a **Decoys** card: place `passwords.txt`, a decoy project or the decoy variables at
+  their default places, each after asking first, see what is placed, and **Remove decoys**.
 
 ### Changed
 

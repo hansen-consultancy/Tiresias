@@ -1,8 +1,8 @@
 # Decoys: catching what goes looking for secrets
 
 Status: **phase 1 built** (#39): `tir decoys place|list|remove`, the agent's loopback endpoints,
-the activity record, the doctor's line, and the app's response (block, notify, finding). Placing
-decoys from the app and the read tripwire are next. Its alerts land as findings in [guided setup](guided-setup.md)
+the activity record, the doctor's line, the app's response (block, notify, finding), and Home's
+**Decoys** card. The read tripwire is next. Its alerts land as findings in [guided setup](guided-setup.md)
 and use the program block list that **This wasn't me** already fills.
 
 Consent stops a program using a credential through Tiresias without asking. It does nothing about
@@ -100,6 +100,14 @@ have it, and a reason the wording must stay factual.
   `.env`, and optionally the user environment variables `ADMIN_API_URL` and `ADMIN_API_TOKEN`. The user picks
   from a short list (`tir decoys place passwords|project|variables [<path>]`); nothing is placed
   silently, and a file, folder or variable that exists is refused.
+- **In the app:** a **Decoys** card on Home, below the blocked programs, lists what is placed and
+  offers each kind not yet placed as a link (**Place passwords.txt**, **Place a decoy project**,
+  **Set decoy variables**) at its default place, plus **Remove decoys**. Each asks first, saying
+  what will be created; the page keeps its one button row (app-design.md, section 11). Another
+  place is `tir decoys place <kind> <path>`'s. Considered and not taken: an entry in **What do you
+  need?** (its catalogue is of things to protect, and a decoy protects nothing, so it doesn't fit
+  the Exposure/Control model), a finding offering decoys (a finding is something wrong, and having
+  none isn't), and the command line only (most users never open it).
 - **Where:** the home folder and Documents by default, and inside the project folders the user
   gave the secrets editor, where an agent working on code is most likely to look.
 - **Bookkeeping:** Tiresias records each decoy's path, the values and the two ports in
