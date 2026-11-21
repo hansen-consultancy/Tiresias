@@ -1859,6 +1859,9 @@ Store them in clear?</value>
   <data name="Finding_StartupOff" xml:space="preserve">
     <value>{0} no longer starts at log-on. Turn it back on in Settings, Apps, Startup.</value>
   </data>
+  <data name="Finding_FixInstalledApps" xml:space="preserve">
+    <value>Open Installed apps</value>
+  </data>
   <data name="Finding_FixRemoveEntry" xml:space="preserve">
     <value>Remove entry...</value>
   </data>

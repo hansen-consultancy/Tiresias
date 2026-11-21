@@ -29,6 +29,8 @@ public enum FixAction
     RemoveEntry,
     /// <summary>The Services page's add form, its address filled in.</summary>
     AddService,
+    /// <summary>Settings, Apps, Installed apps, where the user uninstalls a program.</summary>
+    OpenInstalledApps,
 }
 
 /// <summary>
@@ -92,6 +94,7 @@ public static class FindingView
         RemoveEntry or Repair { Command: not null } => (FixAction.CopyCommand, "Finding_FixCopy"),
         RunThroughExec { Setup: not null } => (FixAction.AddService, "Finding_FixGitHubApp"),
         RunThroughExec => (FixAction.CopyCommand, "Finding_FixCopy"),
+        UninstallApp => (FixAction.OpenInstalledApps, "Finding_FixInstalledApps"),
         _ => null,
     };
 

@@ -231,6 +231,9 @@ public partial class StatusWindow : Window
             case RemoveEntry or Repair { Command: not null }:
                 model.CopyFix(fix.Instruction);
                 break;
+            case UninstallApp:
+                Desktop.Open("ms-settings:appsfeatures");
+                break;
             case RunThroughExec { Setup: { } setup }:
                 Navigate<ServicesPage>()?.Add(setup.Upstream);
                 break;

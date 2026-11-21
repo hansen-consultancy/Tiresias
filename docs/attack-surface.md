@@ -1,6 +1,6 @@
 # Attack surface: less software, less to trust
 
-Status: **first slice, log-on use and uninstall-entry checks built** (#34, #55); the rest is design. [Guided setup](guided-setup.md) phase 5: it builds on the
+Status: **first slice, log-on use, uninstall-entry checks and unused applications built** (#34, #55); the rest is design. [Guided setup](guided-setup.md) phase 5: it builds on the
 findings `tir doctor` reports since phase 1 and the findings section, fixes and dismissals the app
 gets in phase 2.
 
@@ -305,6 +305,11 @@ icon, or Tiresias itself. **Uninstall entries are checked** as well: user and ma
 against the disk, raising the gone, can't-be-uninstalled and stale-duplicate findings, with
 **Remove entry...** for the user's own entries and the commands for machine-wide ones; `Repair`
 names winget's command once the inventory knows the package id, and the steps until then.
+**Unused applications are found**: an installed program whose folder had nothing opened in 90
+days (UserAssist), never one with no recorded run or one that runs unseen (a tray icon, a service,
+a driver, a log-on entry, a folder on `PATH`), nor one that used a credential. It is a finding with
+status `ok`, so it sorts last and doesn't count for the badge, and its fix, `UninstallApp`, opens
+Settings, Apps, Installed apps until the inventory knows each program's installer command.
 [Guided setup](guided-setup.md#phases) lists what is still design.
 
 1. **Inventory**: applications, extensions, global tools and startup entries, with last use where
