@@ -41,6 +41,7 @@
                 AutomationProperties.Name="{l:S Activity_ListName}">
         <DataGrid.Columns>
           <DataGridTextColumn Header="{l:S Activity_ColTime}" Binding="{Binding Time}" Width="150" />
+          <DataGridTextColumn Header="{l:S Activity_Source}" Binding="{Binding Source}" Width="110" />
           <DataGridTextColumn Header="{l:S Activity_ColWhat}" Binding="{Binding What}" Width="170" />
           <DataGridTextColumn Header="{l:S Activity_ColService}" Binding="{Binding Service}" Width="160" />
           <DataGridTextColumn Header="{l:S Activity_ColWho}" Binding="{Binding Who}" Width="*" />

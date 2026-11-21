@@ -1,9 +1,7 @@
 using System.ComponentModel;
 using System.IO.Pipes;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using System.Security.Principal;
-using Microsoft.Win32.SafeHandles;
 using Tiresias.AdminTier;
 using Tiresias.Protocol;
 
@@ -14,7 +12,7 @@ namespace Tiresias.Agent;
 /// process the Service Control Manager runs as <c>TiresiasAdmin</c>: a program that took the pipe's
 /// name first is not the service, and is never told or believed anything.
 /// </summary>
-public static partial class AdminClient
+public static class AdminClient
 {
     static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(2);
     static readonly TimeSpan ReplyTimeout = TimeSpan.FromSeconds(5);
@@ -71,7 +69,7 @@ public static partial class AdminClient
         try
         {
             await pipe.ConnectAsync(ConnectTimeout, timeout.Token);
-            if (!GetNamedPipeServerProcessId(pipe.SafePipeHandle, out var server) || server != serviceProcessId)
+            if (!ServicePipeIdentity.Matches(pipe, serviceProcessId))
                 return null;
             await AdminWire.WriteAsync(pipe, request, timeout.Token);
             return await AdminWire.ReadAsync<AdminReply>(pipe, timeout.Token);
@@ -82,8 +80,4 @@ public static partial class AdminClient
             return null;
         }
     }
-
-    [LibraryImport("kernel32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool GetNamedPipeServerProcessId(SafePipeHandle pipe, out uint serverProcessId);
 }

@@ -24,11 +24,11 @@ public partial class ActivityPage : UserControl
 
 public sealed record Choice<T>(string Label, T Value);
 
-public sealed record ActivityRow(string Time, string What, string Service, string Who, string Detail);
+public sealed record ActivityRow(string Time, string Source, string What, string Service, string Who, string Detail);
 
 public sealed partial class ActivityViewModel : ObservableObject
 {
-    IReadOnlyList<ActivityEntry> all = [];
+    ActivityHistory history = new([], ServiceJournalState.InApp);
 
     public IReadOnlyList<Choice<ActivityOutcome>> Outcomes { get; } =
     [
@@ -42,6 +42,7 @@ public sealed partial class ActivityViewModel : ObservableObject
         new(Text.Get("Activity_SourceAll"), null),
         new(Text.Get("Activity_SourceUserSecrets"), ActivitySource.UserSecrets),
         new(Text.Get("Activity_SourceBroker"), ActivitySource.Broker),
+        new(Text.Get("Activity_SourceLegacyBroker"), ActivitySource.LegacyBroker),
     ];
 
     public IReadOnlyList<Choice<ActivityPeriod>> Periods { get; } =
@@ -85,23 +86,32 @@ public sealed partial class ActivityViewModel : ObservableObject
     [RelayCommand]
     async Task LoadAsync()
     {
-        all = await Task.Run(ActivityLog.ReadAll);
+        history = await Task.Run(ActivityLog.ReadAll);
         Apply();
     }
 
     void Apply()
     {
-        var shown = ActivityQuery.Filter(all, new(Search, Outcome, Source, Period), DateTimeOffset.Now);
+        var shown = ActivityQuery.Filter(history.Entries, new(Search, Outcome, Source, Period), DateTimeOffset.Now);
         Rows.Clear();
         foreach (var e in shown)
             Rows.Add(new(
                 e.Time.ToLocalTime().ToString("g", CultureInfo.CurrentCulture),
+                Sources.First(s => s.Value == e.Source).Label,
                 Text.Of(ActivityQuery.Describe(e.Kind)),
                 e.Service ?? "",
                 e.Process ?? e.Consumer ?? "",
                 string.Join("  ", new[] { e.Method, e.Path, e.Status?.ToString(CultureInfo.InvariantCulture), e.Reason }.Where(s => !string.IsNullOrEmpty(s)))));
         IsEmpty = shown.Count == 0;
-        EmptyText = Text.Get(all.Count == 0 ? "Activity_EmptyNone" : "Activity_EmptyFiltered");
-        Summary = shown.Count == ActivityQuery.Limit ? Text.Format("Activity_SummaryLimit", shown.Count) : Text.Format("Activity_Summary", shown.Count, all.Count);
+        var notice = history.ServiceJournal switch
+        {
+            ServiceJournalState.Stopped => Text.Get("Activity_ServiceStopped"),
+            ServiceJournalState.Unavailable => Text.Get("Activity_ServiceUnavailable"),
+            ServiceJournalState.Invalid => Text.Get("Activity_ServiceInvalid"),
+            _ => null,
+        };
+        EmptyText = notice ?? Text.Get(history.Entries.Count == 0 ? "Activity_EmptyNone" : "Activity_EmptyFiltered");
+        var count = shown.Count == ActivityQuery.Limit ? Text.Format("Activity_SummaryLimit", shown.Count) : Text.Format("Activity_Summary", shown.Count, history.Entries.Count);
+        Summary = notice is not null && !IsEmpty ? $"{count}  {notice}" : count;
     }
 }

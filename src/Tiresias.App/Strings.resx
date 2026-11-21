@@ -1029,10 +1029,22 @@ Switch to this copy, {2}, from {3}? The other copy quits first, ending its lease
     <value>All sources</value>
   </data>
   <data name="Activity_SourceUserSecrets" xml:space="preserve">
-    <value>App (user secrets, environment, NuGet)</value>
+    <value>App (unlock, user secrets, environment, NuGet)</value>
   </data>
   <data name="Activity_SourceBroker" xml:space="preserve">
     <value>Broker</value>
+  </data>
+  <data name="Activity_SourceLegacyBroker" xml:space="preserve">
+    <value>Previous app broker</value>
+  </data>
+  <data name="Activity_ServiceUnavailable" xml:space="preserve">
+    <value>Broker service activity is unavailable.</value>
+  </data>
+  <data name="Activity_ServiceStopped" xml:space="preserve">
+    <value>The broker service is stopped. Its activity is unavailable.</value>
+  </data>
+  <data name="Activity_ServiceInvalid" xml:space="preserve">
+    <value>The broker service journal could not be verified.</value>
   </data>
   <data name="Activity_PeriodToday" xml:space="preserve">
     <value>Today</value>

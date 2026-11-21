@@ -51,6 +51,9 @@ public interface IDoctorProbe
     /// <summary>Enrolled with the broker this device hosts itself (solo mode) rather than a remote one.</summary>
     bool Solo => false;
 
+    /// <summary>Solo mode: whether the broker runs as the Windows service rather than inside the app.</summary>
+    BrokerServiceState BrokerService => BrokerServiceState.NotInstalled;
+
     /// <summary><c>null</c> when the vault file is missing.</summary>
     DoctorVault? Vault { get; }
 
@@ -158,11 +161,15 @@ public static partial class Doctor
                 ? new("trust chain", DoctorStatus.Ok, "this device's Windows Hello key signs the links that add trust")
                 : new("trust chain", DoctorStatus.Warn, "this device's Windows Hello key isn't in the trust chain yet, so it can't add a device or change trust: run tir trust bind-hello"));
         if (probe.Solo)
+        {
             checks.AddRange(SoloTradeOffs);
+            checks.Add(BrokerProcess(probe.BrokerService));
+        }
         var brokerStatus = probe.Enrolled ? await probe.BrokerStatusAsync() : null;
         if (probe.Enrolled)
             checks.Add(brokerStatus switch
             {
+                null when probe.Solo && probe.BrokerService != BrokerServiceState.NotInstalled => new("broker reachable", DoctorStatus.Fail, "no answer: the broker runs as the Tiresias service; start it in Windows Services"),
                 null when probe.Solo => new("broker reachable", DoctorStatus.Fail, "no answer: the broker runs inside the Tiresias app; start the app (or tir agent)"),
                 null => new("broker reachable", DoctorStatus.Fail, "no answer (NetBird down, or the broker stopped)"),
                 401 => new("broker reachable", DoctorStatus.Ok, "answers and refuses unsigned calls"),
@@ -221,8 +228,15 @@ public static partial class Doctor
         new("mode", DoctorStatus.Ok, "Solo: the broker runs on this device; encryption, leases, placeholders, consent and audit all apply"),
         new("egress", DoctorStatus.Warn, "Solo: requests leave from your own connection, so there is no fixed IP for upstreams to allow-list"),
         new("isolation", DoctorStatus.Warn, "Solo: secrets live on the same machine as your agents and are not protected from code running as admin"),
-        new("broker process", DoctorStatus.Warn, "Broker runs inside the app: install the service for process isolation (not built yet)"),
     ];
+
+    /// <summary>Where solo mode's broker runs (docs/broker-service.md).</summary>
+    static DoctorCheck BrokerProcess(BrokerServiceState service) => service switch
+    {
+        BrokerServiceState.Running => new("broker process", DoctorStatus.Ok, "Broker runs as the Tiresias service, out of reach of programs running as you"),
+        BrokerServiceState.Stopped => new("broker process", DoctorStatus.Fail, "The Tiresias service is installed but stopped: start it in Windows Services, or run tir solo service install again"),
+        _ => new("broker process", DoctorStatus.Warn, "Broker runs inside the app: install the service for process isolation (tir solo service install, as administrator)"),
+    };
 
     public const string AdminTierCheck = "admin tier";
 
