@@ -81,7 +81,7 @@ public class DecoyTests
     {
         var set = Minted();
 
-        foreach (var text in new[] { DecoyPlan.PasswordsText(set), DecoyPlan.AppSettings(set), DecoyPlan.DotEnv(set) })
+        foreach (var text in new[] { DecoyPlan.DecoyListText(set), DecoyPlan.AppSettings(set), DecoyPlan.DotEnv(set) })
             Assert.That(text, Does.Contain($"127.0.0.1:{set.HttpPort}").Or.Contain($"127.0.0.1,{set.SqlPort}"));
         Assert.That(System.Text.Json.JsonDocument.Parse(DecoyPlan.AppSettings(set)).RootElement.GetProperty("ConnectionStrings").GetProperty("Billing").GetString(),
             Is.EqualTo(set.ConnectionString));
