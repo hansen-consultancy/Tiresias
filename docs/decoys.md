@@ -51,7 +51,8 @@ alphabet), never like a Tiresias placeholder (`tirph_`), which would give them a
 **On a hit**, the listener finds the connecting process from the TCP table, as the solo broker and
 the forwarder already do. Any connection to a decoy port is a hit, since only a decoy names it; the
 record says which value was presented (the SQL password, the admin token, the API key) or that none
-was. Built today: the agent
+was. Repeats by the same program with the same value within a minute are one hit, so a flood of
+connections can't bury the first in the log or the notifications. Built today: the agent
 
 - records it in the activity log (`consumer: decoy`), with the decoy, the endpoint, the process and
   the processes that started it, never a value;
