@@ -106,7 +106,9 @@ have it, and a reason the wording must stay factual.
   `decoys.json` beside the keyring. The doctor's own checks skip them, so a decoy never shows up as
   a plaintext secret to seal.
 - **Removal:** one action (`tir decoys remove`) removes every decoy and stops every listener. A
-  decoy folder is deleted only when nothing else is in it.
+  decoy folder is deleted only when nothing else is in it, and a decoy file or variable changed since
+  it was placed is kept: it is the user's now. A placement that fails partway takes back what it
+  wrote.
 
 ## Open questions
 

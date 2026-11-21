@@ -101,6 +101,25 @@ public class DecoyTests
     }
 
     [Test]
+    public void Removal_takes_what_is_unchanged_and_keeps_what_the_user_changed()
+    {
+        var root = Path.GetFullPath("decoy-root");
+        var project = new PlacedDecoy(DecoyKind.Project, Path.Combine(root, "billing"), Now);
+        var set = Minted().With(project);
+        var settings = Path.Combine(project.Where, "appsettings.Production.json");
+        var env = Path.Combine(project.Where, ".env");
+        var now = new Dictionary<string, string?> { [settings] = DecoyPlan.AppSettings(set), [env] = "OPENAI_API_KEY=mine" };
+
+        var (remove, kept) = DecoyPlan.Undo(set, project, path => now.GetValueOrDefault(path));
+
+        Assert.That(remove.OfType<WriteDecoyFile>().Select(f => f.Path), Is.EqualTo(new[] { settings }));
+        Assert.That(kept, Is.EqualTo(new[] { env }));
+        var gone = DecoyPlan.Undo(set, project, _ => null);
+        Assert.That(gone.Remove, Is.Empty);
+        Assert.That(gone.Kept, Is.Empty);
+    }
+
+    [Test]
     public void The_doctor_skips_decoy_files_and_everything_in_a_decoy_folder()
     {
         var root = Path.GetFullPath("decoy-root");
