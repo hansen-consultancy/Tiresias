@@ -67,7 +67,8 @@ Seeing the read itself, before anything is tried, is harder on Windows without a
 | Last-access time, `FileSystemWatcher` | No | Unusable: no process, and access times are often not updated |
 | Auditing with a SACL (Security log event 4663) | Yes, to set the audit policy and read the log | Works; offered only where the user is an administrator |
 | Kernel ETW file events, a minifilter driver | Yes, or a driver | Out of scope |
-| An oplock on the decoy, plus Restart Manager | No | **Dropped** after a spike: it sees a read but can't say who read it (below) |
+| An oplock on the decoy, naming the reader by Restart Manager | No | **Dropped** after a spike: it sees a read but can't say who read it (below) |
+| An oplock on the decoy, naming the reader by the thread that wakes when the oplock is released | No (to be proven) | **Second spike**: prior art (below) reports it naming the opener in about 0.1 s |
 
 **The oplock spike** (Windows 11, NTFS, ordinary user; 5 oplock levels, 2 share modes, 11 kinds of
 opener, each in its own process):
@@ -88,8 +89,8 @@ opener, each in its own process):
 
 So an ordinary user can learn that *something* read a decoy file, once, but not what. Without a
 name, the indexer, antivirus and backup openers below can't be told apart from a thief, so the
-signal would be mostly noise. A read alert without a name would break principle 5, and it was not
-built. For now, files are covered only when a credential in them is *used* (layer 1).
+signal would be mostly noise. A read alert without a name would break principle 5, so this way of
+naming the reader was dropped. For now, files are covered only when a credential in them is *used* (layer 1).
 
 **False positives** are the cost of this layer: Windows Search, Defender, OneDrive and backup tools
 open files they find. Decoys go in a folder those tools are told to skip where possible, and an
@@ -99,6 +100,23 @@ needs the user.
 
 An AI agent listing and reading files in the home folder will trip this layer. That is a reason to
 have it, and a reason the wording must stay factual.
+
+## Prior art: A Better Antivirus
+
+[A Better Antivirus](https://github.com/vulnix0x4/a-better-antivirus) (MIT) plants bait files for
+infostealers and freezes the program that opens one. It watches reads, runs a SYSTEM service and
+sets audit rules; Tiresias watches use and needs no admin rights. What fits Tiresias:
+
+| Idea | Fit | Where |
+|---|---|---|
+| Name the opener by the thread that wakes when the oplock is released | Would give layer 2 the name it lacks, without admin rights | Layer 2, second spike |
+| Decoys for tools that **aren't installed**, so nothing legitimate reads them, retired when the real tool appears | Yes, for developer credentials pointing home: `~/.aws/credentials` with an `endpoint_url` on loopback, a `~/.kube/config` whose server is the HTTP decoy, a `pgpass.conf`. Only where the file doesn't exist (principle 4) | Layer 1, next |
+| Different file names per install, from the names grabbers search for | Yes: `passwords.txt` is one fixed name today | Placement, next |
+| A program using **several** decoys is a sweep: say so | Yes, as a fact in the finding ("used 3 decoys in 2 minutes") | Finding, next |
+| Say whether the program is signed and where it runs from (Downloads, Temp) | Yes: the activity record has the signature; the finding should too | Finding, next |
+| Freeze the process tree, cut its network, isolate the PC | Not now: Tiresias refuses its own leases, it doesn't police the machine. Revisit with layer 2 | Considered |
+| Canary tokens registered with a public service | Yes, opt-in | Phase 3 |
+| A fake browser profile, fake wallets and chat sessions | No: outside developer credentials | Not taken |
 
 ## Placement
 
@@ -127,6 +145,6 @@ have it, and a reason the wording must stay factual.
 
 1. **Decoy credentials with loopback endpoints:** files, listeners, process identification, activity,
    block list, finding.
-2. **Read tripwire:** the oplock spike is done and the approach dropped (it can't name the reader).
-   What remains is SACL auditing, for administrators only.
+2. **Read tripwire:** naming the reader through Restart Manager is dropped; naming it through the
+   thread that wakes is the second spike. SACL auditing, for administrators only, is the fallback.
 3. **External canaries** (opt-in): decoys registered with a canary service, for use off the machine.
