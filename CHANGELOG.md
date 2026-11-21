@@ -8,6 +8,14 @@ its section below.
 
 ## [Unreleased]
 
+### Added
+
+- Decoy credentials: `tir decoys place passwords|project|variables` puts a `passwords.txt`, an old
+  project's `appsettings.Production.json` and `.env`, or two user variables on disk, holding
+  credentials that open nothing and point to ports only Tiresias listens on. A program that finds
+  and uses one is named in the activity log while the app or `tir agent` runs. `tir decoys remove`
+  takes them all away, and `tir doctor` warns when nothing listens.
+
 ### Changed
 
 - The secrets editor hides user-secrets folders that hold no keys behind a line, "*N* empty
