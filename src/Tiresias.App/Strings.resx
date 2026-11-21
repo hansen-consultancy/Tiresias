@@ -58,6 +58,54 @@
   <data name="About_Windows" xml:space="preserve">
     <value>Windows</value>
   </data>
+  <data name="About_AdminTier_Heading" xml:space="preserve">
+    <value>Admin tier (optional)</value>
+  </data>
+  <data name="About_AdminTier_Checking" xml:space="preserve">
+    <value>Checking...</value>
+  </data>
+  <data name="About_AdminTier_NotInstalled" xml:space="preserve">
+    <value>Not set up. With your approval at a Windows admin prompt, a small Tiresias service can do what an ordinary account can't. Tiresias works the same without it.</value>
+  </data>
+  <data name="About_AdminTier_Running" xml:space="preserve">
+    <value>Running, version {0}.</value>
+  </data>
+  <data name="About_AdminTier_Stopped" xml:space="preserve">
+    <value>Set up, but stopped, so nothing it does happens. Set up again to start it.</value>
+  </data>
+  <data name="About_AdminTier_NotAnswering" xml:space="preserve">
+    <value>The service runs, but no answer came from it: it hung, or another program holds its name. Restart the PC; if this stays, remove it and set it up again.</value>
+  </data>
+  <data name="About_AdminTier_Older" xml:space="preserve">
+    <value>Running version {0}, older than this app ({1}). Update it to match.</value>
+  </data>
+  <data name="About_AdminTier_SetUp" xml:space="preserve">
+    <value>Set up...</value>
+  </data>
+  <data name="About_AdminTier_Update" xml:space="preserve">
+    <value>Update...</value>
+  </data>
+  <data name="About_AdminTier_Remove" xml:space="preserve">
+    <value>Remove...</value>
+  </data>
+  <data name="AdminTier_Declined" xml:space="preserve">
+    <value>Nothing changed: the Windows prompt was declined.</value>
+  </data>
+  <data name="AdminTier_SetUp" xml:space="preserve">
+    <value>The admin tier is set up and running.</value>
+  </data>
+  <data name="AdminTier_Removed" xml:space="preserve">
+    <value>The admin tier is removed.</value>
+  </data>
+  <data name="AdminTier_FilesMissing" xml:space="preserve">
+    <value>This copy of Tiresias doesn't carry the admin tier's files (a development build?). Install Tiresias from its release to set it up.</value>
+  </data>
+  <data name="AdminTier_DidNotStart" xml:space="preserve">
+    <value>The service was set up but stopped again at once. Its folder or its pipe's name may be held by something else; the Windows event log has the reason.</value>
+  </data>
+  <data name="AdminTier_Failed" xml:space="preserve">
+    <value>That didn't work (code {0}). Nothing else changed; try again, or see the Windows event log.</value>
+  </data>
   <data name="About_Unknown" xml:space="preserve">
     <value>unknown</value>
   </data>
@@ -543,6 +591,12 @@ Switch to this copy, {2}, from {3}? The other copy quits first, ending its lease
   </data>
   <data name="Tray_Status" xml:space="preserve">
     <value>Status...</value>
+  </data>
+  <data name="Tray_StatusNew" xml:space="preserve">
+    <value>Status... ({0} new)</value>
+  </data>
+  <data name="Tray_NewFindings" xml:space="preserve">
+    <value>New findings: {0}</value>
   </data>
   <data name="Tray_Quit" xml:space="preserve">
     <value>Quit Tiresias</value>
@@ -1211,6 +1265,26 @@ Store them in clear?</value>
   <data name="FirstRun_Later" xml:space="preserve">
     <value>Finish later</value>
   </data>
+  <data name="FirstRun_AdminTier_Title" xml:space="preserve">
+    <value>Protect more with admin rights (optional)</value>
+  </data>
+  <data name="FirstRun_AdminTier_Body" xml:space="preserve">
+    <value>A small Tiresias service, running from Program Files, can do what your ordinary account can't. Setting it up takes one Windows admin prompt.</value>
+  </data>
+  <data name="FirstRun_AdminTier_Adds" xml:space="preserve">
+    <value>• It keeps your decoys out of reach of programs running as you.
+• It notices a decoy used or read from the moment Windows starts, even with the app closed.
+• It can stop a program that used one until you say otherwise.</value>
+  </data>
+  <data name="FirstRun_AdminTier_Note" xml:space="preserve">
+    <value>This version sets up the service; what it does arrives in the next updates. Not now changes nothing, and About offers it again any time.</value>
+  </data>
+  <data name="FirstRun_Primary_AdminTier" xml:space="preserve">
+    <value>Set up...</value>
+  </data>
+  <data name="FirstRun_AdminTier_NotNow" xml:space="preserve">
+    <value>Not now</value>
+  </data>
   <data name="FirstRun_Primary_Start" xml:space="preserve">
     <value>Get started</value>
   </data>
@@ -1835,6 +1909,153 @@ Store them in clear?</value>
   <data name="Finding_FixReveal" xml:space="preserve">
     <value>Show file</value>
   </data>
+  <data name="Finding_FixDisableStartup" xml:space="preserve">
+    <value>Turn off at log-on...</value>
+  </data>
+  <data name="Finding_FixStartupSettings" xml:space="preserve">
+    <value>Open Startup apps</value>
+  </data>
+  <data name="Finding_DisableStartupHeading" xml:space="preserve">
+    <value>Stop starting {0} at log-on?</value>
+  </data>
+  <data name="Finding_DisableStartupBody" xml:space="preserve">
+    <value>It stays installed and you can open it whenever you need it. Turn it back on in Settings, Apps, Startup.</value>
+  </data>
+  <data name="Finding_TurnOff" xml:space="preserve">
+    <value>Turn off</value>
+  </data>
+  <data name="Finding_StartupOff" xml:space="preserve">
+    <value>{0} no longer starts at log-on. Turn it back on in Settings, Apps, Startup.</value>
+  </data>
+  <data name="Finding_FixInstalledList" xml:space="preserve">
+    <value>Show installed programs</value>
+  </data>
+  <data name="Nav_Installed" xml:space="preserve">
+    <value>Installed</value>
+  </data>
+  <data name="Installed_Search" xml:space="preserve">
+    <value>Search</value>
+  </data>
+  <data name="Installed_ColFolder" xml:space="preserve">
+    <value>Folder</value>
+  </data>
+  <data name="Installed_ShortUnused" xml:space="preserve">
+    <value>{0} (unused)</value>
+  </data>
+  <data name="Installed_ShortBackground" xml:space="preserve">
+    <value>Unknown (background)</value>
+  </data>
+  <data name="Installed_ShortNotRecorded" xml:space="preserve">
+    <value>Unknown</value>
+  </data>
+  <data name="Installed_ReachedNone" xml:space="preserve">
+    <value>None</value>
+  </data>
+  <data name="Installed_FolderUnknown" xml:space="preserve">
+    <value>Not known</value>
+  </data>
+  <data name="Installed_ShortRecentNoRun" xml:space="preserve">
+    <value>Uses credentials</value>
+  </data>
+  <data name="Installed_Heading" xml:space="preserve">
+    <value>Installed programs</value>
+  </data>
+  <data name="Installed_Intro" xml:space="preserve">
+    <value>Every program in the installed-apps list, those you haven't opened in 90 days first. Last opened is the last time you started something in its folder from Start, the taskbar or Explorer; Windows doesn't record other use, so that shows as unknown, never as unused.</value>
+  </data>
+  <data name="Installed_ShowLabel" xml:space="preserve">
+    <value>Show</value>
+  </data>
+  <data name="Installed_ShowAll" xml:space="preserve">
+    <value>All programs</value>
+  </data>
+  <data name="Installed_ShowUnused" xml:space="preserve">
+    <value>Not opened in 90 days</value>
+  </data>
+  <data name="Installed_ListName" xml:space="preserve">
+    <value>Installed programs</value>
+  </data>
+  <data name="Installed_ColName" xml:space="preserve">
+    <value>Program</value>
+  </data>
+  <data name="Installed_ColVersion" xml:space="preserve">
+    <value>Version</value>
+  </data>
+  <data name="Installed_ColFor" xml:space="preserve">
+    <value>Installed for</value>
+  </data>
+  <data name="Installed_ColUse" xml:space="preserve">
+    <value>Last opened</value>
+  </data>
+  <data name="Installed_ColReached" xml:space="preserve">
+    <value>Credentials used (90 days)</value>
+  </data>
+  <data name="Installed_ForYou" xml:space="preserve">
+    <value>You</value>
+  </data>
+  <data name="Installed_ForEveryone" xml:space="preserve">
+    <value>Everyone (administrator)</value>
+  </data>
+  <data name="Installed_UseUnused" xml:space="preserve">
+    <value>{0}, over 90 days ago</value>
+  </data>
+  <data name="Installed_UseBackground" xml:space="preserve">
+    <value>Unknown: part of it works without being opened (a tray icon, a service, a driver, something that starts at log-on, or a command on PATH), which Windows doesn't record</value>
+  </data>
+  <data name="Installed_UseNotRecorded" xml:space="preserve">
+    <value>Unknown: Windows has no record of you opening anything in its folder, or it names no folder of its own</value>
+  </data>
+  <data name="Installed_UseRecentNoRun" xml:space="preserve">
+    <value>Not recorded, but it used credentials through Tiresias in the last 90 days</value>
+  </data>
+  <data name="Installed_Summary" xml:space="preserve">
+    <value>{0} programs, {1} not opened in 90 days</value>
+  </data>
+  <data name="Installed_Loading" xml:space="preserve">
+    <value>Reading the installed-apps list...</value>
+  </data>
+  <data name="Installed_Empty" xml:space="preserve">
+    <value>Nothing to show.</value>
+  </data>
+  <data name="Installed_Refresh" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="Installed_OpenSettings" xml:space="preserve">
+    <value>Open Installed apps in Settings</value>
+  </data>
+  <data name="Finding_FixRemoveEntry" xml:space="preserve">
+    <value>Remove entry...</value>
+  </data>
+  <data name="Finding_RemoveEntryHeading" xml:space="preserve">
+    <value>Remove the entry for {0}?</value>
+  </data>
+  <data name="Finding_RemoveEntryBody" xml:space="preserve">
+    <value>Tiresias saves the entry to a .reg file first, then removes it from the installed apps list. Nothing on disk is deleted. Open the saved file to put the entry back.</value>
+  </data>
+  <data name="Finding_EntryRemoved" xml:space="preserve">
+    <value>Removed the entry for {0}. It is saved in {1}; open that file to put it back.</value>
+  </data>
+  <data name="Finding_FixUnblock" xml:space="preserve">
+    <value>Unblock (that was me)</value>
+  </data>
+  <data name="Notify_Decoy_Title" xml:space="preserve">
+    <value>A program used a decoy credential</value>
+  </data>
+  <data name="Notify_Decoy_Body" xml:space="preserve">
+    <value>{0} connected with {1}. Tiresias blocked it until you review it on Home.</value>
+    <comment>{0}: program file name; {1}: which decoy, e.g. "the decoy admin token"</comment>
+  </data>
+  <data name="Notify_DecoyRead_Title" xml:space="preserve">
+    <value>A program opened a decoy file</value>
+  </data>
+  <data name="Notify_DecoyRead_Body" xml:space="preserve">
+    <value>{0} opened the decoy file {1}. That may be harmless; Tiresias blocked nothing. See Home.</value>
+    <comment>{0}: program file name; {1}: decoy file name, e.g. "passwords.txt"</comment>
+  </data>
+  <data name="Notify_Decoy_Unknown" xml:space="preserve">
+    <value>A program connected with {0}, but it couldn't be named. See Home.</value>
+    <comment>{0}: which decoy</comment>
+  </data>
   <data name="Finding_RemoveExtensionHeading" xml:space="preserve">
     <value>Remove {0} from {1}?</value>
   </data>
@@ -1918,6 +2139,9 @@ Store them in clear?</value>
   </data>
   <data name="Finding_FixPlaceholder" xml:space="preserve">
     <value>Use a placeholder...</value>
+  </data>
+  <data name="Finding_FixGitHubApp" xml:space="preserve">
+    <value>Add a GitHub App...</value>
   </data>
   <data name="About_Mode" xml:space="preserve">
     <value>Mode</value>
@@ -2098,5 +2322,101 @@ Store them in clear?</value>
   </data>
   <data name="Secrets_NothingToSeal" xml:space="preserve">
     <value>Nothing to seal: this file holds no keys.</value>
+  </data>
+  <data name="Installed_ColPublisher" xml:space="preserve">
+    <value>Publisher (as its installer says)</value>
+  </data>
+  <data name="Installed_PublisherUnknown" xml:space="preserve">
+    <value>Not given</value>
+  </data>
+  <data name="Installed_ColSigner" xml:space="preserve">
+    <value>Signed by</value>
+  </data>
+  <data name="Installed_SignerChecking" xml:space="preserve">
+    <value>Checking…</value>
+  </data>
+  <data name="Installed_SignedBy" xml:space="preserve">
+    <value>{0}, a valid signature (checked on this PC)</value>
+  </data>
+  <data name="Installed_SignedNoName" xml:space="preserve">
+    <value>A valid signature without a name (checked on this PC)</value>
+  </data>
+  <data name="Installed_SignedInvalid" xml:space="preserve">
+    <value>A signature that is not valid; it names {0}, which anyone can write</value>
+  </data>
+  <data name="Installed_NotSigned" xml:space="preserve">
+    <value>Not signed</value>
+  </data>
+  <data name="Installed_SignerUnknown" xml:space="preserve">
+    <value>Not checked: a part of Windows or a Store app, or no program file found</value>
+  </data>
+  <data name="Installed_SearchOnline" xml:space="preserve">
+    <value>Search online…</value>
+  </data>
+  <data name="Installed_SearchOnlineTip" xml:space="preserve">
+    <value>Opens your browser with a web search for this name and version</value>
+  </data>
+  <data name="Decoys_Title" xml:space="preserve">
+    <value>Decoys</value>
+  </data>
+  <data name="Decoys_Intro" xml:space="preserve">
+    <value>Fake credentials that work nowhere. A program that uses one is named and blocked until you say it was you.</value>
+  </data>
+  <data name="Decoys_Since" xml:space="preserve">
+    <value>Placed {0:g}</value>
+    <comment>{0}: when it was placed</comment>
+  </data>
+  <data name="Decoys_Passwords" xml:space="preserve">
+    <value>passwords.txt</value>
+  </data>
+  <data name="Decoys_Passwords_Place" xml:space="preserve">
+    <value>Place passwords.txt</value>
+  </data>
+  <data name="Decoys_Project" xml:space="preserve">
+    <value>Decoy project</value>
+  </data>
+  <data name="Decoys_Project_Place" xml:space="preserve">
+    <value>Place a decoy project</value>
+  </data>
+  <data name="Decoys_Variables" xml:space="preserve">
+    <value>Decoy environment variables</value>
+  </data>
+  <data name="Decoys_Variables_Place" xml:space="preserve">
+    <value>Set decoy variables</value>
+  </data>
+  <data name="Decoys_WhereProject" xml:space="preserve">
+    <value>{0}, a new folder with an appsettings.Production.json and a .env</value>
+    <comment>{0}: the folder</comment>
+  </data>
+  <data name="Decoys_WhereVariables" xml:space="preserve">
+    <value>the user environment variables {0}</value>
+    <comment>{0}: the variable names</comment>
+  </data>
+  <data name="Decoys_PlaceBody" xml:space="preserve">
+    <value>Tiresias creates {0}, holding a fake database password, admin token and API key that work nowhere. Nothing that exists is changed. A program that uses one is named and blocked. Remove decoys takes it away again.</value>
+    <comment>{0}: the file, folder or variables</comment>
+  </data>
+  <data name="Decoys_PlaceAction" xml:space="preserve">
+    <value>Place</value>
+  </data>
+  <data name="Decoys_Remove" xml:space="preserve">
+    <value>Remove decoys</value>
+  </data>
+  <data name="Decoys_RemoveHeading" xml:space="preserve">
+    <value>Remove every decoy?</value>
+  </data>
+  <data name="Decoys_RemoveBody" xml:space="preserve">
+    <value>Tiresias deletes the files and variables it placed, and a decoy folder when nothing else is in it.</value>
+  </data>
+  <data name="Decoys_RemoveAction" xml:space="preserve">
+    <value>Remove</value>
+  </data>
+  <data name="Decoys_RemoveLeft" xml:space="preserve">
+    <value>Couldn't remove: {0}</value>
+    <comment>{0}: paths or variable names</comment>
+  </data>
+  <data name="Decoys_RemoveKept" xml:space="preserve">
+    <value>Kept {0}: changed since Tiresias placed it, so it is yours now.</value>
+    <comment>{0}: paths or variable names</comment>
   </data>
 </root>

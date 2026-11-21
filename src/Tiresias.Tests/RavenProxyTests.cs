@@ -289,7 +289,7 @@ public class RavenProxyTests
 
         await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "done", CancellationToken.None);
         Assert.That(socket.CloseStatus, Is.EqualTo(WebSocketCloseStatus.NormalClosure), "the node's close comes back");
-        Assert.That(SpinWait.SpinUntil(() => Audit().Contains("closed: 10 bytes up, 10 bytes down"), TimeSpan.FromSeconds(5)), Is.True, Audit());
+        Assert.That(SpinWait.SpinUntil(() => Audit().Contains("closed: 10 bytes up, 10 bytes down", StringComparison.Ordinal), TimeSpan.FromSeconds(5)), Is.True, Audit());
         Assert.That(Audit(), Does.Contain("\"WEBSOCKET\""));
     }
 
@@ -311,15 +311,83 @@ public class RavenProxyTests
         {
         }
         Assert.That(timeout.IsCancellationRequested, Is.False, "the socket ended before the timeout");
-        Assert.That(SpinWait.SpinUntil(() => Audit().Contains("lease-ended"), TimeSpan.FromSeconds(5)), Is.True, Audit());
+        Assert.That(SpinWait.SpinUntil(() => Audit().Contains("lease-ended", StringComparison.Ordinal), TimeSpan.FromSeconds(5)), Is.True, Audit());
     }
 
     sealed record SeenRequest(string Uri, string? Authorization, string? AcceptEncoding);
+
+    /// <summary>The shape RavenDB 7.2 answers, with made-up names and a dummy certificate.</summary>
+    const string Whoami = """
+        {"Name":"orders-app","Thumbprint":"00112233445566778899AABBCCDDEEFF00112233","SecurityClearance":"ValidUser",
+         "Permissions":{"orders":"ReadWrite","billing":"Read"},"NotAfter":"2031-11-21T00:00:00.0000000","Usage":"Client",
+         "PublicKeyPinningHash":"pin-hash","Certificate":"MIIE-not-a-real-certificate"}
+        """;
+
+    HttpRequestMessage SignedGet(string endpoint)
+    {
+        var ts = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var message = new HttpRequestMessage(HttpMethod.Get, endpoint);
+        message.Headers.Add(RequestSignature.DeviceHeader, "laptop");
+        message.Headers.Add(RequestSignature.TimestampHeader, ts.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        message.Headers.Add(RequestSignature.SignatureHeader, Convert.ToBase64String(RequestSignature.Sign(device, "GET", endpoint, ts, [])));
+        return message;
+    }
+
+    [Test]
+    public async Task Clearance_relays_only_the_level_and_databases_asked_with_the_vault_certificate()
+    {
+        await OpenLeaseAndMint();
+        var response = await client.SendAsync(SignedGet("/clearance/ravendb"));
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.That(body, Is.EqualTo("""{"clearance":"ValidUser","databases":{"billing":"Read","orders":"ReadWrite"}}"""));
+        Assert.That(raven.Requests.Single().Uri, Is.EqualTo("https://a.raven.example/certificates/whoami"));
+        Assert.That(raven.Certificates.Single().Thumbprint, Is.EqualTo(issued.Thumbprint));
+        var audit = File.ReadAllText(Path.Combine(dir, "audit.jsonl"));
+        Assert.That(audit, Does.Contain("\"method\":\"CLEARANCE\"").And.Not.Contain("MIIE"));
+    }
+
+    [Test]
+    public async Task Clearance_needs_a_device_signature_and_a_lease()
+    {
+        Assert.That((await client.GetAsync("/clearance/ravendb")).StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+        Assert.That((await client.SendAsync(SignedGet("/clearance/ravendb"))).StatusCode, Is.EqualTo(HttpStatusCode.ServiceUnavailable));
+        Assert.That(raven.Requests, Is.Empty);
+    }
+
+    [Test]
+    public async Task Clearance_of_a_service_that_isnt_ravendb_is_refused_before_its_secret_is_opened()
+    {
+        await OpenLeaseAndMint();
+        Assert.That((await client.SendAsync(SignedGet("/clearance/llm"))).StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        Assert.That(raven.Requests, Is.Empty);
+        Assert.That(raven.Certificates, Is.Empty);
+    }
+
+    [Test]
+    public async Task Clearance_from_an_unreachable_server_says_so()
+    {
+        await OpenLeaseAndMint();
+        raven.Unreachable = true;
+        var response = await client.SendAsync(SignedGet("/clearance/ravendb"));
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadGateway));
+        Assert.That(await response.Content.ReadAsStringAsync(), Does.Contain("whoami-unanswered"));
+    }
+
+    [Test]
+    public async Task Clearance_of_an_unknown_service_is_a_404()
+    {
+        await OpenLeaseAndMint();
+        Assert.That((await client.SendAsync(SignedGet("/clearance/nope"))).StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+    }
 
     sealed class FakeRaven
     {
         public ConcurrentQueue<SeenRequest> Requests { get; } = new();
         public List<X509Certificate2> Certificates { get; } = [];
+        /// <summary>Connections fail, as when the server's firewall drops this address.</summary>
+        public bool Unreachable { get; set; }
 
         public HttpMessageHandler Handler(X509Certificate2 certificate)
         {
@@ -334,10 +402,13 @@ public class RavenProxyTests
             {
                 owner.Requests.Enqueue(new(request.RequestUri!.OriginalString, request.Headers.Authorization?.ToString(),
                     request.Headers.AcceptEncoding.Count == 0 ? null : request.Headers.AcceptEncoding.ToString()));
+                if (owner.Unreachable)
+                    throw new HttpRequestException("connection timed out");
                 if (request.Headers.TryGetValues("Sec-WebSocket-Key", out var keys))
                     return await FakeWebSocketNode.UpgradeAsync(keys.Single());
                 var body = request.RequestUri!.AbsolutePath switch
                 {
+                    "/certificates/whoami" => Whoami,
                     "/topology" => """{"Nodes":[{"Url":"https://a.raven.example","ClusterTag":"A"}],"Etag":1}""",
                     "/cluster/topology" => """{"Topology":{"AllNodes":{"A":"https://a.raven.example"}},"Leader":"A"}""",
                     _ => """{"ok":true}""",

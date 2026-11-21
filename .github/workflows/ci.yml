@@ -47,6 +47,7 @@ jobs:
             dotnet publish src/Tiresias.App -c Release -r $rid --self-contained -o publish/$rid
             dotnet publish src/Tiresias.Keyring -c Release -r $rid --self-contained -o publish/$rid
             dotnet publish src/Tiresias.NuGetPlugin -c Release -r $rid --self-contained -o publish/$rid
+            dotnet publish src/Tiresias.Admin -c Release -r $rid --self-contained -p:PublishSingleFile=true -o publish/$rid/admin
           done
 
   denylist:

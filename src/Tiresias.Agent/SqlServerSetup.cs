@@ -246,7 +246,7 @@ public static class SqlServerSetup
         return $" The database runs {string.Join(", ", ddlTriggers)} on every CREATE USER, as the user who runs it, so {Provisioner} must be allowed what the trigger does.{grant}";
     }
 
-    static string Bracket(string name) => $"[{name.Replace("]", "]]")}]";
+    static string Bracket(string name) => $"[{name.Replace("]", "]]", StringComparison.Ordinal)}]";
 
     /// <summary>
     /// 32 characters from letters and digits, with at least one of each kind, which every password
