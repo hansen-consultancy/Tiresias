@@ -81,7 +81,8 @@ public sealed class SoloBroker : IAsyncDisposable
 
     /// <param name="contentRoot">An empty folder of its own, so no appsettings.json from wherever tir was started is read.</param>
     /// <param name="windowsService">Run under the service manager (<see cref="BrokerService"/>).</param>
-    internal async Task StartAsync(string vaultPath, string contentRoot, Dictionary<string, string?> settings, bool windowsService = false)
+    /// <param name="journalReaderSid">The installing account recorded in the service's protected configuration.</param>
+    internal async Task StartAsync(string vaultPath, string contentRoot, Dictionary<string, string?> settings, bool windowsService = false, string? journalReaderSid = null)
     {
         vaultStamp = File.GetLastWriteTimeUtc(vaultPath);
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
@@ -94,7 +95,11 @@ public sealed class SoloBroker : IAsyncDisposable
         builder.WebHost.UseUrls(Url.GetLeftPart(UriPartial.Authority));
         builder.Logging.ClearProviders();
         if (windowsService)
+        {
             builder.Host.UseWindowsService(o => o.ServiceName = BrokerServiceLayout.Name);
+            if (journalReaderSid is not null)
+                builder.Services.AddHostedService(sp => new BrokerJournal(sp.GetRequiredService<Tiresias.Audit.AuditLog>(), journalReaderSid));
+        }
 
         var built = BrokerHost.Build(builder);
         var state = built.Services.GetRequiredService<BrokerState>();

@@ -23,7 +23,6 @@ public class BrokerServiceLayoutTests
         var acl = BrokerServiceLayout.StateFolderAcl("state");
         Assert.That(acl, Does.Contain("/inheritance:r"));
         Assert.That(acl.Where(a => a.Contains("(OI)", StringComparison.Ordinal)), Is.EqualTo(new[] { "*S-1-5-18:(OI)(CI)F", "*S-1-5-32-544:(OI)(CI)F", @"NT SERVICE\Tiresias:(OI)(CI)M" }));
-        Assert.That(BrokerServiceLayout.VaultFolderAcl("vault"), Is.EqualTo(new[] { "vault", "/grant", @"NT SERVICE\Tiresias:(OI)(CI)R" }));
     }
 
     [Test]

@@ -21,15 +21,19 @@ static class Commands
         if (genesis is not null && !Regex.IsMatch(genesis, "^[0-9a-f]{64}$"))
             throw new UsageException("--genesis is the trust chain's genesis hash, 64 lower-case hex digits.");
 
-        var settings = KeyringStore.Settings;
+        var settings = ProfileAccess.Run(() => KeyringStore.Settings);
         settings = settings with { DeviceId = args.Option("--device") ?? settings.DeviceId };
-        KeyringStore.Settings = settings;
         var vaultPath = args.Option("--vault") is { } vault ? Path.GetFullPath(vault)
-            : KeyringStore.Tenants.FirstOrDefault(t => t.Name == tenant)?.VaultPath
+            : ProfileAccess.Run(() => KeyringStore.Tenants.FirstOrDefault(t => t.Name == tenant)?.VaultPath)
             ?? (tenant == KeyringStore.DefaultTenant ? settings.VaultPath : Path.Combine(KeyringStore.Directory, $"vault-{tenant}.json"));
-        KeyringStore.Enroll(new(tenant, url, brokerKey, vaultPath, genesis));
-
-        var devicePublicKey = KeyringStore.DevicePublicKey();
+        var enrollment = new TenantConfig(tenant, url, brokerKey, vaultPath, genesis);
+        BrokerService.EnrollRemote(enrollment);
+        var devicePublicKey = ProfileAccess.Run(() =>
+        {
+            KeyringStore.Settings = settings;
+            KeyringStore.Enroll(enrollment);
+            return KeyringStore.DevicePublicKey();
+        });
         Console.WriteLine($"Pinned broker {url} for tenant {tenant} (identity {brokerKey}, vault {vaultPath}).");
         Console.WriteLine("Add this device to the broker's configuration:");
         Console.WriteLine($"  \"Broker\": {{ \"Devices\": {{ \"{settings.DeviceId}\": \"{devicePublicKey}\" }} }}");

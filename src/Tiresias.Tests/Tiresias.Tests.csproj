@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <RootNamespace>Tiresias.Tests</RootNamespace>
     <!-- Gives WebApplication.CreateBuilder a user-secrets source to add in Development, for the interceptor test. Nothing is stored under it. -->
     <UserSecretsId>tiresias-tests-0d1f</UserSecretsId>
@@ -42,6 +43,14 @@
   <!-- The desktop app is Windows-only, so its pure decisions are compiled in here rather than referenced. -->
   <ItemGroup>
     <Compile Include="..\Tiresias.App\Logic\**\*.cs" Link="AppLogic\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <!-- The broker enrollment and saved offer are portable decisions shared with the Windows client. -->
+  <ItemGroup>
+    <Compile Include="..\Tiresias.Agent\BrokerEnrollment.cs" Link="Agent\BrokerEnrollment.cs" />
+    <Compile Include="..\Tiresias.Agent\BrokerVaultAccess.cs" Link="Agent\BrokerVaultAccess.cs" />
+    <Compile Include="..\Tiresias.Agent\BrokerJournalAccess.cs" Link="Agent\BrokerJournalAccess.cs" />
+    <Compile Include="..\Tiresias.Agent\ServicePipeIdentity.cs" Link="Agent\ServicePipeIdentity.cs" />
   </ItemGroup>
 
   <!-- Likewise tir's usage and agent guide, plain text checked against each other. -->

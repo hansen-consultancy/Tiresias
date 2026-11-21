@@ -11,7 +11,7 @@ public enum BrokerServiceState
 }
 
 /// <summary>What the service reads at start, written by an elevated install into its state folder.</summary>
-public sealed record BrokerServiceConfig(string VaultPath, string GenesisHash, string TimeZone)
+public sealed record BrokerServiceConfig(string VaultPath, string GenesisHash, string TimeZone, string? OwnerSid = null, string? RevisionPublicKey = null)
 {
     public const string FileName = "service.json";
 
@@ -43,6 +43,8 @@ public static class BrokerServiceLayout
 
     public static string StateFolder(string programData) => Path.Combine(programData, "Tiresias", "Broker");
 
+    public static string AuditPath(string stateFolder, string ownerSid) => Path.Combine(stateFolder, $"audit-{ownerSid}.jsonl");
+
     /// <summary>
     /// The folders install makes owned by Administrators before granting the service, outermost first.
     /// Any user can create folders in <c>%ProgramData%</c>, and an owner can always change a folder's
@@ -58,20 +60,18 @@ public static class BrokerServiceLayout
     public static IReadOnlyList<string> StateFolderAcl(string stateFolder) =>
         [stateFolder, "/inheritance:r", "/grant:r", "*S-1-5-18:(OI)(CI)F", "/grant:r", "*S-1-5-32-544:(OI)(CI)F", "/grant:r", $"{Account}:(OI)(CI)M"];
 
-    /// <summary><c>icacls.exe</c> arguments: read access for the service to the folder holding the user's vault, which is replaced on save.</summary>
-    public static IReadOnlyList<string> VaultFolderAcl(string vaultFolder) => [vaultFolder, "/grant", $"{Account}:(OI)(CI)R"];
-
     /// <summary>The broker's settings under the service, all paths inside <paramref name="stateFolder"/> but the vault.</summary>
     public static Dictionary<string, string?> BrokerSettings(string stateFolder, BrokerServiceConfig config) => new()
     {
         ["Broker:VaultPath"] = config.VaultPath,
-        ["Broker:AuditPath"] = Path.Combine(stateFolder, "audit.jsonl"),
+        ["Broker:AuditPath"] = config.OwnerSid is { } sid ? AuditPath(stateFolder, sid) : Path.Combine(stateFolder, "audit.jsonl"),
         ["Broker:IdentityKeyPath"] = Path.Combine(stateFolder, "identity.key"),
         ["Broker:TrustChainPath"] = Path.Combine(stateFolder, "trust-chain.json"),
         ["Broker:PinnedGenesisHash"] = config.GenesisHash,
         ["Broker:TimeZone"] = config.TimeZone,
         ["Broker:IdentifyLoopbackCaller"] = "true",
         ["Broker:HighWaterPath"] = Path.Combine(stateFolder, "high-water.json"),
+        ["Broker:RevisionPublicKey"] = config.RevisionPublicKey,
     };
 
     public static string TrustChainPath(string stateFolder) => Path.Combine(stateFolder, "trust-chain.json");
