@@ -366,6 +366,16 @@ public class RavenProxyTests
     }
 
     [Test]
+    public async Task Clearance_from_an_unreachable_server_says_so()
+    {
+        await OpenLeaseAndMint();
+        raven.Unreachable = true;
+        var response = await client.SendAsync(SignedGet("/clearance/ravendb"));
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadGateway));
+        Assert.That(await response.Content.ReadAsStringAsync(), Does.Contain("whoami-unanswered"));
+    }
+
+    [Test]
     public async Task Clearance_of_an_unknown_service_is_a_404()
     {
         await OpenLeaseAndMint();
@@ -376,6 +386,8 @@ public class RavenProxyTests
     {
         public ConcurrentQueue<SeenRequest> Requests { get; } = new();
         public List<X509Certificate2> Certificates { get; } = [];
+        /// <summary>Connections fail, as when the server's firewall drops this address.</summary>
+        public bool Unreachable { get; set; }
 
         public HttpMessageHandler Handler(X509Certificate2 certificate)
         {
@@ -390,6 +402,8 @@ public class RavenProxyTests
             {
                 owner.Requests.Enqueue(new(request.RequestUri!.OriginalString, request.Headers.Authorization?.ToString(),
                     request.Headers.AcceptEncoding.Count == 0 ? null : request.Headers.AcceptEncoding.ToString()));
+                if (owner.Unreachable)
+                    throw new HttpRequestException("connection timed out");
                 if (request.Headers.TryGetValues("Sec-WebSocket-Key", out var keys))
                     return await FakeWebSocketNode.UpgradeAsync(keys.Single());
                 var body = request.RequestUri!.AbsolutePath switch

@@ -130,10 +130,10 @@ public class DoctorTests
         public List<string> ClearanceAsked { get; } = [];
         public IEnumerable<DoctorRavenCertificate> RavenCertificates() => Raven;
 
-        public Task<DoctorRavenClearance?> RavenClearanceAsync(string service)
+        public Task<DoctorBrokerAnswer?> RavenClearanceAsync(string service)
         {
             ClearanceAsked.Add(service);
-            return Task.FromResult<DoctorRavenClearance?>(new("Operator", new Dictionary<string, string>()));
+            return Task.FromResult<DoctorBrokerAnswer?>(new(200, System.Text.Encoding.UTF8.GetBytes("""{"clearance":"Operator","databases":{}}""")));
         }
     }
 

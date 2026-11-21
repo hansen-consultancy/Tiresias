@@ -135,16 +135,16 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public IEnumerable<DoctorRavenCertificate> RavenCertificates() => RavenCertificateStore.ForVault();
 
-    /// <summary>Asks the broker's <c>/clearance</c>, which needs the lease the unlocked agent holds; refused or unanswered reads as <c>null</c>.</summary>
-    public async Task<DoctorRavenClearance?> RavenClearanceAsync(string service)
+    /// <summary>Asks the broker's <c>/clearance</c>, which needs the lease the unlocked agent holds. Waits longer than the broker waits on RavenDB.</summary>
+    public async Task<DoctorBrokerAnswer?> RavenClearanceAsync(string service)
     {
         if (KeyringStore.Broker is not { } broker)
             return null;
         try
         {
             using var client = BrokerClient.For(broker);
-            var (status, body) = await client.GetAsync($"/clearance/{Uri.EscapeDataString(service)}").WaitAsync(TimeSpan.FromSeconds(10));
-            return status == System.Net.HttpStatusCode.OK ? DoctorRavenClearance.FromBroker(body) : null;
+            var (status, body) = await client.GetAsync($"/clearance/{Uri.EscapeDataString(service)}").WaitAsync(TimeSpan.FromSeconds(15));
+            return new((int)status, body);
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or TimeoutException)
         {

@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using NUnit.Framework;
 using Tiresias.App.Logic;
 using Tiresias.Client;
@@ -10,7 +11,11 @@ public class RavenClearanceTests
     static readonly DoctorRavenCertificate Orders = new("orders", "orders-app", "ABCDEF0123456789", DateTimeOffset.UtcNow.AddYears(1));
 
     static DoctorCheck Check(DoctorRavenClearance? clearance, DoctorRavenCertificate? certificate = null) =>
-        Doctor.RavenClearance([(certificate ?? Orders, clearance)]).Single();
+        Doctor.RavenClearance([(certificate ?? Orders, clearance is null ? null : Answer(200, JsonSerializer.Serialize(new { clearance = clearance.Level, databases = clearance.Databases })))]).Single();
+
+    static DoctorBrokerAnswer Answer(int status, string body) => new(status, Encoding.UTF8.GetBytes(body));
+
+    static string Skipped(DoctorBrokerAnswer? answer) => Doctor.RavenClearance([(Orders, answer)]).Single().Detail;
 
     static DoctorRavenClearance Clearance(string level, params string[] databases) =>
         new(level, databases.ToDictionary(d => d, _ => "ReadWrite"));
@@ -69,6 +74,19 @@ public class RavenClearanceTests
         Assert.That(check.Detail, Does.StartWith("skipped"));
         Assert.That(check.IsFinding, Is.False);
     }
+
+    [TestCase(503, """{"reason":"no-lease"}""", "skipped: locked; unlock the app to check")]
+    [TestCase(403, """{"reason":"elevation-required","elevationNeeded":"app"}""", "skipped: the certificate's grant needs an elevation")]
+    [TestCase(502, """{"reason":"whoami-unanswered"}""", "skipped: RavenDB didn't answer the broker; check that the server's firewall allows this PC's address")]
+    [TestCase(400, """{"reason":"not-a-raven-service"}""", "skipped: the broker refused (not-a-raven-service)")]
+    [TestCase(500, "", "skipped: the broker answered 500")]
+    [TestCase(200, "[]", "skipped: the broker answered 200")]
+    public void A_skip_says_why(int status, string body, string expected) =>
+        Assert.That(Skipped(Answer(status, body)), Is.EqualTo(expected));
+
+    [Test]
+    public void No_answer_at_all_blames_the_broker() =>
+        Assert.That(Skipped(null), Is.EqualTo("skipped: the broker didn't answer"));
 
     [Test]
     public void A_new_certificate_is_a_new_finding()

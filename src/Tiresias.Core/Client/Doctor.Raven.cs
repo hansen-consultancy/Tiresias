@@ -6,6 +6,9 @@ namespace Tiresias.Client;
 /// <summary>A RavenDB service's client certificate as recorded when it was set up; the dates are <c>null</c> for one set up before Tiresias recorded them.</summary>
 public sealed record DoctorRavenCertificate(string Service, string? Subject, string? Thumbprint, DateTimeOffset? NotAfter);
 
+/// <summary>The broker's answer to <c>/clearance</c> as it came: its status and body.</summary>
+public sealed record DoctorBrokerAnswer(int Status, byte[] Body);
+
 /// <summary>What RavenDB says a service's certificate may do, asked through the broker with that certificate.</summary>
 /// <param name="Level">RavenDB's security clearance: <c>ClusterAdmin</c>, <c>Operator</c> or <c>ValidUser</c>.</param>
 /// <param name="Databases">The databases a <c>ValidUser</c> may use, with its access to each (<c>Read</c>, <c>ReadWrite</c>, <c>Admin</c>).</param>
@@ -68,18 +71,19 @@ public static partial class Doctor
     /// the server, a <c>ValidUser</c> for more than one database, or one with <c>Admin</c> on its database. Like expiry they carry no
     /// position. The certificate's thumbprint is in the name, so a replacement is a new finding.
     /// </summary>
-    /// <param name="clearances">Each certificate with what RavenDB said, or <c>null</c> when the broker couldn't ask.</param>
-    public static IEnumerable<DoctorCheck> RavenClearance(IEnumerable<(DoctorRavenCertificate Certificate, DoctorRavenClearance? Clearance)> clearances)
+    /// <param name="answers">Each certificate with the broker's answer, or <c>null</c> when it didn't answer or wasn't asked.</param>
+    public static IEnumerable<DoctorCheck> RavenClearance(IEnumerable<(DoctorRavenCertificate Certificate, DoctorBrokerAnswer? Answer)> answers)
     {
-        foreach (var (certificate, clearance) in clearances)
+        foreach (var (certificate, answer) in answers)
         {
             var name = certificate is { Subject: { } subject, Thumbprint: { } thumbprint }
                 ? $"RavenDB clearance of {subject} for {certificate.Service} ({thumbprint[..Math.Min(8, thumbprint.Length)]})"
                 : $"RavenDB clearance for {certificate.Service}";
             var service = certificate.Service;
+            var clearance = answer is { Status: 200 } ? DoctorRavenClearance.FromBroker(answer.Body) : null;
             if (clearance is null)
             {
-                yield return new(name, DoctorStatus.Ok, "skipped: the broker didn't answer (locked, stopped, or the certificate needs an elevation)");
+                yield return new(name, DoctorStatus.Ok, $"skipped: {Unanswered(answer)}");
                 continue;
             }
             var databases = string.Join(", ", clearance.Databases.OrderBy(d => d.Key, StringComparer.Ordinal).Select(d => $"{d.Key} ({d.Value})"));
@@ -95,6 +99,32 @@ public static partial class Doctor
             else
                 yield return new(name, DoctorStatus.Ok, clearance.Databases.Count == 1 ? $"{clearance.Level}, limited to {databases}" : $"{clearance.Level}, no databases");
         }
+    }
+
+    /// <summary>Why there's no clearance, from the broker's refusal code: the broker's own words, never a value.</summary>
+    static string Unanswered(DoctorBrokerAnswer? answer)
+    {
+        if (answer is null)
+            return "the broker didn't answer";
+        string? reason = null;
+        try
+        {
+            using var json = JsonDocument.Parse(answer.Body);
+            if (json.RootElement.ValueKind == JsonValueKind.Object && json.RootElement.TryGetProperty("reason", out var r) && r.ValueKind == JsonValueKind.String)
+                reason = r.GetString();
+        }
+        catch (JsonException)
+        {
+        }
+        return reason switch
+        {
+            "no-lease" => "locked; unlock the app to check",
+            "elevation-required" => "the certificate's grant needs an elevation",
+            "whoami-unanswered" => "RavenDB didn't answer the broker; check that the server's firewall allows this PC's address",
+            "certificate-unreadable" => "the sealed certificate couldn't be opened; replace it",
+            { } code => $"the broker refused ({code})",
+            null => $"the broker answered {answer.Status}",
+        };
     }
 }
 

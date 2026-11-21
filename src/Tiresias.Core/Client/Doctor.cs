@@ -89,8 +89,8 @@ public interface IDoctorProbe
     /// <summary>The vault's RavenDB services with their certificates as recorded at setup. Never the certificate.</summary>
     IEnumerable<DoctorRavenCertificate> RavenCertificates() => [];
 
-    /// <summary>What RavenDB says the service's certificate may do, asked through the broker; <c>null</c> when it couldn't ask. Never prompts.</summary>
-    Task<DoctorRavenClearance?> RavenClearanceAsync(string service) => Task.FromResult<DoctorRavenClearance?>(null);
+    /// <summary>The broker's answer to <c>/clearance</c> for the service; <c>null</c> when it didn't answer. Never prompts.</summary>
+    Task<DoctorBrokerAnswer?> RavenClearanceAsync(string service) => Task.FromResult<DoctorBrokerAnswer?>(null);
 
     /// <summary>The sealed environment's deliveries, by name; <c>null</c> while locked. See <see cref="Doctor.KeysAsValues"/>.</summary>
     DoctorEnvironment? SealedEnvironment => null;
@@ -182,7 +182,7 @@ public static partial class Doctor
         checks.AddRange(PublishingKeys(probe.ToolFiles(), probe.UserVariableNames));
         var ravenCertificates = probe.RavenCertificates().ToArray();
         checks.AddRange(RavenExpiry(ravenCertificates, DateTimeOffset.UtcNow));
-        var clearances = new List<(DoctorRavenCertificate, DoctorRavenClearance?)>();
+        var clearances = new List<(DoctorRavenCertificate, DoctorBrokerAnswer?)>();
         foreach (var certificate in ravenCertificates)
             clearances.Add((certificate, brokerStatus is null ? null : await probe.RavenClearanceAsync(certificate.Service)));
         checks.AddRange(RavenClearance(clearances));

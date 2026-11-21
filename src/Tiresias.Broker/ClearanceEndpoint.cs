@@ -11,6 +11,9 @@ namespace Tiresias.Broker;
 /// </summary>
 sealed class ClearanceEndpoint(BrokerState state, RavenClients ravenClients)
 {
+    /// <summary>How long RavenDB has to answer whoami.</summary>
+    static readonly TimeSpan Patience = TimeSpan.FromSeconds(10);
+
     public async Task<IResult> HandleAsync(HttpContext context, string service)
     {
         var (allowed, refusal) = state.AuthorizeClearance(service, (string)context.Items[DeviceSignatureMiddleware.DeviceItem]!);
@@ -31,13 +34,16 @@ sealed class ClearanceEndpoint(BrokerState state, RavenClients ravenClients)
             }
 
             using var message = new HttpRequestMessage(HttpMethod.Get, new Uri(allowed.Service.Upstream.AbsoluteUri.TrimEnd('/') + "/certificates/whoami"));
+            // Sooner than the doctor waits on the broker, so an unreachable server is reported as such.
+            using var patience = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
+            patience.CancelAfter(Patience);
             Clearance? clearance;
             try
             {
-                using var response = await upstream.SendAsync(message, context.RequestAborted);
-                clearance = response.IsSuccessStatusCode ? Clearance.Parse(await response.Content.ReadAsStringAsync(context.RequestAborted)) : null;
+                using var response = await upstream.SendAsync(message, patience.Token);
+                clearance = response.IsSuccessStatusCode ? Clearance.Parse(await response.Content.ReadAsStringAsync(patience.Token)) : null;
             }
-            catch (HttpRequestException)
+            catch (Exception e) when (e is HttpRequestException || (e is OperationCanceledException && !context.RequestAborted.IsCancellationRequested))
             {
                 clearance = null;
             }
