@@ -61,7 +61,7 @@ connections can't bury the first in the log or the notifications. Tiresias then:
 - shows a notification;
 - raises a finding on Home (`tir doctor` too) naming the program and the decoy it used, with
   **Unblock (that was me)**; dismissing it keeps the program blocked. A process that couldn't be
-  named can't be blocked: its use is a warning for 30 days. The program's signature and parents are
+  named can't be blocked: its uses in the last 30 days are one warning. The program's signature and parents are
   in the activity record, not yet in the finding.
 
 The listener answers like the real service would refuse a bad password, so the caller learns
