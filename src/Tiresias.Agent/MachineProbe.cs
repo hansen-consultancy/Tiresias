@@ -171,11 +171,11 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public IEnumerable<string> BlockedPrograms() => SurfaceProbe.BlockedPrograms();
 
-    public IEnumerable<ProgramRun> ProgramRuns() => SurfaceProbe.ProgramRuns();
+    public IEnumerable<ProgramRun> ProgramRuns(IReadOnlyCollection<string> of) => [.. SurfaceProbe.ProgramRuns(), .. AdminClient.LastRuns(of)];
 
     /// <summary>Everything the attack surface checks read, plus the global tools, which take seconds to list.</summary>
     public SurfaceInventory Inventory() =>
-        new([.. Extensions()], [.. SurfaceProbe.GlobalTools()], [.. StartupEntries()], [.. CredentialUses()], [.. ProgramRuns()]);
+        new([.. Extensions()], [.. SurfaceProbe.GlobalTools()], [.. StartupEntries()], [.. CredentialUses()], [.. SurfaceProbe.ProgramRuns()]);
 
     public IEnumerable<DecoyUseRecord> DecoyUses() => SurfaceProbe.DecoyUses();
 

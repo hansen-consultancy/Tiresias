@@ -1281,7 +1281,7 @@ Store them in clear?</value>
 • It can stop a program that used one until you say otherwise.</value>
   </data>
   <data name="FirstRun_AdminTier_Note" xml:space="preserve">
-    <value>This version holds the decoys and listens for them from boot; the rest arrives in the next updates. Not now changes nothing, and About offers it again any time.</value>
+    <value>Not now changes nothing, and About offers it again any time.</value>
   </data>
   <data name="FirstRun_Primary_AdminTier" xml:space="preserve">
     <value>Set up...</value>

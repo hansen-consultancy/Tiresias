@@ -59,6 +59,19 @@ public static partial class AdminClient
     }
 
     /// <summary>
+    /// How programs, or those under folders, last ran for this user, from the service's
+    /// <c>lastrun</c>; none when it isn't there or doesn't answer. Blocks, off the calling thread.
+    /// </summary>
+    public static IEnumerable<Tiresias.Client.ProgramRun> LastRuns(IReadOnlyCollection<string> paths)
+    {
+        if (paths.Count == 0)
+            return [];
+        var args = new JsonObject { ["paths"] = AdminWire.ToNode(paths.ToArray()) };
+        var reply = Task.Run(() => SendAsync(AdminOps.LastRun, args)).GetAwaiter().GetResult();
+        return reply?.ResultAs<AdminLastRuns>()?.Runs.Select(r => new Tiresias.Client.ProgramRun(r.Path, r.LastRun, Opened: false)) ?? [];
+    }
+
+    /// <summary>
     /// One request to the running service; <c>null</c> when it isn't installed or running, can't be
     /// reached, or the pipe isn't the service's. <paramref name="reply"/> bounds the wait for the answer.
     /// </summary>
