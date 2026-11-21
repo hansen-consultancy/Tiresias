@@ -14,9 +14,12 @@ public static class FindingBadge
     /// <summary>The file format; a change bumps it.</summary>
     public const int Version = 1;
 
-    /// <summary>The keys of the findings Home shows open: not dismissed.</summary>
+    /// <summary>
+    /// The keys of the findings Home shows open: not dismissed, and not hygiene. A finding whose
+    /// status is <see cref="DoctorStatus.Ok"/> (a program unused for 90 days) is listed, never badged.
+    /// </summary>
     public static IReadOnlySet<string> Open(IEnumerable<DoctorCheck> checks, Dismissals dismissals) =>
-        checks.Where(c => c.IsFinding && dismissals.For(c) is null).Select(Dismissals.KeyOf).ToHashSet();
+        checks.Where(c => c.IsFinding && c.Status != DoctorStatus.Ok && dismissals.For(c) is null).Select(Dismissals.KeyOf).ToHashSet();
 
     /// <summary>How many of the open findings weren't among those Home last showed.</summary>
     public static int New(IReadOnlySet<string> open, IReadOnlySet<string> seen) => open.Count(k => !seen.Contains(k));

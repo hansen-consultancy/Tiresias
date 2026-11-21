@@ -105,6 +105,12 @@ public interface IDoctorProbe
     /// <summary>Paths of blocked programs whose file still exists.</summary>
     IEnumerable<string> BlockedPrograms() => [];
 
+    /// <summary>When the user last started each program themselves, where Windows records it (UserAssist).</summary>
+    IEnumerable<ProgramRun> ProgramRuns() => [];
+
+    /// <summary>The uninstall registry entries, machine and user, each with whether its uninstaller and folder are on disk.</summary>
+    IEnumerable<UninstallEntry> UninstallEntries() => [];
+
     /// <summary>Uses of a decoy, from the activity log.</summary>
     IEnumerable<DecoyUseRecord> DecoyUses() => [];
 
@@ -183,8 +189,10 @@ public static partial class Doctor
         var blocked = probe.BlockedPrograms().ToArray();
         checks.AddRange(Decoys(decoyUses, blocked, DateTimeOffset.UtcNow));
         checks.AddRange(CliSignIns(probe.CliConfigs, probe.GitHubAppService));
-        checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), probe.CredentialUses(),
-            blocked.Where(b => !decoyUses.Any(u => SamePath(u.Program, b))), DateTimeOffset.UtcNow));
+        var (uses, runs, installed, now) = (probe.CredentialUses().ToArray(), probe.ProgramRuns().ToArray(), probe.UninstallEntries().ToArray(), DateTimeOffset.UtcNow);
+        checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), uses, blocked.Where(b => !decoyUses.Any(u => SamePath(u.Program, b))), now, runs));
+        checks.AddRange(UninstallEntries(installed));
+        checks.AddRange(UnusedApplications(installed, runs, uses, now));
         return checks;
     }
 
