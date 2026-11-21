@@ -127,7 +127,7 @@ Per sink, in order: drop below the sink's threshold, dedupe, rate-limit, redact,
 | `schema` | The format and its version. A change bumps it; a receiver refuses a version it doesn't know |
 | `id` | A ULID per delivery, also sent as `Idempotency-Key` so a receiver can drop a retry |
 | `event`, `severity`, `title` | From the events table. `title` is never built from the event's data |
-| `machine` | The label you typed when you added the first sink. Never the host name by default |
+| `machine` | The label you typed when you added the first sink: required, never the host name |
 | `at` | When the first occurrence happened, UTC |
 | `count` | Occurrences this delivery stands for (see *Dedupe*) |
 | `key` | `event:` plus the first 16 hex of HMAC-SHA-256 over the subject, keyed by a random per-install key. Stable for one subject on one machine, so a receiver can group repeats; useless for guessing the subject, even a guessable path |
@@ -207,7 +207,7 @@ The sources keep running while locked: the decoy listener, the consent gate and 
 app. `consent.while-locked` exists because of that.
 
 After the app starts, nothing is sent until the first unlock opens `alerts.json`. Events in that gap
-wait in the queue and go out after it (see *Open questions*).
+wait in the queue and go out after it (see *Settled*).
 
 ## Tests
 
@@ -247,13 +247,13 @@ leaving.
 - **Other sinks** (email, Teams, Slack). Each is a formatter over the same payload; Slack and Teams
   webhooks already take a JSON POST.
 
-## Open questions
+## Settled
 
-- **Alerts before the first unlock.** After a reboot, nothing goes out until you unlock once. A
-  DPAPI-protected copy of `alerts.json` would close that gap, but puts the sink credentials where
-  any program running as you can read them without Hello. This design keeps the gap.
-- **Machine label default.** Empty (the payload then says only "Tiresias"), or required when the
-  first sink is added?
+- **Alerts before the first unlock: the gap stays.** After a reboot, nothing goes out until you
+  unlock once. A DPAPI-protected copy of `alerts.json` would close that gap, but would put the sink
+  credentials where any program running as you can read them without Hello.
+- **The machine label is required.** Adding the first sink asks for it, and the form doesn't save
+  without one. It is never filled in from the host name.
 
 ## Phases
 
@@ -261,7 +261,7 @@ leaving.
    buckets, redaction), `AlertPayload` v1 and its JSON. Planner, canary and shape tests. Nothing
    sends.
 2. **Webhook end to end.** Sealed `alerts.json`, an **Alerts** section in Settings to add a webhook
-   behind Hello, **Send a test alert**, the delivery worker, and `decoy.used` wired. README,
+   behind Hello (asking for the required machine label first), **Send a test alert**, the delivery worker, and `decoy.used` wired. README,
    CHANGELOG, I-101 to `mitigated`.
 3. **ntfy.** Its formatter and the setup form (server, topic, token, a hint to use a write-only
    token).
