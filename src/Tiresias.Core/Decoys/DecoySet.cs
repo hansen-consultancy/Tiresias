@@ -32,6 +32,8 @@ public enum DecoyUse
     SqlPassword,
     AdminToken,
     ApiKey,
+    /// <summary>A decoy file was opened (layer 2): a fact that may be harmless, never a use, and never a block by itself.</summary>
+    Read,
 }
 
 /// <summary>

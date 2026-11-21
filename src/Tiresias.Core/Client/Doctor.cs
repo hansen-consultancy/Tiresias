@@ -178,7 +178,7 @@ public static partial class Doctor
         checks.AddRange(Decoys(decoyUses, blocked, DateTimeOffset.UtcNow));
         checks.AddRange(CliSignIns(probe.CliConfigs, probe.GitHubAppService));
         checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), probe.CredentialUses(),
-            blocked.Where(b => !decoyUses.Any(u => SamePath(u.Program, b))), DateTimeOffset.UtcNow));
+            blocked.Where(b => !decoyUses.Any(u => !u.IsRead && SamePath(u.Program, b))), DateTimeOffset.UtcNow));
         return checks;
     }
 
