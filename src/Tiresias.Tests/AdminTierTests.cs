@@ -491,7 +491,7 @@ public class AdminHeldDecoysTests
         Assert.That(status, Is.EqualTo(status with { Held = true, Listening = true, Files = 2 }));
         Assert.That(status.Kinds, Is.EqualTo(new[] { DecoyKind.Project, DecoyKind.Variables }));
         var wire = System.Text.Json.JsonSerializer.Serialize(status);
-        Assert.That(wire, Does.Not.Contain("billing-api-old").And.Not.Contain(held.Set.Values.AdminToken).And.Not.Contain(held.Set.HttpPort.ToString()));
+        Assert.That(wire, Does.Not.Contain("billing-api-old").And.Not.Contain(held.Set.Values.AdminToken).And.Not.Contain(held.Set.HttpPort.ToString(System.Globalization.CultureInfo.InvariantCulture)));
     }
 
     [TestCase(null)]
