@@ -68,6 +68,9 @@ public sealed partial class HelloKeyWrapper : IKeyWrapper, IDisposable
     /// <summary>The lease's approval key; no extra prompt once this wrapper has derived its wrap key.</summary>
     public NSec.Cryptography.Key ApprovalKey(string leaseId) => inner.ApprovalKey(leaseId);
 
+    /// <summary>The vault revision signer enrolled with this user's broker service.</summary>
+    public NSec.Cryptography.Key RevisionKey() => inner.RevisionKey();
+
     /// <summary>
     /// The same credential as a trust-chain link key (docs/trust-links.md): its public key, and a
     /// signer that shows a Hello prompt for every link it signs.

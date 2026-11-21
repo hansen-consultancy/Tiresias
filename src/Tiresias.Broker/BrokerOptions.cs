@@ -46,6 +46,9 @@ public sealed class BrokerOptions
     /// </summary>
     public string? HighWaterPath { get; set; }
 
+    /// <summary>The enrolled Ed25519 key for a broker keeping durable revision marks, in base64.</summary>
+    public string? RevisionPublicKey { get; set; }
+
     /// <summary>RFC 3161 TSA that anchors the audit log's head (e.g. <c>http://timestamp.digicert.com</c>). Unset, nothing is anchored.</summary>
     public string? TimestampAuthorityUrl { get; set; }
 }
