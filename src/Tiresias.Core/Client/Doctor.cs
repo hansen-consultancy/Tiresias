@@ -103,6 +103,9 @@ public interface IDoctorProbe
 
     /// <summary>Paths of blocked programs whose file still exists.</summary>
     IEnumerable<string> BlockedPrograms() => [];
+
+    /// <summary>When the user last started each program themselves, where Windows records it (UserAssist).</summary>
+    IEnumerable<ProgramRun> ProgramRuns() => [];
 }
 
 /// <summary>
@@ -153,7 +156,7 @@ public static partial class Doctor
         checks.AddRange(PublishingKeys(probe.ToolFiles(), probe.UserVariableNames));
         checks.AddRange(RavenExpiry(probe.RavenCertificates(), DateTimeOffset.UtcNow));
         checks.AddRange(KeysAsValues(probe.SealedEnvironment));
-        checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), probe.CredentialUses(), probe.BlockedPrograms(), DateTimeOffset.UtcNow));
+        checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), probe.CredentialUses(), probe.BlockedPrograms(), DateTimeOffset.UtcNow, probe.ProgramRuns()));
         return checks;
     }
 

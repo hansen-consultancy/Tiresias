@@ -8,6 +8,13 @@ its section below.
 
 ## [Unreleased]
 
+### Added
+
+- Home and `tir doctor` point out programs that start at log-on but that you haven't opened in 90
+  days, with **Turn off at log-on...**: the same switch as Task Manager's Startup tab, so Settings,
+  Apps, Startup turns it back on. Programs with a tray icon are never counted as unused, and
+  entries already turned off there are no longer reported.
+
 ### Changed
 
 - The secrets editor hides user-secrets folders that hold no keys behind a line, "*N* empty

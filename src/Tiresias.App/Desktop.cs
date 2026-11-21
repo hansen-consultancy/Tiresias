@@ -84,6 +84,30 @@ static partial class Desktop
         }
     }
 
+    /// <summary>
+    /// Turns one of the user's own log-on entries off the way Task Manager and Settings do, in
+    /// <c>StartupApproved</c>, so Settings, Apps, Startup turns it back on. The entry itself stays.
+    /// </summary>
+    public static bool DisableStartup(Tiresias.Client.DisableStartup startup)
+    {
+        if (startup.Machine || !Tiresias.Client.DisableStartup.IsSafeItem(startup.Item))
+            return false;
+        var kind = startup.Where == Tiresias.Client.StartupEntry.StartupFolder ? "StartupFolder" : "Run";
+        // 03 = turned off by the user, then the FILETIME it happened, as Task Manager writes it.
+        byte[] value = [3, 0, 0, 0, .. BitConverter.GetBytes(DateTime.UtcNow.ToFileTimeUtc())];
+        try
+        {
+            using var key = Registry.CurrentUser.CreateSubKey(Tiresias.Client.DisableStartup.ApprovedKey + kind);
+            key.SetValue(startup.Item, value, RegistryValueKind.Binary);
+            return true;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            AppLog.Error(e, $"could not turn off {startup.Name} at log-on");
+            return false;
+        }
+    }
+
     public static void OpenHelloSettings() => Open("ms-settings:signinoptions");
 
     public static void OpenDataFolder() => Open(KeyringStore.Directory);

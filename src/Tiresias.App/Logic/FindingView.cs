@@ -21,6 +21,10 @@ public enum FixAction
     RemoveExtension,
     /// <summary>Show a file in Explorer.</summary>
     RevealFile,
+    /// <summary>Turn a log-on entry off the way Task Manager does, after the user approves.</summary>
+    DisableStartup,
+    /// <summary>Settings, Apps, Startup, for a machine-wide entry only an administrator can turn off.</summary>
+    OpenStartupSettings,
 }
 
 /// <summary>
@@ -78,6 +82,8 @@ public static class FindingView
         UsePlaceholder => (FixAction.UsePlaceholder, "Finding_FixPlaceholder"),
         RemoveExtension => (FixAction.RemoveExtension, "Finding_FixRemoveExtension"),
         RevealFile => (FixAction.RevealFile, "Finding_FixReveal"),
+        DisableStartup { Machine: false } => (FixAction.DisableStartup, "Finding_FixDisableStartup"),
+        DisableStartup => (FixAction.OpenStartupSettings, "Finding_FixStartupSettings"),
         _ => null,
     };
 
