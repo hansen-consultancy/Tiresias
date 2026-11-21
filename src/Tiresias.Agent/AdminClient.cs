@@ -1,10 +1,7 @@
 using System.ComponentModel;
 using System.IO.Pipes;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using System.Security.Principal;
-using System.Text.Json.Nodes;
-using Microsoft.Win32.SafeHandles;
 using Tiresias.AdminTier;
 using Tiresias.Protocol;
 
@@ -15,7 +12,7 @@ namespace Tiresias.Agent;
 /// process the Service Control Manager runs as <c>TiresiasAdmin</c>: a program that took the pipe's
 /// name first is not the service, and is never told or believed anything.
 /// </summary>
-public static partial class AdminClient
+public static class AdminClient
 {
     static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(2);
     static readonly TimeSpan ReplyTimeout = TimeSpan.FromSeconds(5);
@@ -66,7 +63,7 @@ public static partial class AdminClient
     /// One request to the running service; <c>null</c> when it isn't installed or running, can't be
     /// reached, or the pipe isn't the service's. <paramref name="reply"/> bounds the wait for the answer.
     /// </summary>
-    public static async Task<AdminReply?> SendAsync(string op, JsonObject? args = null, TimeSpan? reply = null, CancellationToken ct = default)
+    public static async Task<AdminReply?> SendAsync(string op, System.Text.Json.Nodes.JsonObject? args = null, TimeSpan? reply = null, CancellationToken ct = default)
     {
         AdminService.State service;
         try
@@ -92,8 +89,10 @@ public static partial class AdminClient
         try
         {
             await pipe.ConnectAsync(ConnectTimeout, timeout.Token);
-            if (!GetNamedPipeServerProcessId(pipe.SafePipeHandle, out var server) || server != serviceProcessId || AdminService.Query().ProcessId != serviceProcessId)
+            if (!ServicePipeIdentity.Matches(pipe, serviceProcessId))
                 return null;
+            if (AdminService.Query().ProcessId != serviceProcessId)
+                throw new IOException("The admin service restarted while connecting.");
             await AdminWire.WriteAsync(pipe, request, timeout.Token);
             return await AdminWire.ReadAsync<AdminReply>(pipe, timeout.Token);
         }
@@ -103,8 +102,4 @@ public static partial class AdminClient
             return null;
         }
     }
-
-    [LibraryImport("kernel32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool GetNamedPipeServerProcessId(SafePipeHandle pipe, out uint serverProcessId);
 }
