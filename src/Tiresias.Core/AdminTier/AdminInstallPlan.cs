@@ -16,6 +16,19 @@ public enum AdminInstallStep
     DeleteStateFolder,
 }
 
+/// <summary>The exit code of <c>Tiresias.exe --admin-tier install|remove</c>, which the app reads back after the UAC prompt.</summary>
+public enum AdminSetupResult
+{
+    Done = 0,
+    Failed = 1,
+    /// <summary>This copy of the app has no <c>admin\</c> folder to install from: a development build.</summary>
+    FilesMissing = 2,
+    /// <summary>Neither <c>install</c> nor <c>remove</c>.</summary>
+    Usage = 3,
+    /// <summary>The service was set up but stopped again at once: its state folder or pipe name isn't its own.</summary>
+    DidNotStart = 4,
+}
+
 /// <summary>The service as the Service Control Manager has it now.</summary>
 public sealed record AdminServiceFacts(bool Exists, bool Running);
 

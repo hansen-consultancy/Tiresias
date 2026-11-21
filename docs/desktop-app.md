@@ -214,6 +214,9 @@ The goal is one command or one download, then a first-run wizard:
 3. Enrol this device: pin the broker key, scan or paste the genesis hash.
 4. Optional: scan the machine for plaintext secrets (the `doctor` checks) and offer to import
    them.
+5. Optional, once: **Protect more with admin rights**, the [admin tier](admin-tier.md): **Set
+   up** (one UAC prompt) or **Not now**, which changes nothing. About shows the tier's state
+   afterwards, with **Set up**, **Update** or **Remove**.
 
 ## Solo mode
 

@@ -1,6 +1,7 @@
 using System.IO.Enumeration;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using Tiresias.AdminTier;
 using Tiresias.Client;
 using Tiresias.Decoys;
 using Tiresias.EnvironmentVariables;
@@ -99,6 +100,9 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     public DoctorDecoys? Decoys => DecoyStore.Current is { Placed.Count: > 0 } set
         ? new(set.Placed.Count, IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners().Any(e => e.Port == set.HttpPort))
         : null;
+
+    // On the thread pool: the app runs the doctor from its UI thread, and this waits on a pipe.
+    public AdminTierFacts? AdminTier => Task.Run(AdminClient.FactsAsync).GetAwaiter().GetResult() is { Installed: true } tier ? tier : null;
 
     public IEnumerable<DoctorFile> Projects() => Found.Projects.Select(Read);
 

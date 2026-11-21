@@ -195,7 +195,7 @@ public partial class App : Application
     {
         var recoverySet = KeyringStore.Settings.RecoveryPublicKey is not null;
         return new(HelloKeyWrapper.Exists(), recoverySet, KeyringStore.Broker is not null, AppSettings.Load().SetupSkipped,
-            SealedWithoutKey: !recoverySet && AnythingSealed());
+            SealedWithoutKey: !recoverySet && AnythingSealed(), AdminTierInstalled: AdminClient.Installed);
     }
 
     /// <summary>A damaged vault or secrets file must not stop the app starting: the status page reports it.</summary>

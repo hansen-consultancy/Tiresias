@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Tiresias.AdminTier;
+using Tiresias.App.Logic;
 using Tiresias.Protocol;
 
 namespace Tiresias.Tests;
@@ -197,6 +198,55 @@ public class AdminTierStateTests
     {
         Assert.That(Math.Sign(AppVersions.Compare(a, b)), Is.EqualTo(expected));
         Assert.That(Math.Sign(AppVersions.Compare(b, a)), Is.EqualTo(-expected));
+    }
+}
+
+public class AdminTierCardTests
+{
+    static AdminTierFacts Tier(bool installed, bool running, string? version, string app = "0.3.0") =>
+        new(installed, running, version is null ? null : new(version, AdminWire.ProtocolVersion, new()), app);
+
+    [Test]
+    public void Each_state_offers_what_can_be_done_about_it()
+    {
+        Assert.That(AdminTierCard.Actions(AdminTierState.NotInstalled), Is.EqualTo(new[] { AdminTierAction.SetUp }));
+        Assert.That(AdminTierCard.Actions(AdminTierState.Running), Is.EqualTo(new[] { AdminTierAction.Remove }));
+        Assert.That(AdminTierCard.Actions(AdminTierState.Older), Is.EqualTo(new[] { AdminTierAction.Update, AdminTierAction.Remove }));
+        Assert.That(AdminTierCard.Actions(AdminTierState.Stopped), Is.EqualTo(new[] { AdminTierAction.SetUp, AdminTierAction.Remove }));
+        Assert.That(AdminTierCard.Actions(AdminTierState.NotAnswering), Is.EqualTo(new[] { AdminTierAction.SetUp, AdminTierAction.Remove }));
+    }
+
+    [Test]
+    public void The_state_is_described_with_its_versions()
+    {
+        Assert.That(AdminTierCard.Describe(Tier(false, false, null)).Key, Is.EqualTo("About_AdminTier_NotInstalled"));
+        Assert.That(AdminTierCard.Describe(Tier(true, true, "0.3.0")).Args, Is.EqualTo(new object[] { "0.3.0" }));
+        var older = AdminTierCard.Describe(Tier(true, true, "0.2.1"));
+        Assert.That(older.Key, Is.EqualTo("About_AdminTier_Older"));
+        Assert.That(older.Args, Is.EqualTo(new object[] { "0.2.1", "0.3.0" }));
+    }
+
+    [Test]
+    public void The_outcome_says_what_happened()
+    {
+        Assert.That(AdminTierCard.Outcome(null, removing: false).Key, Is.EqualTo("AdminTier_Declined"));
+        Assert.That(AdminTierCard.Outcome(AdminSetupResult.Done, removing: false).Key, Is.EqualTo("AdminTier_SetUp"));
+        Assert.That(AdminTierCard.Outcome(AdminSetupResult.Done, removing: true).Key, Is.EqualTo("AdminTier_Removed"));
+        Assert.That(AdminTierCard.Outcome(AdminSetupResult.FilesMissing, removing: false).Key, Is.EqualTo("AdminTier_FilesMissing"));
+        Assert.That(AdminTierCard.Outcome(AdminSetupResult.Failed, removing: true).Args, Is.EqualTo(new object[] { 1 }));
+    }
+
+    [Test]
+    public void First_run_offers_the_tier_once_after_the_vault_unless_it_is_there()
+    {
+        var notThere = new SetupFacts(HelloReady: true, RecoverySet: true, Enrolled: false, Skipped: false, AdminTierInstalled: false);
+        Assert.That(FirstRunPlan.Next(FirstRunStep.Mode, notThere, SetupMode.Solo, haveRecoveryKey: true), Is.EqualTo(FirstRunStep.AdminTier));
+        Assert.That(FirstRunPlan.Next(FirstRunStep.Mode, notThere, SetupMode.SecretsOnly), Is.EqualTo(FirstRunStep.AdminTier));
+        Assert.That(FirstRunPlan.Next(FirstRunStep.AdminTier, notThere), Is.EqualTo(FirstRunStep.Done));
+        Assert.That(FirstRunPlan.Next(FirstRunStep.RecoveryConfirm, notThere with { Enrolled = true }), Is.EqualTo(FirstRunStep.AdminTier));
+        Assert.That(FirstRunPlan.Next(FirstRunStep.Mode, notThere with { AdminTierInstalled = true }, SetupMode.Solo, haveRecoveryKey: true),
+            Is.EqualTo(FirstRunStep.Done));
+        Assert.That(FirstRunPlan.Needed(notThere with { Enrolled = true }), Is.False, "declining it never brings the wizard back");
     }
 }
 
