@@ -16,6 +16,7 @@ public sealed class AgentHost : IAsyncDisposable
     readonly CancellationTokenSource stop = new();
     readonly LeaseKeeper keeper = new();
     readonly SoloBroker solo = new();
+    readonly DecoyWatch decoys = new();
     readonly AuditLog activity;
     readonly List<Task> running = [];
 
@@ -29,6 +30,13 @@ public sealed class AgentHost : IAsyncDisposable
         keeper.Locked += reason => Lock(reason);
         solo.Log += Say;
         solo.SecretsUnleased = SealIntoLeaseAsync;
+        decoys.Log += Say;
+        decoys.Touched += touch =>
+        {
+            activity.Append(touch.Record());
+            Say($"Decoy used: {touch.Hit.Program ?? "an unknown program"} connected with {touch.What}.");
+            DecoyTouched?.Invoke(touch);
+        };
     }
 
     /// <summary>The agent's own decisions (user secrets), beside the broker's audit log.</summary>
@@ -64,6 +72,15 @@ public sealed class AgentHost : IAsyncDisposable
     /// <summary>Unlocked or locked, the lease opened or ended.</summary>
     public event Action? StateChanged;
 
+    /// <summary>
+    /// A decoy credential was used, after it is in the activity log. Raised on a pool thread; the
+    /// app blocks the program and raises a finding, <c>tir agent</c> only prints it.
+    /// </summary>
+    public event Action<DecoyTouch>? DecoyTouched;
+
+    /// <summary>Whether the decoys' listeners are up (decoys are placed and their ports were free).</summary>
+    public bool DecoysListening => decoys.Listening;
+
     /// <summary>Solo mode: whether the broker this agent hosts is up.</summary>
     public bool SoloBrokerRunning => solo.Running;
 
@@ -81,6 +98,7 @@ public sealed class AgentHost : IAsyncDisposable
             await serving;
         running.Add(serving);
         running.Add(keeper.RunAsync(stop.Token));
+        decoys.Start();
         await StartSoloBrokerAsync();
     }
 
@@ -188,6 +206,7 @@ public sealed class AgentHost : IAsyncDisposable
         {
         }
         await solo.DisposeAsync();
+        decoys.Dispose();
         Keys.Dispose();
         UserSecrets.Dispose();
         keeper.Dispose();
