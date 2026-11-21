@@ -38,7 +38,7 @@ public sealed record UninstallEntry(string Key, string Name, string? Version, st
         {
             if (Icon is not { Length: > 0 } icon)
                 return null;
-            var comma = icon.LastIndexOf(',');
+            var comma = icon.LastIndexOf(',', StringComparison.Ordinal);
             var index = 0;
             if (comma > 0 && int.TryParse(icon[(comma + 1)..].Trim(), System.Globalization.NumberStyles.AllowLeadingSign,
                     System.Globalization.CultureInfo.InvariantCulture, out var parsed))
