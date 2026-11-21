@@ -29,11 +29,17 @@ public static class TrustChain
     /// <summary>Adds one more signature, e.g. a second admin's for an M-of-N link collected separately.</summary>
     public static TrustLink Cosign(TrustLink link, Signer signer) => link with
     {
-        Signatures = [.. link.Signatures, new(signer.DeviceId, SignatureAlgorithm.Ed25519.Sign(signer.Key, SignedBytes(link)))],
+        Signatures = [.. link.Signatures, new(signer.DeviceId, SignatureAlgorithm.Ed25519.Sign(signer.Key, SignedBytes(link)), signer.Hello?.Sign(PresenceBytes(link)))],
     };
 
     /// <summary>The bytes every signature on the link covers.</summary>
     public static byte[] SignedBytes(TrustLink link) => TrustLinkJson.Write(link, withSignatures: false);
+
+    /// <summary>
+    /// What a Hello signature on the link covers: <see cref="SignedBytes"/> after a prefix no other
+    /// Hello use shares, so a Hello signature made for anything else never stands in for one here.
+    /// </summary>
+    public static byte[] PresenceBytes(TrustLink link) => [.. "tiresias/v1/link\n"u8, .. SignedBytes(link)];
 
     /// <summary>Lowercase hex SHA-256 of the link's full canonical form, signatures included.</summary>
     public static string Hash(TrustLink link) => Convert.ToHexStringLower(SHA256.HashData(TrustLinkJson.Write(link, withSignatures: true)));
