@@ -1,6 +1,6 @@
 # Attack surface: less software, less to trust
 
-Status: **first slice built** (#34, #55); the rest is design. [Guided setup](guided-setup.md) phase 5: it builds on the
+Status: **first slice, log-on use, uninstall-entry checks, unused applications, the Installed list and `tir doctor --surface` built** (#34, #55); the rest is design. [Guided setup](guided-setup.md) phase 5: it builds on the
 findings `tir doctor` reports since phase 1 and the findings section, fixes and dismissals the app
 gets in phase 2.
 
@@ -38,7 +38,10 @@ Read-only, per user wherever possible, from sources each check can name:
 
 **Last used**, where Windows records it:
 
-- GUI programs: UserAssist (per user: run count and last run), readable without admin.
+- GUI programs: UserAssist (per user: run count and last run), readable without admin. It records
+  only what the user starts from Explorer, Start or the taskbar, so a program with an icon in the
+  notification area (the taskbar's `NotifyIconSettings`) is used from there unseen: its last use is
+  unknown.
 - Anything with admin rights granted: Prefetch, the Background Activity Moderator.
 - Command-line tools: the activity log and the terminal hook's records of what ran under
   Tiresias. File access times are not reliable on Windows and are not used.
@@ -48,7 +51,10 @@ What Windows doesn't record is shown as unknown, never guessed.
 
 **Uninstall entries are checked, not trusted.** An entry is only a claim that something is
 installed. Each one is compared with the disk: the uninstaller its `UninstallString` names, its
-`InstallLocation`, and whether another entry names the same uninstaller. That is what finds the
+`InstallLocation`, and whether another entry has the same uninstall command. The whole command,
+not just the program: an installer engine or `rundll32` uninstalls many products, each with its
+own arguments. Windows Installer entries (`msiexec`), Windows components and updates say nothing
+about the program's files and are skipped; so is a duplicate whose versions can't be ordered. That is what finds the
 entries below that no longer match anything. `EstimatedSize` is written once at install time and
 is shown as such, never as space in use.
 
@@ -104,7 +110,7 @@ guided setup already has for it, with that finding's position.
 | Blocked program still installed | **This wasn't me** or a decoy hit put it on the block list | `RevealFile(path)`, then `Uninstall` |
 | Entry for software that is gone | Neither the uninstaller nor the install folder exists | `RemoveEntry(key)`; leftover data folders are listed, not removed |
 | Installed, but can't be uninstalled | The program is present and its uninstaller is missing | `Repair(kind, id)`: reinstall the same version over it, which restores the uninstaller |
-| Stale duplicate entry | Two entries name the same uninstaller, one for a version no longer on disk | `RemoveEntry(key)` for the stale one. Its **Uninstall** button runs the current version's uninstaller, so the finding says not to use it |
+| Stale duplicate entry | Two entries have the same uninstall command, and one is for an older version | `RemoveEntry(key)` for the stale one. Its **Uninstall** button runs the current version's uninstaller, so the finding says not to use it |
 | Desktop app with a web equivalent | The app is a wrapper around a site, or the site does what it does (mail, streaming, a device tool over WebUSB) | `ReplaceWithWebApp(id, url)` |
 | Global tool rarely used | A global developer tool unused for 90 days | `RunOnDemand(kind, id)`: `dnx`, `npx`/`bunx` or `uvx` instead of a global install |
 | Closed source with a trusted open replacement | A maintained open-source program does the same job (trust per *Trust*, Scorecard for the candidate) | `ReplaceWithOpenSource(id, candidate)`, suggested only |
@@ -119,13 +125,15 @@ the command. The new kinds:
   asked.
 - **`RemoveExtension`** uses the host's command where one exists (`code --uninstall-extension`).
   A browser has none, so the fix opens its extensions page instead.
-- **`DisableStartup`** changes a user Run key, startup folder entry or user scheduled task itself,
-  after approval, and keeps what it changed so **Turn back on** can restore it. Machine-wide
-  entries are reported with the command, not changed.
+- **`DisableStartup`** turns a user Run key or startup folder entry off after approval the way
+  Task Manager and Settings do, in `StartupApproved`, so Settings, Apps, Startup turns it back on
+  and the entry itself is untouched. Entries already off there aren't reported. Machine-wide
+  entries open that Settings page, which asks for an administrator.
 - **`RevealFile`** opens Explorer on the file. It is all Tiresias offers for a binary it can't
   attribute, because deleting an unknown file could break something the user needs.
-- **`RemoveEntry`** exports the uninstall key to a `.reg` file, then deletes it, so **Turn back
-  on** can import it again. A machine-wide key needs an administrator.
+- **`RemoveEntry`** exports the uninstall key to a `.reg` file in `removed-entries` beside the
+  keyring, then deletes it; opening that file puts the entry back. A machine-wide key needs an
+  administrator, so the app copies the commands instead.
 - **`Repair`** is the installer's own reinstall of the installed version
   (`winget install --id <id> --exact --version <installed version> --force`); without
   `--version`, winget installs the latest. When winget no longer offers that version, the fix
@@ -207,7 +215,10 @@ planner stays pure and an offline machine gets the same findings minus those tha
 each saying "not checked online".
 
 Listing every package manager takes seconds, so the inventory runs once a day and on request
-(`tir doctor --surface`, **Check now**), not each time the app opens.
+(`tir doctor --surface`, **Check now**), not each time the app opens. `tir doctor --surface` is
+built: after the checks it lists each extension host with what it reached in 90 days and its
+extensions, the global `dotnet`, `npm`, `pipx` and `cargo` tools (each manager given half a minute,
+a missing one lists nothing), and what starts at log-on with its signature and last use.
 
 ## Tests
 
@@ -291,7 +302,30 @@ All of this is guided setup phase 5, built in this order. **The first slice is b
 offline only, it reads extensions of VS Code and its forks, the Run keys and Startup folder with an
 offline Authenticode check, the blocklist, and reach from the activity and audit logs, and raises
 the extension, unsigned-at-startup and blocked-program findings with **Remove...** and **Show
-file**. [Guided setup](guided-setup.md#phases) lists what is still design.
+file**. **Log-on use is built** too: last use from UserAssist, and the "starts at log-on, rarely
+used" finding with `DisableStartup`, never for a program whose last use is unknown, one with a tray
+icon, or Tiresias itself. **Uninstall entries are checked** as well: user and machine entries
+against the disk, raising the gone, can't-be-uninstalled and stale-duplicate findings, with
+**Remove entry...** for the user's own entries and the commands for machine-wide ones; `Repair`
+names winget's command once the inventory knows the package id, and the steps until then.
+**Unused applications are found**: an installed program whose folder had nothing opened in 90
+days (UserAssist), never one with no recorded run or one that runs unseen (a tray icon, a service,
+a driver, a log-on entry, a folder on `PATH`), nor one that used a credential. It is a finding with
+status `ok`, so it sorts last and doesn't count for the badge; all of them are one line on Home,
+"*n* programs you haven't opened in 90 days", whose one button opens the **Installed** page. That
+page is built too: every entry of the installed-apps list once (Windows Installer entries
+included), for you or for everyone, its last opening or why its use is unknown (works in the
+background, not recorded), and the credentials its folder's programs used in 90 days; unused
+first, longest unused first. Two columns (program with the icon its entry names, last opened) fit any width; an icon is read
+from a local file only, never a network path; selecting one shows
+the rest below the list, and a search box matches every word against name, version, folder and
+services. The selected program's panel also shows the publisher its entry claims and who signed
+its program file (the `.exe` its icon comes from, else its uninstaller), checked offline with
+WinVerifyTrust when it is selected; a name from a signature that doesn't verify is shown as a
+claim only. **Search online...** opens the browser with a web search for the name and version, on
+the user's click only; Tiresias itself sends nothing. Uninstalling goes through Settings, Apps, Installed apps
+(`UninstallApp`) until the inventory knows each program's installer command.
+[Guided setup](guided-setup.md#phases) lists what is still design.
 
 1. **Inventory**: applications, extensions, global tools and startup entries, with last use where
    known, as `tir doctor --surface` facts and the app's **Installed** list. No online lookups.

@@ -1,6 +1,7 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using Tiresias.AdminTier;
 using Tiresias.Protocol;
 using Tiresias.UserSecrets;
 
@@ -92,6 +93,9 @@ public interface IDoctorProbe
     /// <summary>The vault's RavenDB services with their certificates as recorded at setup. Never the certificate.</summary>
     IEnumerable<DoctorRavenCertificate> RavenCertificates() => [];
 
+    /// <summary>The broker's answer to <c>/clearance</c> for the service; <c>null</c> when it didn't answer. Never prompts.</summary>
+    Task<DoctorBrokerAnswer?> RavenClearanceAsync(string service) => Task.FromResult<DoctorBrokerAnswer?>(null);
+
     /// <summary>The sealed environment's deliveries, by name; <c>null</c> while locked. See <see cref="Doctor.KeysAsValues"/>.</summary>
     DoctorEnvironment? SealedEnvironment => null;
 
@@ -106,7 +110,31 @@ public interface IDoctorProbe
 
     /// <summary>Paths of blocked programs whose file still exists.</summary>
     IEnumerable<string> BlockedPrograms() => [];
+
+    /// <summary>When the user last started each program themselves, where Windows records it (UserAssist).</summary>
+    IEnumerable<ProgramRun> ProgramRuns() => [];
+
+    /// <summary>The uninstall registry entries, machine and user, each with whether its uninstaller and folder are on disk.</summary>
+    IEnumerable<UninstallEntry> UninstallEntries() => [];
+
+    /// <summary>Uses of a decoy, from the activity log.</summary>
+    IEnumerable<DecoyUseRecord> DecoyUses() => [];
+
+    /// <summary>The decoys placed (docs/decoys.md), or <c>null</c> when there are none.</summary>
+    DoctorDecoys? Decoys => null;
+
+    /// <summary>The config files of the CLIs that sign in as the user. See <see cref="Doctor.CliSignIns"/>.</summary>
+    DoctorCliConfigs CliConfigs => new(null, null);
+
+    /// <summary>The slug of a vault GitHub App service, for <c>tir exec gh</c>; <c>null</c> when there is none.</summary>
+    string? GitHubAppService => null;
+
+    /// <summary>The optional admin tier (docs/admin-tier.md); <c>null</c> when it isn't installed.</summary>
+    AdminTierFacts? AdminTier => null;
 }
+
+/// <summary>How many decoys are placed, and whether something listens on their endpoints (checked without connecting, which would be a hit).</summary>
+public sealed record DoctorDecoys(int Placed, bool Listening);
 
 /// <summary>
 /// The <c>tir doctor</c> checklist: turns probe facts into ok / warn / fail lines. A failure is
@@ -131,8 +159,9 @@ public static partial class Doctor
                 : new("trust chain", DoctorStatus.Warn, "this device's Windows Hello key isn't in the trust chain yet, so it can't add a device or change trust: run tir trust bind-hello"));
         if (probe.Solo)
             checks.AddRange(SoloTradeOffs);
+        var brokerStatus = probe.Enrolled ? await probe.BrokerStatusAsync() : null;
         if (probe.Enrolled)
-            checks.Add(await probe.BrokerStatusAsync() switch
+            checks.Add(brokerStatus switch
             {
                 null when probe.Solo => new("broker reachable", DoctorStatus.Fail, "no answer: the broker runs inside the Tiresias app; start the app (or tir agent)"),
                 null => new("broker reachable", DoctorStatus.Fail, "no answer (NetBird down, or the broker stopped)"),
@@ -146,6 +175,12 @@ public static partial class Doctor
                 ? new("forwarder", DoctorStatus.Ok, "listening on loopback")
                 : new("forwarder", DoctorStatus.Warn, "not running: placeholders work only against the broker directly"));
 
+        if (probe.Decoys is { Placed: > 0 } decoys)
+            checks.Add(decoys.Listening
+                ? new("decoys", DoctorStatus.Ok, $"{decoys.Placed} placed; a program that uses one is named")
+                : new("decoys", DoctorStatus.Warn, $"{decoys.Placed} placed, but nothing listens on their endpoints, so a use goes unseen: start the app or tir agent"));
+        if (probe.AdminTier is { Installed: true } adminTier)
+            checks.Add(AdminTierLine(adminTier));
         checks.AddRange(probe.UserSecretsFiles().Select(UserSecretsFile).OfType<DoctorCheck>());
         checks.AddRange(probe.Projects().Select(Project).OfType<DoctorCheck>());
         checks.Add(probe.ExposedVariables switch
@@ -158,9 +193,22 @@ public static partial class Doctor
         checks.AddRange(ConfigChecks(probe.UserSecretsFiles(), probe.ConfigFiles(), probe.KeyFiles()));
         checks.AddRange(GitTokens(probe.GitConfigs(), probe.GitCredentials));
         checks.AddRange(PublishingKeys(probe.ToolFiles(), probe.UserVariableNames));
-        checks.AddRange(RavenExpiry(probe.RavenCertificates(), DateTimeOffset.UtcNow));
+        var ravenCertificates = probe.RavenCertificates().ToArray();
+        checks.AddRange(RavenExpiry(ravenCertificates, DateTimeOffset.UtcNow));
+        var clearances = new List<(DoctorRavenCertificate, DoctorBrokerAnswer?)>();
+        foreach (var certificate in ravenCertificates)
+            clearances.Add((certificate, brokerStatus is null ? null : await probe.RavenClearanceAsync(certificate.Service)));
+        checks.AddRange(RavenClearance(clearances));
         checks.AddRange(KeysAsValues(probe.SealedEnvironment));
-        checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), probe.CredentialUses(), probe.BlockedPrograms(), DateTimeOffset.UtcNow));
+        // A program blocked for using a decoy is that finding, not "This wasn't me"'s.
+        var decoyUses = probe.DecoyUses().ToArray();
+        var blocked = probe.BlockedPrograms().ToArray();
+        checks.AddRange(Decoys(decoyUses, blocked, DateTimeOffset.UtcNow));
+        checks.AddRange(CliSignIns(probe.CliConfigs, probe.GitHubAppService));
+        var (uses, runs, installed, now) = (probe.CredentialUses().ToArray(), probe.ProgramRuns().ToArray(), probe.UninstallEntries().ToArray(), DateTimeOffset.UtcNow);
+        checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), uses, blocked.Where(b => !decoyUses.Any(u => !u.IsRead && SamePath(u.Program, b))), now, runs));
+        checks.AddRange(UninstallEntries(installed));
+        checks.AddRange(UnusedApplications(installed, runs, uses, now));
         return checks;
     }
 
@@ -175,6 +223,20 @@ public static partial class Doctor
         new("isolation", DoctorStatus.Warn, "Solo: secrets live on the same machine as your agents and are not protected from code running as admin"),
         new("broker process", DoctorStatus.Warn, "Broker runs inside the app: install the service for process isolation (not built yet)"),
     ];
+
+    public const string AdminTierCheck = "admin tier";
+
+    /// <summary>The admin tier, when installed: running and which version, or a failure when nothing it does happens.</summary>
+    static DoctorCheck AdminTierLine(AdminTierFacts tier) => tier.State switch
+    {
+        AdminTierState.Stopped => new(AdminTierCheck, DoctorStatus.Fail,
+            "installed but stopped, so nothing it does happens: Set up again in the app's About page"),
+        AdminTierState.NotAnswering => new(AdminTierCheck, DoctorStatus.Fail,
+            "the service runs, but no answer came from it: it hung, or another program holds its pipe's name. Restart the PC; if it stays, Remove and Set up again in About"),
+        AdminTierState.Older => new(AdminTierCheck, DoctorStatus.Warn,
+            $"running version {tier.Status!.Version}, older than this Tiresias ({tier.AppVersion}): Update in the app's About page"),
+        _ => new(AdminTierCheck, DoctorStatus.Ok, $"running, version {tier.Status!.Version}; features on: {tier.Features}"),
+    };
 
     static DoctorCheck Vault(DoctorVault? vault)
     {

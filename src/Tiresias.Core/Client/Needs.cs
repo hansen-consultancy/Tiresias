@@ -30,7 +30,7 @@ public sealed record RankedOption(NeedOption Option, bool Recommended, string? U
 /// </summary>
 public static class NeedCatalog
 {
-    const string GitHubApi = "https://api.github.com";
+    internal const string GitHubApi = "https://api.github.com";
     const string NoBroker = "Needs a broker: finish setting up Tiresias, or run tir solo init.";
 
     public static IReadOnlyList<Need> Needs { get; } =

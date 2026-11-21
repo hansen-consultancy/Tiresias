@@ -38,11 +38,13 @@ static class CliUsage
         tir grant <service> --consumer <name> --purpose <text> --for <duration> [--ceiling <grant>]
         tir elevate <service> <grant> [--for 15m]
         tir exec <service>[,<service>...] --purpose <text> [--for 1h] [--ceiling <grant>] -- <command> [args...]
-        tir doctor [--projects <dir>]
+        tir doctor [--projects <dir>] [--surface]
             Checks this device and how its credentials are delivered. --projects also looks under <dir>
             for projects without the protected provider, passwords in appsettings*.json connection
             strings, and private keys in files. A finding shows where it sits on the two axes (E5/C3:
-            readable, used silently) and where its fix takes it.
+            readable, used silently) and where its fix takes it. --surface also lists what is
+            installed: extensions with what their host reached, global dotnet/npm/pipx/cargo tools,
+            and what starts at log-on with its signature and last use. Read-only and offline.
         tir advise ["<what you need>"]
             The ways to meet a need, strongest first on both axes, and what each gives up: "OpenAI key
             for a script", "my EF Core app talks to Azure SQL". With no words, every need. The words are
@@ -91,5 +93,13 @@ static class CliUsage
         tir run [--only NAME[,NAME...]] -- <command> [args...]
             Runs the command with the sealed environment variables, after you allow it (in the app's
             dialog, or with Windows Hello when the app isn't running). --only gives it just those.
+        tir decoys place <passwords|project|variables> [<path>]
+        tir decoys list
+        tir decoys remove
+            Decoy credentials that open nothing and point to a port only Tiresias listens on, so a
+            program that finds and uses one is named in the activity log (and blocked by the app).
+            passwords: a passwords.txt (Documents by default); project: a new folder with an
+            appsettings.Production.json and a .env; variables: ADMIN_API_URL and ADMIN_API_TOKEN.
+            Nothing that exists is overwritten. remove takes away every decoy placed.
         """;
 }

@@ -42,7 +42,10 @@ static class FakeWebSocketNode
                 far.Dispose();
             }
         });
+        // RFC 6455 fixes SHA-1 for the handshake; it protects nothing.
+#pragma warning disable CA5350
         var accept = Convert.ToBase64String(SHA1.HashData(System.Text.Encoding.ASCII.GetBytes(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")));
+#pragma warning restore CA5350
         var response = new HttpResponseMessage(HttpStatusCode.SwitchingProtocols) { Content = new Duplex(near) };
         response.Headers.Connection.Add("Upgrade");
         response.Headers.Upgrade.Add(new("websocket"));

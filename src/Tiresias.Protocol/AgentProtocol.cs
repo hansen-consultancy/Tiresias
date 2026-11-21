@@ -1,4 +1,3 @@
-using System.Buffers.Binary;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -46,25 +45,9 @@ public static class AgentWire
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
     };
 
-    public static async Task WriteAsync<T>(Stream stream, T message, CancellationToken ct)
-    {
-        var body = JsonSerializer.SerializeToUtf8Bytes(message, Json);
-        var header = new byte[4];
-        BinaryPrimitives.WriteInt32LittleEndian(header, body.Length);
-        await stream.WriteAsync(header, ct).ConfigureAwait(false);
-        await stream.WriteAsync(body, ct).ConfigureAwait(false);
-        await stream.FlushAsync(ct).ConfigureAwait(false);
-    }
+    public static Task WriteAsync<T>(Stream stream, T message, CancellationToken ct) =>
+        LengthPrefixedJson.WriteAsync(stream, message, Json, ct);
 
-    public static async Task<T> ReadAsync<T>(Stream stream, CancellationToken ct)
-    {
-        var header = new byte[4];
-        await stream.ReadExactlyAsync(header, ct).ConfigureAwait(false);
-        var length = BinaryPrimitives.ReadInt32LittleEndian(header);
-        if (length is <= 0 or > MaxMessageBytes)
-            throw new InvalidDataException($"Agent message of {length} bytes is out of range.");
-        var body = new byte[length];
-        await stream.ReadExactlyAsync(body, ct).ConfigureAwait(false);
-        return JsonSerializer.Deserialize<T>(body, Json) ?? throw new InvalidDataException("Empty agent message.");
-    }
+    public static Task<T> ReadAsync<T>(Stream stream, CancellationToken ct) =>
+        LengthPrefixedJson.ReadAsync<T>(stream, Json, MaxMessageBytes, "Agent", ct);
 }

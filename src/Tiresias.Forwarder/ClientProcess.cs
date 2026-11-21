@@ -44,6 +44,12 @@ sealed partial class WindowsClientProcessLookup : IClientProcessLookup
         return pid is null ? null : $"{ImagePath(pid.Value) ?? "unknown image"} (pid {pid})";
     }
 
+    /// <summary>The process that opened a loopback connection to <paramref name="serverPort"/> from <paramref name="client"/>, and its image path when readable.</summary>
+    public static (int Pid, string? Image)? Owner(IPEndPoint client, int serverPort) =>
+        IPAddress.IsLoopback(client.Address) && OwningPid(client.AddressFamily == AddressFamily.InterNetworkV6, client.Port, serverPort) is { } pid
+            ? (pid, ImagePath(pid))
+            : null;
+
     /// <summary>The PID of the row whose local end is the client's port and remote end is ours.</summary>
     static unsafe int? OwningPid(bool ipv6, int clientPort, int serverPort)
     {

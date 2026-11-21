@@ -48,6 +48,7 @@ public static class BrokerHost
         builder.Services.AddSingleton<RavenClients>();
         builder.Services.AddSingleton<SqlEndpoint>();
         builder.Services.AddSingleton<TokenEndpoint>();
+        builder.Services.AddSingleton<ClearanceEndpoint>();
         builder.Services.TryAddSingleton<IGitHubInstallationTokens, GitHubInstallationTokens>();
         builder.Services.TryAddSingleton<ISqlGateway, SqlServerGateway>();
         builder.Services.AddHostedService<LeaseWatch>();
@@ -129,6 +130,7 @@ public static class BrokerHost
 
         app.MapPost("/token/{service}", (HttpContext context, string service, SignedApproval? body, TokenEndpoint endpoint) =>
             endpoint.HandleAsync(context, service, body));
+        app.MapGet("/clearance/{service}", (HttpContext context, string service, ClearanceEndpoint endpoint) => endpoint.HandleAsync(context, service));
 
         app.MapPost("/elevate", (SignedApproval? body, BrokerState state) =>
         {

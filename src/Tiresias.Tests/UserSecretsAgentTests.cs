@@ -599,4 +599,18 @@ public class AgentPipeTests
         await stop.CancelAsync();
         await serving;
     }
+
+    [Test]
+    public async Task The_client_finds_the_process_serving_the_pipe_to_hand_it_the_foreground()
+    {
+        var name = $"tiresias-test-{Guid.NewGuid():N}";
+        await using var server = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+        var accepting = server.WaitForConnectionAsync();
+        await using var client = new NamedPipeClientStream(".", name, PipeDirection.InOut, PipeOptions.Asynchronous);
+        await client.ConnectAsync(5000);
+        await accepting;
+
+        Assert.That(PipeForeground.ServerProcessId(client), Is.EqualTo(OperatingSystem.IsWindows() ? (uint)Environment.ProcessId : null));
+        Assert.DoesNotThrow(() => PipeForeground.AllowServer(client));
+    }
 }
