@@ -34,4 +34,9 @@
     <ProjectReference Include="..\Tiresias.Core\Tiresias.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The tier's removal takes the service's audit rules off the decoy files, the service stopped. -->
+    <Compile Include="..\Tiresias.Admin\AuditRules.cs" Link="AuditRules.cs" />
+  </ItemGroup>
+
 </Project>

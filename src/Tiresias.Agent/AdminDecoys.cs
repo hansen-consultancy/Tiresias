@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using Microsoft.Win32;
 using Microsoft.Win32.SafeHandles;
+using Tiresias.Admin;
 using Tiresias.AdminTier;
 using Tiresias.Decoys;
 using Tiresias.Protocol;
@@ -75,24 +76,49 @@ public static partial class AdminDecoys
 
     /// <summary>
     /// Run elevated by the tier's removal, the service stopped: hands every set in its state folder
-    /// back to its user, deleting each one that went.
+    /// back to its user, deleting each one that went, and undoes the service's read auditing: the
+    /// rules on the sets' files, and File System success auditing once no set is left, if the
+    /// service turned it on (<c>audit.json</c>).
     /// </summary>
     /// <returns>Whether every set went back; one that didn't stays in the state folder.</returns>
     public static bool HandBackAll(string stateFolder)
     {
         var folder = Path.Combine(stateFolder, "decoys");
-        if (!Directory.Exists(folder))
-            return true;
         var all = true;
-        foreach (var file in Directory.EnumerateFiles(folder, "*.json"))
+        var privileged = Privileged();
+        foreach (var file in Directory.Exists(folder) ? Directory.EnumerateFiles(folder, "*.json") : [])
         {
             var sid = Path.GetFileNameWithoutExtension(file);
             if (AdminArgs.UserSid(sid) && AdminHeldDecoys.Parse(File.ReadAllText(file)) is { } held && HandBack(sid, held.Set))
+            {
+                if (privileged)
+                    foreach (var path in held.Files)
+                        AuditRules.Remove(path);
                 File.Delete(file);
+            }
             else
                 all = false;
         }
+        var audit = Path.Combine(stateFolder, "audit.json");
+        if (all && privileged && File.Exists(audit) && AdminAuditState.Parse(File.ReadAllText(audit)).Release(0).TurnOff)
+        {
+            AuditRules.SetSuccess(false);
+            File.Delete(audit);
+        }
         return all;
+    }
+
+    static bool Privileged()
+    {
+        try
+        {
+            AuditRules.EnablePrivilege();
+            return true;
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            return false;
+        }
     }
 
     /// <summary>Writes the set to the user's <c>decoys.json</c>, only as a new file at exactly that path (<see cref="AdminHandBack"/>).</summary>

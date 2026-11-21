@@ -70,7 +70,7 @@ public sealed class AgentHost : IAsyncDisposable
                 continue;
             }
             foreach (var e in events)
-                OnDecoyTouched(new(e.Hit, e.Parents));
+                OnDecoyTouched(new(e.Hit, e.Parents, e.Routine));
             ack = [.. events.Select(e => e.Id)];
         }
     }
