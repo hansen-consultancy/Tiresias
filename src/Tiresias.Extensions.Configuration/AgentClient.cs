@@ -29,6 +29,8 @@ sealed class NamedPipeUserSecretsAgent(string? pipeName = null) : IUserSecretsAg
         {
             return null;
         }
+        // The app may answer with a consent dialog or a Hello prompt: let it come to the front.
+        PipeForeground.AllowServer(pipe);
 
         // Configuration loading is synchronous; this runs once at startup.
         using var cts = new CancellationTokenSource(ReplyTimeout);

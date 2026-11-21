@@ -18,6 +18,12 @@ its section below.
   secrets") instead of warning that it is in plain text. Dismissing a plain-text secrets file now
   lasts only until a key is added to it.
 
+### Fixed
+
+- An app loading its user secrets through `Tiresias.Extensions.Configuration` now lets the
+  consent dialog and Windows Hello prompt come to the front, as `tir` already did, instead of
+  opening behind the IDE.
+
 ## [0.2.1] - 2026-11-20
 
 The desktop app's 0.2 release: everything listed under 0.2.0 below. The app's 0.2.0 build was
