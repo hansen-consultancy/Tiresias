@@ -87,14 +87,14 @@ public static class SqlServerSetupPlanner
     static string? HostOf(string server)
     {
         var host = server;
-        var comma = host.IndexOf(',');
+        var comma = host.IndexOf(',', StringComparison.Ordinal);
         if (comma >= 0)
         {
             if (!ushort.TryParse(host[(comma + 1)..], out var port) || port == 0)
                 return null;
             host = host[..comma];
         }
-        var slash = host.IndexOf('\\');
+        var slash = host.IndexOf('\\', StringComparison.Ordinal);
         if (slash >= 0)
         {
             var instance = host[(slash + 1)..];
@@ -117,7 +117,7 @@ public static class SqlServerSetupPlanner
     {
         var batches = new List<string>();
         var batch = new StringBuilder();
-        foreach (var raw in script.Replace("\r\n", "\n").Split('\n'))
+        foreach (var raw in script.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n'))
         {
             var line = raw.TrimEnd();
             if (line.Trim().Equals("GO", StringComparison.OrdinalIgnoreCase))
@@ -125,7 +125,7 @@ public static class SqlServerSetupPlanner
                 Flush();
                 continue;
             }
-            if (line.StartsWith(':'))
+            if (line.StartsWith(':', StringComparison.Ordinal))
             {
                 if (line.Equals(":on error exit", StringComparison.OrdinalIgnoreCase))
                     continue;

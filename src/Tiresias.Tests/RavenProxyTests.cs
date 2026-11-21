@@ -289,7 +289,7 @@ public class RavenProxyTests
 
         await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "done", CancellationToken.None);
         Assert.That(socket.CloseStatus, Is.EqualTo(WebSocketCloseStatus.NormalClosure), "the node's close comes back");
-        Assert.That(SpinWait.SpinUntil(() => Audit().Contains("closed: 10 bytes up, 10 bytes down"), TimeSpan.FromSeconds(5)), Is.True, Audit());
+        Assert.That(SpinWait.SpinUntil(() => Audit().Contains("closed: 10 bytes up, 10 bytes down", StringComparison.Ordinal), TimeSpan.FromSeconds(5)), Is.True, Audit());
         Assert.That(Audit(), Does.Contain("\"WEBSOCKET\""));
     }
 
@@ -311,7 +311,7 @@ public class RavenProxyTests
         {
         }
         Assert.That(timeout.IsCancellationRequested, Is.False, "the socket ended before the timeout");
-        Assert.That(SpinWait.SpinUntil(() => Audit().Contains("lease-ended"), TimeSpan.FromSeconds(5)), Is.True, Audit());
+        Assert.That(SpinWait.SpinUntil(() => Audit().Contains("lease-ended", StringComparison.Ordinal), TimeSpan.FromSeconds(5)), Is.True, Audit());
     }
 
     sealed record SeenRequest(string Uri, string? Authorization, string? AcceptEncoding);

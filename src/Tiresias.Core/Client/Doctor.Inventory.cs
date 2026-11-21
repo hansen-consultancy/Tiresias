@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -87,7 +88,7 @@ public static partial class Doctor
             yield return $"  {host.Key.Name} ({host.Count()}): {(reached.Length > 0 ? $"reached {string.Join(", ", reached)}" : "reached nothing")} in 90 days";
             foreach (var extension in host.OrderBy(e => e.Id, StringComparer.OrdinalIgnoreCase))
                 yield return $"    {extension.Id} {extension.Version ?? "?"}, {extension.Publisher ?? "unknown publisher"}, "
-                    + $"updated {(extension.Updated is { } updated ? updated.ToString("yyyy-MM-dd") : "unknown")}";
+                    + $"updated {(extension.Updated is { } updated ? updated.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "unknown")}";
         }
         yield return "Global tools";
         if (inventory.Tools.Count == 0)

@@ -83,7 +83,7 @@ static partial class SurfaceProbe
     /// <summary>A path that may start with a known folder's id, as the shell records them; <c>null</c> when the id isn't one this reads.</summary>
     static string? ResolveKnownFolder(string path)
     {
-        if (!path.StartsWith('{') || path.IndexOf('}') is not (> 0 and var close))
+        if (!path.StartsWith('{', StringComparison.Ordinal) || path.IndexOf('}', StringComparison.Ordinal) is not (> 0 and var close))
             return path;
         return Guid.TryParse(path[..(close + 1)], out var id) && KnownFolder(id) is { } folder ? folder.TrimEnd('\\') + path[(close + 1)..] : null;
     }
