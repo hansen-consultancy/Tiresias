@@ -21,7 +21,9 @@ public sealed class AgentHost : IAsyncDisposable
     readonly DecoyWatch decoys = new();
     readonly AuditLog activity;
     readonly List<Task> running = [];
+    readonly SemaphoreSlim soloGate = new(1, 1);
     FileSystemWatcher? vaultWatcher;
+    BrokerServiceState? soloService;
     Dictionary<string, int> vaultVersions = [];
 
     public AgentHost(IUserSecretsConsentPrompt prompt)
@@ -106,6 +108,25 @@ public sealed class AgentHost : IAsyncDisposable
         running.Add(keeper.RunAsync(stop.Token));
         decoys.Start();
         await StartSoloBrokerAsync();
+        running.Add(FollowBrokerServiceAsync(stop.Token));
+    }
+
+    /// <summary>
+    /// The service can be installed, stopped or removed while this agent runs unlocked all day: each check that finds
+    /// it changed starts the solo broker over, so the status and the vault watcher never describe a broker that is gone.
+    /// </summary>
+    async Task FollowBrokerServiceAsync(CancellationToken ct)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(15));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(ct))
+                if (KeyringStore.Tenant is { Solo: true } && BrokerService.State() != soloService)
+                    await StartSoloBrokerAsync();
+        }
+        catch (OperationCanceledException)
+        {
+        }
     }
 
     /// <summary>Answers the request, then links its id to the asking program's project, off the pipe's path.</summary>
@@ -119,9 +140,28 @@ public sealed class AgentHost : IAsyncDisposable
     /// <summary>Starts the solo broker when this device uses one and it isn't up; a failure is kept in <see cref="SoloBrokerProblem"/>, not thrown.</summary>
     async Task StartSoloBrokerAsync()
     {
+        await soloGate.WaitAsync();
+        try
+        {
+            await StartSoloBrokerLockedAsync();
+        }
+        finally
+        {
+            soloGate.Release();
+        }
+    }
+
+    async Task StartSoloBrokerLockedAsync()
+    {
         if (KeyringStore.Tenant is not { Solo: true } tenant)
             return;
-        if (BrokerService.State() is not BrokerServiceState.NotInstalled and var service)
+        var service = BrokerService.State();
+        if (soloService is { } was && was != service)
+            Say(service == BrokerServiceState.NotInstalled
+                ? "The Tiresias service was removed: the solo broker runs in this app again. Unlock to open its lease."
+                : $"The Tiresias service is {service.ToString().ToLowerInvariant()}.");
+        soloService = service;
+        if (service is not BrokerServiceState.NotInstalled)
         {
             SoloBrokerProblem = service == BrokerServiceState.Stopped
                 ? "The Tiresias service is stopped: start it in Windows Services, or run tir solo service install again."
@@ -130,6 +170,8 @@ public sealed class AgentHost : IAsyncDisposable
             StateChanged?.Invoke();
             return;
         }
+        vaultWatcher?.Dispose();
+        vaultWatcher = null;
         try
         {
             await solo.StartAsync();
@@ -262,6 +304,7 @@ public sealed class AgentHost : IAsyncDisposable
         }
         await solo.DisposeAsync();
         vaultWatcher?.Dispose();
+        soloGate.Dispose();
         decoys.Dispose();
         Keys.Dispose();
         UserSecrets.Dispose();

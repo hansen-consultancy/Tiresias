@@ -34,7 +34,8 @@ open it or write the files only it can write.
   a restored older vault is refused against the marks the service keeps.
 - **The rollback mark persists.** The service keeps, per secret, the highest version it has
   loaded, and refuses a vault below it whether a lease is open or not. A secret below its mark at
-  start is left out, and audited, until a newer one is saved.
+  start is left out, and audited, until a newer one is saved; a reload that still holds it keeps it
+  out and loads the rest. Only going below a version the service serves refuses the whole vault.
 - **The trust chain moves.** Install verifies the user's solo chain against the genesis pinned in
   the Keyring and copies it into the service's folder. From then on the service's copy is the
   chain; `tir trust bind-hello` extends it with `POST /trust/chain` as with any broker.
@@ -42,7 +43,9 @@ open it or write the files only it can write.
   user), so install re-pins the solo tenant to it, and uninstall back to the app's.
 - **The app hosts the broker only when the service isn't installed.** With the service, the agent
   watches the vault and seals new or re-sealed secrets to the open lease over HTTP, which the
-  in-app broker did through a callback.
+  in-app broker did through a callback. The agent checks the service every 15 seconds, so an install
+  or uninstall while it stays unlocked switches it over: uninstalled, the app's own broker starts again
+  and needs an unlock for its lease.
 - **Admin once.** Install and uninstall need an elevated `tir`. Nothing else does.
 
 ## Design twice
@@ -81,7 +84,8 @@ B can't be hardened: a process can't keep its memory from another process of the
 ## Tests
 
 - `BrokerStateTests`: persisted marks survive a new `BrokerState`; a vault below them is refused
-  without a lease; a secret below its mark at start is left out and audited.
+  without a lease; a secret below its mark at start is left out and audited, and does not block
+  reloading the rest.
 - `DoctorTests`: the three "broker process" lines.
 - `BrokerServiceLayoutTests`: paths, the `service.json` round trip, and the `sc.exe` arguments
   (binary path quoted, virtual account).

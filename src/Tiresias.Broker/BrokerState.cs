@@ -202,19 +202,26 @@ public sealed class BrokerState : IDisposable
     /// seals the new one. A secret bound to its policy that is unchanged on disk but no longer opens
     /// means its policy changed without approval: the whole vault is refused and the previous one
     /// kept. A service whose policy changed loses its placeholders and elevations, which were
-    /// approved for the old one.
+    /// approved for the old one. A secret below its high-water mark refuses the whole vault when
+    /// the current one serves it, and is left out when it is already out.
     /// </summary>
     public VaultReload ReplaceVault(VaultDocument next)
     {
         lock (gate)
         {
-            var rolledBack = lease is null && marks is null ? [] : RolledBack(next);
+            // Going below a version this broker serves now is a rollback: the whole vault is refused. A secret already
+            // left out (at startup, below its persisted mark) stays out as the constructor has it, so an older copy that
+            // is still on disk does not block every unrelated change.
+            var below = lease is null && marks is null ? [] : RolledBack(next);
+            var rolledBack = below.Where(slug => vault.FindSecret(slug) is not null).ToArray();
             if (rolledBack.Length > 0)
             {
                 foreach (var slug in rolledBack)
                     audit.Append(new(AuditKind.Deny, lease?.Id, Reason: $"secret-rolled-back: {slug}; vault reload refused"));
                 return new([], [], rolledBack);
             }
+            if (below.Length > 0)
+                next = next with { Secrets = [.. next.Secrets.Where(s => !below.Contains(s.Slug))] };
 
             var unapproved = deks
                 .Where(d => vault.FindSecret(d.Key) is { PolicyHash: not null } current

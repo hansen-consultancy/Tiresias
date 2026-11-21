@@ -325,6 +325,34 @@ public class BrokerStateTests
     }
 
     [Test]
+    public void A_secret_left_out_below_its_mark_does_not_block_reloading_the_rest()
+    {
+        var marksPath = auditPath + ".marks";
+        try
+        {
+            var newer = SecretEnvelope.Seal("llm-read", 2, "Bearer sk-read-2"u8, [vault.Tpm], PolicyBinding.Hash(vault.Document, "llm-read"));
+            BrokerState Start(VaultDocument document) => new(document, LeaseTerms.Workday(TimeZoneInfo.FindSystemTimeZoneById("Europe/Brussels")),
+                new AuditLog(auditPath, time), Key.Create(SignatureAlgorithm.Ed25519), time, new HighWaterMarks(marksPath));
+            using (var first = Start(vault.Document))
+                first.ReplaceVault(vault.Document with { Secrets = [.. vault.Document.Secrets.Where(s => s.Slug != "llm-read"), newer] });
+
+            using var restarted = Start(vault.Document); // llm-read@1 left out
+            var edited = vault.Document with { Services = [.. vault.Document.Services, new Service("httpbin", new Uri("https://httpbin.example/"), [])] };
+
+            var reload = restarted.ReplaceVault(edited);
+
+            Assert.That(reload.Refused, Is.False, "the unrelated change loads");
+            var offer = restarted.BeginLease("laptop").Offer;
+            var sealedResult = restarted.Seal(offer.LeaseId, vault.SealTo(offer), vault.ApprovalKey(offer.LeaseId)).Result!;
+            Assert.That(sealedResult.Accepted, Does.Not.Contain("llm-read"), "and the older secret stays out");
+        }
+        finally
+        {
+            File.Delete(marksPath);
+        }
+    }
+
+    [Test]
     public void A_re_sealed_secret_loses_its_old_dek_until_the_new_one_is_sealed()
     {
         var offer = OpenLease();
