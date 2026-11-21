@@ -68,7 +68,7 @@ Seeing the read itself, before anything is tried, is harder on Windows without a
 | Auditing with a SACL (Security log event 4663) | Yes, to set the audit policy and read the log | Works; offered only where the user is an administrator |
 | Kernel ETW file events, a minifilter driver | Yes, or a driver | Out of scope |
 | An oplock on the decoy, naming the reader by Restart Manager | No | **Dropped** after a spike: it sees a read but can't say who read it (below) |
-| An oplock on the decoy, naming the reader by the thread that wakes when the oplock is released | No (to be proven) | **Second spike**: prior art (below) reports it naming the opener in about 0.1 s |
+| **An oplock on the decoy, naming the reader by the thread that wakes when the oplock is released** | **No** | **Works** (second spike, below): never named the wrong process |
 
 **The oplock spike** (Windows 11, NTFS, ordinary user; 5 oplock levels, 2 share modes, 11 kinds of
 opener, each in its own process):
@@ -91,6 +91,27 @@ So an ordinary user can learn that *something* read a decoy file, once, but not 
 name, the indexer, antivirus and backup openers below can't be told apart from a thief, so the
 signal would be mostly noise. A read alert without a name would break principle 5, so this way of
 naming the reader was dropped. For now, files are covered only when a credential in them is *used* (layer 1).
+
+**The second spike** (method from prior art, below; ordinary user, no privilege): when the oplock
+breaks, the opener's thread is stuck in a wait that began at that tick. Tiresias lists every thread
+on the machine (`NtQuerySystemInformation`, which shows state and wait start even for processes
+it can't open), keeps those waiting since the break and unchanged across two snapshots, releases
+the oplock, and looks again: the thread whose wait ended is the opener. If threads of more than one
+process woke, it says it can't tell rather than guess.
+
+- 295 opens from separate processes (`type`, `Get-Content`, `File.ReadAllText`, a raw read):
+  267 named correctly, 28 "can't tell", **none wrong**. Busy processes doing file I/O alongside never
+  became candidates. The "can't tell" cases were long-waiting threads that happened to wake at the
+  same instant (OneDrive's sync service most often).
+- The reader waits about 55 ms (snapshots 20 ms apart) to 90 ms; unarmed, under 1 ms. Naming takes
+  15 to 20 ms after the release. The reader still gets the file: this layer names, it doesn't stop.
+- Elevated and SYSTEM openers are seen too: a same-user elevated process by path, a service by
+  image name only.
+- Short-lived openers exit within milliseconds, so the name comes from the thread list itself, not
+  a later lookup. A program that opens a file for another (Explorer's preview, Defender, the indexer)
+  is named as itself: right process, innocent identity, which is why the publisher check below matters.
+- An attacker can force "can't tell" by waking a helper at the same moment; it can't make Tiresias
+  name the wrong program. Each break uses the oplock up; it is taken again within about 0.15 s.
 
 **False positives** are the cost of this layer: Windows Search, Defender, OneDrive and backup tools
 open files they find. Decoys go in a folder those tools are told to skip where possible, and an
@@ -129,13 +150,13 @@ sets audit rules; Tiresias watches use and needs no admin rights. What fits Tire
 
 | Idea | Fit | Where |
 |---|---|---|
-| Name the opener by the thread that wakes when the oplock is released | Would give layer 2 the name it lacks, without admin rights | Layer 2, second spike |
-| Decoys for tools that **aren't installed**, so nothing legitimate reads them, retired when the real tool appears | Yes, for developer credentials pointing home: `~/.aws/credentials` with an `endpoint_url` on loopback, a `~/.kube/config` whose server is the HTTP decoy, a `pgpass.conf`. Only where the file doesn't exist (principle 4) | Layer 1, next |
-| Different file names per install, from the names grabbers search for | Yes: `passwords.txt` is one fixed name today | Placement, next |
-| A program using **several** decoys is a sweep: say so | Yes, as a fact in the finding ("used 3 decoys in 2 minutes") | Finding, next |
-| Say whether the program is signed and where it runs from (Downloads, Temp) | Yes: the activity record has the signature; the finding should too | Finding, next |
-| Freeze the process tree, cut its network | With admin rights only (above), undoable from Home; isolating the whole PC is not taken | Admin tier |
-| Canary tokens registered with a public service | Yes, opt-in | Phase 3 |
+| Name the opener by the thread that wakes when the oplock is released | Yes: proven without admin rights | Layer 2 |
+| Decoys for tools that **aren't installed**, so nothing legitimate reads them, retired when the real tool appears | Yes, for developer credentials pointing home: `~/.aws/credentials` with an `endpoint_url` on loopback, a `~/.kube/config` whose server is the HTTP decoy, a `pgpass.conf`. Only where the file doesn't exist (principle 4) | Layer 1, #92 |
+| Different file names per install, from the names grabbers search for | Yes: `passwords.txt` is one fixed name today | Placement, #92 |
+| A program using **several** decoys is a sweep: say so | Yes, as a fact in the finding ("used 3 decoys in 2 minutes") | Finding, #92 |
+| Say whether the program is signed and where it runs from (Downloads, Temp) | Yes: the activity record has the signature; the finding should too | Finding, #92 |
+| Freeze the process tree, cut its network | With admin rights only (above), undoable from Home; isolating the whole PC is not taken | Admin tier, #91 |
+| Canary tokens registered with a public service | Yes, opt-in | Phase 3, #93 |
 | A fake browser profile, fake wallets and chat sessions | No: outside developer credentials | Not taken |
 
 ## Placement
@@ -165,6 +186,6 @@ sets audit rules; Tiresias watches use and needs no admin rights. What fits Tire
 
 1. **Decoy credentials with loopback endpoints:** files, listeners, process identification, activity,
    block list, finding.
-2. **Read tripwire:** naming the reader through Restart Manager is dropped; naming it through the
-   thread that wakes is the second spike. With admin rights, auditing names every read (above).
+2. **Read tripwire:** an oplock on each decoy file, naming the reader by the thread that wakes
+   (proven without admin rights). With admin rights, auditing names every read as well (#91).
 3. **External canaries** (opt-in): decoys registered with a canary service, for use off the machine.
