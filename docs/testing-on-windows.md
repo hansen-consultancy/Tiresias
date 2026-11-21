@@ -31,6 +31,8 @@ Start menu.
 $root = "$env:LOCALAPPDATA\Programs\Tiresias"
 dotnet publish src/Tiresias.App -c Release -o "$root\app"
 dotnet publish src/Tiresias.Keyring -c Release -o "$root\cli"
+# Only to try the admin tier (docs/admin-tier.md): its service, where the app's install step looks for it.
+dotnet publish src/Tiresias.Admin -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o "$root\app\admin"
 $env:PATH = "$root\cli;$env:PATH"
 tir status
 ```

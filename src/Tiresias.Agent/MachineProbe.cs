@@ -1,6 +1,7 @@
 using System.IO.Enumeration;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using Tiresias.AdminTier;
 using Tiresias.Client;
 using Tiresias.Decoys;
 using Tiresias.EnvironmentVariables;
@@ -100,6 +101,9 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
         ? new(set.Placed.Count, IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners().Any(e => e.Port == set.HttpPort))
         : null;
 
+    // On the thread pool: the app runs the doctor from its UI thread, and this waits on a pipe.
+    public AdminTierFacts? AdminTier => Task.Run(AdminClient.FactsAsync).GetAwaiter().GetResult() is { Installed: true } tier ? tier : null;
+
     public IEnumerable<DoctorFile> Projects() => Found.Projects.Select(Read);
 
     public IEnumerable<DoctorFile> ConfigFiles()
@@ -135,6 +139,23 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public IEnumerable<DoctorRavenCertificate> RavenCertificates() => RavenCertificateStore.ForVault();
 
+    /// <summary>Asks the broker's <c>/clearance</c>, which needs the lease the unlocked agent holds. Waits longer than the broker waits on RavenDB.</summary>
+    public async Task<DoctorBrokerAnswer?> RavenClearanceAsync(string service)
+    {
+        if (KeyringStore.Broker is not { } broker)
+            return null;
+        try
+        {
+            using var client = BrokerClient.For(broker);
+            var (status, body) = await client.GetAsync($"/clearance/{Uri.EscapeDataString(service)}").WaitAsync(TimeSpan.FromSeconds(15));
+            return new((int)status, body);
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or TimeoutException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>The unlocked key, for the checks that need the sealed environment's names; <c>null</c> skips them. Never prompts.</summary>
     public IKeyWrapper? Hello { get; init; }
 
@@ -160,6 +181,9 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     public IEnumerable<UninstallEntry> UninstallEntries() => SurfaceProbe.UninstallEntries();
 
     public IEnumerable<string> BlockedPrograms() => SurfaceProbe.BlockedPrograms();
+
+    /// <inheritdoc cref="SurfaceProbe.Signature"/>
+    public static (bool? Valid, string? Signer) Signature(string path) => SurfaceProbe.Signature(path);
 
     public IEnumerable<ProgramRun> ProgramRuns() => SurfaceProbe.ProgramRuns();
 

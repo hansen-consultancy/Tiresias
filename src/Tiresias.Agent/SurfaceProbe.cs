@@ -151,9 +151,9 @@ static partial class SurfaceProbe
 
     /// <summary>
     /// The uninstall entries a person would see in Settings, machine (64- and 32-bit) and user, each
-    /// with whether the uninstaller its command names and its folder exist. Windows components,
-    /// updates and Windows Installer entries are left out: the first two aren't apps, and the last
-    /// names <c>msiexec</c>, which says nothing about the program's own files.
+    /// with whether the uninstaller its command names and its folder exist. Windows components and
+    /// updates are left out: they aren't apps. A Windows Installer entry names <c>msiexec</c>, which
+    /// says nothing about the program's own files, so its uninstaller is <c>null</c>.
     /// </summary>
     public static IEnumerable<UninstallEntry> UninstallEntries()
     {
@@ -178,7 +178,7 @@ static partial class SurfaceProbe
             {
                 using var key = uninstall.OpenSubKey(name);
                 if (key?.GetValue("DisplayName") is not string { Length: > 0 } display
-                    || key.GetValue("SystemComponent") is 1 || key.GetValue("ParentKeyName") is not null || key.GetValue("WindowsInstaller") is 1
+                    || key.GetValue("SystemComponent") is 1 || key.GetValue("ParentKeyName") is not null
                     || key.GetValue("UninstallString") is not string command)
                     continue;
                 command = Environment.ExpandEnvironmentVariables(command).Trim();
@@ -190,7 +190,9 @@ static partial class SurfaceProbe
                 var own = folder is not null && !SameOrUnder(folder, windows) ? folder : null;
                 entries.Add(new($@"{prefix}\{name}", display, key.GetValue("DisplayVersion") as string, uninstaller,
                     uninstaller is not null && File.Exists(uninstaller), folder is not null && Directory.Exists(folder), command,
-                    own, own is not null && (unseen.Any(p => SameOrUnder(p, own)) || HasDriver(own))));
+                    own, own is not null && (unseen.Any(p => SameOrUnder(p, own)) || HasDriver(own)),
+                    key.GetValue("DisplayIcon") is string { Length: > 0 } icon ? Environment.ExpandEnvironmentVariables(icon) : null,
+                    key.GetValue("Publisher") as string is { Length: > 0 } publisher ? publisher.Trim() : null));
             }
         }
         return entries;
@@ -296,6 +298,31 @@ static partial class SurfaceProbe
     /// count as unchecked rather than unsigned; so do Store apps, signed as a package and started
     /// through an alias the check can't open.
     /// </summary>
+    /// <summary>
+    /// Whether a local file's embedded signature is valid (offline, as <see cref="IsSigned"/>) and the
+    /// name of who signed it. The name comes from the signer's certificate and is shown only next to
+    /// the verdict: an invalid signature can name anyone.
+    /// </summary>
+    public static (bool? Valid, string? Signer) Signature(string path)
+    {
+        if (!Path.IsPathFullyQualified(path) || path.StartsWith(@"\\", StringComparison.Ordinal) || !File.Exists(path))
+            return (null, null);
+        var valid = IsSigned(path);
+        try
+        {
+            // Reads the embedded signer certificate only; whether to believe it is WinVerifyTrust's call above.
+#pragma warning disable SYSLIB0057
+            using var certificate = new System.Security.Cryptography.X509Certificates.X509Certificate2(
+                System.Security.Cryptography.X509Certificates.X509Certificate.CreateFromSignedFile(path));
+#pragma warning restore SYSLIB0057
+            return (valid, certificate.GetNameInfo(System.Security.Cryptography.X509Certificates.X509NameType.SimpleName, forIssuer: false));
+        }
+        catch (System.Security.Cryptography.CryptographicException)
+        {
+            return (valid, null);
+        }
+    }
+
     static unsafe bool? IsSigned(string path)
     {
         var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);

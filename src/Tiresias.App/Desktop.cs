@@ -225,6 +225,40 @@ static partial class Desktop
     [LibraryImport("shell32.dll", EntryPoint = "SHFileOperationW")]
     private static unsafe partial int SHFileOperation(ShellFileOperation* operation);
 
+    /// <summary>
+    /// The small icon at <paramref name="index"/> in a program, library or <c>.ico</c> file, frozen so
+    /// any thread can build it; <c>null</c> when there is none. The file is read as data, never run.
+    /// </summary>
+    public static System.Windows.Media.ImageSource? SmallIcon(string path, int index)
+    {
+        if (!File.Exists(path))
+            return null;
+        var small = new nint[1];
+        if (ExtractIconEx(path, index, null, small, 1) == 0 || small[0] == 0)
+            return null;
+        try
+        {
+            var image = Imaging.CreateBitmapSourceFromHIcon(small[0], Int32Rect.Empty, System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
+            image.Freeze();
+            return image;
+        }
+        catch (Exception e) when (e is COMException or ArgumentException)
+        {
+            return null;
+        }
+        finally
+        {
+            DestroyIcon(small[0]);
+        }
+    }
+
+    [LibraryImport("shell32.dll", EntryPoint = "ExtractIconExW", StringMarshalling = StringMarshalling.Utf16)]
+    private static partial uint ExtractIconEx(string file, int index, nint[]? large, nint[]? small, uint icons);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool DestroyIcon(nint icon);
+
     [LibraryImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static partial bool SetWindowDisplayAffinity(nint hwnd, uint affinity);

@@ -58,6 +58,37 @@ public partial class AboutPage : UserControl
 
         PageButton.Content = Text.Get(build.Installed ? "About_ReleasePage" : "About_CommitPage");
         PageButton.Visibility = build.Installed || AppBuild.CommitPage is not null ? Visibility.Visible : Visibility.Collapsed;
+
+        Loaded += async (_, _) => await ShowAdminTierAsync();
+    }
+
+    async Task ShowAdminTierAsync()
+    {
+        var tier = await Task.Run(AdminClient.FactsAsync);
+        AdminTierText.Text = Text.Of(AdminTierCard.Describe(tier));
+        var actions = AdminTierCard.Actions(tier.State);
+        AdminTierSetUp.Visibility = actions.Contains(AdminTierAction.SetUp) ? Visibility.Visible : Visibility.Collapsed;
+        AdminTierUpdate.Visibility = actions.Contains(AdminTierAction.Update) ? Visibility.Visible : Visibility.Collapsed;
+        AdminTierRemove.Visibility = actions.Contains(AdminTierAction.Remove) ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    async void OnAdminTierInstall(object sender, RoutedEventArgs e) => await RunAdminTierAsync("install");
+
+    async void OnAdminTierRemove(object sender, RoutedEventArgs e) => await RunAdminTierAsync("remove");
+
+    async Task RunAdminTierAsync(string verb)
+    {
+        AdminTierSetUp.IsEnabled = AdminTierUpdate.IsEnabled = AdminTierRemove.IsEnabled = false;
+        try
+        {
+            var result = await AdminTierElevation.RunAsync(verb);
+            AdminTierOutcome.Text = Text.Of(AdminTierCard.Outcome(result, removing: verb == "remove"));
+            await ShowAdminTierAsync();
+        }
+        finally
+        {
+            AdminTierSetUp.IsEnabled = AdminTierUpdate.IsEnabled = AdminTierRemove.IsEnabled = true;
+        }
     }
 
     void OnStartWithWindows(object sender, RoutedEventArgs e)
