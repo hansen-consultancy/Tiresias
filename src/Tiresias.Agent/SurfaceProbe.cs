@@ -190,6 +190,8 @@ static partial class SurfaceProbe
         return paths;
     }
 
+    public static IEnumerable<DecoyUseRecord> DecoyUses() => Doctor.DecoyUses(Lines(AgentHost.ActivityPath));
+
     public static IEnumerable<CredentialUse> CredentialUses() =>
         Doctor.CredentialUses(Lines(AgentHost.ActivityPath).Concat(Lines(SoloBroker.AuditPath)));
 

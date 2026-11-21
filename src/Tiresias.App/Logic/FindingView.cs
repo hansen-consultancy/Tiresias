@@ -27,6 +27,8 @@ public enum FixAction
     OpenStartupSettings,
     /// <summary>Save one of the user's uninstall entries to a <c>.reg</c> file and delete it, after the user approves.</summary>
     RemoveEntry,
+    /// <summary>Take a program off the blocklist.</summary>
+    Unblock,
     /// <summary>The Services page's add form, its address filled in.</summary>
     AddService,
     /// <summary>Settings, Apps, Installed apps, where the user uninstalls a program.</summary>
@@ -92,6 +94,7 @@ public static class FindingView
         DisableStartup => (FixAction.OpenStartupSettings, "Finding_FixStartupSettings"),
         RemoveEntry { Machine: false } => (FixAction.RemoveEntry, "Finding_FixRemoveEntry"),
         RemoveEntry or Repair { Command: not null } => (FixAction.CopyCommand, "Finding_FixCopy"),
+        UnblockProgram => (FixAction.Unblock, "Finding_FixUnblock"),
         RunThroughExec { Setup: not null } => (FixAction.AddService, "Finding_FixGitHubApp"),
         RunThroughExec => (FixAction.CopyCommand, "Finding_FixCopy"),
         UninstallApp => (FixAction.OpenInstalledApps, "Finding_FixInstalledApps"),
