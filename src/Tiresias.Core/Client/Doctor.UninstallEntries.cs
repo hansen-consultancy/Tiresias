@@ -38,7 +38,7 @@ public sealed record UninstallEntry(string Key, string Name, string? Version, st
         {
             if (Icon is not { Length: > 0 } icon)
                 return null;
-            var comma = icon.LastIndexOf(',');
+            var comma = icon.LastIndexOf(',', StringComparison.Ordinal);
             var index = 0;
             if (comma > 0 && int.TryParse(icon[(comma + 1)..].Trim(), System.Globalization.NumberStyles.AllowLeadingSign,
                     System.Globalization.CultureInfo.InvariantCulture, out var parsed))
@@ -68,7 +68,7 @@ public sealed partial record RemoveEntry(string Key, string Name) : DoctorFix
         $"reg export \"{Key}\" \"{BackupName}\", then reg delete \"{Key}\" /f{(Machine ? ", as an administrator" : "")}";
 
     /// <summary>The backup's file name: the key's last part, without what a file name can't hold.</summary>
-    public string BackupName => $"{Unsafe().Replace(Key[(Key.LastIndexOf('\\') + 1)..], "_")}.reg";
+    public string BackupName => $"{Unsafe().Replace(Key[(Key.LastIndexOf('\\', StringComparison.Ordinal) + 1)..], "_")}.reg";
 
     /// <summary>
     /// Whether <paramref name="key"/> is a subkey of an Uninstall key in plain characters, so it can be

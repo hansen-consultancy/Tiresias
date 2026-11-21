@@ -16,8 +16,8 @@ design and issue. A PR that finishes, starts or adds an item edits this page in 
 - [ ] Policy integrity: the broker refuses a service policy the user didn't approve
       ([design](policy-integrity.md), #24). Phases 1 to 3 built; the rollback high-water mark is in
       review
-- [ ] Step-up at the broker: minting, elevation and tokens need an approval only the vault can
-      produce ([design](step-up.md), #23). In review
+- [x] Step-up at the broker: minting, elevation and tokens need an approval only the vault can
+      produce ([design](step-up.md), #23)
 - [ ] Trust-chain links that add a key need a Windows Hello signature ([design](trust-links.md), #41).
       In review
 - [x] Seal user environment variables and hand them back per shell session ([design](environment-variables.md))

@@ -83,7 +83,7 @@ public class UnusedApplicationTests
         var warning = new DoctorCheck("acme starts at log-on unsigned", DoctorStatus.Warn, "detail", new RevealFile(@"C:\acme.exe"));
 
         Assert.That(FindingBadge.Open([unused, warning], Dismissals.Empty), Is.EquivalentTo(new[] { Dismissals.KeyOf(warning) }));
-        Assert.That(FindingView.Of([unused, warning], Dismissals.Empty).Open.Last().Single(), Is.EqualTo(unused));
+        Assert.That(FindingView.Of([unused, warning], Dismissals.Empty).Open[^1].Single(), Is.EqualTo(unused));
     }
 
     const string Programs = @"C:\Users\alice\AppData\Local\Programs\";
