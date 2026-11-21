@@ -147,6 +147,10 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public IEnumerable<ProgramRun> ProgramRuns() => SurfaceProbe.ProgramRuns();
 
+    /// <summary>Everything the attack surface checks read, plus the global tools, which take seconds to list.</summary>
+    public SurfaceInventory Inventory() =>
+        new([.. Extensions()], [.. SurfaceProbe.GlobalTools()], [.. StartupEntries()], [.. CredentialUses()], [.. ProgramRuns()]);
+
     /// <summary>How long the walk of the project roots took and what it covered; <c>null</c> until a check needed it.</summary>
     public ScanStats? Scan => found?.Stats;
 
