@@ -157,7 +157,15 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public IEnumerable<CredentialUse> CredentialUses() => SurfaceProbe.CredentialUses();
 
+    public IEnumerable<UninstallEntry> UninstallEntries() => SurfaceProbe.UninstallEntries();
+
     public IEnumerable<string> BlockedPrograms() => SurfaceProbe.BlockedPrograms();
+
+    public IEnumerable<ProgramRun> ProgramRuns() => SurfaceProbe.ProgramRuns();
+
+    /// <summary>Everything the attack surface checks read, plus the global tools, which take seconds to list.</summary>
+    public SurfaceInventory Inventory() =>
+        new([.. Extensions()], [.. SurfaceProbe.GlobalTools()], [.. StartupEntries()], [.. CredentialUses()], [.. ProgramRuns()]);
 
     public IEnumerable<DecoyUseRecord> DecoyUses() => SurfaceProbe.DecoyUses();
 

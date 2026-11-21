@@ -13,6 +13,12 @@
     <RootNamespace>Tiresias.Protocol</RootNamespace>
     <PackageId>Tiresias.Protocol</PackageId>
     <Description>Wire formats shared by Tiresias components: the sealed secrets.json envelope and the agent pipe protocol.</Description>
+    <!-- LibraryImport marshalling of the pipe server PID out-parameter. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Tiresias.Tests" />
+  </ItemGroup>
 
 </Project>

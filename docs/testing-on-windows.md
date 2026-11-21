@@ -335,13 +335,13 @@ dotnet run --project src/Tiresias.App -- --demo everyday
   git config), vault secrets, sealed user secrets, Windows and sealed environment variables, all
   in plain text. The app seals them at start. `{{profile}}` in a file is the profile's path,
   `{{now-2h}}` a time two hours ago. Add a scenario for any case you want to see or reproduce.
-- The made-up user is `alice`, with her profile in `%PUBLIC%\Tiresias-demolice` and her `HKCU`
+- The made-up user is `alice`, with her profile in `%PUBLIC%\Tiresias-demo\alice` and her `HKCU`
   in `HKCU\Software\Tiresias\Demo`. Both are emptied at start and when the demo quits, so what you
   change lasts until then. Windows Hello is a fixed key and never prompts.
 - Every button works, against that machine. Your vault, profile, environment, Hello credential
   and running app are never touched: the demo runs beside the real app and serves nothing (no
   user-secrets pipe, broker or `tir` control pipe), and checks for no updates.
-- Titles say "(demo)" and nothing is excluded from screen capture.
+- Titles say "(demo)" and nothing is excluded from screen capture; About names the scenario and the made-up machine's folder.
 - A Release build has no demo mode and ships no scenarios.
 - Not faked yet: the consent dialog (nothing asks), the SQL Server and RavenDB setup windows
   (they connect for real, and the SQL one names your Windows account), and the Installed page.

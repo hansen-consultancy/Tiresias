@@ -21,11 +21,14 @@ static class Demo
     public static string? Requested(string[] args)
     {
         var at = Array.IndexOf(args, "--demo");
-        return at < 0 ? null : at + 1 < args.Length && !args[at + 1].StartsWith('-') ? args[at + 1] : DefaultScenario;
+        return at < 0 ? null : at + 1 < args.Length && !args[at + 1].StartsWith('-', StringComparison.Ordinal) ? args[at + 1] : DefaultScenario;
     }
 
     /// <summary>The scenario running, while demo mode is on.</summary>
     public static string? Scenario { get; private set; }
+
+    /// <summary>What the running scenario shows.</summary>
+    public static string? Description { get; private set; }
 
     /// <summary>Empties the made-up machine and fills it from the scenario, before anything reads a store.</summary>
     /// <returns>Whether the scenario starts unlocked.</returns>
@@ -36,6 +39,7 @@ static class Demo
         DemoMode.Start(helloExists: scenario.SetUp);
         Seed(scenario, DemoMode.Profile!);
         Scenario = name;
+        Description = scenario.Description;
         AppLog.Info($"demo mode: scenario {name} in {DemoMode.Profile}");
         return scenario.Unlocked;
     }
@@ -43,6 +47,7 @@ static class Demo
     public static void End()
     {
         Scenario = null;
+        Description = null;
         DemoMode.End();
     }
 
