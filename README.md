@@ -71,8 +71,9 @@ co-signed by a key derived from the paper recovery key. Encryption at rest, Hell
 leases, placeholders, consent and audit all work, offline too. What you give up: requests leave
 from your own connection (no fixed IP to allow-list), and the secrets stay on the same machine
 as your agents, with no protection from code running as admin. `tir doctor` lists these every
-time. The broker shares the agent's process for now; running it as a Windows service under its
-own account is planned (see [docs/desktop-app.md](docs/desktop-app.md#solo-mode)).
+time. The broker shares the agent's process unless you run `tir solo service install` as
+administrator, which moves it into a Windows service under its own account
+(see [docs/broker-service.md](docs/broker-service.md)).
 
 Services are added with one command, for example
 `tir service add httpbin --upstream https://httpbin.org --allow '^/headers$'`, which asks for the

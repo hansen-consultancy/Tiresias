@@ -85,5 +85,7 @@ a new action with effects outside those (a shell command, the Recycle Bin, a net
 - User-facing changes add a line under `## [Unreleased]` in `CHANGELOG.md`, written for users, in the
   same PR. Release notes (GitHub and the app's update dialog) are that file's version sections
   (`docs/releasing.md`).
+- A PR that finishes, starts or adds a [roadmap](docs/roadmap.md) item edits that item in the
+  same PR (what is built, what is in review), so the page never trails `main`.
 - Version is `VersionPrefix`/`VersionSuffix` in `Directory.Build.props`; releases are `v*` tags,
   published by `release.yml` via nuget.org trusted publishing.

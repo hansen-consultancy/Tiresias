@@ -1,5 +1,8 @@
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Security.AccessControl;
+using System.Security.Principal;
+using Tiresias.Agent;
 using Tiresias.Policy;
 using Tiresias.Vault;
 
@@ -66,5 +69,30 @@ public class VaultFileTests
         VaultFile.Save(path, vault.Document);
         VaultFile.Save(path, vault.Document);
         Assert.That(Directory.GetFiles(dir).Select(Path.GetFileName), Is.EqualTo(new[] { "vault.json" }));
+    }
+
+    [Test, Platform("Win"), System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    public void Service_read_access_stays_with_its_vault_across_saves_and_is_removed_on_uninstall()
+    {
+        var reader = new SecurityIdentifier("S-1-5-80-1234-5678-1234-5678-1234");
+        var folder = new DirectoryInfo(dir);
+        var folderAcl = folder.GetAccessControl();
+        folderAcl.AddAccessRule(new FileSystemAccessRule(reader, FileSystemRights.Read,
+            InheritanceFlags.ObjectInherit | InheritanceFlags.ContainerInherit, PropagationFlags.None, AccessControlType.Allow));
+        folder.SetAccessControl(folderAcl);
+        var vault = new FileInfo(Path.Combine(dir, "vault.json"));
+        var adjacent = new FileInfo(Path.Combine(dir, "other.json"));
+        var document = new VaultDocument([], []);
+        VaultFile.Save(vault.FullName, document);
+        VaultFile.Save(adjacent.FullName, document);
+        BrokerVaultAccess.Set(vault.FullName, reader, grant: true);
+        VaultFile.Save(vault.FullName, document);
+
+        FileSystemRights[] Rights(FileInfo file) => file.GetAccessControl().GetAccessRules(true, true, typeof(SecurityIdentifier))
+            .OfType<FileSystemAccessRule>().Where(rule => rule.IdentityReference == reader).Select(rule => rule.FileSystemRights).ToArray();
+        Assert.That(Rights(vault), Is.EqualTo(new[] { FileSystemRights.Read | FileSystemRights.Synchronize }));
+        Assert.That(Rights(adjacent), Is.Empty);
+        BrokerVaultAccess.Set(vault.FullName, reader, grant: false);
+        Assert.That(Rights(vault), Is.Empty);
     }
 }

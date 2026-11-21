@@ -16,6 +16,9 @@ static class CliUsage
         tir solo init
             Solo mode: the broker runs inside the Tiresias app on this PC, no server needed. Creates
             the recovery key if there is none (or asks for it) and a one-device trust chain.
+        tir solo service install | uninstall
+            As administrator: runs the solo broker as the Tiresias Windows service, under its own
+            account, so programs running as you can't read its memory. Quit the app first.
         tir trust bind-hello
             Names this PC's Windows Hello key in the trust chain, for a chain made before Tiresias
             asked for it: one Hello prompt and the recovery key, once. Solo mode needs the app running.
