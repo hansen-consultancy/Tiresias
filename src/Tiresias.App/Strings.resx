@@ -1841,6 +1841,18 @@ Store them in clear?</value>
   <data name="Finding_FixReveal" xml:space="preserve">
     <value>Show file</value>
   </data>
+  <data name="Finding_FixRemoveEntry" xml:space="preserve">
+    <value>Remove entry...</value>
+  </data>
+  <data name="Finding_RemoveEntryHeading" xml:space="preserve">
+    <value>Remove the entry for {0}?</value>
+  </data>
+  <data name="Finding_RemoveEntryBody" xml:space="preserve">
+    <value>Tiresias saves the entry to a .reg file first, then removes it from the installed apps list. Nothing on disk is deleted. Open the saved file to put the entry back.</value>
+  </data>
+  <data name="Finding_EntryRemoved" xml:space="preserve">
+    <value>Removed the entry for {0}. It is saved in {1}; open that file to put it back.</value>
+  </data>
   <data name="Finding_FixUnblock" xml:space="preserve">
     <value>Unblock (that was me)</value>
   </data>

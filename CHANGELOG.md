@@ -10,6 +10,11 @@ its section below.
 
 ### Added
 
+- Home and `tir doctor` check the installed-apps list against the disk: an entry for an app that
+  is gone, an app whose uninstaller is missing (reinstall it over itself), and an older version's
+  entry left after an update, whose **Uninstall** would remove the current version's files.
+  **Remove entry...** saves the entry to a `.reg` file before removing it; machine-wide entries
+  get the commands to run as an administrator.
 - Decoy credentials: `tir decoys place passwords|project|variables` puts a `passwords.txt`, an old
   project's `appsettings.Production.json` and `.env`, or two user variables on disk, holding
   credentials that open nothing and point to ports only Tiresias listens on. A program that finds
