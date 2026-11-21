@@ -16,9 +16,17 @@ namespace Tiresias.Client;
 /// <param name="RunsUnseen">Part of it runs without the user opening it (a tray icon, a service, a driver, a log-on entry, a
 /// folder on <c>PATH</c>), which Windows doesn't record, so its last use is unknown.</param>
 /// <param name="Icon">Its <c>DisplayIcon</c>, environment variables expanded: a file and, after a comma, an icon index.</param>
+/// <param name="Publisher">Its <c>Publisher</c>: what the installer wrote, a claim, not a signature.</param>
 public sealed record UninstallEntry(string Key, string Name, string? Version, string? Uninstaller, bool UninstallerExists, bool FolderExists,
-    string? Command = null, string? Folder = null, bool RunsUnseen = false, string? Icon = null)
+    string? Command = null, string? Folder = null, bool RunsUnseen = false, string? Icon = null, string? Publisher = null)
 {
+    /// <summary>
+    /// The file whose signature speaks for the program: the program its icon comes from, which is
+    /// usually the one it opens, else its uninstaller; <c>null</c> when it names neither.
+    /// </summary>
+    public string? ProgramFile =>
+        IconLocation is { Path: var icon } && icon.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? icon : Uninstaller;
+
     /// <summary>
     /// The file and index <see cref="Icon"/> names, as Settings reads them: <c>"C:\app\app.exe",0</c>,
     /// <c>C:\app\app.ico</c>, a negative index for a resource id. Only a local, fully qualified

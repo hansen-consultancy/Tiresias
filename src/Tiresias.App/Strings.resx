@@ -2234,4 +2234,37 @@ Store them in clear?</value>
   <data name="Secrets_NothingToSeal" xml:space="preserve">
     <value>Nothing to seal: this file holds no keys.</value>
   </data>
+  <data name="Installed_ColPublisher" xml:space="preserve">
+    <value>Publisher (as its installer says)</value>
+  </data>
+  <data name="Installed_PublisherUnknown" xml:space="preserve">
+    <value>Not given</value>
+  </data>
+  <data name="Installed_ColSigner" xml:space="preserve">
+    <value>Signed by</value>
+  </data>
+  <data name="Installed_SignerChecking" xml:space="preserve">
+    <value>Checking…</value>
+  </data>
+  <data name="Installed_SignedBy" xml:space="preserve">
+    <value>{0}, a valid signature (checked on this PC)</value>
+  </data>
+  <data name="Installed_SignedNoName" xml:space="preserve">
+    <value>A valid signature without a name (checked on this PC)</value>
+  </data>
+  <data name="Installed_SignedInvalid" xml:space="preserve">
+    <value>A signature that is not valid; it names {0}, which anyone can write</value>
+  </data>
+  <data name="Installed_NotSigned" xml:space="preserve">
+    <value>Not signed</value>
+  </data>
+  <data name="Installed_SignerUnknown" xml:space="preserve">
+    <value>Not checked: a part of Windows or a Store app, or no program file found</value>
+  </data>
+  <data name="Installed_SearchOnline" xml:space="preserve">
+    <value>Search online…</value>
+  </data>
+  <data name="Installed_SearchOnlineTip" xml:space="preserve">
+    <value>Opens your browser with a web search for this name and version</value>
+  </data>
 </root>

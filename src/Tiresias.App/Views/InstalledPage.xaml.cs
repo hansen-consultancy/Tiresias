@@ -27,12 +27,20 @@ public partial class InstalledPage : UserControl
     }
 
     void OnOpenSettings(object sender, RoutedEventArgs e) => Desktop.Open("ms-settings:appsfeatures");
+
+    void OnSearchOnline(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is InstalledViewModel { Selected: { } row })
+            Desktop.Open(InstalledDetails.SearchOnline(row.Name, row.Version).AbsoluteUri);
+    }
 }
 
 /// <param name="ShortUse">The list's column: a date or a few words.</param>
 /// <param name="Use">The details panel's line: what is known of its use, in full.</param>
 /// <param name="Icon">The icon its entry names; <c>null</c> shows a generic one.</param>
-public sealed record InstalledRow(string Name, string Version, string For, string ShortUse, string Use, string Reached, string Folder, ImageSource? Icon)
+/// <param name="ProgramFile">The file whose signature the panel checks when the row is selected.</param>
+public sealed record InstalledRow(string Name, string Version, string For, string ShortUse, string Use, string Reached, string Folder, ImageSource? Icon,
+    string Publisher, string? ProgramFile)
 {
     public string Spoken => $"{Name}. {Use}";
 
@@ -67,6 +75,30 @@ public sealed partial class InstalledViewModel : ObservableObject
     public partial InstalledRow? Selected { get; set; }
 
     public Visibility DetailsVisibility => Selected is null ? Visibility.Collapsed : Visibility.Visible;
+
+    /// <summary>Who signed the selected program, checked offline when it is selected: a few files, not the whole list.</summary>
+    [ObservableProperty]
+    public partial string Signer { get; set; } = "";
+
+    readonly Dictionary<string, string> signers = new(StringComparer.OrdinalIgnoreCase);
+
+    async partial void OnSelectedChanged(InstalledRow? value)
+    {
+        if (value?.ProgramFile is not { } file)
+        {
+            Signer = Text.Get("Installed_SignerUnknown");
+            return;
+        }
+        if (!signers.TryGetValue(file, out var text))
+        {
+            Signer = Text.Get("Installed_SignerChecking");
+            var (valid, signer) = await Task.Run(() => MachineProbe.Signature(file));
+            var (key, argument) = InstalledDetails.Signer(valid, signer);
+            text = signers[file] = argument is null ? Text.Get(key) : Text.Format(key, argument);
+        }
+        if (Selected == value)
+            Signer = text;
+    }
 
     [ObservableProperty]
     public partial string Summary { get; set; } = Text.Get("Installed_Loading");
@@ -119,7 +151,8 @@ public sealed partial class InstalledViewModel : ObservableObject
         };
         return new(program.Entry.Name, program.Entry.Version ?? "", Text.Get(program.Entry.Machine ? "Installed_ForEveryone" : "Installed_ForYou"),
             shortUse, UseText(program), program.Reached.Count > 0 ? string.Join(", ", program.Reached) : Text.Get("Installed_ReachedNone"),
-            program.Entry.Folder ?? Text.Get("Installed_FolderUnknown"), icon);
+            program.Entry.Folder ?? Text.Get("Installed_FolderUnknown"), icon, program.Entry.Publisher ?? Text.Get("Installed_PublisherUnknown"),
+            program.Entry.ProgramFile);
     }
 
     static string UseText(InstalledProgram program)

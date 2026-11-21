@@ -16,7 +16,8 @@ its section below.
   doesn't light the tray badge.
 - A new **Installed** page lists every installed program with when you last opened it (or why
   that's unknown) and its icon, unused ones first, with a search box. Select one to see its version, who it is
-  installed for, the credentials it used in the last 90 days and its folder. **Open Installed apps
+  installed for, the credentials it used in the last 90 days, its folder, its publisher and who
+  signed it (checked on your PC), and **Search online...** to look it up in your browser. **Open Installed apps
   in Settings** is where you uninstall it.
 - Home and `tir doctor` point out programs that start at log-on but that you haven't opened in 90
   days, with **Turn off at log-on...**: the same switch as Task Manager's Startup tab, so Settings,

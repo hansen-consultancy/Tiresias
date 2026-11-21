@@ -147,6 +147,9 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public IEnumerable<string> BlockedPrograms() => SurfaceProbe.BlockedPrograms();
 
+    /// <inheritdoc cref="SurfaceProbe.Signature"/>
+    public static (bool? Valid, string? Signer) Signature(string path) => SurfaceProbe.Signature(path);
+
     public IEnumerable<ProgramRun> ProgramRuns() => SurfaceProbe.ProgramRuns();
 
     /// <summary>Where each tool keeps them, honouring <c>GH_CONFIG_DIR</c> and <c>AZURE_CONFIG_DIR</c> as the tools do.</summary>

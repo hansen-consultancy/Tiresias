@@ -316,7 +316,11 @@ background, not recorded), and the credentials its folder's programs used in 90 
 first, longest unused first. Two columns (program with the icon its entry names, last opened) fit any width; an icon is read
 from a local file only, never a network path; selecting one shows
 the rest below the list, and a search box matches every word against name, version, folder and
-services. Uninstalling goes through Settings, Apps, Installed apps
+services. The selected program's panel also shows the publisher its entry claims and who signed
+its program file (the `.exe` its icon comes from, else its uninstaller), checked offline with
+WinVerifyTrust when it is selected; a name from a signature that doesn't verify is shown as a
+claim only. **Search online...** opens the browser with a web search for the name and version, on
+the user's click only; Tiresias itself sends nothing. Uninstalling goes through Settings, Apps, Installed apps
 (`UninstallApp`) until the inventory knows each program's installer command.
 [Guided setup](guided-setup.md#phases) lists what is still design.
 

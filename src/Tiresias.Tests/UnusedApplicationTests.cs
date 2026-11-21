@@ -162,6 +162,32 @@ public class UnusedApplicationTests
         Assert.That((Program("Acme") with { Icon = displayIcon }).IconLocation, Is.Null);
     }
 
+    [TestCase(@"""C:\Program Files\Acme\acme.exe"",0", @"C:\Users\alice\AppData\Local\Programs\Acme\uninstall.exe", @"C:\Program Files\Acme\acme.exe")]
+    [TestCase(@"C:\Program Files\Acme\acme.ico", @"C:\Users\alice\AppData\Local\Programs\Acme\uninstall.exe", @"C:\Users\alice\AppData\Local\Programs\Acme\uninstall.exe")]
+    [TestCase(null, null, null)]
+    public void The_signature_checked_is_the_programs_icon_exe_else_its_uninstaller(string? icon, string? uninstaller, string? expected)
+    {
+        Assert.That((Program("Acme") with { Icon = icon, Uninstaller = uninstaller }).ProgramFile, Is.EqualTo(expected));
+    }
+
+    [TestCase(true, "Acme Inc", "Installed_SignedBy", "Acme Inc")]
+    [TestCase(true, null, "Installed_SignedNoName", null)]
+    [TestCase(false, "Acme Inc", "Installed_SignedInvalid", "Acme Inc")]
+    [TestCase(false, null, "Installed_NotSigned", null)]
+    [TestCase(null, "Microsoft Windows", "Installed_SignerUnknown", null)]
+    public void A_signer_name_is_trusted_only_with_a_valid_signature(bool? valid, string? signer, string key, string? argument)
+    {
+        Assert.That(InstalledDetails.Signer(valid, signer), Is.EqualTo((key, argument)));
+    }
+
+    [Test]
+    public void Search_online_sends_only_the_name_and_version()
+    {
+        Assert.That(InstalledDetails.SearchOnline("Acme & Co Editor", "2.1").AbsoluteUri,
+            Is.EqualTo("https://duckduckgo.com/?q=%22Acme%20%26%20Co%20Editor%22%202.1"));
+        Assert.That(InstalledDetails.SearchOnline("Acme", "").AbsoluteUri, Is.EqualTo("https://duckduckgo.com/?q=%22Acme%22"));
+    }
+
     [Test]
     public void A_group_of_findings_with_their_own_fixes_has_no_shared_button()
     {
