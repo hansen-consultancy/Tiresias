@@ -222,7 +222,7 @@ public partial class StatusWindow : Window
             case RemoveEntry { Machine: false } entry:
                 _ = RemoveEntryAsync(entry);
                 break;
-            case RemoveEntry or Repair { WingetId: not null }:
+            case RemoveEntry or Repair { Command: not null }:
                 model.CopyFix(fix.Instruction);
                 break;
         }

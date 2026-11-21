@@ -34,12 +34,13 @@ public sealed partial record RemoveEntry(string Key, string Name) : DoctorFix
     public string BackupName => $"{Unsafe().Replace(Key[(Key.LastIndexOf('\\') + 1)..], "_")}.reg";
 
     /// <summary>
-    /// Whether <paramref name="key"/> is a subkey of an Uninstall key and nothing else, so it can be
-    /// deleted: the name comes from the registry, which any installer can write.
+    /// Whether <paramref name="key"/> is a subkey of an Uninstall key in plain characters, so it can be
+    /// deleted and quoted in a command someone pastes into cmd or PowerShell: the name comes from the
+    /// registry, which any installer can write, and a quote, <c>$</c>, <c>%</c> or <c>&amp;</c> would break out.
     /// </summary>
     public static bool IsSafeKey(string key) => SafeKey().IsMatch(key);
 
-    [GeneratedRegex(@"^HK(CU|LM)\\Software\\(WOW6432Node\\)?Microsoft\\Windows\\CurrentVersion\\Uninstall\\[^\\""\r\n\0]+$", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"^HK(CU|LM)\\Software\\(WOW6432Node\\)?Microsoft\\Windows\\CurrentVersion\\Uninstall\\[A-Za-z0-9 ._{}()+,#@-]+$", RegexOptions.IgnoreCase)]
     private static partial Regex SafeKey();
 
     [GeneratedRegex(@"[^A-Za-z0-9._ {}-]")]
@@ -50,11 +51,18 @@ public sealed partial record RemoveEntry(string Key, string Name) : DoctorFix
 /// Reinstall the installed version over itself, which restores a missing uninstaller. With the
 /// winget id it is winget's own command; without one, the steps.
 /// </summary>
-public sealed record Repair(string Name, string? Version, string? WingetId = null) : DoctorFix
+public sealed partial record Repair(string Name, string? Version, string? WingetId = null) : DoctorFix
 {
-    public override string Instruction => WingetId is not null
+    /// <summary>winget's command, only when the id and version are plain tokens: both come from the machine.</summary>
+    public string? Command => WingetId is not null && Token().IsMatch(WingetId) && (Version is null || Token().IsMatch(Version))
         ? $"winget install --id {WingetId} --exact{(Version is null ? "" : $" --version {Version}")} --force"
-        : $"reinstall {Name}{(Version is null ? "" : $" {Version}")} over itself with its own installer; that restores its uninstaller";
+        : null;
+
+    public override string Instruction =>
+        Command ?? $"reinstall {Name}{(Version is null ? "" : $" {Version}")} over itself with its own installer; that restores its uninstaller";
+
+    [GeneratedRegex(@"^[A-Za-z0-9][A-Za-z0-9._+-]*$")]
+    private static partial Regex Token();
 }
 
 public static partial class Doctor
@@ -84,7 +92,7 @@ public static partial class Doctor
                     $"Windows lists it as installed, but neither its uninstaller {entry.Uninstaller} nor its folder exists. "
                     + "Remove the entry; any data folders it left are yours to check"
                     + (entry.Machine ? ". It is machine-wide, so this needs an administrator" : ""),
-                    new RemoveEntry(entry.Key, entry.Name), Kind: GoneEntryKind);
+                    RemoveFix(entry), Kind: GoneEntryKind);
 
         var shared = all.Where(e => e is { UninstallerExists: true, Command.Length: > 0 })
             .GroupBy(e => e.Command!.Trim(), StringComparer.OrdinalIgnoreCase)
@@ -101,9 +109,15 @@ public static partial class Doctor
                     $"Both run {current.Uninstaller}, the uninstaller of version {current.Version}. Don't use Uninstall on the old entry: "
                     + "it removes the current program's files, and the program fails the next time it starts. Remove the entry instead"
                     + (stale.Machine ? ". It is machine-wide, so this needs an administrator" : ""),
-                    new RemoveEntry(stale.Key, stale.Name), Kind: StaleEntryKind);
+                    RemoveFix(stale), Kind: StaleEntryKind);
         }
     }
+
+    /// <summary>
+    /// The fix for an entry to remove; none for a key whose name isn't plain, which no command is
+    /// built from. Without a fix the line is a warning, not a finding.
+    /// </summary>
+    static RemoveEntry? RemoveFix(UninstallEntry entry) => RemoveEntry.IsSafeKey(entry.Key) ? new(entry.Key, entry.Name) : null;
 
     /// <summary>The entry's name with its version, unless the name already says it.</summary>
     static string Label(UninstallEntry entry) =>

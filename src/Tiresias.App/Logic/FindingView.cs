@@ -81,7 +81,7 @@ public static class FindingView
         RemoveExtension => (FixAction.RemoveExtension, "Finding_FixRemoveExtension"),
         RevealFile => (FixAction.RevealFile, "Finding_FixReveal"),
         RemoveEntry { Machine: false } => (FixAction.RemoveEntry, "Finding_FixRemoveEntry"),
-        RemoveEntry or Repair { WingetId: not null } => (FixAction.CopyCommand, "Finding_FixCopy"),
+        RemoveEntry or Repair { Command: not null } => (FixAction.CopyCommand, "Finding_FixCopy"),
         _ => null,
     };
 

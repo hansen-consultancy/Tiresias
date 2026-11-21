@@ -120,8 +120,32 @@ public class UninstallEntryTests
     [TestCase(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\Acme\Sub", false)]
     [TestCase(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Run\Acme", false)]
     [TestCase("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Acme\" /f", false)]
+    [TestCase(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\Acme & start calc", false)]
+    [TestCase(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\Acme$(calc)", false)]
+    [TestCase(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\Acme %PATH%", false)]
+    [TestCase(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\Opera GX 139.0.6053.63", true)]
     public void Only_an_uninstall_subkey_can_be_removed(string key, bool safe) =>
         Assert.That(RemoveEntry.IsSafeKey(key), Is.EqualTo(safe));
+
+    [Test]
+    public void An_entry_whose_key_isnt_plain_is_reported_without_a_command()
+    {
+        var check = Run(Entry("Acme\" & start calc & rem", uninstallerExists: false, folderExists: false)).Single();
+
+        Assert.That(check.Fix, Is.Null);
+        Assert.That(check.IsFinding, Is.False);
+    }
+
+    [TestCase("Acme.Tool", "1.0 & calc")]
+    [TestCase("Acme.Tool;calc", "1.0")]
+    public void Repair_builds_no_winget_command_from_values_that_arent_plain(string id, string version)
+    {
+        var repair = new Repair("Acme", version, id);
+
+        Assert.That(repair.Command, Is.Null);
+        Assert.That(repair.Instruction, Does.StartWith("reinstall Acme"));
+        Assert.That(FindingView.Button(repair), Is.Null);
+    }
 
     [Test]
     public void The_backup_is_named_after_the_key_without_what_a_file_name_cant_hold()
