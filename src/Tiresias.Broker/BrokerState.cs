@@ -284,11 +284,11 @@ public sealed class BrokerState : IDisposable
 
     /// <summary>
     /// Lets a device ask RavenDB who a service's certificate is (<c>/clearance</c>), with that
-    /// certificate. Not through the grant's rule: the answer is metadata about the certificate,
-    /// never data, and the device already holds the lease.
+    /// certificate. Only for a service the RavenDB setup saved, whose one grant is the certificate;
+    /// not through the grant's rule: the answer is metadata about the certificate, never data.
     /// </summary>
     public (AllowedRequest? Allowed, Refusal? Refusal) AuthorizeClearance(string serviceSlug, string device) =>
-        AuthorizeDeviceUse(serviceSlug, device, "CLEARANCE", AuditKind.Allow, s => s.Upstream.Scheme == Uri.UriSchemeHttps, "not-a-raven-service");
+        AuthorizeDeviceUse(serviceSlug, device, "CLEARANCE", AuditKind.Allow, s => RavenSetupPlanner.Recognize(s) is not null, "not-a-raven-service");
 
     /// <summary>A device using a service's first grant itself, outside any placeholder: <c>/token</c> and <c>/clearance</c>.</summary>
     (AllowedRequest? Allowed, Refusal? Refusal) AuthorizeDeviceUse(string serviceSlug, string device, string method, AuditKind kind, Func<Service, bool> fits, string misfit)

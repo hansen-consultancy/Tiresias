@@ -357,6 +357,15 @@ public class RavenProxyTests
     }
 
     [Test]
+    public async Task Clearance_of_a_service_that_isnt_ravendb_is_refused_before_its_secret_is_opened()
+    {
+        await OpenLeaseAndMint();
+        Assert.That((await client.SendAsync(SignedGet("/clearance/llm"))).StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        Assert.That(raven.Requests, Is.Empty);
+        Assert.That(raven.Certificates, Is.Empty);
+    }
+
+    [Test]
     public async Task Clearance_of_an_unknown_service_is_a_404()
     {
         await OpenLeaseAndMint();

@@ -40,8 +40,9 @@ certificate's subject, thumbprint and expiry, and its clearance on the server.
   (`GET /certificates/whoami`, which any registered certificate may call; confirmed on RavenDB 7.2
   for a `ValidUser` with Read, ReadWrite and Admin). The device-signed broker endpoint
   `GET /clearance/{service}` returns the clearance and the databases with their access, and never
-  the certificate, its thumbprint or anything else whoami returns. It needs the lease (the unlocked
-  agent holds one) and the grant's elevation if it has one, but not the grant's rule: the answer is
+  the certificate, its thumbprint or anything else whoami returns. It answers only for a service the RavenDB setup saved
+  (`RavenSetupPlanner.Recognize`), and needs the lease (the unlocked agent holds one) and the
+  grant's elevation if it has one, but not the grant's rule: the answer is
   about the certificate, not data. Not under `/raven`, which takes placeholders, not signatures.
   Without an answer (no broker, locked, elevation needed) the check says "skipped", and with no
   broker reachable it doesn't ask.

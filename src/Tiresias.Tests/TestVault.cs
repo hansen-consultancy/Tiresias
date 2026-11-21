@@ -91,8 +91,8 @@ sealed class TestVault : IDisposable
     /// <param name="changes">The grant also opens WebSockets (the Changes API).</param>
     public static TestVault CreateWithRaven(byte[] pfx, bool changes = false) => new(tpm =>
     (
-        [SecretEnvelope.Seal("raven-read", 1, System.Text.Encoding.ASCII.GetBytes(Convert.ToBase64String(pfx)), [tpm])],
-        [new Service("ravendb", new Uri("https://a.raven.example/"), [new Grant("read", "raven-read",
+        [SecretEnvelope.Seal("ravendb-certificate", 1, System.Text.Encoding.ASCII.GetBytes(Convert.ToBase64String(pfx)), [tpm])],
+        [new Service("ravendb", new Uri("https://a.raven.example/"), [new Grant(RavenSetupPlanner.GrantName, "ravendb-certificate",
             changes ? new(new HashSet<string> { "GET", "WEBSOCKET" }, [VaultFile.Compile("^/")]) : Rule("GET", "^/"))])]
     ));
 
