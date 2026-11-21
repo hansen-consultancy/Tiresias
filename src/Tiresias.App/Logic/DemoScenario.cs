@@ -18,7 +18,7 @@ namespace Tiresias.App.Logic;
 /// <param name="UserSecrets">Sealed <c>secrets.json</c> documents, by user-secrets id. A plain one is a file like any other.</param>
 /// <param name="Variables">The user's Windows environment variables.</param>
 /// <param name="SealedVariables">The sealed environment's global variables.</param>
-public sealed record DemoScenario(
+public sealed partial record DemoScenario(
     string Description,
     bool SetUp,
     bool Unlocked,
@@ -34,6 +34,8 @@ public sealed record DemoScenario(
     public static DemoScenario Parse(string json)
     {
         var dto = JsonSerializer.Deserialize<Dto>(json, Json) ?? throw new JsonException("The scenario is empty.");
+        if (dto.UserSecrets?.Keys.FirstOrDefault(id => !UserSecretsId().IsMatch(id) || id.Trim('.').Length == 0) is { } bad)
+            throw new JsonException($"'{bad}' is not a user-secrets id: it names a folder, so it takes letters, digits, '.', '_' and '-' only.");
         return new(dto.Description ?? "", dto.SetUp ?? true, dto.Unlocked ?? false,
             dto.Files ?? [], dto.Secrets ?? [], dto.UserSecrets ?? [], dto.Variables ?? [], dto.SealedVariables ?? []);
     }
@@ -51,6 +53,19 @@ public sealed record DemoScenario(
             throw new ArgumentException($"'{relative}' is not a path inside the profile.", nameof(relative));
         return Path.Combine([profile, .. parts]);
     }
+
+    /// <summary>
+    /// Whether <paramref name="path"/> is inside <paramref name="profile"/>, so demo mode may delete
+    /// it for good: anything else is on the real machine, even while the demo runs.
+    /// </summary>
+    public static bool Inside(string profile, string path)
+    {
+        var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(profile)) + Path.DirectorySeparatorChar;
+        return Path.GetFullPath(path).StartsWith(root, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [GeneratedRegex(@"^[A-Za-z0-9._-]+$")]
+    private static partial Regex UserSecretsId();
 
     static readonly Regex Token = new(@"\{\{(?:profile|now(?:-(?<n>\d+)(?<unit>[mhd]))?)\}\}", RegexOptions.CultureInvariant);
 

@@ -35,7 +35,7 @@
     <value>A development build: run from a build folder, not installed, so it doesn't update itself. Its tray icon has an orange corner, so you can tell it from the installed app.</value>
   </data>
   <data name="About_Demo" xml:space="preserve">
-    <value>Demo mode: the app runs on a made-up machine filled from a scenario file, so every window can be captured. Everything works, but it changes only the made-up machine, which is emptied when the app quits. Your real secrets, settings, registry and environment variables are neither shown nor changed.</value>
+    <value>Demo mode: the app runs on a made-up machine filled from a scenario file, so its windows can be captured. Everything works, but it changes only the made-up machine, which is emptied when the app quits. The recovery-key, SQL Server and RavenDB windows still take real input, so they stay hidden from capture.</value>
   </data>
   <data name="About_DemoScenario" xml:space="preserve">
     <value>Demo scenario</value>

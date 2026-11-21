@@ -18,11 +18,12 @@ static partial class Desktop
 
     /// <summary>
     /// Keeps a window out of screenshots, screen recordings and screen sharing (it shows as black),
-    /// for windows that can show a secret value or the recovery key. Not in demo mode: its values are made up.
+    /// for windows that can show a secret value or the recovery key. Not in demo mode, whose values are
+    /// made up, unless the window takes real input there too (a recovery key, a server's real login).
     /// </summary>
-    public static void ExcludeFromCapture(Window window)
+    public static void ExcludeFromCapture(Window window, bool evenInDemo = false)
     {
-        if (!DemoMode.On)
+        if (!DemoMode.On || evenInDemo)
             window.SourceInitialized += (_, _) => SetWindowDisplayAffinity(new WindowInteropHelper(window).Handle, WdaExcludeFromCapture);
     }
 
@@ -181,9 +182,16 @@ static partial class Desktop
     /// <returns>Whether it went; one open in another program stays where it is.</returns>
     public static unsafe bool Recycle(string directory)
     {
-        // The demo's files would land in the real Recycle Bin.
+        // The demo's files would land in the real Recycle Bin; anything outside its made-up machine stays.
         if (DemoMode.On)
         {
+#if DEBUG
+            if (!DemoScenario.Inside(DemoMode.Profile!, directory))
+            {
+                AppLog.Info("demo mode: left a path outside the made-up machine where it is");
+                return false;
+            }
+#endif
             if (Directory.Exists(directory))
                 Directory.Delete(directory, recursive: true);
             else

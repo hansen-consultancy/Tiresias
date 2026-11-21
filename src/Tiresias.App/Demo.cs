@@ -81,6 +81,7 @@ static class Demo
                 SecretEnvelope.Seal(s.Key, 1, Encoding.UTF8.GetBytes(s.Value), [hello, recovery], PolicyBinding.Hash(vault, s.Key)))];
             VaultFile.Save(VaultEditor.Path, vault with { Secrets = [.. vault.Secrets, .. secrets] });
         }
+        // Parse refused an id that would leave the made-up machine.
         foreach (var (id, document) in scenario.UserSecrets)
         {
             var folder = UserSecretsFiles.Folder(id);

@@ -67,6 +67,27 @@ public class DemoScenarioTests
     public void A_path_leaving_the_profile_is_refused(string relative) =>
         Assert.That(() => DemoScenario.Target(Profile, relative), Throws.ArgumentException);
 
+    [TestCase("..")]
+    [TestCase(@"..\..\outside")]
+    [TestCase("a/b")]
+    [TestCase("C:x")]
+    [TestCase("")]
+    public void A_user_secrets_id_that_is_not_one_folder_is_refused(string id) =>
+        Assert.That(() => DemoScenario.Parse($$"""{ "userSecrets": { "{{id.Replace(@"\", @"\\", StringComparison.Ordinal)}}": {} } }"""),
+            Throws.InstanceOf<System.Text.Json.JsonException>());
+
+    [Test]
+    public void A_user_secrets_id_names_one_folder() =>
+        Assert.That(DemoScenario.Parse("""{ "userSecrets": { "5f0c2a6e-0b1d.v2_x": {} } }""").UserSecrets, Has.Count.EqualTo(1));
+
+    [TestCase(Profile + @"\source\ShopApi\secrets.json", true)]
+    [TestCase(Profile, false)]
+    [TestCase(Profile + @"\..\bob\x.pfx", false)]
+    [TestCase(Profile + @"-other\x.pfx", false)]
+    [TestCase(@"C:\Users\someone\source\x.pfx", false)]
+    public void Only_a_path_inside_the_profile_is_the_demos_to_delete(string path, bool inside) =>
+        Assert.That(DemoScenario.Inside(Profile, path), Is.EqualTo(inside));
+
     [Test]
     public void The_profile_token_is_escaped_in_json_only()
     {
