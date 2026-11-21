@@ -114,6 +114,7 @@ public class DoctorTests
         public List<DoctorFile> ProjectFiles { get; } = [];
         public List<DoctorFile> Config { get; } = [];
         public List<string> Keys { get; } = [];
+        public DoctorDecoys? Decoys { get; set; }
 
         public Task<int?> BrokerStatusAsync() => Task.FromResult(BrokerStatus);
         public Task<bool> ForwarderListeningAsync() => Task.FromResult(Forwarder);
@@ -121,6 +122,19 @@ public class DoctorTests
         public IEnumerable<DoctorFile> Projects() => ProjectFiles;
         public IEnumerable<DoctorFile> ConfigFiles() => Config;
         public IEnumerable<string> KeyFiles() => Keys;
+    }
+
+    [Test]
+    public async Task Decoys_say_whether_a_use_would_be_seen()
+    {
+        Assert.That((await Doctor.RunAsync(new FakeProbe())).Any(c => c.Name == "decoys"), Is.False);
+
+        var listening = (await Doctor.RunAsync(new FakeProbe { Decoys = new(2, true) })).Single(c => c.Name == "decoys");
+        var deaf = (await Doctor.RunAsync(new FakeProbe { Decoys = new(2, false) })).Single(c => c.Name == "decoys");
+
+        Assert.That(listening.Status, Is.EqualTo(DoctorStatus.Ok));
+        Assert.That(deaf.Status, Is.EqualTo(DoctorStatus.Warn));
+        Assert.That(deaf.Detail, Does.Contain("goes unseen"));
     }
 
     static readonly Position Plaintext = new(Exposure.Readable, Control.Silent);
