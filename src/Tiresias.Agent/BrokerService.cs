@@ -69,7 +69,16 @@ public static class BrokerService
         RequireElevated();
         if (State() == BrokerServiceState.NotInstalled)
             throw new InvalidOperationException("The Tiresias service isn't installed.");
-        Run("sc.exe", ["stop", BrokerServiceLayout.Name], check: false);
+        // sc stop only asks; the service can't be deleted, nor its binary removed, until it has stopped.
+        using (var service = new ServiceController(BrokerServiceLayout.Name))
+        {
+            if (service.Status != ServiceControllerStatus.Stopped)
+            {
+                if (service.Status != ServiceControllerStatus.StopPending)
+                    service.Stop();
+                service.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(30));
+            }
+        }
         Run("sc.exe", ["delete", BrokerServiceLayout.Name]);
 
         // The service may have extended the chain (tir trust bind-hello); the app's broker carries on from there.
