@@ -7,7 +7,7 @@ using Tiresias.AdminTier;
 namespace Tiresias.Agent;
 
 /// <summary>
-/// <c>Tiresias.exe --admin-tier install|remove|release-decoys</c>, run elevated after a UAC prompt: carries out
+/// <c>Tiresias.exe --admin-tier install|remove|release-decoys|thaw &lt;program&gt;</c>, run elevated after a UAC prompt: carries out
 /// <see cref="AdminInstallPlan"/>. The service's files go to <c>%ProgramFiles%</c>, never run from
 /// the app's per-user folder; its state folder is made, or made again, so that only SYSTEM and
 /// Administrators control it.
@@ -25,7 +25,8 @@ public static class AdminTierSetup
 
     const string Binary = "tiresias-admin.exe";
 
-    public static AdminSetupResult Run(string verb, string appFolder)
+    /// <param name="argument">The verb's argument: <c>thaw</c>'s program, by its full path.</param>
+    public static AdminSetupResult Run(string verb, string appFolder, string? argument = null)
     {
         try
         {
@@ -41,14 +42,21 @@ public static class AdminTierSetup
                     return AdminSetupResult.Done;
                 case "remove":
                     var handedBack = true;
+                    var undone = true;
                     foreach (var step in AdminInstallPlan.Remove(service.Facts))
-                        if (step == AdminInstallStep.HandBackDecoys)
+                        if (step == AdminInstallStep.Teardown)
+                            AdminDecoys.Teardown();
+                        else if (step == AdminInstallStep.HandBackDecoys)
                             handedBack = !Trusted(StateFolder) || AdminDecoys.HandBackAll(StateFolder);
-                        else if (step != AdminInstallStep.DeleteStateFolder || handedBack)
+                        else if (step == AdminInstallStep.UndoFreezes)
+                            undone = !Trusted(StateFolder) || AdminFreezes.UndoAll(StateFolder);
+                        else if (step != AdminInstallStep.DeleteStateFolder || handedBack && undone)
                             Do(step, service, appFolder);
-                    return handedBack ? AdminSetupResult.Done : AdminSetupResult.Failed;
+                    return handedBack && undone ? AdminSetupResult.Done : AdminSetupResult.Failed;
                 case "release-decoys":
                     return AdminDecoys.Release();
+                case "thaw" when argument is not null:
+                    return AdminDecoys.Thaw(argument);
                 default:
                     return AdminSetupResult.Usage;
             }

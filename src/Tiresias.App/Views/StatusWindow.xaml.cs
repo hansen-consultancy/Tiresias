@@ -50,14 +50,31 @@ public partial class StatusWindow : Window
     /// <summary>A decoy use is a new finding: run the checks again.</summary>
     void OnDecoyTouched(DecoyTouch _) => Dispatcher.BeginInvoke(model.Refresh);
 
-    void OnUnblock(object sender, RoutedEventArgs e)
+    /// <summary>A program the admin tier froze is thawed first (a UAC prompt); declined or failed, it stays blocked.</summary>
+    async void OnUnblock(object sender, RoutedEventArgs e)
     {
-        if (((FrameworkElement)sender).DataContext is BlockedRow row)
-        {
-            AppLog.Info($"unblocked {row.Path}");
-            App.Current.Guard.Unblock(row.Path);
-        }
+        if (((FrameworkElement)sender).DataContext is not BlockedRow row)
+            return;
+        if ((await AdminClient.FactsAsync()).Status?.Features.Frozen > 0 && !await ThawAsync(row.Path))
+            return;
+        AppLog.Info($"unblocked {row.Path}");
+        App.Current.Guard.Unblock(row.Path);
     }
+
+    /// <summary>The decoy use was the user's: thaw the program (a UAC prompt), then unblock it; declined or failed, it stays both.</summary>
+    async Task ThawAndUnblockAsync(string program)
+    {
+        if (await ThawAsync(program))
+        {
+            AppLog.Info($"thawed and unblocked {program}: the decoy use was the user's");
+            App.Current.Guard.Unblock(program);
+        }
+        model.Refresh();
+    }
+
+    /// <summary>Has the admin tier thaw the user's freezes of the program and unblock its network, behind a UAC prompt.</summary>
+    static async Task<bool> ThawAsync(string program) =>
+        await AdminTierElevation.RunAsync("thaw", program) == AdminSetupResult.Done;
 
     /// <summary>Places one decoy at its default place, once the user agreed in the ask-first window.</summary>
     void OnPlaceDecoy(object sender, RoutedEventArgs e)
@@ -289,6 +306,9 @@ public partial class StatusWindow : Window
                 break;
             case UninstallApp:
                 Desktop.Open("ms-settings:appsfeatures");
+                break;
+            case ThawProgram { Path: var program }:
+                _ = ThawAndUnblockAsync(program);
                 break;
             case UnblockProgram { Path: var program }:
                 AppLog.Info($"unblocked {program}: the decoy use was the user's");

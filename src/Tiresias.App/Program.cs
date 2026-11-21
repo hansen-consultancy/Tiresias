@@ -19,8 +19,8 @@ static class Program
             })
             .Run();
         // Run elevated by AdminTierElevation, after its UAC prompt: no window, just the step and its exit code.
-        if (args is [AdminTierElevation.Argument, var verb])
-            return (int)AdminTierSetup.Run(verb, AppContext.BaseDirectory);
+        if (args is [AdminTierElevation.Argument, var verb, .. var rest] && rest.Length <= 1)
+            return (int)AdminTierSetup.Run(verb, AppContext.BaseDirectory, rest is [var argument] ? argument : null);
         var app = new App();
         app.InitializeComponent();
         app.Run();

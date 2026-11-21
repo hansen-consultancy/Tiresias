@@ -58,7 +58,23 @@ public static partial class AdminDecoys
     }
 
     /// <summary>
-    /// Run elevated (<c>tir decoys release</c>, <c>Tiresias.exe --admin-tier release-decoys</c>):
+    /// For the app's <i>This wasn't me</i>: asks the admin tier to freeze the process and block its
+    /// program's network, as it does on a decoy use.
+    /// </summary>
+    /// <returns>What it did; <c>null</c> when it doesn't answer or refuses.</returns>
+    public static async Task<AdminFreezeResult?> FreezeAsync(int processId) =>
+        (await AdminClient.SendAsync(AdminOps.Freeze, new JsonObject { ["pid"] = processId }))?.ResultAs<AdminFreezeResult>();
+
+    /// <summary>Run elevated (<c>Tiresias.exe --admin-tier thaw &lt;program&gt;</c>): thaws the session user's freezes of the program and unblocks its network.</summary>
+    public static AdminSetupResult Thaw(string program) =>
+        Send(AdminOps.Thaw, new JsonObject { ["program"] = program }) is { Status: AdminStatus.Ok } ? AdminSetupResult.Done : AdminSetupResult.Failed;
+
+    /// <summary>Run elevated by the tier's removal: asks the running service to undo its work (<see cref="AdminInstallStep.Teardown"/>).</summary>
+    /// <returns>Whether it answered that it did.</returns>
+    public static bool Teardown() => Send(AdminOps.Teardown) is { Status: AdminStatus.Ok };
+
+    /// <summary>
+    /// Run elevated (<c>tir decoys release</c>,<c>Tiresias.exe --admin-tier release-decoys</c>):
     /// takes the session user's set back from the admin tier and writes it to that user's
     /// <c>decoys.json</c>. When it can't be written, the set is handed to the admin tier again.
     /// </summary>

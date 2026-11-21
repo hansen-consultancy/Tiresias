@@ -321,7 +321,8 @@ public partial class App : Application
     /// <summary>
     /// "This wasn't me", after the lockdown is already in place: lock (which forgets every session
     /// consent, terminal and NuGet allowance, revokes the terminals' placeholders and ends the lease),
-    /// find the process and what started it, block the program, record it and show what to do next.
+    /// find the process and what started it, block the program, have the admin tier (when installed)
+    /// freeze the process and block its network, record it and show what to do next.
     /// </summary>
     async Task NotMeAsync(Asker asker, string asked)
     {
@@ -337,8 +338,11 @@ public partial class App : Application
         });
         guard!.Block(asker.Image, sha);
         var blocked = asker.Image is { } image && guard.Current.Programs.Any(p => string.Equals(p.Path, image, StringComparison.OrdinalIgnoreCase));
-        host!.RecordIncident(asked, process is null ? asker.Image : $"{process.Program} ({process.ProcessId})", chain, blocked);
-        IncidentView view = new(asked, asker.Image, process, chain, blocked);
+        var frozen = process is not null && await AdminDecoys.FreezeAsync(process.ProcessId) is { Processes: > 0 };
+        if (frozen)
+            AppLog.Info($"this wasn't me: the admin tier froze {process!.Program} ({process.ProcessId})");
+        host!.RecordIncident(asked, process is null ? asker.Image : $"{process.Program} ({process.ProcessId})", chain, blocked, frozen);
+        IncidentView view = new(asked, asker.Image, process, chain, blocked, frozen);
         IncidentWindow.Show(view);
     }
 
@@ -362,7 +366,7 @@ public partial class App : Application
         Dispatcher.BeginInvoke(() =>
             tray?.Notify(Text.Get("Notify_Decoy_Title"), program is null
                 ? Text.Format("Notify_Decoy_Unknown", touch.What)
-                : Text.Format("Notify_Decoy_Body", System.IO.Path.GetFileName(program), touch.What)));
+                : Text.Format(touch.Frozen ? "Notify_Decoy_BodyFrozen" : "Notify_Decoy_Body", System.IO.Path.GetFileName(program), touch.What)));
     }
 
     /// <summary>A request that came through <c>tir</c>: the program that ran it is the one asking, not <c>tir</c> itself.</summary>

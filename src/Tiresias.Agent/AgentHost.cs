@@ -39,7 +39,7 @@ public sealed class AgentHost : IAsyncDisposable
         activity.Append(touch.Record());
         Say(touch.Hit.Use == Decoys.DecoyUse.Read
             ? $"Decoy file opened: {touch.Sentence}{(touch.Routine is { } routine ? $" (routine: {routine})" : "")}."
-            : $"Decoy used: {touch.Sentence}.");
+            : $"Decoy used: {touch.Sentence}{(touch.Frozen ? "; the admin tier froze it" : "")}.");
         DecoyTouched?.Invoke(touch);
     }
 
@@ -70,7 +70,7 @@ public sealed class AgentHost : IAsyncDisposable
                 continue;
             }
             foreach (var e in events)
-                OnDecoyTouched(new(e.Hit, e.Parents, e.Routine));
+                OnDecoyTouched(new(e.Hit, e.Parents, e.Routine, e.Frozen));
             ack = [.. events.Select(e => e.Id)];
         }
     }
@@ -96,9 +96,9 @@ public sealed class AgentHost : IAsyncDisposable
     /// Records "This wasn't me" in the activity log: what was asked, the program and the processes
     /// that started it (nearest first), and whether it is now blocked. Never a value.
     /// </summary>
-    public void RecordIncident(string asked, string? process, IEnumerable<string> parents, bool blocked) =>
+    public void RecordIncident(string asked, string? process, IEnumerable<string> parents, bool blocked, bool frozen = false) =>
         activity.Append(new(AuditKind.Deny, Consumer: "incident", Service: asked, Process: process,
-            Reason: $"This wasn't me: locked{(blocked ? ", program blocked" : "")}; started by {(parents.Any() ? string.Join(" < ", parents) : "unknown")}"));
+            Reason: $"This wasn't me: locked{(blocked ? ", program blocked" : "")}{(frozen ? ", frozen by the admin tier" : "")}; started by {(parents.Any() ? string.Join(" < ", parents) : "unknown")}"));
 
     public UserSecretsService UserSecrets { get; }
 

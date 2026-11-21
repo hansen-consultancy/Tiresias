@@ -748,6 +748,10 @@ Switch to this copy, {2}, from {3}? The other copy quits first, ending its lease
     <value>Still running as process {0}.</value>
     <comment>{0}: process id</comment>
   </data>
+  <data name="Incident_ProcessFrozen" xml:space="preserve">
+    <value>Process {0} is frozen, with the processes it started, and its program can't use the network: the admin tier stopped it. End it here, or thaw it from Home if it was you after all.</value>
+    <comment>{0}: process id</comment>
+  </data>
   <data name="Incident_ProcessEnded" xml:space="preserve">
     <value>Process {0} is no longer running.</value>
     <comment>{0}: process id</comment>
@@ -1945,11 +1949,18 @@ Store them in clear?</value>
   <data name="Finding_FixUnblock" xml:space="preserve">
     <value>Unblock (that was me)</value>
   </data>
+  <data name="Finding_FixThaw" xml:space="preserve">
+    <value>Thaw and unblock (that was me)</value>
+  </data>
   <data name="Notify_Decoy_Title" xml:space="preserve">
     <value>A program used a decoy credential</value>
   </data>
   <data name="Notify_Decoy_Body" xml:space="preserve">
     <value>{0} connected with {1}. Tiresias blocked it until you review it on Home.</value>
+    <comment>{0}: program file name; {1}: which decoy, e.g. "the decoy admin token"</comment>
+  </data>
+  <data name="Notify_Decoy_BodyFrozen" xml:space="preserve">
+    <value>{0} connected with {1}. The admin tier froze it and cut its network; Tiresias blocked it until you review it on Home.</value>
     <comment>{0}: program file name; {1}: which decoy, e.g. "the decoy admin token"</comment>
   </data>
   <data name="Notify_DecoyRead_Title" xml:space="preserve">

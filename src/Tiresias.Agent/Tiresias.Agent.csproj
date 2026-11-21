@@ -37,6 +37,9 @@
   <ItemGroup>
     <!-- The tier's removal takes the service's audit rules off the decoy files, the service stopped. -->
     <Compile Include="..\Tiresias.Admin\AuditRules.cs" Link="AuditRules.cs" />
+    <!-- ...and thaws its freezes and lifts its network filters, when the service didn't. -->
+    <Compile Include="..\Tiresias.Admin\ProcessFreezer.cs" Link="ProcessFreezer.cs" />
+    <Compile Include="..\Tiresias.Admin\NetworkBlock.cs" Link="NetworkBlock.cs" />
   </ItemGroup>
 
 </Project>

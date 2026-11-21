@@ -12,12 +12,13 @@ namespace Tiresias.App.Views;
 /// <param name="Process">The running process, when Tiresias could find it.</param>
 /// <param name="Parents">The processes that started it, nearest first.</param>
 /// <param name="Blocked">Whether the program is now on the blocklist.</param>
-public sealed record IncidentView(string Asked, string? Program, ShellIdentity? Process, IReadOnlyList<string> Parents, bool Blocked);
+/// <param name="Frozen">Whether the admin tier froze the process and blocked its program's network.</param>
+public sealed record IncidentView(string Asked, string? Program, ShellIdentity? Process, IReadOnlyList<string> Parents, bool Blocked, bool Frozen = false);
 
 /// <summary>
 /// The follow-up to "This wasn't me": Tiresias is locked, and here is the program to look at, a way
-/// to end it and where to scan. It changes nothing on the system itself: no network or security
-/// setting, nothing that needs an administrator.
+/// to end it and where to scan. It changes nothing on the system itself, except through the admin
+/// tier, when installed: that froze the process and blocked its network.
 /// </summary>
 public partial class IncidentWindow : Window
 {
@@ -48,6 +49,7 @@ public partial class IncidentWindow : Window
     {
         var running = view.Process is { } p && ProcessTree.IsRunning(p.ProcessId, p.Started);
         ProcessState.Text = view.Process is not { } process ? Text.Get("Incident_ProcessNotFound")
+            : running && view.Frozen ? Text.Format("Incident_ProcessFrozen", process.ProcessId)
             : running ? Text.Format("Incident_ProcessRunning", process.ProcessId)
             : Text.Format("Incident_ProcessEnded", process.ProcessId);
         EndProcess.IsEnabled = running;

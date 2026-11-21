@@ -61,7 +61,8 @@ connections can't bury the first in the log or the notifications. Tiresias then:
   so it gets no lease, placeholder or consent dialog until the user reviews it;
 - shows a notification;
 - raises a finding on Home (`tir doctor` too) naming the program and the decoy it used, with
-  **Unblock (that was me)**; dismissing it keeps the program blocked. A process that couldn't be
+  **Unblock (that was me)**, or **Thaw and unblock** when the admin tier froze it; dismissing it
+  keeps the program blocked. A process that couldn't be
   named can't be blocked: its uses in the last 30 days are one warning. The program's signature and parents are
   in the activity record, not yet in the finding.
 
@@ -183,7 +184,9 @@ take the set back through a UAC prompt, then remove the decoys as always. While 
 other is placed beside it. **Step 3**: the service puts an audit rule on each held decoy file and
 reads every read of one from the Security log, including reads while the app or the service was
 stopped; each comes to the app as a read the tripwire saw (recorded, notified, never blocked).
-Stopping the program is a later step.
+**Step 4**: a use by a process the service can name freezes it, with what it started, and blocks
+its program's network until the user thaws it from Home (a UAC prompt); **This wasn't me** asks the
+service to do the same.
 
 **The cost.** A privileged service is the most valuable thing on the machine to attack: a bug in it
 is a privilege escalation. It stays small, takes requests only from the app, does only the

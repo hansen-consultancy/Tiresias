@@ -5,7 +5,7 @@ using Tiresias.AdminTier;
 namespace Tiresias.App;
 
 /// <summary>
-/// Starts this app again elevated, <c>Tiresias.exe --admin-tier install|remove|release-decoys</c>, through the UAC
+/// Starts this app again elevated, <c>Tiresias.exe --admin-tier install|remove|release-decoys|thaw &lt;program&gt;</c>, through the UAC
 /// prompt, and reads back what it did. Program handles that command before any window opens.
 /// </summary>
 static class AdminTierElevation
@@ -13,20 +13,21 @@ static class AdminTierElevation
     public const string Argument = "--admin-tier";
 
     /// <returns>The step's result, or <c>null</c> when the UAC prompt was declined.</returns>
-    public static async Task<AdminSetupResult?> RunAsync(string verb)
+    /// <param name="argument">The verb's argument: <c>thaw</c>'s program.</param>
+    public static async Task<AdminSetupResult?> RunAsync(string verb, string? argument = null)
     {
         AppLog.Info($"admin tier: {verb} asked for (UAC)");
-        var result = await Task.Run(() => Run(verb, TimeSpan.FromMinutes(5)));
+        var result = await Task.Run(() => Run(verb, TimeSpan.FromMinutes(5), argument));
         AppLog.Info($"admin tier: {verb} {(result is null ? "declined at the UAC prompt" : result.ToString())}");
         return result;
     }
 
     /// <summary>Waits at most <paramref name="wait"/>; a step still running then counts as failed.</summary>
-    public static AdminSetupResult? Run(string verb, TimeSpan wait)
+    public static AdminSetupResult? Run(string verb, TimeSpan wait, string? argument = null)
     {
         try
         {
-            using var process = Process.Start(new ProcessStartInfo(Environment.ProcessPath!, [Argument, verb])
+            using var process = Process.Start(new ProcessStartInfo(Environment.ProcessPath!, argument is null ? [Argument, verb] : [Argument, verb, argument])
             {
                 UseShellExecute = true,
                 Verb = "runas",

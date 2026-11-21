@@ -10,6 +10,11 @@ its section below.
 
 ### Added
 
+- Admin tier: a program that uses a decoy credential is now frozen, together with what it started,
+  and cut off the network until you decide. Home's finding offers **Thaw and unblock (that was me)**
+  behind an admin prompt; dismissing it keeps the program frozen. **This wasn't me** freezes the
+  program too. Removing the admin tier thaws everything and lifts every network block first.
+
 - Home and `tir doctor` list programs you haven't opened in 90 days, with **Open Installed apps**
   to uninstall them. A program that works without being opened (a tray icon, a service, a driver,
   something that starts at log-on, a command on `PATH`) is never counted, nor one that used a
