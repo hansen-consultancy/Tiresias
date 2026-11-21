@@ -45,6 +45,9 @@ public class DecoyFindingTests
     {
         Assert.That(Doctor.Decoys([new(null, "a decoy endpoint", Now.AddDays(-2))], [], Now).Single().Status, Is.EqualTo(DoctorStatus.Warn));
         Assert.That(Doctor.Decoys([new(null, "a decoy endpoint", Now.AddDays(-31))], [], Now), Is.Empty);
+        var many = Doctor.Decoys([new(null, "a decoy endpoint", Now.AddDays(-2)), new(null, "the decoy API key", Now.AddDays(-1))], [], Now).Single();
+        Assert.That(many.Detail, Does.Contain("the decoy API key").And.Contain("2 times"));
+        Assert.That(many.Subject, Is.EqualTo(Now.AddDays(-1).ToString("O")));
     });
 
     [Test]

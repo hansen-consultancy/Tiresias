@@ -39,8 +39,8 @@ public static partial class Doctor
 
     /// <summary>
     /// A finding per program that used a decoy and is still blocked: the user says whether it was
-    /// them (unblock) or not (dismiss, keeping it blocked). A use whose process couldn't be named
-    /// can't be blocked; it stays a finding for 30 days, to be dismissed once looked into.
+    /// them (unblock) or not (dismiss, keeping it blocked). Uses whose process couldn't be named
+    /// can't be blocked; the last 30 days' are one finding, to be dismissed once looked into.
     /// </summary>
     /// <param name="blocked">The programs on the blocklist.</param>
     public static IEnumerable<DoctorCheck> Decoys(IEnumerable<DecoyUseRecord> uses, IEnumerable<string> blocked, DateTimeOffset now)
@@ -55,10 +55,12 @@ public static partial class Doctor
                 + "so Tiresias blocked the program: no lease, placeholder or consent dialog until you say. Unblock it if that was you",
                 new UnblockProgram(group.Key), Kind: DecoyKind, Subject: group.Key);
         }
-        foreach (var use in all.Where(u => u.Program is null && now - u.At <= UnnamedDecoyWindow))
+        // One finding for them all, about the latest: dismissing it holds until the next unnamed use.
+        var unnamed = all.Where(u => u.Program is null && now - u.At <= UnnamedDecoyWindow).ToArray();
+        if (unnamed.MaxBy(u => u.At) is { } latest)
             yield return new($"A program Tiresias couldn't name used a decoy credential", DoctorStatus.Warn,
-                $"Something connected with {use.What} on {use.At.ToLocalTime():g}, and the process was gone or unreadable before it could be named. "
-                + "Check the activity log around that time", Kind: DecoyKind, Subject: use.At.ToString("O"));
+                $"Something connected with {latest.What} on {latest.At.ToLocalTime():g}{Times(unnamed.Length)}, and the process was gone or unreadable before it could be named. "
+                + "Check the activity log around that time", Kind: DecoyKind, Subject: latest.At.ToString("O"));
     }
 
     static string Times(int count) => count > 1 ? $" ({count} times in all)" : "";
