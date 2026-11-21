@@ -61,6 +61,9 @@ public sealed partial record RemoveEntry(string Key, string Name) : DoctorFix
 {
     public bool Machine => Key.StartsWith(@"HKLM\", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>The key under its hive, as <c>RegistryKey</c> takes it: no hive and no leading backslash.</summary>
+    public string Subkey => Key[(Key.IndexOf('\\', StringComparison.Ordinal) + 1)..];
+
     public override string Instruction =>
         $"reg export \"{Key}\" \"{BackupName}\", then reg delete \"{Key}\" /f{(Machine ? ", as an administrator" : "")}";
 

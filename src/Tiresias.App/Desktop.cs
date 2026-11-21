@@ -115,7 +115,6 @@ static partial class Desktop
     /// <returns>The backup that puts it back; <c>null</c> when nothing was deleted.</returns>
     public static async Task<string?> RemoveEntryAsync(Tiresias.Client.RemoveEntry remove)
     {
-        const string prefix = @"HKCU";
         if (remove.Machine || !Tiresias.Client.RemoveEntry.IsSafeKey(remove.Key))
             return null;
         var folder = Path.Combine(KeyringStore.Directory, "removed-entries");
@@ -135,7 +134,7 @@ static partial class Desktop
                 if (process.ExitCode != 0 || !File.Exists(backup))
                     return null;
             }
-            Registry.CurrentUser.DeleteSubKeyTree(remove.Key[prefix.Length..], throwOnMissingSubKey: false);
+            Registry.CurrentUser.DeleteSubKeyTree(remove.Subkey, throwOnMissingSubKey: false);
             return backup;
         }
         catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException or OperationCanceledException
