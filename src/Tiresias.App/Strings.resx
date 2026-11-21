@@ -2149,6 +2149,9 @@ Store them in clear?</value>
   <data name="Finding_FixPlaceholder" xml:space="preserve">
     <value>Use a placeholder...</value>
   </data>
+  <data name="Finding_FixReachGuide" xml:space="preserve">
+    <value>How to close it</value>
+  </data>
   <data name="Finding_FixGitHubApp" xml:space="preserve">
     <value>Add a GitHub App...</value>
   </data>

@@ -131,6 +131,9 @@ public interface IDoctorProbe
 
     /// <summary>The optional admin tier (docs/admin-tier.md); <c>null</c> when it isn't installed.</summary>
     AdminTierFacts? AdminTier => null;
+
+    /// <summary>What the user's account can open of their containers, WSL and VMs (docs/containers-and-vms.md). No contents.</summary>
+    ReachFacts Reach => ReachFacts.None;
 }
 
 /// <summary>How many decoys are placed, and whether something listens on their endpoints (checked without connecting, which would be a hit).</summary>
@@ -205,6 +208,7 @@ public static partial class Doctor
         var blocked = probe.BlockedPrograms().ToArray();
         checks.AddRange(Decoys(decoyUses, blocked, DateTimeOffset.UtcNow));
         checks.AddRange(CliSignIns(probe.CliConfigs, probe.GitHubAppService));
+        checks.AddRange(Reach(probe.Reach));
         var (uses, runs, installed, now) = (probe.CredentialUses().ToArray(), probe.ProgramRuns().ToArray(), probe.UninstallEntries().ToArray(), DateTimeOffset.UtcNow);
         checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), uses, blocked.Where(b => !decoyUses.Any(u => !u.IsRead && SamePath(u.Program, b))), now, runs));
         checks.AddRange(UninstallEntries(installed));

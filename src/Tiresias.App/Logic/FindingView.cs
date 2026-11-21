@@ -33,6 +33,8 @@ public enum FixAction
     AddService,
     /// <summary>The Installed page: the whole list, unused programs first.</summary>
     OpenInstalledList,
+    /// <summary>The steps on a page in the repository, in the browser: they need an administrator, or Docker quit, not Tiresias.</summary>
+    OpenGuide,
 }
 
 /// <summary>
@@ -98,6 +100,7 @@ public static class FindingView
         RunThroughExec { Setup: not null } => (FixAction.AddService, "Finding_FixGitHubApp"),
         RunThroughExec => (FixAction.CopyCommand, "Finding_FixCopy"),
         UninstallApp => (FixAction.OpenInstalledList, "Finding_FixInstalledList"),
+        ReachGuide => (FixAction.OpenGuide, "Finding_FixReachGuide"),
         _ => null,
     };
 
@@ -109,6 +112,9 @@ public static class FindingView
         group.Count == 1 ? Button(group[0].Fix)
         : group.Select(c => Button(c.Fix)).Distinct().ToArray() is [{ Action: FixAction.OpenInstalledList } shared] ? shared
         : null;
+
+    /// <summary>The page a <see cref="ReachGuide"/> opens: its findings, which say how to close each path.</summary>
+    public static string ReachGuideUrl(string repository) => $"{repository}/blob/main/{ReachGuide.Page}#findings";
 
     /// <summary>Where the delivery sits and where the fix takes it, as <c>E5/C3 → E2/C1</c>.</summary>
     public static string Moves(DoctorCheck check) => check switch

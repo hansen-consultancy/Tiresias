@@ -10,6 +10,9 @@ its section below.
 
 ### Added
 
+- Home and `tir doctor` say when every program you run can open your Docker engine (and with it
+  every container's environment), when you are in Hyper-V Administrators, and which WSL
+  distributions' disks are files you own. Nothing inside a container, distribution or VM is read.
 - `Tiresias.Core` and `Tiresias.Protocol` carry the groundwork for out-of-band alerts: the
   `tiresias.alert/v1` payload and the planner that decides, per sink, what to send, with dedupe,
   rate limits and redaction. Nothing sends alerts yet.
