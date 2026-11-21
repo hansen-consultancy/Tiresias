@@ -26,6 +26,9 @@ open it or write the files only it can write.
   writable by SYSTEM, Administrators and the service only. It holds the broker identity, the trust
   chain and its accepted head, the audit log, the rollback high-water marks, and `service.json`
   (vault path, pinned genesis hash, time zone), written at install.
+  Install makes it, and `%ProgramData%\Tiresias`, owned by Administrators, as the admin tier
+  does: a folder a user made there first is moved aside, since its owner could change its ACL
+  back. The binaries are copied the same link-safe way.
 - **The vault stays in the user's profile.** Install grants the service read access to its folder.
   Writing it is still the user's: policy changes are bound into the ciphertext and need Hello, and
   a restored older vault is refused against the marks the service keeps.

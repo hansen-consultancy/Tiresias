@@ -96,7 +96,7 @@ public static class AdminTierSetup
     /// elevated. Any link in it fails the install (<see cref="AdminCopySource"/>); each file is
     /// checked on its open handle and copied from that handle, so it can't be swapped in between.
     /// </summary>
-    static void CopyFiles(string from, string to)
+    internal static void CopyFiles(string from, string to)
     {
         string root;
         using (var folder = SourceHandle.Open(from, directory: true))
@@ -140,7 +140,7 @@ public static class AdminTierSetup
     /// <c>%ProgramData%</c>, so one already there that isn't ours is moved aside (Administrators may
     /// rename any child of it) rather than used: its owner could change its ACL back.
     /// </summary>
-    static void Secure(string folder)
+    internal static void Secure(string folder)
     {
         var info = new DirectoryInfo(folder);
         if (info.Exists && !Trusted(folder))
@@ -182,7 +182,7 @@ public static class AdminTierSetup
     }
 
     /// <summary>A service process that has just stopped can hold its files a moment longer.</summary>
-    static void Retry(Action act)
+    internal static void Retry(Action act)
     {
         for (var attempt = 1; ; attempt++)
         {

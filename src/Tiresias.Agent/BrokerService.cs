@@ -43,8 +43,11 @@ public static class BrokerService
         if (chain is null || !TrustChainVerifier.Verify(chain, genesis).IsValid)
             throw new InvalidOperationException("The solo trust chain doesn't verify against the genesis this device pinned; set solo mode up again.");
 
-        CopyFolder(AppContext.BaseDirectory, BinaryFolder);
-        Directory.CreateDirectory(StateFolder);
+        // As for the admin tier: a link-safe copy from the user's folder, and state folders that only
+        // SYSTEM and Administrators own (one a user made first is moved aside, its owner could reopen it).
+        AdminTierSetup.Retry(() => AdminTierSetup.CopyFiles(AppContext.BaseDirectory, BinaryFolder));
+        AdminTierSetup.Secure(Path.GetDirectoryName(StateFolder)!);
+        AdminTierSetup.Secure(StateFolder);
         File.WriteAllBytes(BrokerServiceLayout.TrustChainPath(StateFolder), TrustLinkJson.WriteChain(chain));
         File.WriteAllBytes(Path.Combine(StateFolder, BrokerServiceConfig.FileName),
             new BrokerServiceConfig(tenant.VaultPath, genesis, TimeZoneInfo.Local.Id).Write());
@@ -93,7 +96,7 @@ public static class BrokerService
             KeyringStore.Enroll(tenant with { IdentityKey = SoloBroker.IdentityPublicKey() });
         }
         if (Directory.Exists(BinaryFolder) && !IsInside(AppContext.BaseDirectory, BinaryFolder))
-            Directory.Delete(BinaryFolder, recursive: true);
+            AdminTierSetup.Retry(() => Directory.Delete(BinaryFolder, recursive: true));
     }
 
     /// <summary>The service's body: the solo broker under the service manager, with its state in the service's own folder.</summary>
@@ -125,16 +128,6 @@ public static class BrokerService
         process.WaitForExit();
         if (check && process.ExitCode != 0)
             throw new InvalidOperationException($"{program} {arguments[0]} failed ({process.ExitCode}): {output.Trim()}");
-    }
-
-    static void CopyFolder(string from, string to)
-    {
-        foreach (var file in Directory.EnumerateFiles(from, "*", SearchOption.AllDirectories))
-        {
-            var target = Path.Combine(to, Path.GetRelativePath(from, file));
-            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-            File.Copy(file, target, overwrite: true);
-        }
     }
 
     static bool IsInside(string path, string folder) =>
