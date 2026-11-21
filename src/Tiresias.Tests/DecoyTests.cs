@@ -134,6 +134,19 @@ public class DecoyTests
     }
 
     [Test]
+    public void Repeats_of_a_program_and_use_are_reported_once_a_minute()
+    {
+        var filter = new DecoyHitFilter();
+        DecoyHit Hit(int pid, DecoyUse use, double seconds) => new(use, "SQL Server", pid, "x.exe", Now.AddSeconds(seconds));
+
+        Assert.That(filter.ShouldReport(Hit(1, DecoyUse.SqlPassword, 0)), Is.True);
+        Assert.That(filter.ShouldReport(Hit(1, DecoyUse.SqlPassword, 30)), Is.False);
+        Assert.That(filter.ShouldReport(Hit(1, DecoyUse.Connected, 30)), Is.True);
+        Assert.That(filter.ShouldReport(Hit(2, DecoyUse.SqlPassword, 30)), Is.True);
+        Assert.That(filter.ShouldReport(Hit(1, DecoyUse.SqlPassword, 60)), Is.True);
+    }
+
+    [Test]
     public void A_login_reads_back_its_user_and_unobfuscated_password()
     {
         var login = Login7("billing_admin", "p@ss!word");

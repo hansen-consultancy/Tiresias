@@ -26,6 +26,7 @@ public sealed class DecoyListener : IAsyncDisposable
     readonly CancellationTokenSource stop = new();
     readonly List<TcpListener> listeners = [];
     readonly List<Task> running = [];
+    readonly DecoyHitFilter repeats = new();
 
     /// <param name="identify">The process owning a loopback connection, from the client's end point and the server's port.</param>
     public DecoyListener(DecoySet set, Func<IPEndPoint, int, (int Pid, string? Program)?> identify, TimeProvider time)
@@ -35,7 +36,7 @@ public sealed class DecoyListener : IAsyncDisposable
         this.time = time;
     }
 
-    /// <summary>Raised once per connection, after the caller has been answered (or gave up). Never carries a value.</summary>
+    /// <summary>Raised after a caller has been answered (or gave up): once per program and use a minute (<see cref="DecoyHitFilter"/>). Never carries a value.</summary>
     public event Action<DecoyHit>? Hit;
 
     /// <exception cref="SocketException">A port is taken.</exception>
@@ -83,7 +84,9 @@ public sealed class DecoyListener : IAsyncDisposable
             {
                 // A caller that hangs up or speaks something else is still a caller.
             }
-            Hit?.Invoke(new(use, endpoint, caller?.Pid, caller?.Program, time.GetUtcNow()));
+            var hit = new DecoyHit(use, endpoint, caller?.Pid, caller?.Program, time.GetUtcNow());
+            if (repeats.ShouldReport(hit))
+                Hit?.Invoke(hit);
         }
     }
 
