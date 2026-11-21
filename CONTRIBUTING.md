@@ -3,6 +3,8 @@
 Issues and pull requests are welcome.
 
 - Run `dotnet test src/Tiresias.Tests/Tiresias.Tests.csproj` before opening a PR.
+- Leave no build warnings: CI builds with warnings as errors, so one fails the PR. Fix it rather
+  than suppress it; where a rule is wrong for one line, suppress that line with the reason.
 - Prefer pure, tested planners for decisions (grants, trust, doctor checks) and keep I/O at the
   edges; that is how the existing code is laid out.
 - Never commit a real secret, hostname, IP address or person's name, not even in a test. Use

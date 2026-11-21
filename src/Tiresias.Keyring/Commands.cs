@@ -258,7 +258,8 @@ static class Commands
         var projects = args.Option("--projects");
         if (projects is not null && !Directory.Exists(projects))
             throw new UsageException($"No folder {projects}.");
-        var checks = await Tiresias.Client.Doctor.RunAsync(new MachineProbe(projects));
+        var probe = new MachineProbe(projects);
+        var checks = await Tiresias.Client.Doctor.RunAsync(probe);
         var dismissals = DismissalStore.Load();
         foreach (var check in checks)
         {
@@ -268,6 +269,12 @@ static class Commands
                 Console.WriteLine($"      fix: {fix.Instruction}");
             if (check.IsFinding && dismissals.For(check) is { } dismissal)
                 Console.WriteLine($"      dismissed {dismissal.At.ToLocalTime():d}: {dismissal.Reason}");
+        }
+        if (args.Flag("--surface"))
+        {
+            Console.WriteLine();
+            foreach (var line in Tiresias.Client.Doctor.InventoryLines(probe.Inventory(), DateTimeOffset.UtcNow))
+                Console.WriteLine(line);
         }
         return checks.Any(c => c.Status == Tiresias.Client.DoctorStatus.Fail) ? 1 : 0;
     }

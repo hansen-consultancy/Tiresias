@@ -84,6 +84,67 @@ static partial class Desktop
         }
     }
 
+    /// <summary>
+    /// Turns one of the user's own log-on entries off the way Task Manager and Settings do, in
+    /// <c>StartupApproved</c>, so Settings, Apps, Startup turns it back on. The entry itself stays.
+    /// </summary>
+    public static bool DisableStartup(Tiresias.Client.DisableStartup startup)
+    {
+        if (startup.Machine || !Tiresias.Client.DisableStartup.IsSafeItem(startup.Item))
+            return false;
+        var kind = startup.Where == Tiresias.Client.StartupEntry.StartupFolder ? "StartupFolder" : "Run";
+        // 03 = turned off by the user, then the FILETIME it happened, as Task Manager writes it.
+        byte[] value = [3, 0, 0, 0, .. BitConverter.GetBytes(DateTime.UtcNow.ToFileTimeUtc())];
+        try
+        {
+            using var key = Registry.CurrentUser.CreateSubKey(Tiresias.Client.DisableStartup.ApprovedKey + kind);
+            key.SetValue(startup.Item, value, RegistryValueKind.Binary);
+            return true;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            AppLog.Error(e, $"could not turn off {startup.Name} at log-on");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Saves one of the user's own uninstall entries to a <c>.reg</c> file beside the keyring, then
+    /// deletes it. The key comes from the registry, so it is checked to be an Uninstall subkey first.
+    /// </summary>
+    /// <returns>The backup that puts it back; <c>null</c> when nothing was deleted.</returns>
+    public static async Task<string?> RemoveEntryAsync(Tiresias.Client.RemoveEntry remove)
+    {
+        if (remove.Machine || !Tiresias.Client.RemoveEntry.IsSafeKey(remove.Key))
+            return null;
+        var folder = Path.Combine(KeyringStore.Directory, "removed-entries");
+        var backup = Path.Combine(folder, $"{DateTime.Now:yyyyMMdd-HHmmss} {remove.BackupName}");
+        var start = new ProcessStartInfo("reg.exe") { UseShellExecute = false, CreateNoWindow = true };
+        foreach (var argument in new[] { "export", remove.Key, backup, "/y" })
+            start.ArgumentList.Add(argument);
+        try
+        {
+            Directory.CreateDirectory(folder);
+            using (var process = Process.Start(start))
+            {
+                if (process is null)
+                    return null;
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                await process.WaitForExitAsync(timeout.Token);
+                if (process.ExitCode != 0 || !File.Exists(backup))
+                    return null;
+            }
+            Registry.CurrentUser.DeleteSubKeyTree(remove.Subkey, throwOnMissingSubKey: false);
+            return backup;
+        }
+        catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException or OperationCanceledException
+                                      or IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            AppLog.Error(e, $"could not remove the uninstall entry for {remove.Name}");
+            return null;
+        }
+    }
+
     public static void OpenHelloSettings() => Open("ms-settings:signinoptions");
 
     public static void OpenDataFolder() => Open(KeyringStore.Directory);
@@ -132,6 +193,40 @@ static partial class Desktop
 
     [LibraryImport("shell32.dll", EntryPoint = "SHFileOperationW")]
     private static unsafe partial int SHFileOperation(ShellFileOperation* operation);
+
+    /// <summary>
+    /// The small icon at <paramref name="index"/> in a program, library or <c>.ico</c> file, frozen so
+    /// any thread can build it; <c>null</c> when there is none. The file is read as data, never run.
+    /// </summary>
+    public static System.Windows.Media.ImageSource? SmallIcon(string path, int index)
+    {
+        if (!File.Exists(path))
+            return null;
+        var small = new nint[1];
+        if (ExtractIconEx(path, index, null, small, 1) == 0 || small[0] == 0)
+            return null;
+        try
+        {
+            var image = Imaging.CreateBitmapSourceFromHIcon(small[0], Int32Rect.Empty, System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
+            image.Freeze();
+            return image;
+        }
+        catch (Exception e) when (e is COMException or ArgumentException)
+        {
+            return null;
+        }
+        finally
+        {
+            DestroyIcon(small[0]);
+        }
+    }
+
+    [LibraryImport("shell32.dll", EntryPoint = "ExtractIconExW", StringMarshalling = StringMarshalling.Utf16)]
+    private static partial uint ExtractIconEx(string file, int index, nint[]? large, nint[]? small, uint icons);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool DestroyIcon(nint icon);
 
     [LibraryImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

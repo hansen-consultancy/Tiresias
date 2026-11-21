@@ -15,6 +15,8 @@ public enum FirstRunStep
     Mode,
     /// <summary>Resuming solo setup after the key was shown in an earlier run: it is typed back from paper.</summary>
     RecoveryType,
+    /// <summary>Optional, once, after the vault: set up the admin tier (UAC) or not now.</summary>
+    AdminTier,
     Done,
 }
 
@@ -28,7 +30,8 @@ public enum SetupMode
 /// <summary>What is already in place on this machine; read without a prompt.</summary>
 /// <param name="Skipped">The user chose to finish without a broker (user secrets only, or enrolling later).</param>
 /// <param name="SealedWithoutKey">Sealed secrets are here while no recovery key is stored: copied from another PC, or left by an earlier setup.</param>
-public sealed record SetupFacts(bool HelloReady, bool RecoverySet, bool Enrolled, bool Skipped, bool SealedWithoutKey = false);
+/// <param name="AdminTierInstalled">The admin tier is already set up, so the wizard doesn't offer it.</param>
+public sealed record SetupFacts(bool HelloReady, bool RecoverySet, bool Enrolled, bool Skipped, bool SealedWithoutKey = false, bool AdminTierInstalled = true);
 
 /// <summary>
 /// The first-run wizard as a resumable sequence. Each step leaves something durable behind (the
@@ -53,10 +56,16 @@ public static class FirstRunPlan
         FirstRunStep.Welcome => f.HelloReady ? Next(FirstRunStep.Hello, f) : FirstRunStep.Hello,
         FirstRunStep.Hello => f.RecoverySet ? FirstRunStep.Mode : NewOrRestore(f),
         FirstRunStep.RecoveryShow => FirstRunStep.RecoveryConfirm,
-        FirstRunStep.RecoveryConfirm or FirstRunStep.RecoveryRestore => f.Enrolled ? FirstRunStep.Done : FirstRunStep.Mode,
-        FirstRunStep.Mode => mode == SetupMode.Solo && !f.Enrolled && !haveRecoveryKey ? FirstRunStep.RecoveryType : FirstRunStep.Done,
+        FirstRunStep.RecoveryConfirm or FirstRunStep.RecoveryRestore => f.Enrolled ? Finishing(f) : FirstRunStep.Mode,
+        FirstRunStep.Mode => mode == SetupMode.Solo && !f.Enrolled && !haveRecoveryKey ? FirstRunStep.RecoveryType : Finishing(f),
         _ => FirstRunStep.Done,
     };
+
+    /// <summary>
+    /// The step once the vault is set up: the admin tier's offer, unless it is in place already, then
+    /// done. Declining it changes nothing, and it isn't offered again: About has it.
+    /// </summary>
+    public static FirstRunStep Finishing(SetupFacts f) => f.AdminTierInstalled ? FirstRunStep.Done : FirstRunStep.AdminTier;
 
     /// <summary>A new recovery key would leave sealed secrets already here unrecoverable, so their own key is asked for first.</summary>
     static FirstRunStep NewOrRestore(SetupFacts f) => f.SealedWithoutKey ? FirstRunStep.RecoveryRestore : FirstRunStep.RecoveryShow;

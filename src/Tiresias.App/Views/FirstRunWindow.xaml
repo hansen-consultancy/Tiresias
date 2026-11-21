@@ -121,6 +121,14 @@
           </Expander>
         </StackPanel>
 
+        <!-- The admin tier, optional: Set up (UAC) or Not now -->
+        <StackPanel x:Name="AdminTierPanel" Tag="{x:Static logic:FirstRunStep.AdminTier}">
+          <TextBlock Text="{l:S FirstRun_AdminTier_Title}" Style="{StaticResource TitleText}" AutomationProperties.HeadingLevel="Level1" />
+          <TextBlock Text="{l:S FirstRun_AdminTier_Body}" Style="{StaticResource BodyText}" />
+          <TextBlock Text="{l:S FirstRun_AdminTier_Adds}" Style="{StaticResource BodyText}" />
+          <TextBlock Text="{l:S FirstRun_AdminTier_Note}" Style="{StaticResource CaptionText}" />
+        </StackPanel>
+
         <!-- Done -->
         <StackPanel x:Name="Done" Tag="{x:Static logic:FirstRunStep.Done}">
           <TextBlock Text="{l:S FirstRun_Done_Title}" Style="{StaticResource TitleText}" AutomationProperties.HeadingLevel="Level1" />
