@@ -8,13 +8,15 @@ namespace Tiresias.AdminTier;
 
 /// <summary>What <c>decoys.status</c> answers: the kinds placed (one per decoy) and how many files, never a place, port or value.</summary>
 /// <param name="Listening">The service has the set's ports bound now.</param>
-public sealed record AdminDecoysStatus(bool Held, bool Listening, IReadOnlyList<DecoyKind> Kinds, int Files);
+/// <param name="Auditing">Every held file carries the audit rule and the policy logs it, so each read is named.</param>
+public sealed record AdminDecoysStatus(bool Held, bool Listening, IReadOnlyList<DecoyKind> Kinds, int Files, bool Auditing = false);
 
 /// <summary>What <c>decoys.release</c> answers: the set, handed back, and the user it is whose (the session's, for an over-the-shoulder caller).</summary>
 public sealed record AdminDecoysRelease(string UserSid, DecoySet? Set);
 
-/// <summary>A decoy used, queued for its user until the app acknowledges it: <see cref="DecoyHit"/> and the processes that started the program, nearest first.</summary>
-public sealed record AdminEvent(long Id, DecoyHit Hit, IReadOnlyList<string> Parents);
+/// <summary>A decoy used or a decoy file read, queued for its user until the app acknowledges it: <see cref="DecoyHit"/> and the processes that started the program, nearest first.</summary>
+/// <param name="Routine">A read by a routine opener (<see cref="DecoyReads.RoutineOpener"/>): recorded, raising nothing.</param>
+public sealed record AdminEvent(long Id, DecoyHit Hit, IReadOnlyList<string> Parents, string? Routine = null);
 
 /// <summary>What <c>events.wait</c> answers: the caller's events not yet acknowledged, oldest first.</summary>
 public sealed record AdminEvents(IReadOnlyList<AdminEvent> Events);
@@ -118,7 +120,7 @@ public sealed record AdminHeldDecoys(DecoySet Set, IReadOnlyList<string> Files)
 {
     public const int Version = 1;
 
-    public AdminDecoysStatus Status(bool listening) => new(true, listening, [.. Set.Placed.Select(p => p.Kind)], Files.Count);
+    public AdminDecoysStatus Status(bool listening, bool auditing = false) => new(true, listening, [.. Set.Placed.Select(p => p.Kind)], Files.Count, auditing);
 
     public string ToJson() => new JsonObject
     {
@@ -156,9 +158,9 @@ public sealed record AdminEventQueue(long NextId, IReadOnlyList<AdminEvent> Pend
 
     public static readonly AdminEventQueue Empty = new(1, []);
 
-    public (AdminEventQueue Queue, AdminEvent Added) Add(DecoyHit hit, IReadOnlyList<string> parents)
+    public (AdminEventQueue Queue, AdminEvent Added) Add(DecoyHit hit, IReadOnlyList<string> parents, string? routine = null)
     {
-        var added = new AdminEvent(NextId, hit, parents);
+        var added = new AdminEvent(NextId, hit, parents, routine);
         return (new(NextId + 1, [.. Pending.Append(added).TakeLast(Capacity)]), added);
     }
 
