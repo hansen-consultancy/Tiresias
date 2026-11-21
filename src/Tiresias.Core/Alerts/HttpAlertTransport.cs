@@ -4,7 +4,7 @@ using Tiresias.Protocol;
 
 namespace Tiresias.Alerts;
 
-public enum WebhookProblem
+public enum SinkProblem
 {
     None,
     /// <summary>Not an absolute URL.</summary>
@@ -22,49 +22,94 @@ public enum WebhookProblem
     HeaderTwice,
     /// <summary>A sink id that isn't 1 to 32 of a-z, 0-9 and <c>-</c>.</summary>
     Id,
+    /// <summary>An ntfy server URL with a query or fragment, or a topic URL whose last segment isn't 1 to 64 of A-Z, a-z, 0-9, <c>-</c> and <c>_</c>.</summary>
+    Topic,
+    /// <summary>An ntfy token that isn't 1 to 256 visible ASCII characters.</summary>
+    Token,
 }
 
-/// <summary>What a webhook definition may hold (docs/alerts.md, <i>Sinks</i>): checked by the form and again before every send.</summary>
-public static class WebhookRules
+/// <summary>What a sink definition may hold (docs/alerts.md, <i>Sinks</i>): checked by the form and again before every send.</summary>
+public static class SinkRules
 {
     /// <summary>Set by the transport itself; a user header could otherwise smuggle a second body or retarget the request.</summary>
     public static readonly IReadOnlySet<string> Reserved =
         new HashSet<string>(["Host", "Content-Length", "Content-Type", "Idempotency-Key"], StringComparer.OrdinalIgnoreCase);
 
-    public static WebhookProblem CheckId(string id) =>
-        id.Length is >= 1 and <= 32 && id.All(c => c is (>= 'a' and <= 'z') or (>= '0' and <= '9') or '-') ? WebhookProblem.None : WebhookProblem.Id;
+    public static SinkProblem CheckId(string id) =>
+        id.Length is >= 1 and <= 32 && id.All(c => c is (>= 'a' and <= 'z') or (>= '0' and <= '9') or '-') ? SinkProblem.None : SinkProblem.Id;
 
     /// <summary>HTTPS, or plain HTTP to loopback for a local relay; never a user name or password in it.</summary>
-    public static WebhookProblem CheckUrl(string text, out Uri? url)
+    public static SinkProblem CheckUrl(string text, out Uri? url)
     {
         if (!Uri.TryCreate(text.Trim(), UriKind.Absolute, out url) || url.IsFile || url.IsUnc)
-            return WebhookProblem.NotAbsolute;
+            return SinkProblem.NotAbsolute;
         if (url.UserInfo.Length > 0)
-            return WebhookProblem.UserInfo;
-        return url.Scheme == Uri.UriSchemeHttps || (url.Scheme == Uri.UriSchemeHttp && url.IsLoopback) ? WebhookProblem.None : WebhookProblem.NotHttps;
+            return SinkProblem.UserInfo;
+        return url.Scheme == Uri.UriSchemeHttps || (url.Scheme == Uri.UriSchemeHttp && url.IsLoopback) ? SinkProblem.None : SinkProblem.NotHttps;
     }
 
-    public static WebhookProblem CheckHeader(string name, string value)
+    public static SinkProblem CheckHeader(string name, string value)
     {
         if (name.Length == 0 || !name.All(IsTokenChar))
-            return WebhookProblem.HeaderName;
+            return SinkProblem.HeaderName;
         if (Reserved.Contains(name))
-            return WebhookProblem.HeaderReserved;
-        return value.Any(c => char.IsControl(c) && c != '\t') ? WebhookProblem.HeaderValue : WebhookProblem.None;
+            return SinkProblem.HeaderReserved;
+        return value.Any(c => char.IsControl(c) && c != '\t') ? SinkProblem.HeaderValue : SinkProblem.None;
     }
 
-    public static WebhookProblem Check(WebhookSink sink)
+    /// <summary>
+    /// The topic URL for <paramref name="topic"/> on the ntfy <paramref name="server"/>: HTTPS (or HTTP
+    /// to loopback), no query or fragment, a topic ntfy accepts. A server may sit under a path.
+    /// </summary>
+    public static SinkProblem CheckNtfy(string server, string topic, out Uri? url)
+    {
+        url = null;
+        if (CheckUrl(server, out var parsed) is var problem and not SinkProblem.None)
+            return problem;
+        if (parsed!.Query.Length > 0 || parsed.Fragment.Length > 0 || !IsTopic(topic.Trim()))
+            return SinkProblem.Topic;
+        url = new Uri(parsed.GetLeftPart(UriPartial.Path).TrimEnd('/') + "/" + topic.Trim(), UriKind.Absolute);
+        return SinkProblem.None;
+    }
+
+    /// <summary>1 to 256 visible ASCII characters: it goes in a header after <c>Bearer</c>.</summary>
+    public static SinkProblem CheckToken(string token) =>
+        token.Length is >= 1 and <= 256 && token.All(c => c is > ' ' and < (char)0x7F) ? SinkProblem.None : SinkProblem.Token;
+
+    public static SinkProblem Check(AlertSink sink) => sink switch
+    {
+        WebhookSink webhook => Check(webhook),
+        NtfySink ntfy => Check(ntfy),
+        _ => throw new ArgumentOutOfRangeException(nameof(sink), sink.Kind, "Not a sink kind this build knows."),
+    };
+
+    static SinkProblem Check(NtfySink sink)
     {
         var problem = CheckId(sink.Id);
-        if (problem == WebhookProblem.None)
-            problem = CheckUrl(sink.Url.OriginalString, out _);
-        foreach (var (name, value) in sink.Headers)
-            if (problem == WebhookProblem.None)
-                problem = CheckHeader(name, value);
-        if (problem == WebhookProblem.None && sink.Headers.Select(h => h.Key).Distinct(StringComparer.OrdinalIgnoreCase).Count() != sink.Headers.Count)
-            problem = WebhookProblem.HeaderTwice;
+        if (problem == SinkProblem.None)
+            problem = CheckUrl(sink.Topic.OriginalString, out _);
+        if (problem == SinkProblem.None && (sink.Topic.Query.Length > 0 || sink.Topic.Fragment.Length > 0 || !IsTopic(sink.Topic.Segments[^1])))
+            problem = SinkProblem.Topic;
+        if (problem == SinkProblem.None && sink.Token is not null)
+            problem = CheckToken(sink.Token);
         return problem;
     }
+
+    static SinkProblem Check(WebhookSink sink)
+    {
+        var problem = CheckId(sink.Id);
+        if (problem == SinkProblem.None)
+            problem = CheckUrl(sink.Url.OriginalString, out _);
+        foreach (var (name, value) in sink.Headers)
+            if (problem == SinkProblem.None)
+                problem = CheckHeader(name, value);
+        if (problem == SinkProblem.None && sink.Headers.Select(h => h.Key).Distinct(StringComparer.OrdinalIgnoreCase).Count() != sink.Headers.Count)
+            problem = SinkProblem.HeaderTwice;
+        return problem;
+    }
+
+    /// <summary>What ntfy accepts as a topic name.</summary>
+    static bool IsTopic(string name) => name.Length is >= 1 and <= 64 && name.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
 
     /// <summary>RFC 9110 <c>tchar</c>.</summary>
     static bool IsTokenChar(char c) => char.IsAsciiLetterOrDigit(c) || "!#$%&'*+-.^_`|~".Contains(c, StringComparison.Ordinal);
@@ -90,23 +135,24 @@ public sealed record DeliveryResult(DeliveryStatus Status, int? StatusCode = nul
 }
 
 /// <summary>
-/// Posts a <see cref="AlertPayload"/> to a webhook as <c>tiresias.alert/v1</c> JSON
-/// (docs/alerts.md, <i>Sinks</i>): the sink's headers, <c>Idempotency-Key</c> set to the payload's id,
-/// no redirects followed (so the headers never reach another host), 10 seconds, the system proxy.
+/// Posts an <see cref="AlertPayload"/> to a sink over HTTP (docs/alerts.md, <i>Sinks</i>): to a webhook
+/// as <c>tiresias.alert/v1</c> JSON with the sink's headers, to ntfy as <see cref="NtfyFormat"/> says.
+/// Every request carries <c>Idempotency-Key</c> set to the payload's id, follows no redirect (so a
+/// credential never reaches another host), gives up after 10 seconds and uses the system proxy.
 /// </summary>
-public sealed class WebhookTransport : IDisposable
+public sealed class HttpAlertTransport : IDisposable
 {
     public static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
 
     readonly HttpClient client;
     readonly TimeProvider time;
 
-    public WebhookTransport() : this(CreateHandler(), TimeProvider.System)
+    public HttpAlertTransport() : this(CreateHandler(), TimeProvider.System)
     {
     }
 
     /// <param name="handler">The innermost handler; tests pass a fake.</param>
-    public WebhookTransport(HttpMessageHandler handler, TimeProvider time)
+    public HttpAlertTransport(HttpMessageHandler handler, TimeProvider time)
     {
         client = new HttpClient(handler, disposeHandler: true) { Timeout = System.Threading.Timeout.InfiniteTimeSpan };
         this.time = time;
@@ -122,17 +168,18 @@ public sealed class WebhookTransport : IDisposable
         PooledConnectionLifetime = TimeSpan.FromMinutes(5),
     };
 
-    public async Task<DeliveryResult> DeliverAsync(AlertPayload payload, WebhookSink sink, CancellationToken ct)
+    public async Task<DeliveryResult> DeliverAsync(AlertPayload payload, AlertSink sink, CancellationToken ct)
     {
-        if (WebhookRules.Check(sink) is var problem and not WebhookProblem.None)
+        if (SinkRules.Check(sink) is var problem and not SinkProblem.None)
             return new(DeliveryStatus.Stop, Error: problem.ToString());
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, sink.Url) { Content = new ByteArrayContent(AlertWire.Serialize(payload)) };
-        request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+        using var request = sink switch
+        {
+            WebhookSink webhook => WebhookRequest(payload, webhook),
+            NtfySink ntfy => NtfyFormat.Request(payload, ntfy),
+            _ => throw new ArgumentOutOfRangeException(nameof(sink), sink.Kind, "Not a sink kind this build knows."),
+        };
         request.Headers.TryAddWithoutValidation("Idempotency-Key", payload.Id);
-        foreach (var (name, value) in sink.Headers)
-            if (!request.Headers.TryAddWithoutValidation(name, value))
-                request.Content.Headers.TryAddWithoutValidation(name, value);
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(Timeout);
@@ -149,6 +196,16 @@ public sealed class WebhookTransport : IDisposable
         {
             return new(DeliveryStatus.Retry, Error: e.GetType().Name);
         }
+    }
+
+    static HttpRequestMessage WebhookRequest(AlertPayload payload, WebhookSink sink)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, sink.Url) { Content = new ByteArrayContent(AlertWire.Serialize(payload)) };
+        request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+        foreach (var (name, value) in sink.Headers)
+            if (!request.Headers.TryAddWithoutValidation(name, value))
+                request.Content.Headers.TryAddWithoutValidation(name, value);
+        return request;
     }
 
     /// <summary>2xx delivered; 429 and 503 retry after <c>Retry-After</c>; any other 4xx, and a redirect, stop the sink; the rest retry.</summary>

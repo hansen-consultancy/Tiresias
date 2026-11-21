@@ -1,6 +1,6 @@
 # Out-of-band alerts
 
-Status: **phase 2 built**: webhook end to end, with `decoy.used` the only event wired so far. Tracks issue #101. This page designs how Tiresias tells you about a
+Status: **phase 3 built**: webhook and ntfy end to end, with `decoy.used` the only event wired so far. Tracks issue #101. This page designs how Tiresias tells you about a
 serious event when you aren't looking at the app: a push to your phone through
 [ntfy](https://ntfy.sh), a line on a [LcdHub](https://github.com/stevehansen/LcdHub) screen beside
 the machine, or a JSON POST to a webhook of your choice.
@@ -302,8 +302,29 @@ leaving.
      attempt, no retry; the card shows the status code or the exception type.
    - The canary now runs through the first source mapping (`AlertSources.DecoyUsed`) and the webhook
      formatter into captured request bytes, with a value and a placeholder token beside the event.
-3. **ntfy.** Its formatter and the setup form (server, topic, token, a hint to use a write-only
-   token).
+3. **ntfy. Done.** `NtfyFormat`, and an **Add ntfy...** form on the Alerts card (server, topic,
+   optional token, with hints to use a write-only token and a long random topic), sealed like the
+   webhook. What it settled or changed:
+   - **One HTTP transport.** `WebhookTransport` became `HttpAlertTransport`, which checks a sink and
+     hands it to its kind's formatter; `WebhookRules` became `SinkRules`. A sink is an `AlertSink`
+     record (`WebhookSink`, `NtfySink`) whose `ToString` is sealed to its kind and id, so no kind can
+     print its address or token.
+   - **The form takes the server and the topic apart** (the server prefilled with `https://ntfy.sh`);
+     `alerts.json` keeps the joined topic URL as `url`, beside `token` when there is one. A server may
+     sit under a path, but has no query or fragment. A topic follows ntfy's own rule, 1 to 64 of
+     `A-Z`, `a-z`, `0-9`, `-`, `_`; a token is 1 to 256 visible ASCII characters. Both are checked
+     again before every send.
+   - **Priority** is 2/3/4/5 as designed; 1 (min) is never used, so an alert always shows. **Tags**
+     are emoji names: `information_source`, `large_orange_diamond`, `warning`, `rotating_light`
+     for info to critical.
+   - **The body** is "Critical on desk, ×1. Open Tiresias.", in English (it leaves the machine; it
+     isn't the app's UI). A trusted sink adds the program's file name in brackets and nothing else
+     from `detail`: never the folder, which can name the user, nor the parents, names or decoy kind.
+   - **`Title` is the event table's title as is**; a test pins every title to printable ASCII, so it
+     fits a header without encoding. `Content-Type` is `text/plain; charset=utf-8`.
+   - The canary runs through the decoy mapping, the planner and the ntfy formatter into the captured
+     request line, headers and body: no name canary on a public sink, only the program's file name on
+     a trusted one, never a value, a placeholder or the folder; the token once, in `Authorization`.
 4. **LcdHub.** The pipe client (wire v4 status items) and clearing items from `FindingWatch.Shown`.
 5. **The other events.** Blocklist and lockdown refusals, "This wasn't me", `consent.while-locked`,
    broker audit events from the solo broker, `findings.new`.

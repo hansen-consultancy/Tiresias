@@ -10,6 +10,10 @@ its section below.
 
 ### Added
 
+- Alerts to your phone through ntfy: **About**, **Alerts**, **Add ntfy...** pushes the same events
+  to an ntfy topic on ntfy.sh or your own server, with the severity as the notification's priority.
+  The topic and an optional access token are sealed like a webhook's URL and saving needs Windows
+  Hello; the form suggests a long random topic and a write-only token.
 - Alerts to a webhook: **About**, **Alerts**, **Add a webhook...** posts serious events (today, a
   used decoy credential) as JSON to a URL you choose, so you hear about them when you aren't at the
   PC, even while it is locked. The URL and header are sealed like your secrets and saving needs

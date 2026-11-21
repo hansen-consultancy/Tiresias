@@ -2441,7 +2441,7 @@ Store them in clear?</value>
     <value>Unlock to see and change alerts. They open at the first unlock after the app starts, then keep working while locked.</value>
   </data>
   <data name="Alerts_None" xml:space="preserve">
-    <value>Tiresias can post serious events, such as a decoy credential used, to a webhook of your choice, so you hear about them when you aren't at this PC. Nothing is set up.</value>
+    <value>Tiresias can push serious events, such as a decoy credential used, to your phone through ntfy or to a webhook of your choice, so you hear about them when you aren't at this PC. Nothing is set up.</value>
   </data>
   <data name="Alerts_Summary" xml:space="preserve">
     <value>Serious events on “{0}” are posted to:</value>
@@ -2456,7 +2456,7 @@ Store them in clear?</value>
     <value>Muted. Nothing is sent until you unmute it.</value>
   </data>
   <data name="Alerts_RowStopped" xml:space="preserve">
-    <value>Stopped: the webhook refused an alert, so nothing more is sent. Fix it on the receiving side and send a test alert, or remove it and add it again.</value>
+    <value>Stopped: the receiver refused an alert, so nothing more is sent. Fix it on the receiving side and send a test alert, or remove it and add it again.</value>
   </data>
   <data name="Alerts_Critical" xml:space="preserve">
     <value>Critical</value>
@@ -2495,7 +2495,7 @@ Store them in clear?</value>
     <value>{0} accepted the test alert.</value>
   </data>
   <data name="Alerts_TestRefused" xml:space="preserve">
-    <value>{0} answered {1}. Check the URL and header.</value>
+    <value>{0} answered {1}. Check its address and credentials.</value>
   </data>
   <data name="Alerts_TestTimeout" xml:space="preserve">
     <value>{0} didn't answer within 10 seconds.</value>
@@ -2507,7 +2507,7 @@ Store them in clear?</value>
     <value>{0} is no longer set up.</value>
   </data>
   <data name="Alerts_RemoveHeading" xml:space="preserve">
-    <value>Remove this webhook?</value>
+    <value>Remove this alert destination?</value>
   </data>
   <data name="Alerts_RemoveBody" xml:space="preserve">
     <value>{0} gets no more alerts, starting now. To use it again you add it again, with Windows Hello.</value>
@@ -2521,9 +2521,6 @@ Store them in clear?</value>
   <data name="Alerts_WindowTitle" xml:space="preserve">
     <value>Add a webhook</value>
   </data>
-  <data name="Alerts_WindowHeading" xml:space="preserve">
-    <value>Add a webhook</value>
-  </data>
   <data name="Alerts_WindowIntro" xml:space="preserve">
     <value>Tiresias posts each alert as JSON (tiresias.alert/v1). The URL and header are sealed like your secrets, for Windows Hello and the recovery key.</value>
   </data>
@@ -2534,10 +2531,10 @@ Store them in clear?</value>
     <value>Every alert carries it, so you know which machine it came from. Pick one that tells you nothing more, such as “desk” or “build box”: it leaves this PC with each alert.</value>
   </data>
   <data name="Alerts_Id" xml:space="preserve">
-    <value>Name for this webhook</value>
+    <value>Name for this destination</value>
   </data>
   <data name="Alerts_IdHint" xml:space="preserve">
-    <value>Lowercase letters, digits and dashes, such as “siem”. The app log uses it; it never leaves this PC.</value>
+    <value>Lowercase letters, digits and dashes, such as “phone” or “siem”. The app log uses it; it never leaves this PC.</value>
   </data>
   <data name="Alerts_Url" xml:space="preserve">
     <value>URL</value>
@@ -2561,7 +2558,7 @@ Store them in clear?</value>
     <value>Trusted: also send program paths and secret names</value>
   </data>
   <data name="Alerts_TrustedHint" xml:space="preserve">
-    <value>Only for a receiver you run yourself. Without it a webhook learns what happened and when, never where. No webhook ever gets a value or a token.</value>
+    <value>Only for a receiver you run yourself. Without it the receiver learns what happened and when, never where. Nothing ever gets a value or a token.</value>
   </data>
   <data name="Alerts_Save" xml:space="preserve">
     <value>Save with Windows Hello</value>
@@ -2573,10 +2570,10 @@ Store them in clear?</value>
     <value>Give this PC a name first.</value>
   </data>
   <data name="Alerts_BadId" xml:space="preserve">
-    <value>Name the webhook with 1 to 32 lowercase letters, digits or dashes.</value>
+    <value>Use 1 to 32 lowercase letters, digits or dashes for the name.</value>
   </data>
   <data name="Alerts_IdTaken" xml:space="preserve">
-    <value>A webhook named {0} is already set up. Pick another name, or remove that one first.</value>
+    <value>{0} is already set up. Pick another name, or remove that one first.</value>
   </data>
   <data name="Alerts_UrlNotHttps" xml:space="preserve">
     <value>Enter a full HTTPS URL, such as https://hooks.example.com/tiresias. Plain HTTP works only to localhost.</value>
@@ -2592,5 +2589,38 @@ Store them in clear?</value>
   </data>
   <data name="Alerts_HeaderValue" xml:space="preserve">
     <value>The header value can't hold line breaks.</value>
+  </data>
+  <data name="Alerts_AddNtfy" xml:space="preserve">
+    <value>Add ntfy…</value>
+  </data>
+  <data name="Alerts_NtfyWindowTitle" xml:space="preserve">
+    <value>Add ntfy</value>
+  </data>
+  <data name="Alerts_NtfyWindowIntro" xml:space="preserve">
+    <value>Tiresias pushes each alert to an ntfy topic, which the ntfy app on your phone can subscribe to. The topic and token are sealed like your secrets, for Windows Hello and the recovery key.</value>
+  </data>
+  <data name="Alerts_NtfyServer" xml:space="preserve">
+    <value>Server</value>
+  </data>
+  <data name="Alerts_NtfyServerHint" xml:space="preserve">
+    <value>https://ntfy.sh, or your own ntfy server. HTTPS; plain HTTP only to this PC (localhost). Redirects aren't followed.</value>
+  </data>
+  <data name="Alerts_NtfyTopic" xml:space="preserve">
+    <value>Topic</value>
+  </data>
+  <data name="Alerts_NtfyTopicHint" xml:space="preserve">
+    <value>Use a long random name, such as one from a password generator: on a shared server, anyone who knows the topic can read it.</value>
+  </data>
+  <data name="Alerts_NtfyToken" xml:space="preserve">
+    <value>Access token (optional)</value>
+  </data>
+  <data name="Alerts_NtfyTokenHint" xml:space="preserve">
+    <value>Use a token that can only write to this topic, so a stolen one can't read your alerts back. Sent to this server only.</value>
+  </data>
+  <data name="Alerts_NtfyTopicBad" xml:space="preserve">
+    <value>A topic is 1 to 64 letters, digits, - or _, and the server address has no ? or #.</value>
+  </data>
+  <data name="Alerts_NtfyTokenBad" xml:space="preserve">
+    <value>The token can't hold spaces or line breaks.</value>
   </data>
 </root>

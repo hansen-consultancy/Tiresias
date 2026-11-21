@@ -47,7 +47,8 @@
         </ItemsControl>
         <TextBlock x:Name="AlertsOutcome" Style="{StaticResource CaptionText}" AutomationProperties.LiveSetting="Polite" />
         <StackPanel Orientation="Horizontal">
-          <Button x:Name="AlertsAdd" Content="{l:S Alerts_AddWebhook}" Padding="12,6" Click="OnAlertAdd" />
+          <Button x:Name="AlertsAddNtfy" Content="{l:S Alerts_AddNtfy}" Padding="12,6" Click="OnAlertAdd" />
+          <Button x:Name="AlertsAdd" Content="{l:S Alerts_AddWebhook}" Padding="12,6" Margin="8,0,0,0" Click="OnAlertAdd" />
         </StackPanel>
       </StackPanel>
     </Border>

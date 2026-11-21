@@ -30,7 +30,7 @@ public sealed class AlertCenter : IAsyncDisposable
 
     static readonly TimeSpan TickEvery = TimeSpan.FromMinutes(1);
 
-    readonly WebhookTransport transport;
+    readonly HttpAlertTransport transport;
     readonly TimeProvider time;
     readonly Lock gate = new();
     readonly Queue<AlertEvent> waiting = new();
@@ -40,7 +40,7 @@ public sealed class AlertCenter : IAsyncDisposable
     AlertState state = AlertState.Empty;
     bool opened;
 
-    public AlertCenter(WebhookTransport transport, TimeProvider time, Action<string> log)
+    public AlertCenter(HttpAlertTransport transport, TimeProvider time, Action<string> log)
     {
         this.transport = transport;
         this.time = time;

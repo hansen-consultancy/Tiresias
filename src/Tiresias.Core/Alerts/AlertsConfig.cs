@@ -7,22 +7,48 @@ using Tiresias.Vault;
 namespace Tiresias.Alerts;
 
 /// <summary>
-/// A webhook sink as sealed in <c>alerts.json</c>. Its URL and headers are credentials (a key in the
-/// query, an <c>Authorization</c> header), so <see cref="ToString"/> names the id only: a log line or
-/// an exception that prints one shows nothing to steal.
+/// One place alerts go, as sealed in <c>alerts.json</c>. Its address and credentials can be secrets (a
+/// key in a webhook's query, an <c>Authorization</c> header, an ntfy topic or token), so every sink
+/// prints as its kind and id only: a log line or an exception that prints one shows nothing to steal.
 /// </summary>
 /// <param name="Id">The name the user gave it, e.g. <c>siem</c>. Not secret: logs and findings use it.</param>
+public abstract record AlertSink(string Id, AlertSeverity Threshold, AlertRedaction Redaction)
+{
+    /// <summary>The <c>kind</c> in <c>alerts.json</c>.</summary>
+    public abstract string Kind { get; }
+
+    /// <summary>Whether <paramref name="other"/> delivers to the same place with the same credentials.</summary>
+    public abstract bool SameTarget(AlertSink other);
+
+    public sealed override string ToString() => $"{Kind} {Id}";
+}
+
+/// <summary>A webhook: <c>tiresias.alert/v1</c> JSON posted to <see cref="Url"/> with the user's headers.</summary>
 public sealed record WebhookSink(
     string Id,
     Uri Url,
     IReadOnlyList<KeyValuePair<string, string>> Headers,
     AlertSeverity Threshold = AlertSeverity.High,
-    AlertRedaction Redaction = AlertRedaction.Public)
+    AlertRedaction Redaction = AlertRedaction.Public) : AlertSink(Id, Threshold, Redaction)
 {
-    /// <summary>Whether <paramref name="other"/> posts to the same place with the same headers.</summary>
-    public bool SameTarget(WebhookSink other) => Url == other.Url && Headers.SequenceEqual(other.Headers);
+    public override string Kind => "webhook";
 
-    public override string ToString() => $"webhook {Id}";
+    public override bool SameTarget(AlertSink other) => other is WebhookSink o && Url == o.Url && Headers.SequenceEqual(o.Headers);
+}
+
+/// <summary>An ntfy topic on any ntfy server (docs/alerts.md, <i>Sinks</i>), with an optional access token.</summary>
+/// <param name="Topic">The topic's full URL, e.g. <c>https://ntfy.sh/&lt;topic&gt;</c>.</param>
+/// <param name="Token">Sent as <c>Authorization: Bearer</c>; <c>null</c> for an open topic.</param>
+public sealed record NtfySink(
+    string Id,
+    Uri Topic,
+    string? Token,
+    AlertSeverity Threshold = AlertSeverity.High,
+    AlertRedaction Redaction = AlertRedaction.Public) : AlertSink(Id, Threshold, Redaction)
+{
+    public override string Kind => "ntfy";
+
+    public override bool SameTarget(AlertSink other) => other is NtfySink o && Topic == o.Topic && Token == o.Token;
 }
 
 /// <summary>
@@ -43,7 +69,7 @@ public sealed record AlertsConfig
     /// <summary>The document's own version, inside the sealed envelope.</summary>
     public const int Version = 1;
 
-    public AlertsConfig(string machine, byte[] installKey, IReadOnlyList<WebhookSink> sinks)
+    public AlertsConfig(string machine, byte[] installKey, IReadOnlyList<AlertSink> sinks)
     {
         // AlertSetup checks the label, the key and unique ids; so a config that exists can always plan.
         _ = new AlertSetup(machine, installKey, [.. sinks.Select(s => new SinkDefinition(s.Id, s.Threshold))]);
@@ -54,13 +80,13 @@ public sealed record AlertsConfig
 
     public string Machine { get; }
     public byte[] InstallKey { get; }
-    public IReadOnlyList<WebhookSink> Sinks { get; }
+    public IReadOnlyList<AlertSink> Sinks { get; }
 
     /// <summary>A first configuration: the label the user typed and a fresh install key, no sinks yet.</summary>
     public static AlertsConfig New(string machine) => new(machine.Trim(), RandomNumberGenerator.GetBytes(32), []);
 
     /// <summary>Adds <paramref name="sink"/>, replacing one with the same id.</summary>
-    public AlertsConfig With(WebhookSink sink) =>
+    public AlertsConfig With(AlertSink sink) =>
         new(Machine, InstallKey, [.. Sinks.Where(s => s.Id != sink.Id), sink]);
 
     /// <summary>Without the sinks <paramref name="narrowing"/> marks removed: what the next sealed save writes.</summary>
@@ -68,7 +94,7 @@ public sealed record AlertsConfig
         new(Machine, InstallKey, [.. Sinks.Where(s => narrowing?.GetValueOrDefault(s.Id)?.Removed != true)]);
 
     /// <summary>The sinks still delivering: not removed. Muted ones stay, so their queue keeps what is already in it.</summary>
-    public IReadOnlyList<WebhookSink> Live(IReadOnlyDictionary<string, SinkNarrowing>? narrowing) => Purged(narrowing).Sinks;
+    public IReadOnlyList<AlertSink> Live(IReadOnlyDictionary<string, SinkNarrowing>? narrowing) => Purged(narrowing).Sinks;
 
     /// <summary>What the planner works from: the sealed sinks, narrowed.</summary>
     public AlertSetup Setup(IReadOnlyDictionary<string, SinkNarrowing>? narrowing) =>
@@ -84,18 +110,25 @@ public sealed record AlertsConfig
         var sinks = new JsonArray();
         foreach (var sink in Sinks)
         {
-            var headers = new JsonObject();
-            foreach (var (name, value) in sink.Headers)
-                headers[name] = value;
-            sinks.Add(new JsonObject
+            var node = new JsonObject { ["id"] = sink.Id, ["kind"] = sink.Kind };
+            switch (sink)
             {
-                ["id"] = sink.Id,
-                ["kind"] = "webhook",
-                ["url"] = sink.Url.OriginalString,
-                ["headers"] = headers,
-                ["threshold"] = Name(sink.Threshold),
-                ["redaction"] = sink.Redaction == AlertRedaction.Trusted ? "trusted" : "public",
-            });
+                case WebhookSink webhook:
+                    var headers = new JsonObject();
+                    foreach (var (name, value) in webhook.Headers)
+                        headers[name] = value;
+                    node["url"] = webhook.Url.OriginalString;
+                    node["headers"] = headers;
+                    break;
+                case NtfySink ntfy:
+                    node["url"] = ntfy.Topic.OriginalString;
+                    if (ntfy.Token is not null)
+                        node["token"] = ntfy.Token;
+                    break;
+            }
+            node["threshold"] = Name(sink.Threshold);
+            node["redaction"] = sink.Redaction == AlertRedaction.Trusted ? "trusted" : "public";
+            sinks.Add(node);
         }
         return new JsonObject
         {
@@ -119,11 +152,17 @@ public sealed record AlertsConfig
             var sinks = (document["sinks"] as JsonArray ?? []).Select(node =>
             {
                 var sink = node as JsonObject ?? throw new InvalidDataException("An alert sink is not an object.");
-                if ((string?)sink["kind"] != "webhook")
-                    throw new InvalidDataException($"Alert sink kind '{(string?)sink["kind"]}' is not one this build knows.");
-                var headers = (sink["headers"] as JsonObject ?? []).Select(h => KeyValuePair.Create(h.Key, (string)h.Value!)).ToArray();
-                return new WebhookSink((string)sink["id"]!, new Uri((string)sink["url"]!, UriKind.Absolute), headers,
-                    Parse((string)sink["threshold"]!), (string?)sink["redaction"] == "trusted" ? AlertRedaction.Trusted : AlertRedaction.Public);
+                var id = (string)sink["id"]!;
+                var url = new Uri((string)sink["url"]!, UriKind.Absolute);
+                var threshold = Parse((string)sink["threshold"]!);
+                var redaction = (string?)sink["redaction"] == "trusted" ? AlertRedaction.Trusted : AlertRedaction.Public;
+                return (string?)sink["kind"] switch
+                {
+                    "webhook" => (AlertSink)new WebhookSink(id, url,
+                        (sink["headers"] as JsonObject ?? []).Select(h => KeyValuePair.Create(h.Key, (string)h.Value!)).ToArray(), threshold, redaction),
+                    "ntfy" => new NtfySink(id, url, (string?)sink["token"], threshold, redaction),
+                    var kind => throw new InvalidDataException($"Alert sink kind '{kind}' is not one this build knows."),
+                };
             }).ToArray();
             return new((string)document["machine"]!, Convert.FromBase64String((string)document["installKey"]!), sinks);
         }

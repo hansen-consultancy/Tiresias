@@ -129,40 +129,40 @@ sealed class FakeHandler(Func<HttpRequestMessage, int, HttpResponseMessage> resp
     public static FakeHandler Always(HttpStatusCode code) => new((_, _) => new HttpResponseMessage(code));
 }
 
-public class WebhookRulesTests
+public class SinkRulesTests
 {
-    [TestCase("https://hooks.example.com/t", WebhookProblem.None)]
-    [TestCase("http://localhost:8080/relay", WebhookProblem.None)]
-    [TestCase("http://127.0.0.1/relay", WebhookProblem.None)]
-    [TestCase("http://[::1]/relay", WebhookProblem.None)]
-    [TestCase("http://hooks.example.com/t", WebhookProblem.NotHttps)]
-    [TestCase("ftp://hooks.example.com/t", WebhookProblem.NotHttps)]
-    [TestCase("https://alice:pw@hooks.example.com/t", WebhookProblem.UserInfo)]
-    [TestCase("hooks.example.com/t", WebhookProblem.NotAbsolute)]
-    [TestCase("C:\\temp\\x", WebhookProblem.NotAbsolute)]
-    public void Urls(string url, WebhookProblem expected) =>
-        Assert.That(WebhookRules.CheckUrl(url, out _), Is.EqualTo(expected));
+    [TestCase("https://hooks.example.com/t", SinkProblem.None)]
+    [TestCase("http://localhost:8080/relay", SinkProblem.None)]
+    [TestCase("http://127.0.0.1/relay", SinkProblem.None)]
+    [TestCase("http://[::1]/relay", SinkProblem.None)]
+    [TestCase("http://hooks.example.com/t", SinkProblem.NotHttps)]
+    [TestCase("ftp://hooks.example.com/t", SinkProblem.NotHttps)]
+    [TestCase("https://alice:pw@hooks.example.com/t", SinkProblem.UserInfo)]
+    [TestCase("hooks.example.com/t", SinkProblem.NotAbsolute)]
+    [TestCase("C:\\temp\\x", SinkProblem.NotAbsolute)]
+    public void Urls(string url, SinkProblem expected) =>
+        Assert.That(SinkRules.CheckUrl(url, out _), Is.EqualTo(expected));
 
-    [TestCase("Authorization", "Bearer abc", WebhookProblem.None)]
-    [TestCase("X-Api-Key", "k\tv", WebhookProblem.None)]
-    [TestCase("X Api", "v", WebhookProblem.HeaderName)]
-    [TestCase("X-Api:", "v", WebhookProblem.HeaderName)]
-    [TestCase("", "v", WebhookProblem.HeaderName)]
-    [TestCase("X-Api", "v\r\nX-Evil: 1", WebhookProblem.HeaderValue)]
-    [TestCase("X-Api", "v\n", WebhookProblem.HeaderValue)]
-    [TestCase("host", "evil.example.com", WebhookProblem.HeaderReserved)]
-    [TestCase("Content-Length", "1", WebhookProblem.HeaderReserved)]
-    [TestCase("Content-Type", "text/plain", WebhookProblem.HeaderReserved)]
-    [TestCase("Idempotency-Key", "x", WebhookProblem.HeaderReserved)]
-    public void Headers(string name, string value, WebhookProblem expected) =>
-        Assert.That(WebhookRules.CheckHeader(name, value), Is.EqualTo(expected));
+    [TestCase("Authorization", "Bearer abc", SinkProblem.None)]
+    [TestCase("X-Api-Key", "k\tv", SinkProblem.None)]
+    [TestCase("X Api", "v", SinkProblem.HeaderName)]
+    [TestCase("X-Api:", "v", SinkProblem.HeaderName)]
+    [TestCase("", "v", SinkProblem.HeaderName)]
+    [TestCase("X-Api", "v\r\nX-Evil: 1", SinkProblem.HeaderValue)]
+    [TestCase("X-Api", "v\n", SinkProblem.HeaderValue)]
+    [TestCase("host", "evil.example.com", SinkProblem.HeaderReserved)]
+    [TestCase("Content-Length", "1", SinkProblem.HeaderReserved)]
+    [TestCase("Content-Type", "text/plain", SinkProblem.HeaderReserved)]
+    [TestCase("Idempotency-Key", "x", SinkProblem.HeaderReserved)]
+    public void Headers(string name, string value, SinkProblem expected) =>
+        Assert.That(SinkRules.CheckHeader(name, value), Is.EqualTo(expected));
 
     [Test]
     public void The_same_header_twice_is_refused() =>
-        Assert.That(WebhookRules.Check(new("siem", new("https://hooks.example.com"), [new("X-A", "1"), new("x-a", "2")])), Is.EqualTo(WebhookProblem.HeaderTwice));
+        Assert.That(SinkRules.Check(new WebhookSink("siem", new("https://hooks.example.com"), [new("X-A", "1"), new("x-a", "2")])), Is.EqualTo(SinkProblem.HeaderTwice));
 }
 
-public class WebhookTransportTests
+public class HttpAlertTransportTests
 {
     static readonly DateTimeOffset T0 = new(2026, 11, 21, 10, 0, 0, TimeSpan.Zero);
 
@@ -173,7 +173,7 @@ public class WebhookTransportTests
 
     static async Task<(DeliveryResult Result, FakeHandler Handler)> Deliver(FakeHandler handler, WebhookSink? sink = null)
     {
-        using var transport = new WebhookTransport(handler, new SteppedTime(T0));
+        using var transport = new HttpAlertTransport(handler, new SteppedTime(T0));
         return (await transport.DeliverAsync(Payload, sink ?? Sink, CancellationToken.None), handler);
     }
 
@@ -204,7 +204,7 @@ public class WebhookTransportTests
     [Test]
     public void The_real_handler_follows_no_redirect_and_uses_the_system_proxy()
     {
-        using var handler = WebhookTransport.CreateHandler();
+        using var handler = HttpAlertTransport.CreateHandler();
         Assert.That(handler.AllowAutoRedirect, Is.False);
         Assert.That(handler.UseProxy, Is.True);
         Assert.That(handler.Proxy, Is.Null, "null means the system proxy");
@@ -311,7 +311,7 @@ public class AlertDeliveryTests
         var time = new SteppedTime(T0);
         var handler = new FakeHandler((_, n) => new HttpResponseMessage(n == 1 ? HttpStatusCode.InternalServerError : HttpStatusCode.OK));
         var log = new ConcurrentQueue<string>();
-        await using var sender = new AlertSender(new WebhookTransport(handler, time), time, log.Enqueue);
+        await using var sender = new AlertSender(new HttpAlertTransport(handler, time), time, log.Enqueue);
         sender.Configure([Sink]);
         sender.Start();
         sender.Enqueue(new("siem", Payload(1)));
@@ -335,7 +335,7 @@ public class AlertDeliveryTests
         var handler = new FakeHandler((request, _) => new HttpResponseMessage(
             request.RequestUri!.Host == "hooks.example.com" ? HttpStatusCode.Unauthorized : HttpStatusCode.OK));
         var log = new ConcurrentQueue<string>();
-        await using var sender = new AlertSender(new WebhookTransport(handler, time), time, log.Enqueue);
+        await using var sender = new AlertSender(new HttpAlertTransport(handler, time), time, log.Enqueue);
         sender.Configure([Sink]);
         sender.Start();
         sender.Enqueue(new("siem", Payload(1)));
@@ -358,7 +358,7 @@ public class AlertDeliveryTests
         var time = new SteppedTime(T0);
         var handler = FakeHandler.Always(HttpStatusCode.BadGateway);
         var log = new ConcurrentQueue<string>();
-        await using var sender = new AlertSender(new WebhookTransport(handler, time), time, log.Enqueue);
+        await using var sender = new AlertSender(new HttpAlertTransport(handler, time), time, log.Enqueue);
         sender.Configure([Sink]);
         sender.Start();
         sender.Enqueue(new("siem", Payload(1)));
@@ -381,7 +381,7 @@ public class AlertDeliveryTests
             ? throw new HttpRequestException($"Failed {request.RequestUri} {request.Headers.Authorization}")
             : new HttpResponseMessage(HttpStatusCode.Forbidden));
         var log = new ConcurrentQueue<string>();
-        await using var sender = new AlertSender(new WebhookTransport(handler, time), time, log.Enqueue);
+        await using var sender = new AlertSender(new HttpAlertTransport(handler, time), time, log.Enqueue);
         sender.Configure([Sink]);
         sender.Start();
         sender.Enqueue(new("siem", Payload(1) with { Title = "CANARY-body" }));
@@ -418,7 +418,7 @@ public class AlertCenterTests
     {
         var handler = FakeHandler.Always(HttpStatusCode.OK);
         var time = new SteppedTime(T0);
-        await using var center = new AlertCenter(new WebhookTransport(handler, time), time, _ => { });
+        await using var center = new AlertCenter(new HttpAlertTransport(handler, time), time, _ => { });
         center.Start();
         center.Raise(new(AlertKind.DecoyUsed, new(Program: "C:\\x.exe"), T0));
         await Task.Delay(50);
@@ -434,7 +434,7 @@ public class AlertCenterTests
     {
         var handler = FakeHandler.Always(HttpStatusCode.OK);
         var time = new SteppedTime(T0);
-        await using var center = new AlertCenter(new WebhookTransport(handler, time), time, _ => { });
+        await using var center = new AlertCenter(new HttpAlertTransport(handler, time), time, _ => { });
         center.Start();
         center.Use(new("workstation", InstallKey, [Sink("a", AlertRedaction.Public), Sink("b", AlertRedaction.Public), Sink("c", AlertRedaction.Public)]),
             new Dictionary<string, SinkNarrowing> { ["a"] = new(Muted: true), ["b"] = new(Removed: true) });
@@ -450,7 +450,7 @@ public class AlertCenterTests
     {
         var handler = FakeHandler.Always(HttpStatusCode.OK);
         var time = new SteppedTime(T0);
-        await using var center = new AlertCenter(new WebhookTransport(handler, time), time, _ => { });
+        await using var center = new AlertCenter(new HttpAlertTransport(handler, time), time, _ => { });
         center.Use(new("workstation", InstallKey, [Sink("a", AlertRedaction.Public), Sink("b", AlertRedaction.Trusted)]), null);
 
         var first = await center.SendTestAsync("b", CancellationToken.None);
@@ -480,7 +480,7 @@ public class AlertCenterTests
         var handler = FakeHandler.Always(HttpStatusCode.OK);
         var time = new SteppedTime(T0);
         var log = new ConcurrentQueue<string>();
-        await using var center = new AlertCenter(new WebhookTransport(handler, time), time, log.Enqueue);
+        await using var center = new AlertCenter(new HttpAlertTransport(handler, time), time, log.Enqueue);
         center.Start();
         center.Use(new("workstation", InstallKey, [Sink("siem", redaction)]), null);
         center.Raise(alert);
@@ -525,8 +525,8 @@ public class AlertsFileTests
 
     static readonly AlertsConfig Config = new("workstation", [.. Enumerable.Range(1, 32).Select(i => (byte)i)],
     [
-        new("siem", new("https://hooks.example.com/t?key=CANARY-url-secret"), [new("Authorization", "Bearer CANARY-header-secret")], AlertSeverity.High, AlertRedaction.Trusted),
-        new("relay", new("http://localhost:8080/"), [], AlertSeverity.Warning),
+        new WebhookSink("siem", new("https://hooks.example.com/t?key=CANARY-url-secret"), [new("Authorization", "Bearer CANARY-header-secret")], AlertSeverity.High, AlertRedaction.Trusted),
+        new WebhookSink("relay", new("http://localhost:8080/"), [], AlertSeverity.Warning),
     ]);
 
     static void AssertSame(AlertsConfig? back)
@@ -569,7 +569,7 @@ public class AlertsFileTests
     {
         // Anyone can seal for the recovery key's public half; only the app holding Hello can seal for Hello.
         var intruder = X25519KeyWrapper.ForKey("hello", Key.Create(KeyAgreementAlgorithm.X25519));
-        var widened = Config.With(new("evil", new("https://evil.example.com/"), [], AlertSeverity.Info, AlertRedaction.Trusted));
+        var widened = Config.With(new WebhookSink("evil", new("https://evil.example.com/"), [], AlertSeverity.Info, AlertRedaction.Trusted));
         var text = AlertsFile.Seal(widened, 1, intruder, RecoveryPublic);
 
         Assert.Throws<InvalidDataException>(() => AlertsFile.Open(text, Hello));

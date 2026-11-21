@@ -83,16 +83,26 @@ unlock.
 
 ## Alerts when you're away
 
-The tray app can post serious events to a webhook of your choice, so a used decoy credential
-reaches you when you aren't at the PC. In **About**, **Alerts**, **Add a webhook...** asks for a
-name for this PC (it goes with every alert, so pick one that says nothing more), the URL (HTTPS, or
-plain HTTP to localhost) and an optional header such as `Authorization`. The URL and header are
-sealed like your secrets and saving needs Windows Hello; muting or removing a webhook doesn't.
-**Send a test alert** checks it arrives. Each alert is one `tiresias.alert/v1` JSON POST: the
-event, its severity and time, and the PC's name. A webhook you mark trusted also gets program paths
-and names; no webhook ever gets a value or a token. Alerts open at the first unlock after the app
-starts, then keep working while the session is locked. Today only a used decoy credential raises
-one; ntfy, LcdHub and more events are planned (see [docs/alerts.md](docs/alerts.md)).
+The tray app can push serious events to your phone through [ntfy](https://ntfy.sh), or post them
+to a webhook of your choice, so a used decoy credential reaches you when you aren't at the PC. In
+**About**, **Alerts**, the first one you add asks for a name for this PC (it goes with every alert,
+so pick one that says nothing more).
+
+- **Add ntfy...** asks for the server (`https://ntfy.sh` or your own), the topic your phone's ntfy
+  app subscribes to, and an optional access token. Use a long random topic name, and a token that
+  can only write to it, so a stolen one can't read your alerts back. Each alert is a notification
+  with the event as its title, its severity as the priority, and a line such as "Critical on desk,
+  ×1. Open Tiresias."
+- **Add a webhook...** asks for the URL (HTTPS, or plain HTTP to localhost) and an optional header
+  such as `Authorization`. Each alert is one `tiresias.alert/v1` JSON POST: the event, its severity
+  and time, and the PC's name.
+
+Topics, tokens, URLs and headers are sealed like your secrets and saving needs Windows Hello;
+muting or removing one doesn't. **Send a test alert** checks it arrives. One you mark trusted also
+gets program paths and names (ntfy: the program's file name only); nothing ever gets a value or a
+token. Alerts open at the first unlock after the app starts, then keep working while the session is
+locked. Today only a used decoy credential raises one; LcdHub and more events are planned (see
+[docs/alerts.md](docs/alerts.md)).
 
 ## AI coding agents
 

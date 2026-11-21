@@ -38,14 +38,14 @@ public sealed class AlertSender : IAsyncDisposable
 {
     sealed record Pending(AlertPayload Payload, DateTimeOffset QueuedAt, int Failures, DateTimeOffset NotBefore);
 
-    sealed class SinkQueue(WebhookSink definition)
+    sealed class SinkQueue(AlertSink definition)
     {
-        public WebhookSink Definition = definition;
+        public AlertSink Definition = definition;
         public readonly LinkedList<Pending> Items = new();
         public bool Stopped;
     }
 
-    readonly WebhookTransport transport;
+    readonly HttpAlertTransport transport;
     readonly TimeProvider time;
     readonly Action<string> log;
     readonly Lock gate = new();
@@ -54,7 +54,7 @@ public sealed class AlertSender : IAsyncDisposable
     TaskCompletionSource signal = new(TaskCreationOptions.RunContinuationsAsynchronously);
     Task? running;
 
-    public AlertSender(WebhookTransport transport, TimeProvider time, Action<string> log)
+    public AlertSender(HttpAlertTransport transport, TimeProvider time, Action<string> log)
     {
         this.transport = transport;
         this.time = time;
@@ -67,7 +67,7 @@ public sealed class AlertSender : IAsyncDisposable
     /// The sinks to deliver to. A sink left out loses its queue. A sink whose URL or headers changed
     /// starts again: its definition was the problem, and the user has fixed it.
     /// </summary>
-    public void Configure(IEnumerable<WebhookSink> sinks)
+    public void Configure(IEnumerable<AlertSink> sinks)
     {
         lock (gate)
         {
@@ -145,7 +145,7 @@ public sealed class AlertSender : IAsyncDisposable
             Task wake;
             SinkQueue? due = null;
             Pending? item = null;
-            WebhookSink? definition = null;
+            AlertSink? definition = null;
             TimeSpan? wait = null;
             lock (gate)
             {
@@ -200,7 +200,7 @@ public sealed class AlertSender : IAsyncDisposable
     }
 
     /// <summary>Applies one attempt's result, unless the sink was removed or retargeted meanwhile.</summary>
-    void Apply(SinkQueue queue, Pending item, WebhookSink definition, DeliveryResult result)
+    void Apply(SinkQueue queue, Pending item, AlertSink definition, DeliveryResult result)
     {
         if (!queues.TryGetValue(definition.Id, out var current) || current != queue || queue.Items.First is not { } head || head.Value != item)
             return;
