@@ -43,6 +43,13 @@ public static class BrokerServiceLayout
 
     public static string StateFolder(string programData) => Path.Combine(programData, "Tiresias", "Broker");
 
+    /// <summary>
+    /// The folders install makes owned by Administrators before granting the service, outermost first.
+    /// Any user can create folders in <c>%ProgramData%</c>, and an owner can always change a folder's
+    /// ACL back, so neither the state folder nor its parent may be one a user made.
+    /// </summary>
+    public static IReadOnlyList<string> SecuredFolders(string programData) => [Path.Combine(programData, "Tiresias"), StateFolder(programData)];
+
     /// <summary><c>sc.exe</c> arguments that register <paramref name="tirPath"/> as the service, under its virtual account.</summary>
     public static IReadOnlyList<string> CreateArguments(string tirPath) =>
         ["create", Name, "binPath=", $"\"{tirPath}\" solo service run", "obj=", Account, "start=", "auto", "DisplayName=", "Tiresias broker"];

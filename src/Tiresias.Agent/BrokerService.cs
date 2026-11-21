@@ -46,8 +46,8 @@ public static class BrokerService
         // As for the admin tier: a link-safe copy from the user's folder, and state folders that only
         // SYSTEM and Administrators own (one a user made first is moved aside, its owner could reopen it).
         AdminTierSetup.Retry(() => AdminTierSetup.CopyFiles(AppContext.BaseDirectory, BinaryFolder));
-        AdminTierSetup.Secure(Path.GetDirectoryName(StateFolder)!);
-        AdminTierSetup.Secure(StateFolder);
+        foreach (var folder in BrokerServiceLayout.SecuredFolders(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData)))
+            AdminTierSetup.Secure(folder);
         File.WriteAllBytes(BrokerServiceLayout.TrustChainPath(StateFolder), TrustLinkJson.WriteChain(chain));
         File.WriteAllBytes(Path.Combine(StateFolder, BrokerServiceConfig.FileName),
             new BrokerServiceConfig(tenant.VaultPath, genesis, TimeZoneInfo.Local.Id).Write());

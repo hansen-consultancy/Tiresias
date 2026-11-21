@@ -1,3 +1,4 @@
+using Tiresias.AdminTier;
 using Tiresias.Client;
 
 namespace Tiresias.Tests;
@@ -23,6 +24,19 @@ public class BrokerServiceLayoutTests
         Assert.That(acl, Does.Contain("/inheritance:r"));
         Assert.That(acl.Where(a => a.Contains("(OI)", StringComparison.Ordinal)), Is.EqualTo(new[] { "*S-1-5-18:(OI)(CI)F", "*S-1-5-32-544:(OI)(CI)F", @"NT SERVICE\Tiresias:(OI)(CI)M" }));
         Assert.That(BrokerServiceLayout.VaultFolderAcl("vault"), Is.EqualTo(new[] { "vault", "/grant", @"NT SERVICE\Tiresias:(OI)(CI)R" }));
+    }
+
+    [Test]
+    public void Install_owns_the_state_folder_and_its_parent_and_trusts_no_folder_a_user_made()
+    {
+        var programData = Path.Combine("data");
+        Assert.That(BrokerServiceLayout.SecuredFolders(programData), Is.EqualTo(new[]
+        {
+            Path.Combine(programData, "Tiresias"), BrokerServiceLayout.StateFolder(programData),
+        }), "outermost first: a user-owned parent could swap the state folder out");
+        Assert.That(AdminFolders.Trusted(isReparsePoint: false, "S-1-5-21-1-2-3-1001"), Is.False, "a folder a user made first is moved aside");
+        Assert.That(AdminFolders.Trusted(isReparsePoint: true, AdminFolders.AdministratorsSid), Is.False);
+        Assert.That(AdminFolders.Trusted(isReparsePoint: false, AdminFolders.AdministratorsSid), Is.True);
     }
 
     [Test]
