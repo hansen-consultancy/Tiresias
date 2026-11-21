@@ -225,6 +225,12 @@ public partial class StatusWindow : Window
             case DisableStartup:
                 Desktop.Open("ms-settings:startupapps");
                 break;
+            case RunThroughExec { Setup: { } setup }:
+                Navigate<ServicesPage>()?.Add(setup.Upstream);
+                break;
+            case RunThroughExec exec:
+                model.CopyFix(exec.Instruction);
+                break;
         }
     }
 

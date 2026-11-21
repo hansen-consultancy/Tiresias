@@ -1937,6 +1937,9 @@ Store them in clear?</value>
   <data name="Finding_FixPlaceholder" xml:space="preserve">
     <value>Use a placeholder...</value>
   </data>
+  <data name="Finding_FixGitHubApp" xml:space="preserve">
+    <value>Add a GitHub App...</value>
+  </data>
   <data name="About_Mode" xml:space="preserve">
     <value>Mode</value>
   </data>
