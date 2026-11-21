@@ -106,6 +106,12 @@ public interface IDoctorProbe
 
     /// <summary>The uninstall registry entries, machine and user, each with whether its uninstaller and folder are on disk.</summary>
     IEnumerable<UninstallEntry> UninstallEntries() => [];
+
+    /// <summary>The config files of the CLIs that sign in as the user. See <see cref="Doctor.CliSignIns"/>.</summary>
+    DoctorCliConfigs CliConfigs => new(null, null);
+
+    /// <summary>The slug of a vault GitHub App service, for <c>tir exec gh</c>; <c>null</c> when there is none.</summary>
+    string? GitHubAppService => null;
 }
 
 /// <summary>
@@ -156,6 +162,7 @@ public static partial class Doctor
         checks.AddRange(PublishingKeys(probe.ToolFiles(), probe.UserVariableNames));
         checks.AddRange(RavenExpiry(probe.RavenCertificates(), DateTimeOffset.UtcNow));
         checks.AddRange(KeysAsValues(probe.SealedEnvironment));
+        checks.AddRange(CliSignIns(probe.CliConfigs, probe.GitHubAppService));
         checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), probe.CredentialUses(), probe.BlockedPrograms(), DateTimeOffset.UtcNow));
         checks.AddRange(UninstallEntries(probe.UninstallEntries()));
         return checks;

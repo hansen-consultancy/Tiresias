@@ -225,6 +225,12 @@ public partial class StatusWindow : Window
             case RemoveEntry or Repair { Command: not null }:
                 model.CopyFix(fix.Instruction);
                 break;
+            case RunThroughExec { Setup: { } setup }:
+                Navigate<ServicesPage>()?.Add(setup.Upstream);
+                break;
+            case RunThroughExec exec:
+                model.CopyFix(exec.Instruction);
+                break;
         }
     }
 
@@ -706,7 +712,10 @@ public sealed partial class StatusViewModel : ObservableObject
         var split = FindingView.Of(last, DismissalStore.Load());
         allFindings = [.. split.Open.Select((group, i) => new FindingRow(group) { IsOpen = i == 0, Number = i + 1 })];
         if (last.Count > 0)
+        {
             Home.LastFindings = allFindings.Count;
+            FindingWatch.Shown(last);
+        }
         ShowFindings();
         Dismissed.Clear();
         foreach (var group in split.Dismissed)
