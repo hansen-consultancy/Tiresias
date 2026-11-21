@@ -21,6 +21,12 @@ sealed class ReadAudit : IDisposable
     /// <summary>Events that aren't reads of a held file move the record id forward; saving it this often is enough.</summary>
     static readonly TimeSpan SaveEvery = TimeSpan.FromSeconds(30);
 
+    /// <summary>
+    /// How often the log is read. Polled, not subscribed: an <c>EventLogWatcher</c> ignores the
+    /// <c>EventRecordID</c> condition of its query and delivers nothing, while a reader honours it.
+    /// </summary>
+    static readonly TimeSpan ReadEvery = TimeSpan.FromSeconds(2);
+
     readonly string statePath;
     readonly ILogger logger;
     readonly Action<string, DecoyHit, IReadOnlyList<string>, string?> report;
@@ -32,7 +38,8 @@ sealed class ReadAudit : IDisposable
     readonly bool privileged;
     AdminAuditState state;
     DateTime saved = DateTime.UtcNow;
-    EventLogWatcher? watcher;
+    Timer? poll;
+    bool unreadable;
 
     /// <param name="report">A read of a user's file: the user's SID, the read, who started the reader, and the routine opener it is, if one.</param>
     public ReadAudit(string stateFolder, ILogger logger, Action<string, DecoyHit, IReadOnlyList<string>, string?> report)
@@ -56,7 +63,7 @@ sealed class ReadAudit : IDisposable
     public bool Auditing(string sid)
     {
         lock (gate)
-            return watcher is not null && audited.Contains(sid);
+            return poll is not null && !unreadable && audited.Contains(sid);
     }
 
     /// <summary>Sets the rule on each of the user's files and turns success auditing on, if it is off. Again for a set held before: a rule is never doubled.</summary>
@@ -102,7 +109,7 @@ sealed class ReadAudit : IDisposable
     /// <summary>Takes the rules off a released set's files, and success auditing off when no set is left and the service turned it on.</summary>
     public void Release(string sid, IReadOnlyList<string> paths, int setsLeft)
     {
-        EventLogWatcher? stopped = null;
+        Timer? stopped = null;
         lock (gate)
         {
             audited.Remove(sid);
@@ -114,9 +121,8 @@ sealed class ReadAudit : IDisposable
             }
             Settle(setsLeft);
             if (files.Count == 0)
-                (stopped, watcher) = (watcher, null);
+                (stopped, poll) = (poll, null);
         }
-        // Outside the lock: disposing waits for a callback that may be waiting for it.
         stopped?.Dispose();
     }
 
@@ -143,25 +149,46 @@ sealed class ReadAudit : IDisposable
 
     void Watch()
     {
-        if (watcher is not null || files.Count == 0)
-            return;
+        if (poll is null && files.Count > 0)
+            poll = new(_ => Poll(), null, TimeSpan.Zero, Timeout.InfiniteTimeSpan);
+    }
+
+    /// <summary>Reads the log from the last record handled, then comes again: one read at a time.</summary>
+    void Poll()
+    {
         try
         {
-            // The first time, the log's end is where reading starts: what came before held nothing.
-            if (state.LastRecordId == 0)
+            long after;
+            lock (gate)
             {
-                state = state.Handled(NewestRecord());
-                Save();
+                // The first time, the log's end is where reading starts: what came before held nothing.
+                if (state.LastRecordId == 0)
+                {
+                    state = state.Handled(NewestRecord());
+                    Save();
+                }
+                after = state.LastRecordId;
             }
-            watcher = new(new EventLogQuery("Security", PathType.LogName, AdminAudit.Query(state.LastRecordId)), null, readExistingEvents: true);
-            watcher.EventRecordWritten += (_, e) => Written(e);
-            watcher.Enabled = true;
+            using var reader = new EventLogReader(new EventLogQuery("Security", PathType.LogName, AdminAudit.Query(after)));
+            while (reader.ReadEvent() is { } record)
+            {
+                string xml;
+                using (record)
+                    xml = record.ToXml();
+                Handle(xml);
+            }
+            unreadable = false;
         }
         catch (Exception e) when (e is EventLogException or UnauthorizedAccessException)
         {
-            watcher?.Dispose();
-            watcher = null;
-            logger.LogError("The Security log can't be read ({Kind}); reads of held decoy files go unseen", e.GetType().Name);
+            if (!unreadable)
+                logger.LogError("The Security log can't be read ({Kind}); reads of held decoy files go unseen", e.GetType().Name);
+            unreadable = true;
+        }
+        finally
+        {
+            lock (gate)
+                poll?.Change(ReadEvery, Timeout.InfiniteTimeSpan);
         }
     }
 
@@ -172,19 +199,9 @@ sealed class ReadAudit : IDisposable
         return newest?.RecordId ?? 0;
     }
 
-    void Written(EventRecordWrittenEventArgs e)
+    void Handle(string xml)
     {
-        if (e.EventException is { } failed)
-        {
-            logger.LogError("The Security log can't be read ({Kind})", failed.GetType().Name);
-            return;
-        }
-        if (e.EventRecord is not { } record)
-            return;
-        AuditedAccess? access;
-        using (record)
-            access = AdminAudit.Parse(record.ToXml());
-        if (access is null)
+        if (AdminAudit.Parse(xml) is not { } access)
             return;
         (string Sid, DecoyHit Hit)? read;
         RoutineFolders folders;
@@ -247,9 +264,9 @@ sealed class ReadAudit : IDisposable
 
     public void Dispose()
     {
-        EventLogWatcher? stopped;
+        Timer? stopped;
         lock (gate)
-            (stopped, watcher) = (watcher, null);
+            (stopped, poll) = (poll, null);
         stopped?.Dispose();
         lock (gate)
             Save();
