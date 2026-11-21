@@ -61,9 +61,10 @@ public partial class TrayFlyout : UserControl
     /// <summary>Today's approvals under the headline, read off the UI thread; the mode, when there is one, leads.</summary>
     async Task ShowApprovalsAsync()
     {
-        var today = await Task.Run(() => ActivityQuery.Today(ActivityLog.ReadAll(), DateTimeOffset.Now));
-        var approvals = today.Approvals switch
+        var today = await Task.Run(() => ActivityLog.ReadAll().Today(DateTimeOffset.Now));
+        var approvals = today?.Approvals switch
         {
+            null => Text.Get("Activity_ServiceUnavailable"),
             0 => Text.Get("Flyout_ApprovalsNone"),
             1 => Text.Get("Flyout_ApprovalsOne"),
             var n => Text.Format("Flyout_ApprovalsMany", n),

@@ -17,4 +17,6 @@ stops silent use through Tiresias. Placeholders keep the real value out of the p
 allows it.
 
 **Accepted because** no user-mode design can stop a process reading a sibling of the same account.
-Moving the broker into the Windows service under its own account narrows it.
+`tir solo service install` moves the solo broker into a Windows service under its own account,
+out of reach of the user's programs ([broker-service.md](../broker-service.md)); the app and the
+user's own processes stay exposed.

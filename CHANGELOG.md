@@ -23,6 +23,10 @@ its section below.
   Windows Hello; mute, remove and **Send a test alert** are on the same card. Alerts carry the
   event, its time and a name you give the PC, never a secret's name unless you mark the webhook
   trusted, and never a value.
+- `tir solo service install` (as administrator) runs solo mode's broker as a Windows service under
+  its own account, so programs running as you can't read its memory or rewrite the files it
+  trusts, and an older `vault.json` restored while locked is refused. `tir solo service uninstall`
+  moves it back into the app.
 - `Tiresias.Core` and `Tiresias.Protocol` carry the groundwork for out-of-band alerts: the
   `tiresias.alert/v1` payload and the planner that decides, per sink, what to send, with dedupe,
   rate limits and redaction.
@@ -73,8 +77,11 @@ its section below.
 - An optional admin tier: with one Windows admin prompt, the app sets up a small Tiresias service
   that runs from Program Files. First run offers it once (**Not now** changes nothing); About shows
   whether it runs and offers **Set up**, **Update** or **Remove**, and `tir doctor` reports it.
-  This release sets up the service only; what it does (holding decoys out of reach, noticing
-  them used from boot) comes in the next ones.
+  With it, your decoys are held by the service: programs running as you can no longer read which
+  files are decoys or their values, a decoy used while the app is closed is caught from boot and
+  shown when the app next runs, and Home and `tir decoys list` show the kinds held. Removing the
+  decoys, or the admin tier, gives them back first (one more admin prompt). Auditing reads and
+  stopping the program come in the next releases.
 
 ### Changed
 
