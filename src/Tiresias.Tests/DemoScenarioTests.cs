@@ -85,6 +85,7 @@ public class DemoScenarioTests
     [TestCase(Profile + @"\..\bob\x.pfx", false)]
     [TestCase(Profile + @"-other\x.pfx", false)]
     [TestCase(@"C:\Users\someone\source\x.pfx", false)]
+    [Platform("Win")]
     public void Only_a_path_inside_the_profile_is_the_demos_to_delete(string path, bool inside) =>
         Assert.That(DemoScenario.Inside(Profile, path), Is.EqualTo(inside));
 
