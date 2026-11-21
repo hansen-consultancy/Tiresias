@@ -69,8 +69,10 @@ public static partial class Doctor
     /// couldn't be named: an open may be harmless, so it blocks nothing and the wording says only "opened".
     /// </summary>
     /// <param name="blocked">The programs on the blocklist.</param>
-    public static IEnumerable<DoctorCheck> Decoys(IEnumerable<DecoyUseRecord> uses, IEnumerable<string> blocked, DateTimeOffset now)
+    /// <param name="runs">When programs last ran, to say when Windows last saw a blocked one run.</param>
+    public static IEnumerable<DoctorCheck> Decoys(IEnumerable<DecoyUseRecord> uses, IEnumerable<string> blocked, DateTimeOffset now, IEnumerable<ProgramRun>? runs = null)
     {
+        var allRuns = (runs ?? []).ToArray();
         var records = uses.ToArray();
         var all = records.Where(u => !u.IsRead).ToArray();
         var blockedPaths = blocked.ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -81,7 +83,7 @@ public static partial class Doctor
             // Frozen by any use still listed: thawing undoes every freeze of the program at once.
             var frozen = group.Any(u => u.Frozen);
             yield return new($"{FileName(group.Key)} used a decoy credential", DoctorStatus.Fail,
-                $"{group.Key} connected with {last.What} on {last.At.ToLocalTime():g}{Times(group.Count())}. Nothing legitimate knows that credential, "
+                $"{group.Key} connected with {last.What} on {last.At.ToLocalTime():g}{Times(group.Count())}{LastSeen(allRuns, group.Key)}. Nothing legitimate knows that credential, "
                 + (frozen
                     ? "so Tiresias froze the program and blocked its network, and refuses it any lease, placeholder or consent dialog until you say. Thaw it if that was you"
                     : "so Tiresias blocked the program: no lease, placeholder or consent dialog until you say. Unblock it if that was you"),
@@ -114,6 +116,11 @@ public static partial class Doctor
     }
 
     static string Times(int count) => count > 1 ? $" ({count} times in all)" : "";
+
+    static string LastSeen(IEnumerable<ProgramRun> runs, string program) =>
+        runs.Where(r => string.Equals(r.Path, program, StringComparison.OrdinalIgnoreCase)).MaxBy(r => r.LastRun) is { } run
+            ? $"; Windows last saw it run on {run.LastRun.ToLocalTime():g}"
+            : "";
 
     sealed record DecoyLine(DateTimeOffset Time, string? Consumer, string? Service, string? Process, string? Reason);
 }

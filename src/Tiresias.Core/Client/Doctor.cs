@@ -105,8 +105,12 @@ public interface IDoctorProbe
     /// <summary>Paths of blocked programs whose file still exists.</summary>
     IEnumerable<string> BlockedPrograms() => [];
 
-    /// <summary>When the user last started each program themselves, where Windows records it (UserAssist).</summary>
-    IEnumerable<ProgramRun> ProgramRuns() => [];
+    /// <summary>
+    /// When programs last ran for the user, where Windows records it: every program the user started
+    /// themselves (UserAssist), and, with the admin tier installed, how any program or one under a
+    /// folder of <paramref name="of"/> last ran (its <c>lastrun</c>).
+    /// </summary>
+    IEnumerable<ProgramRun> ProgramRuns(IReadOnlyCollection<string> of) => [];
 
     /// <summary>The uninstall registry entries, machine and user, each with whether its uninstaller and folder are on disk.</summary>
     IEnumerable<UninstallEntry> UninstallEntries() => [];
@@ -186,10 +190,12 @@ public static partial class Doctor
         // A program blocked for using a decoy is that finding, not "This wasn't me"'s.
         var decoyUses = probe.DecoyUses().ToArray();
         var blocked = probe.BlockedPrograms().ToArray();
-        checks.AddRange(Decoys(decoyUses, blocked, DateTimeOffset.UtcNow));
+        var (startup, installed) = (probe.StartupEntries().ToArray(), probe.UninstallEntries().ToArray());
+        var runs = probe.ProgramRuns(RunsAsked(startup, installed, blocked)).ToArray();
+        checks.AddRange(Decoys(decoyUses, blocked, DateTimeOffset.UtcNow, runs));
         checks.AddRange(CliSignIns(probe.CliConfigs, probe.GitHubAppService));
-        var (uses, runs, installed, now) = (probe.CredentialUses().ToArray(), probe.ProgramRuns().ToArray(), probe.UninstallEntries().ToArray(), DateTimeOffset.UtcNow);
-        checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), uses, blocked.Where(b => !decoyUses.Any(u => !u.IsRead && SamePath(u.Program, b))), now, runs));
+        var (uses, now) = (probe.CredentialUses().ToArray(), DateTimeOffset.UtcNow);
+        checks.AddRange(AttackSurface(probe.Extensions(), startup, uses, blocked.Where(b => !decoyUses.Any(u => !u.IsRead && SamePath(u.Program, b))), now, runs));
         checks.AddRange(UninstallEntries(installed));
         checks.AddRange(UnusedApplications(installed, runs, uses, now));
         return checks;

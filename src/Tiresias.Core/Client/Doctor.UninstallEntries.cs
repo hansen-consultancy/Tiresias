@@ -158,6 +158,20 @@ public static partial class Doctor
         }
     }
 
+    /// <summary>
+    /// What the doctor asks the admin tier's <c>lastrun</c> about: the programs started at log-on,
+    /// the installed programs' own folders and the blocked programs, as many as one request takes.
+    /// </summary>
+    public static IReadOnlyCollection<string> RunsAsked(IEnumerable<StartupEntry> startup, IEnumerable<UninstallEntry> installed, IEnumerable<string> blocked) =>
+    [
+        .. startup.Select(s => s.Path).OfType<string>()
+            .Concat(installed.Where(e => e is { FolderExists: true, Folder: { } folder } && Deep(folder)).Select(e => e.Folder!))
+            .Concat(blocked)
+            .Where(p => p.Length <= Tiresias.AdminTier.AdminArgs.MaxPath && !p.Any(char.IsControl) && Tiresias.AdminTier.AdminArgs.FullPath(p))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(Tiresias.AdminTier.AdminArgs.MaxRunPaths),
+    ];
+
     /// <summary>A program's own folder, not a root such as <c>C:\Program Files</c> that holds everyone's.</summary>
     static bool Deep(string folder) => folder.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries).Length >= 3;
 

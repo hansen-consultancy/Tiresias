@@ -47,7 +47,7 @@ public static class AdminCallerPolicy
         [AdminOps.Freeze] = new(false, new Dictionary<string, ArgCheck> { ["pid"] = AdminArgs.Pid }),
         [AdminOps.Thaw] = new(true, new Dictionary<string, ArgCheck> { ["program"] = AdminArgs.Program }),
         [AdminOps.DecoysRelease] = new(true, NoArgs),
-        [AdminOps.LastRun] = new(false, null),
+        [AdminOps.LastRun] = new(false, new Dictionary<string, ArgCheck> { ["paths"] = AdminArgs.RunPaths }),
         [AdminOps.Teardown] = new(true, NoArgs),
     };
 

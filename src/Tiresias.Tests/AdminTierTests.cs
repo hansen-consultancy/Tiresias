@@ -81,7 +81,7 @@ public class AdminCallerPolicyTests
     static readonly string[] Built =
     [
         AdminOps.Status, AdminOps.EventsWait, AdminOps.DecoysAdopt, AdminOps.DecoysStatus, AdminOps.DecoysRelease,
-        AdminOps.Freeze, AdminOps.Thaw, AdminOps.Teardown,
+        AdminOps.Freeze, AdminOps.Thaw, AdminOps.Teardown, AdminOps.LastRun,
     ];
 
     [Test]
