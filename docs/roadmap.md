@@ -12,10 +12,10 @@ design and issue. A PR that finishes, starts or adds an item edits this page in 
 - [x] Local activity log and the app's activity window
 - [ ] `tir activity`
 - [x] Solo mode, with the broker hosted in the app ([design](desktop-app.md#solo-mode))
-- [ ] Solo mode: local broker as a Windows service (in review)
-- [ ] Policy integrity: the broker refuses a service policy the user didn't approve
-      ([design](policy-integrity.md), #24). Phases 1 to 3 and the rollback high-water mark within a
-      lease built; keeping it across locks and restarts waits for the Windows service
+- [x] Solo mode: local broker as a Windows service
+- [x] Policy integrity: the broker refuses a service policy the user didn't approve
+      ([design](policy-integrity.md), #24). The rollback high-water mark holds within a lease, and
+      across locks and restarts when the solo broker runs as the Windows service
 - [x] Step-up at the broker: minting, elevation and tokens need an approval only the vault can
       produce ([design](step-up.md), #23)
 - [x] Trust-chain links that add a key need a Windows Hello signature ([design](trust-links.md), #41)

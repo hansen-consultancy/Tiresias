@@ -13,6 +13,10 @@ its section below.
 - Home and `tir doctor` say when every program you run can open your Docker engine (and with it
   every container's environment), when you are in Hyper-V Administrators, and which WSL
   distributions' disks are files you own. Nothing inside a container, distribution or VM is read.
+- `tir solo service install` (as administrator) runs solo mode's broker as a Windows service under
+  its own account, so programs running as you can't read its memory or rewrite the files it
+  trusts, and an older `vault.json` restored while locked is refused. `tir solo service uninstall`
+  moves it back into the app.
 - `Tiresias.Core` and `Tiresias.Protocol` carry the groundwork for out-of-band alerts: the
   `tiresias.alert/v1` payload and the planner that decides, per sink, what to send, with dedupe,
   rate limits and redaction. Nothing sends alerts yet.
