@@ -41,6 +41,10 @@ public static class DecoyPlan
         return steps;
     }
 
+    /// <summary>Every decoy file placed (a variable has none): what the read tripwire watches.</summary>
+    public static IReadOnlyList<string> Files(DecoySet set) =>
+        [.. set.Placed.SelectMany(p => Steps(set, p.Kind, p.Where, _ => false)).OfType<WriteDecoyFile>().Select(f => f.Path)];
+
     /// <summary>
     /// What removing a decoy deletes or clears: each of its files or variables that still holds
     /// exactly what was placed. One that is gone needs nothing; one the user changed is theirs now
