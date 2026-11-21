@@ -5,7 +5,7 @@ using Tiresias.AdminTier;
 namespace Tiresias.App;
 
 /// <summary>
-/// Starts this app again elevated, <c>Tiresias.exe --admin-tier install|remove</c>, through the UAC
+/// Starts this app again elevated, <c>Tiresias.exe --admin-tier install|remove|release-decoys</c>, through the UAC
 /// prompt, and reads back what it did. Program handles that command before any window opens.
 /// </summary>
 static class AdminTierElevation

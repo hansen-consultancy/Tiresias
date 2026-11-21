@@ -128,7 +128,8 @@ public interface IDoctorProbe
 }
 
 /// <summary>How many decoys are placed, and whether something listens on their endpoints (checked without connecting, which would be a hit).</summary>
-public sealed record DoctorDecoys(int Placed, bool Listening);
+/// <param name="Held">The admin tier holds the set and is the one listening (docs/admin-tier.md), so the agent needn't run.</param>
+public sealed record DoctorDecoys(int Placed, bool Listening, bool Held = false);
 
 /// <summary>
 /// The <c>tir doctor</c> checklist: turns probe facts into ok / warn / fail lines. A failure is
@@ -165,9 +166,7 @@ public static partial class Doctor
                 : new("forwarder", DoctorStatus.Warn, "not running: placeholders work only against the broker directly"));
 
         if (probe.Decoys is { Placed: > 0 } decoys)
-            checks.Add(decoys.Listening
-                ? new("decoys", DoctorStatus.Ok, $"{decoys.Placed} placed; a program that uses one is named")
-                : new("decoys", DoctorStatus.Warn, $"{decoys.Placed} placed, but nothing listens on their endpoints, so a use goes unseen: start the app or tir agent"));
+            checks.Add(DecoysLine(decoys));
         if (probe.AdminTier is { Installed: true } adminTier)
             checks.Add(AdminTierLine(adminTier));
         checks.AddRange(probe.UserSecretsFiles().Select(UserSecretsFile).OfType<DoctorCheck>());
@@ -209,6 +208,15 @@ public static partial class Doctor
     ];
 
     public const string AdminTierCheck = "admin tier";
+
+    /// <summary>Whether a use of a placed decoy is seen: the agent listens, or the admin tier holding the set does.</summary>
+    static DoctorCheck DecoysLine(DoctorDecoys decoys) => (decoys.Listening, decoys.Held) switch
+    {
+        (true, false) => new("decoys", DoctorStatus.Ok, $"{decoys.Placed} placed; a program that uses one is named"),
+        (true, true) => new("decoys", DoctorStatus.Ok, $"{decoys.Placed} placed, held by the admin tier, which listens from boot; a program that uses one is named"),
+        (false, false) => new("decoys", DoctorStatus.Warn, $"{decoys.Placed} placed, but nothing listens on their endpoints, so a use goes unseen: start the app or tir agent"),
+        (false, true) => new("decoys", DoctorStatus.Warn, $"{decoys.Placed} placed, held by the admin tier, but it can't listen on their endpoints (a port is taken), so a use goes unseen"),
+    };
 
     /// <summary>The admin tier, when installed: running and which version, or a failure when nothing it does happens.</summary>
     static DoctorCheck AdminTierLine(AdminTierFacts tier) => tier.State switch

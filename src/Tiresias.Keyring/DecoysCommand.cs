@@ -1,3 +1,7 @@
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Security.Principal;
+using Tiresias.AdminTier;
 using Tiresias.Agent;
 using Tiresias.Decoys;
 
@@ -11,12 +15,14 @@ static class DecoysCommand
         "place" => Place(args.Require(2, "kind"), args.At(3)),
         "list" => List(),
         "remove" => Remove(),
+        // What remove runs elevated when the admin tier holds the decoys: not for typing.
+        "release" => (int)AdminDecoys.Release(),
         _ => throw new UsageException("tir decoys takes place, list or remove."),
     };
 
     static int Place(string kind, string? where)
     {
-        var placed = DecoyStore.Place(kind switch
+        var placed = AdminDecoys.Place(kind switch
         {
             "passwords" => DecoyKind.PasswordsFile,
             "project" => DecoyKind.Project,
@@ -24,12 +30,20 @@ static class DecoysCommand
             _ => throw new UsageException("A decoy is passwords, project or variables."),
         }, where);
         Console.WriteLine($"Placed a decoy: {placed.Where}.");
-        Console.WriteLine("A program that uses it is seen while the app or tir agent runs.");
+        Console.WriteLine(DecoyStore.Current is null
+            ? "The admin tier holds it: a program that uses it is seen from boot."
+            : "A program that uses it is seen while the app or tir agent runs.");
         return 0;
     }
 
     static int List()
     {
+        if (DecoyStore.Current is null && AdminDecoys.Status() is { Held: true } held)
+        {
+            Console.WriteLine($"Held by the admin tier: {string.Join(", ", held.Kinds)}; {held.Files} file(s).");
+            Console.WriteLine("Places, ports and values stay with it; tir decoys remove takes them back (UAC) and removes them.");
+            return 0;
+        }
         if (DecoyStore.Current is not { Placed.Count: > 0 } set)
         {
             Console.WriteLine("No decoys placed. tir decoys place passwords puts one in Documents.");
@@ -43,6 +57,15 @@ static class DecoysCommand
 
     static int Remove()
     {
+        if (DecoyStore.Current is null && AdminDecoys.Status() is { Held: true })
+        {
+            Console.WriteLine("The admin tier holds the decoys; giving them back takes an administrator (UAC).");
+            if (ReleaseElevated() is not AdminSetupResult.Done || DecoyStore.Current is null)
+            {
+                Console.Error.WriteLine("The admin tier still holds the decoys: nothing was removed.");
+                return 1;
+            }
+        }
         var (left, kept) = DecoyStore.RemoveAll();
         if (kept.Count > 0)
             Console.WriteLine($"Kept {string.Join(", ", kept)}: changed since Tiresias placed it, so it is yours now.");
@@ -53,5 +76,24 @@ static class DecoysCommand
         }
         Console.Error.WriteLine($"Couldn't remove: {string.Join(", ", left)}. Close what holds them and run this again.");
         return 1;
+    }
+
+    /// <summary><c>tir decoys release</c>, elevated: this process when it already is, otherwise a copy started through UAC.</summary>
+    static AdminSetupResult? ReleaseElevated()
+    {
+        if (new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator))
+            return AdminDecoys.Release();
+        try
+        {
+            using var process = Process.Start(new ProcessStartInfo(Environment.ProcessPath!, ["decoys", "release"]) { UseShellExecute = true, Verb = "runas" });
+            if (process is null || !process.WaitForExit(TimeSpan.FromMinutes(2)))
+                return AdminSetupResult.Failed;
+            return (AdminSetupResult)process.ExitCode;
+        }
+        catch (Win32Exception)
+        {
+            // Declined at the UAC prompt.
+            return null;
+        }
     }
 }

@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Tiresias.AdminTier;
 using Tiresias.Agent;
 using Tiresias.App.Logic;
 using Tiresias.Client;
@@ -74,7 +75,7 @@ public partial class StatusWindow : Window
             return;
         try
         {
-            var placed = DecoyStore.Place(link.Kind, link.Kind == DecoyKind.Variables ? null : where);
+            var placed = AdminDecoys.Place(link.Kind, link.Kind == DecoyKind.Variables ? null : where);
             AppLog.Info($"placed a decoy ({placed.Kind}) at {placed.Where}");
             model.ShowDecoys();
             // The doctor's decoys check says whether they are listened for.
@@ -86,10 +87,17 @@ public partial class StatusWindow : Window
         }
     }
 
-    void OnRemoveDecoys(object sender, RoutedEventArgs e)
+    async void OnRemoveDecoys(object sender, RoutedEventArgs e)
     {
         if (!AskWindow.Confirm(this, Text.Get("Decoys_RemoveHeading"), Text.Get("Decoys_RemoveBody"), Text.Get("Decoys_RemoveAction")))
             return;
+        // Held by the admin tier: getting the set back takes the UAC prompt; then it is removed as always.
+        if (DecoyStore.Current is null && await Task.Run(AdminDecoys.Status) is { Held: true }
+            && (await AdminTierElevation.RunAsync("release-decoys") is not AdminSetupResult.Done || DecoyStore.Current is null))
+        {
+            model.ShowDecoys(Text.Get("Decoys_StillHeld"));
+            return;
+        }
         var (left, kept) = DecoyStore.RemoveAll();
         AppLog.Info($"removed the decoys; {left.Count} left, {kept.Count} kept as changed");
         model.ShowDecoys(string.Join(" ", new[]
@@ -585,14 +593,16 @@ public sealed partial class StatusViewModel : ObservableObject
         {
             set = null;
         }
-        var card = DecoyCard.Of(set);
+        var card = DecoyCard.Of(set, set is null && AdminClient.Installed ? AdminDecoys.Status() : null);
         Decoys.Clear();
         foreach (var placed in card.Placed)
             Decoys.Add(new(Text.Get(DecoyCard.Keys(placed.Kind).Name), placed.Where, Text.Format("Decoys_Since", placed.Placed.ToLocalTime())));
+        foreach (var kind in card.Held)
+            Decoys.Add(new(Text.Get(DecoyCard.Keys(kind).Name), Text.Get("Decoys_Held"), ""));
         DecoyLinks.Clear();
         foreach (var kind in card.Placeable)
             DecoyLinks.Add(new(kind, Text.Get(DecoyCard.Keys(kind).Place)));
-        DecoysRemovableVisibility = card.Placed.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        DecoysRemovableVisibility = card.Removable ? Visibility.Visible : Visibility.Collapsed;
         DecoyMessage = message;
     }
 

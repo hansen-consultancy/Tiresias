@@ -94,12 +94,18 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
         [.. EnvironmentStore.UserVariables().Where(v => v.LooksSecret && !IsDecoyVariable(v.Name)).Select(v => v.Name)];
 
     /// <summary>The decoy variables, while placed: a decoy is not a secret to seal.</summary>
-    static bool IsDecoyVariable(string name) =>
-        DecoyStore.Current is { } set && set.Placed.Any(p => p.Kind == DecoyKind.Variables) && DecoyPlan.VariableNames.Contains(name, StringComparer.OrdinalIgnoreCase);
+    bool IsDecoyVariable(string name) =>
+        DecoyPlan.VariableNames.Contains(name, StringComparer.OrdinalIgnoreCase)
+        && (DecoyStore.Current is { } set ? set.Placed.Any(p => p.Kind == DecoyKind.Variables) : HeldDecoys?.Kinds.Contains(DecoyKind.Variables) == true);
+
+    /// <summary>The set the admin tier holds, asked once per doctor run: <c>decoys.json</c> is gone then.</summary>
+    AdminDecoysStatus? HeldDecoys => heldDecoys ??= AdminClient.Installed ? AdminDecoys.Status() : null;
+
+    AdminDecoysStatus? heldDecoys;
 
     public DoctorDecoys? Decoys => DecoyStore.Current is { Placed.Count: > 0 } set
         ? new(set.Placed.Count, IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners().Any(e => e.Port == set.HttpPort))
-        : null;
+        : HeldDecoys is { Held: true } held ? new(held.Kinds.Count, held.Listening, Held: true) : null;
 
     // On the thread pool: the app runs the doctor from its UI thread, and this waits on a pipe.
     public AdminTierFacts? AdminTier => Task.Run(AdminClient.FactsAsync).GetAwaiter().GetResult() is { Installed: true } tier ? tier : null;

@@ -174,6 +174,14 @@ prompt gets more, through the same step that installs the broker as a Windows se
 | **Stopping the program, not only refusing it**: suspend it and what it started in a job object the user can't thaw, and cut its network (Windows Filtering Platform) until the user decides | Suspending another process and adding firewall filters, from a privileged service |
 | Richer facts for the finding: process start history (Prefetch, Background Activity Moderator), as [attack surface](attack-surface.md) wants too | Both need admin to read |
 
+**Built (step 2 of [the admin tier](admin-tier.md)).** With the tier installed, the agent places
+the decoys as before, then hands the set to the service and deletes `decoys.json`; the service
+listens on its ports from boot and queues each use until the app (or `tir agent`) takes it, which
+then blocks, notifies, records and raises the finding as for a use it saw itself. Home and
+`tir decoys list` show the kinds held, not the places. `tir decoys remove` and **Remove decoys**
+take the set back through a UAC prompt, then remove the decoys as always. While a set is held, no
+other is placed beside it. Auditing reads and stopping the program are later steps.
+
 **The cost.** A privileged service is the most valuable thing on the machine to attack: a bug in it
 is a privilege escalation. It stays small, takes requests only from the app, does only the
 actions above, and the parts that read or suspend user processes run as SYSTEM only if the
