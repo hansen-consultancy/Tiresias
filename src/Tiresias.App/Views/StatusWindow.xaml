@@ -301,6 +301,42 @@
           </StackPanel>
         </Border>
 
+        <!-- Decoys: fake credentials that work nowhere, so a program using one names itself (docs/decoys.md). Links, not buttons (rule 11). -->
+        <Border Style="{StaticResource Card}">
+          <StackPanel>
+            <TextBlock x:Name="DecoysTitle" Text="{l:S Decoys_Title}" Style="{StaticResource SubtitleText}" />
+            <TextBlock Text="{l:S Decoys_Intro}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
+            <ItemsControl ItemsSource="{Binding Decoys}" Focusable="False" AutomationProperties.LabeledBy="{Binding ElementName=DecoysTitle}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <StackPanel Margin="0,4">
+                    <TextBlock Text="{Binding Name}" Style="{StaticResource BodyText}" />
+                    <TextBox Text="{Binding Where, Mode=OneWay}" Style="{StaticResource SelectableText}" />
+                    <TextBlock Text="{Binding Since}" Style="{StaticResource CaptionText}" />
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <WrapPanel Margin="0,4,0,0">
+              <ItemsControl ItemsSource="{Binding DecoyLinks}" Focusable="False">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <TextBlock Margin="0,0,20,0"><Hyperlink Click="OnPlaceDecoy"><Run Text="{Binding Label, Mode=OneWay}" /></Hyperlink></TextBlock>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock Visibility="{Binding DecoysRemovableVisibility}">
+                <Hyperlink Click="OnRemoveDecoys"><Run Text="{l:S Decoys_Remove}" /></Hyperlink>
+              </TextBlock>
+            </WrapPanel>
+            <TextBox Text="{Binding DecoyMessage, Mode=OneWay}" Style="{StaticResource SelectableText}" TextWrapping="Wrap"
+                     Visibility="{Binding DecoyMessageVisibility}" Margin="0,4,0,0" />
+          </StackPanel>
+        </Border>
+
         <!-- Findings: deliveries weaker than they could be, each with its fix and Dismiss with a reason. -->
         <ItemsControl ItemsSource="{Binding Findings}" Focusable="False" ItemTemplate="{StaticResource FindingTemplate}"
                       AutomationProperties.Name="{Binding Summary}" />
