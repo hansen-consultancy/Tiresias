@@ -138,7 +138,7 @@ static partial class ProcessFreezer
     const uint DupHandle = 0x0040;
     const uint TokenQuery = 0x8;
     const uint Synchronize = 0x00100000;
-    const uint JobSetAttributes = 0x0010;
+    const uint JobSetAttributes = 0x0002;
     const uint JobQuery = 0x0004;
     const int ErrorAlreadyExists = 183;
     const int JobObjectFreezeInformation = 18;
