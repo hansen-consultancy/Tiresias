@@ -62,6 +62,8 @@ its section below.
 
 ### Changed
 
+- While unlocked, the broker refuses a `vault.json` holding older versions of secrets than it
+  already saw, as when an older copy is restored, and keeps the newer one.
 - The broker now checks that you approved each placeholder, elevation and GitHub App token itself,
   instead of trusting any program that can sign as this PC. Approvals are signed with a key only
   the unlocked app or a Windows Hello prompt can derive; prompts are unchanged. Update `tir` and

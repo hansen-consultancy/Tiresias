@@ -162,6 +162,11 @@ public sealed class SoloBroker : IAsyncDisposable
             }
             vaultStamp = stamp;
             var reload = state.ReplaceVault(vault);
+            if (reload.RolledBack is { Count: > 0 } rolledBack)
+            {
+                Log?.Invoke($"The vault holds older versions of {string.Join(", ", rolledBack)} than this lease already saw, as when an older copy is restored. The solo broker keeps the vault it had; undo the change in {vaultPath}.");
+                return;
+            }
             if (reload.Refused)
             {
                 Log?.Invoke($"The vault changed the services of {string.Join(", ", reload.Unapproved)} without your approval. The solo broker keeps the services it had; undo the change in {vaultPath}.");
