@@ -33,7 +33,8 @@ design and issue. A PR that finishes, starts or adds an item edits this page in 
       ([design](admin-tier.md), #91). Step 1 built (the service, its pipe, setup)
 - [ ] Out-of-band alerts: ntfy, LcdHub and a webhook, public by default ([design](alerts.md), #101).
       Slice 1 in review
-- [ ] Secrets reachable in containers, WSL and VMs from the user's account (#113). Design in review
+- [ ] Secrets reachable in containers, WSL and VMs from the user's account
+      ([design](containers-and-vms.md), #113). Design in review
 - [x] `tir ai`: instructions for AI coding agents ([guide](ai-agents.md))
 - [x] Velopack installer and auto-update from GitHub Releases (`app-release.yml`)
 - [x] Signed with Azure Artifact Signing ([releasing.md](releasing.md))
