@@ -1,7 +1,7 @@
 # More checks
 
 Status: **built**: RavenDB certificate expiry, sealed keys handed out as values, publishing keys,
-git tokens, a CLI acting as the user. **Design**: RavenDB clearance. Phase 6 of [guided setup](guided-setup.md) (#32). Phase 1 gave the
+git tokens, a CLI acting as the user, RavenDB clearance. Phase 6 of [guided setup](guided-setup.md) (#32). Phase 1 gave the
 doctor its shape: a probe gathers facts, the pure planner in `Doctor` turns them into checks, and
 a check that can go higher carries its `Now` and `Better` positions and a typed `DoctorFix`. Each
 check below adds probe facts, planner cases and at most one fix type, and ships on its own.
@@ -37,9 +37,16 @@ certificate's subject, thumbprint and expiry, and its clearance on the server.
   sealed before this has no metadata; the check then asks the broker, and says "skipped: locked"
   when the solo broker isn't running.
 - **Clearance.** The broker asks the server who the certificate is, with that certificate
-  (`GET /certificates/whoami`, which any registered certificate may call; to be confirmed against
-  RavenDB 6 and 7). A new device-signed broker endpoint, `GET /raven/{service}/whoami`, returns
-  the clearance and the database names it may use, and never the certificate.
+  (`GET /certificates/whoami`, which any registered certificate may call; confirmed on RavenDB 7.2
+  for a `ValidUser` with Read, ReadWrite and Admin). The device-signed broker endpoint
+  `GET /clearance/{service}` returns the clearance and the databases with their access, and never
+  the certificate, its thumbprint or anything else whoami returns. It answers only for a service the RavenDB setup saved
+  (`RavenSetupPlanner.Recognize`), and needs the lease (the unlocked agent holds one) and the
+  grant's elevation if it has one, but not the grant's rule: the answer is
+  about the certificate, not data. Not under `/raven`, which takes placeholders, not signatures.
+  Without an answer the check says "skipped" and why: locked, an elevation needed, or RavenDB not
+  answering the broker within 10 seconds (a server firewall that doesn't allow this PC's address).
+  With no broker reachable it doesn't ask.
 
 **Reports.**
 
@@ -47,8 +54,14 @@ certificate's subject, thumbprint and expiry, and its clearance on the server.
 - expired: Fail, because every request through it already fails;
 - `ClusterAdmin` or `Operator`: Warn, "*service*'s certificate is *clearance*: a program using it
   can change the server, not only read its data";
-- `ValidUser` with access to more than one database: Warn, listing how many beyond the ones the
-  app is set up for. The database names are the user's own and may be shown.
+- `ValidUser` with access to more than one database: Warn, listing them with their access. The
+  service doesn't record which database the app uses, so more than one is the line. The database
+  names are the user's own and may be shown;
+- `ValidUser` with `Admin` on its database: Warn, because a program can change indexes and settings,
+  not only documents.
+
+A finding's name carries the certificate's thumbprint, so a replacement certificate is a new finding
+and an old dismissal doesn't hide it.
 
 **Positions.** None. The certificate stays with the broker (E3/C1); what changes is how much it
 can do and how long it keeps working.

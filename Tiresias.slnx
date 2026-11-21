@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Tiresias.Admin/Tiresias.Admin.csproj" />
     <Project Path="src/Tiresias.Agent/Tiresias.Agent.csproj" />
     <Project Path="src/Tiresias.App/Tiresias.App.csproj" />
     <Project Path="src/Tiresias.Broker/Tiresias.Broker.csproj" />

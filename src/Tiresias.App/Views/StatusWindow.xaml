@@ -184,6 +184,9 @@
       <ListBoxItem x:Name="NavActivity" Tag="Activity" DockPanel.Dock="Top" Visibility="{Binding ActivityVisibility}">
         <DockPanel><TextBlock Text="&#xE81C;" Style="{StaticResource NavIcon}" /><TextBlock DockPanel.Dock="Right" Text="{Binding ActivityCount}" Style="{StaticResource NavCount}" /><TextBlock Text="{l:S Nav_Activity}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" /></DockPanel>
       </ListBoxItem>
+      <ListBoxItem x:Name="NavInstalled" Tag="Installed" DockPanel.Dock="Top">
+        <DockPanel><TextBlock Text="&#xE71D;" Style="{StaticResource NavIcon}" /><TextBlock Text="{l:S Nav_Installed}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" /></DockPanel>
+      </ListBoxItem>
       <ListBoxItem x:Name="NavAbout" Tag="About" DockPanel.Dock="Bottom">
         <DockPanel><TextBlock Text="&#xE946;" Style="{StaticResource NavIcon}" /><TextBlock Text="{l:S Status_About}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" /></DockPanel>
       </ListBoxItem>

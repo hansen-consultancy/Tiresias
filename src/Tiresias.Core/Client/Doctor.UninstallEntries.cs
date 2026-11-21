@@ -15,9 +15,39 @@ namespace Tiresias.Client;
 /// <param name="Folder">Its <c>InstallLocation</c>, or the uninstaller's folder when it names none; <c>null</c> when that is in Windows' own folder.</param>
 /// <param name="RunsUnseen">Part of it runs without the user opening it (a tray icon, a service, a driver, a log-on entry, a
 /// folder on <c>PATH</c>), which Windows doesn't record, so its last use is unknown.</param>
+/// <param name="Icon">Its <c>DisplayIcon</c>, environment variables expanded: a file and, after a comma, an icon index.</param>
+/// <param name="Publisher">Its <c>Publisher</c>: what the installer wrote, a claim, not a signature.</param>
 public sealed record UninstallEntry(string Key, string Name, string? Version, string? Uninstaller, bool UninstallerExists, bool FolderExists,
-    string? Command = null, string? Folder = null, bool RunsUnseen = false)
+    string? Command = null, string? Folder = null, bool RunsUnseen = false, string? Icon = null, string? Publisher = null)
 {
+    /// <summary>
+    /// The file whose signature speaks for the program: the program its icon comes from, which is
+    /// usually the one it opens, else its uninstaller; <c>null</c> when it names neither.
+    /// </summary>
+    public string? ProgramFile =>
+        IconLocation is { Path: var icon } && icon.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? icon : Uninstaller;
+
+    /// <summary>
+    /// The file and index <see cref="Icon"/> names, as Settings reads them: <c>"C:\app\app.exe",0</c>,
+    /// <c>C:\app\app.ico</c>, a negative index for a resource id. Only a local, fully qualified
+    /// path: a network one would make Windows connect to that host, as the user, just to draw a list.
+    /// </summary>
+    public (string Path, int Index)? IconLocation
+    {
+        get
+        {
+            if (Icon is not { Length: > 0 } icon)
+                return null;
+            var comma = icon.LastIndexOf(',');
+            var index = 0;
+            if (comma > 0 && int.TryParse(icon[(comma + 1)..].Trim(), System.Globalization.NumberStyles.AllowLeadingSign,
+                    System.Globalization.CultureInfo.InvariantCulture, out var parsed))
+                (icon, index) = (icon[..comma], parsed);
+            var path = icon.Trim().Trim('"');
+            return path.Length > 3 && path[1] == ':' && path[2] == '\\' && char.IsAsciiLetter(path[0]) ? (path, index) : null;
+        }
+    }
+
     /// <summary>A machine-wide entry, which only an administrator can change.</summary>
     public bool Machine => Key.StartsWith(@"HKLM\", StringComparison.OrdinalIgnoreCase);
 }
@@ -71,6 +101,24 @@ public sealed partial record Repair(string Name, string? Version, string? Winget
     [GeneratedRegex(@"^[A-Za-z0-9][A-Za-z0-9._+-]*$")]
     private static partial Regex Token();
 }
+
+/// <summary>What is known of how an installed program is used.</summary>
+public enum ProgramUse
+{
+    /// <summary>Opened, or used a credential, in the last 90 days.</summary>
+    Recent,
+    /// <summary>Last opened over 90 days ago, and nothing of it runs unseen.</summary>
+    Unused,
+    /// <summary>A part of it runs without being opened (tray icon, service, driver, log-on entry, <c>PATH</c>), so its use is unknown.</summary>
+    Background,
+    /// <summary>No run recorded, or no folder of its own to look in: unknown.</summary>
+    NotRecorded,
+}
+
+/// <summary>One program in the installed-apps list with what is known of its use.</summary>
+/// <param name="LastOpened">The latest recorded run of anything in its folder, recent or not.</param>
+/// <param name="Reached">Services its folder's programs used through Tiresias in the last 90 days.</param>
+public sealed record InstalledProgram(UninstallEntry Entry, ProgramUse Use, DateTimeOffset? LastOpened, IReadOnlyList<string> Reached);
 
 /// <summary>
 /// Uninstall a program in Settings, Apps, Installed apps, which runs its own uninstaller and asks
@@ -131,32 +179,50 @@ public static partial class Doctor
     }
 
     /// <summary>
-    /// Installed programs the user last opened over 90 days ago (docs/attack-surface.md, "Not used in
-    /// 90 days"): the latest UserAssist run of anything under the program's folder. Never for a
-    /// program with no recorded run, one that <see cref="UninstallEntry.RunsUnseen"/>, one that used a
-    /// credential in that time, or one already reported as broken. Hygiene, not a warning: the
-    /// status is <see cref="DoctorStatus.Ok"/>, so the lines sort last and don't count for the badge.
+    /// Every program in the installed-apps list once (docs/attack-surface.md, <b>Installed</b>), with
+    /// what is known of its use: credentials its folder's programs used through Tiresias in 90 days,
+    /// and the latest UserAssist run of anything under its folder. A program with no folder of its
+    /// own, no recorded run, or a part that <see cref="UninstallEntry.RunsUnseen"/> has an unknown
+    /// use, never "unused". Programs not opened in 90 days come first, longest unused first, then the
+    /// rest by name.
     /// </summary>
-    public static IEnumerable<DoctorCheck> UnusedApplications(IEnumerable<UninstallEntry> entries, IEnumerable<ProgramRun> runs,
+    public static IReadOnlyList<InstalledProgram> InstalledPrograms(IEnumerable<UninstallEntry> entries, IEnumerable<ProgramRun> runs,
         IEnumerable<CredentialUse> uses, DateTimeOffset now)
     {
         var allRuns = runs.ToArray();
         var recent = uses.Where(u => now - u.At <= ReachWindow).ToArray();
-        var candidates = entries
-            .Where(e => e is { FolderExists: true, RunsUnseen: false, Folder: { } folder } && Deep(folder) && (e.Uninstaller is null || e.UninstallerExists))
-            .DistinctBy(e => e.Name, StringComparer.OrdinalIgnoreCase)
-            .OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase);
-        foreach (var entry in candidates)
+        var programs = entries.DistinctBy(e => e.Name, StringComparer.OrdinalIgnoreCase).Select(entry =>
         {
-            var lastRun = allRuns.Where(r => IsUnder(r.Path, entry.Folder!)).Select(r => (DateTimeOffset?)r.LastRun).Max();
-            if (lastRun is not { } last || now - last <= ReachWindow || recent.Any(u => IsUnder(u.Program, entry.Folder!)))
-                continue;
-            yield return new($"{Label(entry)} not opened since {last:yyyy-MM-dd}", DoctorStatus.Ok,
-                $"Nothing in {entry.Folder} has been opened from the Start menu, the taskbar or Explorer in 90 days. "
-                + "Uninstall it if you don't need it: software you don't use still gets updates, or doesn't, and runs as you when something opens it",
-                new UninstallApp(entry.Name, entry.Machine), Kind: UnusedAppKind);
-        }
+            if (entry is not { FolderExists: true, Folder: { } folder } || !Deep(folder))
+                return new InstalledProgram(entry, ProgramUse.NotRecorded, null, []);
+            string[] reached = [.. recent.Where(u => IsUnder(u.Program, folder)).Select(u => u.Service).Distinct(StringComparer.OrdinalIgnoreCase)
+                .Order(StringComparer.OrdinalIgnoreCase)];
+            var lastRun = allRuns.Where(r => IsUnder(r.Path, folder)).Select(r => (DateTimeOffset?)r.LastRun).Max();
+            var use = reached.Length > 0 || now - lastRun <= ReachWindow ? ProgramUse.Recent
+                : entry.RunsUnseen ? ProgramUse.Background
+                : lastRun is null ? ProgramUse.NotRecorded
+                : ProgramUse.Unused;
+            return new InstalledProgram(entry, use, lastRun, reached);
+        });
+        return [.. programs.OrderBy(p => p.Use == ProgramUse.Unused ? 0 : 1).ThenBy(p => p.Use == ProgramUse.Unused ? p.LastOpened : null)
+            .ThenBy(p => p.Entry.Name, StringComparer.OrdinalIgnoreCase)];
     }
+
+    /// <summary>
+    /// The <see cref="ProgramUse.Unused"/> programs of <see cref="InstalledPrograms"/> as findings,
+    /// except one already reported as broken (its uninstaller is gone). Hygiene, not a warning: the
+    /// status is <see cref="DoctorStatus.Ok"/>, so on Home they are one line, last, and don't count
+    /// for the badge.
+    /// </summary>
+    public static IEnumerable<DoctorCheck> UnusedApplications(IEnumerable<UninstallEntry> entries, IEnumerable<ProgramRun> runs,
+        IEnumerable<CredentialUse> uses, DateTimeOffset now) =>
+        InstalledPrograms(entries, runs, uses, now)
+            .Where(p => p is { Use: ProgramUse.Unused, Entry: var e } && (e.Uninstaller is null || e.UninstallerExists))
+            .OrderBy(p => p.Entry.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(p => new DoctorCheck($"{Label(p.Entry)} not opened since {p.LastOpened:yyyy-MM-dd}", DoctorStatus.Ok,
+                $"Nothing in {p.Entry.Folder} has been opened from the Start menu, the taskbar or Explorer in 90 days. "
+                + "Uninstall it if you don't need it: software you don't use still gets updates, or doesn't, and runs as you when something opens it",
+                new UninstallApp(p.Entry.Name, p.Entry.Machine), Kind: UnusedAppKind));
 
     /// <summary>A program's own folder, not a root such as <c>C:\Program Files</c> that holds everyone's.</summary>
     static bool Deep(string folder) => folder.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries).Length >= 3;
