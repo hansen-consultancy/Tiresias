@@ -10,10 +10,15 @@ its section below.
 
 ### Added
 
-- Home and `tir doctor` list programs you haven't opened in 90 days, with **Open Installed apps**
-  to uninstall them. A program that works without being opened (a tray icon, a service, a driver,
-  something that starts at log-on, a command on `PATH`) is never counted, nor one that used a
-  credential. These lines sort last and don't light the tray badge.
+- Home and `tir doctor` list programs you haven't opened in 90 days. A program that works without
+  being opened (a tray icon, a service, a driver, something that starts at log-on, a command on
+  `PATH`) is never counted, nor one that used a credential. On Home they are one line, last, that
+  doesn't light the tray badge.
+- A new **Installed** page lists every installed program with when you last opened it (or why
+  that's unknown) and its icon, unused ones first, with a search box. Select one to see its version, who it is
+  installed for, the credentials it used in the last 90 days, its folder, its publisher and who
+  signed it (checked on your PC), and **Search online...** to look it up in your browser. **Open Installed apps
+  in Settings** is where you uninstall it.
 - `tir doctor --surface` also lists what is installed: each editor's extensions with the
   credentials that editor used through Tiresias in the last 90 days, global `dotnet`, `npm`, `pipx`
   and `cargo` tools, and what starts at log-on with its signature and when you last opened it.

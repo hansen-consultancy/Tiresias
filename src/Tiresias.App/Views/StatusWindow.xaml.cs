@@ -155,6 +155,7 @@ public partial class StatusWindow : Window
             ServicesPage => NavServices,
             EnvironmentPage => NavEnvironment,
             ActivityPage => NavActivity,
+            InstalledPage => NavInstalled,
             AboutPage => NavAbout,
             _ => NavHome,
         };
@@ -179,6 +180,7 @@ public partial class StatusWindow : Window
             "Services" => Navigate<ServicesPage>(),
             "Environment" => ShowEnvironment(),
             "Activity" => Navigate<ActivityPage>(),
+            "Installed" => Navigate<InstalledPage>(),
             "About" => Navigate<AboutPage>(),
             _ => null,
         };
@@ -288,7 +290,7 @@ public partial class StatusWindow : Window
                 model.CopyFix(fix.Instruction);
                 break;
             case UninstallApp:
-                Desktop.Open("ms-settings:appsfeatures");
+                Navigate<InstalledPage>();
                 break;
             case UnblockProgram { Path: var program }:
                 AppLog.Info($"unblocked {program}: the decoy use was the user's");
@@ -473,11 +475,17 @@ public sealed partial class FindingRow(IReadOnlyList<DoctorCheck> checks) : Obse
 
     public string? MovesMeaning => PositionText.Meaning(Check.Now, Check.Better) is { Length: > 0 } meaning ? meaning : null;
 
-    public string Glyph => Check.Status == DoctorStatus.Fail ? "\uEA39" : "\uE7BA";
+    /// <summary>Failure, warning, or for hygiene (status ok) a plain information mark.</summary>
+    public string Glyph => Check.Status switch { DoctorStatus.Fail => "\uEA39", DoctorStatus.Warn => "\uE7BA", _ => "\uE946" };
 
-    public Brush? Brush => Application.Current.TryFindResource(Check.Status == DoctorStatus.Fail ? "SystemFillColorCriticalBrush" : "SystemFillColorCautionBrush") as Brush;
+    public Brush? Brush => Application.Current.TryFindResource(Check.Status switch
+    {
+        DoctorStatus.Fail => "SystemFillColorCriticalBrush",
+        DoctorStatus.Warn => "SystemFillColorCautionBrush",
+        _ => "TextFillColorSecondaryBrush",
+    }) as Brush;
 
-    public string FixLabel { get; } = checks.Count == 1 && FindingView.Button(checks[0].Fix) is { } button ? Text.Get(button.Label) : "";
+    public string FixLabel { get; } = FindingView.GroupButton(checks) is { } button ? Text.Get(button.Label) : "";
 
     public Visibility FixVisibility => FixLabel.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
 

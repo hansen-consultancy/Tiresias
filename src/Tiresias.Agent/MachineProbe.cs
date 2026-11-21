@@ -110,6 +110,9 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     // On the thread pool: the app runs the doctor from its UI thread, and this waits on a pipe.
     public AdminTierFacts? AdminTier => Task.Run(AdminClient.FactsAsync).GetAwaiter().GetResult() is { Installed: true } tier ? tier : null;
 
+    // On the thread pool: the app runs the doctor from its UI thread, and this waits on a pipe.
+    public AdminTierFacts? AdminTier => Task.Run(AdminClient.FactsAsync).GetAwaiter().GetResult() is { Installed: true } tier ? tier : null;
+
     public IEnumerable<DoctorFile> Projects() => Found.Projects.Select(Read);
 
     public IEnumerable<DoctorFile> ConfigFiles()
@@ -170,6 +173,9 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     public IEnumerable<UninstallEntry> UninstallEntries() => SurfaceProbe.UninstallEntries();
 
     public IEnumerable<string> BlockedPrograms() => SurfaceProbe.BlockedPrograms();
+
+    /// <inheritdoc cref="SurfaceProbe.Signature"/>
+    public static (bool? Valid, string? Signer) Signature(string path) => SurfaceProbe.Signature(path);
 
     public IEnumerable<ProgramRun> ProgramRuns() => SurfaceProbe.ProgramRuns();
 
