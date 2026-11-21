@@ -28,30 +28,86 @@ static partial class SurfaceProbe
 
     const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
 
+    /// <summary>The log-on entries that are on: those turned off in Task Manager or Settings are left out.</summary>
     public static IEnumerable<StartupEntry> StartupEntries()
     {
+        var tray = TrayPrograms();
         List<StartupEntry> entries = [];
-        foreach (var (hive, where) in new[] { (Registry.CurrentUser, "Run key"), (Registry.LocalMachine, "machine Run key") })
+        foreach (var (hive, where) in new[] { (Registry.CurrentUser, StartupEntry.RunKey), (Registry.LocalMachine, StartupEntry.MachineRunKey) })
         {
             using var key = hive.OpenSubKey(RunKey);
+            using var approved = hive.OpenSubKey(DisableStartup.ApprovedKey + "Run");
             if (key is null)
                 continue;
             foreach (var name in key.GetValueNames())
-                if (key.GetValue(name) is string command && Doctor.ExecutableIn(Environment.ExpandEnvironmentVariables(command)) is { } path)
-                    entries.Add(Entry(name, where, path));
+                if (!Doctor.StartupTurnedOff(approved?.GetValue(name) as byte[])
+                    && key.GetValue(name) is string command && Doctor.ExecutableIn(Environment.ExpandEnvironmentVariables(command)) is { } path)
+                    entries.Add(Entry(name, where, path, name, tray));
         }
         var folder = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
+        using var approvedFiles = Registry.CurrentUser.OpenSubKey(DisableStartup.ApprovedKey + "StartupFolder");
         if (Directory.Exists(folder))
             foreach (var file in Directory.EnumerateFiles(folder))
+            {
+                var item = Path.GetFileName(file);
+                if (Doctor.StartupTurnedOff(approvedFiles?.GetValue(item) as byte[]))
+                    continue;
                 if (Path.GetExtension(file).Equals(".exe", StringComparison.OrdinalIgnoreCase))
-                    entries.Add(Entry(Path.GetFileNameWithoutExtension(file), "Startup folder", file));
+                    entries.Add(Entry(Path.GetFileNameWithoutExtension(file), StartupEntry.StartupFolder, file, item, tray));
                 else if (Path.GetExtension(file).Equals(".lnk", StringComparison.OrdinalIgnoreCase) && ShortcutTarget(file) is { } target)
-                    entries.Add(Entry(Path.GetFileNameWithoutExtension(file), "Startup folder", target));
+                    entries.Add(Entry(Path.GetFileNameWithoutExtension(file), StartupEntry.StartupFolder, target, item, tray));
+            }
         return entries;
     }
 
-    static StartupEntry Entry(string name, string where, string path) =>
-        File.Exists(path) ? new(name, where, path, IsSigned(path)) : new(name, where, path, null);
+    static StartupEntry Entry(string name, string where, string path, string item, HashSet<string> tray) =>
+        new(name, where, path, File.Exists(path) ? IsSigned(path) : null, item, tray.Contains(path));
+
+    /// <summary>Programs that have shown an icon in the notification area, from the taskbar's own record of them.</summary>
+    static HashSet<string> TrayPrograms()
+    {
+        HashSet<string> paths = new(StringComparer.OrdinalIgnoreCase);
+        using var icons = Registry.CurrentUser.OpenSubKey(@"Control Panel\NotifyIconSettings");
+        if (icons is null)
+            return paths;
+        foreach (var name in icons.GetSubKeyNames())
+        {
+            using var icon = icons.OpenSubKey(name);
+            if (icon?.GetValue("ExecutablePath") is string { Length: > 0 } path && ResolveKnownFolder(path) is { } resolved)
+                paths.Add(resolved);
+        }
+        return paths;
+    }
+
+    /// <summary>A path that may start with a known folder's id, as the shell records them; <c>null</c> when the id isn't one this reads.</summary>
+    static string? ResolveKnownFolder(string path)
+    {
+        if (!path.StartsWith('{') || path.IndexOf('}') is not (> 0 and var close))
+            return path;
+        return Guid.TryParse(path[..(close + 1)], out var id) && KnownFolder(id) is { } folder ? folder.TrimEnd('\\') + path[(close + 1)..] : null;
+    }
+
+    static string? KnownFolder(Guid id) => KnownFolders.TryGetValue(id, out var folder) && Environment.GetFolderPath(folder) is { Length: > 0 } path ? path : null;
+
+    /// <summary>The known folders UserAssist names programs under.</summary>
+    static readonly Dictionary<Guid, Environment.SpecialFolder> KnownFolders = new()
+    {
+        [new("6D809377-6AF0-444B-8957-A3773F02200E")] = Environment.SpecialFolder.ProgramFiles,
+        [new("7C5A40EF-A0FB-4BFC-874A-C0F2E0B9FA8E")] = Environment.SpecialFolder.ProgramFilesX86,
+        [new("1AC14E77-02E7-4E5D-B744-2EB1AE5198B7")] = Environment.SpecialFolder.System,
+        [new("D65231B0-B2F1-4857-A4CE-A8E7C6EA7D27")] = Environment.SpecialFolder.SystemX86,
+        [new("F38BF404-1D43-42F2-9305-67DE0B28FC23")] = Environment.SpecialFolder.Windows,
+    };
+
+    /// <summary>When the user last started each program from Explorer, the Start menu or the taskbar (UserAssist, per user, no admin).</summary>
+    public static IEnumerable<ProgramRun> ProgramRuns()
+    {
+        const string executables = @"Software\Microsoft\Windows\CurrentVersion\Explorer\UserAssist\{CEBFF5CD-ACE2-4F4F-9178-9926F41749EA}\Count";
+        using var key = Registry.CurrentUser.OpenSubKey(executables);
+        if (key is null)
+            return [];
+        return Doctor.UserAssistRuns([.. key.GetValueNames().Select(n => (n, key.GetValue(n) as byte[]))], KnownFolder);
+    }
 
     const string UninstallKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall";
 

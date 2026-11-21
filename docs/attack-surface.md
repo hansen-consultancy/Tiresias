@@ -1,6 +1,6 @@
 # Attack surface: less software, less to trust
 
-Status: **first slice and uninstall-entry checks built** (#34, #55); the rest is design. [Guided setup](guided-setup.md) phase 5: it builds on the
+Status: **first slice, log-on use and uninstall-entry checks built** (#34, #55); the rest is design. [Guided setup](guided-setup.md) phase 5: it builds on the
 findings `tir doctor` reports since phase 1 and the findings section, fixes and dismissals the app
 gets in phase 2.
 
@@ -38,7 +38,10 @@ Read-only, per user wherever possible, from sources each check can name:
 
 **Last used**, where Windows records it:
 
-- GUI programs: UserAssist (per user: run count and last run), readable without admin.
+- GUI programs: UserAssist (per user: run count and last run), readable without admin. It records
+  only what the user starts from Explorer, Start or the taskbar, so a program with an icon in the
+  notification area (the taskbar's `NotifyIconSettings`) is used from there unseen: its last use is
+  unknown.
 - Anything with admin rights granted: Prefetch, the Background Activity Moderator.
 - Command-line tools: the activity log and the terminal hook's records of what ran under
   Tiresias. File access times are not reliable on Windows and are not used.
@@ -122,9 +125,10 @@ the command. The new kinds:
   asked.
 - **`RemoveExtension`** uses the host's command where one exists (`code --uninstall-extension`).
   A browser has none, so the fix opens its extensions page instead.
-- **`DisableStartup`** changes a user Run key, startup folder entry or user scheduled task itself,
-  after approval, and keeps what it changed so **Turn back on** can restore it. Machine-wide
-  entries are reported with the command, not changed.
+- **`DisableStartup`** turns a user Run key or startup folder entry off after approval the way
+  Task Manager and Settings do, in `StartupApproved`, so Settings, Apps, Startup turns it back on
+  and the entry itself is untouched. Entries already off there aren't reported. Machine-wide
+  entries open that Settings page, which asks for an administrator.
 - **`RevealFile`** opens Explorer on the file. It is all Tiresias offers for a binary it can't
   attribute, because deleting an unknown file could break something the user needs.
 - **`RemoveEntry`** exports the uninstall key to a `.reg` file in `removed-entries` beside the
@@ -295,7 +299,9 @@ All of this is guided setup phase 5, built in this order. **The first slice is b
 offline only, it reads extensions of VS Code and its forks, the Run keys and Startup folder with an
 offline Authenticode check, the blocklist, and reach from the activity and audit logs, and raises
 the extension, unsigned-at-startup and blocked-program findings with **Remove...** and **Show
-file**. **Uninstall entries are checked** too: user and machine entries against the disk, raising
+file**. **Log-on use is built** too: last use from UserAssist, and the "starts at log-on, rarely
+used" finding with `DisableStartup`, never for a program whose last use is unknown, one with a tray
+icon, or Tiresias itself. **Uninstall entries are checked** too: user and machine entries against the disk, raising
 the gone, can't-be-uninstalled and stale-duplicate findings, with **Remove entry...** for the
 user's own entries and the commands for machine-wide ones; `Repair` names winget's command once
 the inventory knows the package id, and the steps until then. [Guided setup](guided-setup.md#phases)
