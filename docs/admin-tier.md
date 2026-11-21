@@ -164,7 +164,7 @@ The service binds the set's two ports on `127.0.0.1` at start, with the same lis
 agent may hold them a moment after offering the set) is tried again every 5 s. A hit becomes an
 event for the user, kept in the state folder (`events\<sid>.json`, the newest 100) until
 acknowledged, so it survives the app being closed and the machine restarting. A hit by a process
-it could name first freezes that process (below), and the event says so. The agent, in the app or `tir agent`, long-polls
+it could name first freezes that process (below), before answering it (a quick caller would be gone by then), and the event says so. The agent, in the app or `tir agent`, long-polls
 `events.wait` (30 s), and runs each event through the path of a use it saw itself: activity record
 (consumer `decoy`), then block list, notification and finding in the app. It acknowledges by id on
 the next wait. With the service holding the set, `decoys.json` is gone and the agent does not
