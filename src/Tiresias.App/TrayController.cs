@@ -161,10 +161,14 @@ sealed class TrayController : IDisposable
         var file = Desktop.TaskbarIsLight() ? "tray-light-theme.ico" : "tray-dark-theme.ico";
         var uri = new Uri($"pack://application:,,,/Assets/{file}");
         var dot = FindingWatch.NewCount > 0;
+        // Icon in both branches: once set, an Icon wins over a later IconSource, so a cleared dot would stay drawn.
         if (AppBuild.Current.Development || dot)
             icon.Icon = Decorated(uri, AppBuild.Current.Development, dot);
         else
-            icon.IconSource = BitmapFrame.Create(uri);
+        {
+            using var stream = Application.GetResourceStream(uri)!.Stream;
+            icon.Icon = new System.Drawing.Icon(stream);
+        }
     }
 
     static readonly SolidColorBrush DevelopmentOrange = Frozen(Color.FromRgb(0xF7, 0x63, 0x0C));
