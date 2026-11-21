@@ -77,20 +77,39 @@ public sealed class BrokerState : IDisposable
     readonly Dictionary<string, DateTimeOffset> usedNonces = [];
 
     /// <summary>
-    /// The highest version of each secret this lease has seen. A vault that goes below it is a
-    /// rollback to an older, once-approved policy (docs/policy-integrity.md, *Rollback*).
+    /// The highest version of each secret this lease has seen, or, with <see cref="marks"/>, this
+    /// broker ever authenticated. A vault that goes below it is a rollback to an older, once-approved
+    /// policy (docs/policy-integrity.md, *Rollback*).
     /// </summary>
-    readonly Dictionary<string, int> highWater = [];
+    Dictionary<string, int> highWater = [];
 
-    public BrokerState(VaultDocument vault, LeaseTerms terms, AuditLog audit, Key identity, TimeProvider time)
+    readonly HighWaterMarks? marks;
+
+    /// <param name="marks">Keeps the marks across restarts and locks; without it they last one lease.</param>
+    public BrokerState(VaultDocument vault, LeaseTerms terms, AuditLog audit, Key identity, TimeProvider time, HighWaterMarks? marks = null)
     {
-        this.vault = vault;
         this.terms = terms;
         this.audit = audit;
         this.identity = identity;
         this.time = time;
+        this.marks = marks;
         placeholders = new(time);
+        if (marks is not null)
+        {
+            foreach (var (slug, version) in marks.Load())
+                highWater[slug] = version;
+            var below = RolledBack(vault);
+            foreach (var slug in below)
+                audit.Append(new(AuditKind.Deny, Reason: $"secret-rolled-back: {slug}; left out until a newer version is saved"));
+            vault = vault with { Secrets = [.. vault.Secrets.Where(s => !below.Contains(s.Slug))] };
+        }
+        this.vault = vault;
     }
+
+    string[] RolledBack(VaultDocument next) => next.Secrets
+        .Where(s => highWater.TryGetValue(s.Slug, out var seen) && s.Version < seen)
+        .Select(s => s.Slug)
+        .ToArray();
 
     /// <summary>
     /// Raised with the lease id after a lease ended, for whatever holds per-lease resources outside
@@ -113,7 +132,8 @@ public sealed class BrokerState : IDisposable
 
             var id = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
             lease = Lease.Begin(id, now, terms);
-            RaiseHighWater(vault);
+            if (marks is null)
+                RaiseHighWater(vault.Secrets);
             leaseKey = Key.Create(KeyAgreementAlgorithm.X25519);
             leaseDevice = device;
             audit.Append(new(AuditKind.LeaseBegin, id, device));
@@ -131,7 +151,9 @@ public sealed class BrokerState : IDisposable
     /// the lease's: only whoever opens the vault can name the key that approves operations.
     /// </summary>
     /// <param name="approvalKey">The raw Ed25519 public key of <see cref="ApprovalKey"/> for this lease.</param>
-    public (SealResult? Result, Refusal? Refusal) Seal(string leaseId, IReadOnlyDictionary<string, byte[]> sealedDeks, byte[]? approvalKey)
+    /// <param name="revisionSignature">For a broker keeping durable marks, the enrolled revision key's signature on this batch.</param>
+    public (SealResult? Result, Refusal? Refusal) Seal(string leaseId, IReadOnlyDictionary<string, byte[]> sealedDeks, byte[]? approvalKey,
+        byte[]? revisionSignature = null)
     {
         lock (gate)
         {
@@ -139,34 +161,53 @@ public sealed class BrokerState : IDisposable
                 return (null, refusal);
             if (approvalKey is not { Length: 32 })
                 return (null, new(400, "approval-key-required"));
+            if (marks is not null && !LeaseSeal.Verify(marks.RevisionKey, leaseId, approvalKey, sealedDeks, revisionSignature))
+            {
+                audit.Append(new(AuditKind.Deny, leaseId, leaseDevice, Reason: "revision-signature-invalid"));
+                return (null, new(401, "revision-signature-invalid"));
+            }
             if (this.approvalKey is { } registered && !registered.Export(KeyBlobFormat.RawPublicKey).AsSpan().SequenceEqual(approvalKey))
             {
                 audit.Append(new(AuditKind.Deny, leaseId, leaseDevice, Reason: "approval-key-mismatch"));
                 return (null, new(409, "approval-key-mismatch"));
             }
 
-            var accepted = new List<string>();
+            var accepted = new Dictionary<string, byte[]>();
             var rejected = new List<string>();
-            foreach (var (slug, box) in sealedDeks)
+            try
             {
-                var secret = vault.FindSecret(slug);
-                var dek = secret is null ? null : SealedBox.Open(leaseKey!, box, LeaseOffer.DekContext(leaseId, slug, approvalKey));
-                if (dek is null || !Opens(secret!, dek, vault))
+                foreach (var (slug, box) in sealedDeks)
                 {
-                    if (dek is not null)
-                        Array.Clear(dek);
-                    rejected.Add(slug);
-                    continue;
+                    var secret = vault.FindSecret(slug);
+                    var dek = secret is null ? null : SealedBox.Open(leaseKey!, box, LeaseOffer.DekContext(leaseId, slug, approvalKey));
+                    if (dek is null || !Opens(secret!, dek, vault))
+                    {
+                        if (dek is not null)
+                            Array.Clear(dek);
+                        rejected.Add(slug);
+                        continue;
+                    }
+                    accepted.Add(slug, dek);
                 }
-
-                if (deks.Remove(slug, out var old))
-                    Array.Clear(old);
-                deks[slug] = dek;
-                accepted.Add(slug);
+                if (marks is not null)
+                    RaiseHighWater(accepted.Keys.Select(slug => vault.FindSecret(slug)!));
+                if (accepted.Count > 0)
+                    this.approvalKey ??= PublicKey.Import(SignatureAlgorithm.Ed25519, approvalKey, KeyBlobFormat.RawPublicKey);
+                foreach (var (slug, dek) in accepted)
+                {
+                    if (deks.Remove(slug, out var old))
+                        Array.Clear(old);
+                    deks[slug] = dek;
+                }
+                var result = new SealResult(accepted.Keys.ToArray(), rejected.ToArray());
+                accepted.Clear(); // The live lease owns these keys now.
+                return (result, null);
             }
-            if (accepted.Count > 0)
-                this.approvalKey ??= PublicKey.Import(SignatureAlgorithm.Ed25519, approvalKey, KeyBlobFormat.RawPublicKey);
-            return (new(accepted.ToArray(), rejected.ToArray()), null);
+            finally
+            {
+                foreach (var dek in accepted.Values)
+                    Array.Clear(dek);
+            }
         }
     }
 
@@ -182,22 +223,27 @@ public sealed class BrokerState : IDisposable
     /// seals the new one. A secret bound to its policy that is unchanged on disk but no longer opens
     /// means its policy changed without approval: the whole vault is refused and the previous one
     /// kept. A service whose policy changed loses its placeholders and elevations, which were
-    /// approved for the old one.
+    /// approved for the old one. A secret below its high-water mark refuses the whole vault when
+    /// the current one serves it, and is left out when it is already out.
     /// </summary>
     public VaultReload ReplaceVault(VaultDocument next)
     {
         lock (gate)
         {
-            var rolledBack = lease is null ? Array.Empty<string>() : next.Secrets
-                .Where(s => highWater.TryGetValue(s.Slug, out var seen) && s.Version < seen)
-                .Select(s => s.Slug)
-                .ToArray();
+            // Going below a version this broker serves now is a rollback: the whole vault is refused. A secret already
+            // left out (at startup, below its persisted mark) stays out as the constructor has it, so an older copy that
+            // is still on disk does not block every unrelated change.
+            var currentLease = CurrentLease(time.GetUtcNow());
+            var below = currentLease is null && marks is null ? [] : RolledBack(next);
+            var rolledBack = below.Where(slug => vault.FindSecret(slug) is not null).ToArray();
             if (rolledBack.Length > 0)
             {
                 foreach (var slug in rolledBack)
                     audit.Append(new(AuditKind.Deny, lease?.Id, Reason: $"secret-rolled-back: {slug}; vault reload refused"));
                 return new([], [], rolledBack);
             }
+            if (below.Length > 0)
+                next = next with { Secrets = [.. next.Secrets.Where(s => !below.Contains(s.Slug))] };
 
             var unapproved = deks
                 .Where(d => vault.FindSecret(d.Key) is { PolicyHash: not null } current
@@ -214,27 +260,41 @@ public sealed class BrokerState : IDisposable
                 return new([], unapproved);
             }
 
-            foreach (var (slug, dek) in deks.ToArray())
+            var authenticated = new List<SealedSecret>();
+            var dropped = new List<string>();
+            foreach (var (slug, dek) in deks)
             {
                 if (next.FindSecret(slug) is { } secret && Opens(secret, dek, next))
-                    continue;
-                Array.Clear(dek);
+                    authenticated.Add(secret);
+                else
+                    dropped.Add(slug);
+            }
+            if (marks is not null)
+                RaiseHighWater(authenticated);
+            else if (currentLease is not null)
+                RaiseHighWater(next.Secrets);
+            foreach (var slug in dropped)
+            {
+                Array.Clear(deks[slug]);
                 deks.Remove(slug);
             }
             RetireChangedServices(next);
             vault = next;
-            if (lease is not null)
-                RaiseHighWater(next);
-            return new(CurrentLease(time.GetUtcNow()) is null ? [] : next.Secrets.Where(s => !deks.ContainsKey(s.Slug)).Select(s => s.Slug).ToArray(), []);
+            return new(currentLease is null ? [] : next.Secrets.Where(s => !deks.ContainsKey(s.Slug)).Select(s => s.Slug).ToArray(), []);
         }
     }
 
-    /// <summary>Call under <see cref="gate"/>, with a lease open.</summary>
-    void RaiseHighWater(VaultDocument accepted)
+    /// <summary>Persist an advance before making its revision available to the lease. Call under <see cref="gate"/>.</summary>
+    void RaiseHighWater(IEnumerable<SealedSecret> secrets)
     {
-        foreach (var secret in accepted.Secrets)
-            if (!highWater.TryGetValue(secret.Slug, out var seen) || secret.Version > seen)
-                highWater[secret.Slug] = secret.Version;
+        Dictionary<string, int>? raised = null;
+        foreach (var secret in secrets)
+            if (!(raised ?? highWater).TryGetValue(secret.Slug, out var seen) || secret.Version > seen)
+                (raised ??= new(highWater))[secret.Slug] = secret.Version;
+        if (raised is null)
+            return;
+        marks?.Save(raised);
+        highWater = raised;
     }
 
     /// <summary>Ends the placeholders and elevations of every service whose policy differs in <paramref name="next"/>. Call under <see cref="gate"/>.</summary>
@@ -628,7 +688,8 @@ public sealed class BrokerState : IDisposable
         leaseKey = null;
         approvalKey = null;
         usedNonces.Clear();
-        highWater.Clear();
+        if (marks is null)
+            highWater.Clear();
         placeholders.RevokeLease(id);
         audit.Append(new(AuditKind.LeaseEnd, id, leaseDevice, Reason: reason));
         lease = null;
