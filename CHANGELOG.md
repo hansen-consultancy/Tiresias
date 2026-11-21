@@ -15,6 +15,11 @@ its section below.
   entry left after an update, whose **Uninstall** would remove the current version's files.
   **Remove entry...** saves the entry to a `.reg` file before removing it; machine-wide entries
   get the commands to run as an administrator.
+- Decoy credentials: `tir decoys place passwords|project|variables` puts a `passwords.txt`, an old
+  project's `appsettings.Production.json` and `.env`, or two user variables on disk, holding
+  credentials that open nothing and point to ports only Tiresias listens on. A program that finds
+  and uses one is named in the activity log while the app or `tir agent` runs. `tir decoys remove`
+  takes them all away, and `tir doctor` warns when nothing listens.
 - Home and `tir doctor` find the GitHub CLI or the Azure CLI signed in as you, which any program
   running as you can use unasked. For `gh`, **Add a GitHub App...** sets up the service `tir exec`
   mints a token per run from, after you allow it. Read from each tool's own config, offline; never
