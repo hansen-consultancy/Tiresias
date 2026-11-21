@@ -26,25 +26,51 @@ public sealed class AgentHost : IAsyncDisposable
     BrokerServiceState? soloService;
     Dictionary<string, int> vaultVersions = [];
 
-    public AgentHost(IUserSecretsConsentPrompt prompt)
+    public AgentHost(IUserSecretsConsentPrompt prompt, Func<string?, CancellationToken, Task<ReleasePolicy>>? checkProgram = null)
     {
         System.IO.Directory.CreateDirectory(KeyringStore.Directory);
         activity = new AuditLog(ActivityPath, TimeProvider.System);
-        UserSecrets = new UserSecretsService(UserSecretsFiles.Root, Keys, prompt, TimeProvider.System, activity, new BrokerSecretReferences(Keys));
+        UserSecrets = new UserSecretsService(UserSecretsFiles.Root, Keys, prompt, TimeProvider.System, activity, new BrokerSecretReferences(Keys),
+            checkProgram ?? AdminProgramBlocks.CheckAsync);
         UserSecrets.Log += Say;
         keeper.Log += Say;
         keeper.Locked += reason => Lock(reason);
         solo.Log += Say;
         solo.SecretsUnleased = SealIntoLeaseAsync;
         decoys.Log += Say;
-        decoys.Touched += touch =>
+        decoys.Touched += OnDecoyTouched;
+    }
+
+    void OnDecoyTouched(DecoyTouch touch)
+    {
+        activity.Append(touch.Record());
+        Say(touch.Hit.Use == Decoys.DecoyUse.Read
+            ? $"Decoy file opened: {touch.Sentence}{(touch.Routine is { } routine ? $" (routine: {routine})" : "")}."
+            : $"Decoy used: {touch.Sentence}.");
+        DecoyTouched?.Invoke(touch);
+    }
+
+    /// <summary>
+    /// The service owns incident history and enforces its blocks even when the desktop is closed.
+    /// The position here belongs to this running agent. Restarting resumes at the last explicit review.
+    /// </summary>
+    async Task FollowAdminTierAsync(CancellationToken ct)
+    {
+        long after = 0;
+        while (!ct.IsCancellationRequested)
         {
-            activity.Append(touch.Record());
-            Say(touch.Hit.Use == Decoys.DecoyUse.Read
-                ? $"Decoy file opened: {touch.Sentence}{(touch.Routine is { } routine ? $" (routine: {routine})" : "")}."
-                : $"Decoy used: {touch.Sentence}.");
-            DecoyTouched?.Invoke(touch);
-        };
+            if (await AdminIncidents.WaitAsync(after, ct) is not { } page)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(30), ct);
+                continue;
+            }
+            if (page.Events.Count > 0)
+            {
+                Say("The admin service has decoy incidents awaiting review. See Service incidents in Activity.");
+                ServiceIncidentsReceived?.Invoke();
+            }
+            after = page.LastId;
+        }
     }
 
     /// <summary>The agent's own decisions (user secrets), beside the broker's audit log.</summary>
@@ -63,6 +89,10 @@ public sealed class AgentHost : IAsyncDisposable
     /// <summary>Records how a NuGet credential request for a mapped feed was answered: program, feed and variable, never the token.</summary>
     public void RecordNuGet(NuGetOutcome outcome, string program, int processId, string source, string variable) =>
         activity.Append(NuGetActivity.Record(outcome, program, processId, source, variable));
+
+    public void RecordPolicyRefusal(string consumer, string service, string program, string? peer, string reason) =>
+        activity.Append(new(AuditKind.Deny, Consumer: consumer, Service: service, Process: program,
+            Reason: string.Equals(program, peer, StringComparison.OrdinalIgnoreCase) ? reason : $"{reason} Pipe client: {peer ?? "unidentified"}."));
 
     /// <summary>
     /// Records "This wasn't me" in the activity log: what was asked, the program and the processes
@@ -86,6 +116,8 @@ public sealed class AgentHost : IAsyncDisposable
     /// </summary>
     public event Action<DecoyTouch>? DecoyTouched;
 
+    public event Action? ServiceIncidentsReceived;
+
     /// <summary>Whether the decoys' listeners are up (decoys are placed and their ports were free).</summary>
     public bool DecoysListening => decoys.Listening;
 
@@ -107,6 +139,7 @@ public sealed class AgentHost : IAsyncDisposable
         running.Add(serving);
         running.Add(keeper.RunAsync(stop.Token));
         decoys.Start();
+        running.Add(FollowAdminTierAsync(stop.Token));
         await StartSoloBrokerAsync();
         running.Add(FollowBrokerServiceAsync(stop.Token));
     }

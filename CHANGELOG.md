@@ -64,8 +64,11 @@ its section below.
 - An optional admin tier: with one Windows admin prompt, the app sets up a small Tiresias service
   that runs from Program Files. First run offers it once (**Not now** changes nothing); About shows
   whether it runs and offers **Set up**, **Update** or **Remove**, and `tir doctor` reports it.
-  This release sets up the service only; what it does (holding decoys out of reach, noticing
-  them used from boot) comes in the next ones.
+  With it, your decoys are held by the service: programs running as you can no longer read which
+  files are decoys or their values, a decoy used while the app is closed is caught from boot and
+  shown when the app next runs, and Home and `tir decoys list` show the kinds held. Removing the
+  decoys, or the admin tier, gives them back first (one more admin prompt). Auditing reads and
+  stopping the program come in the next releases.
 
 ### Changed
 

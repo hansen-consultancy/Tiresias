@@ -50,6 +50,7 @@ public sealed class UserSecretsService : IDisposable
     readonly TimeProvider time;
     readonly AuditLog? audit;
     readonly ISecretReferenceResolver? references;
+    readonly Func<string?, CancellationToken, Task<ReleasePolicy>> checkProgram;
     readonly SemaphoreSlim screen = new(1, 1);
     readonly Lock writeGate = new();
     CancellationTokenSource locked = new();
@@ -57,9 +58,10 @@ public sealed class UserSecretsService : IDisposable
     /// <param name="audit">Where decisions are recorded (keys and programs only), or <c>null</c>.</param>
     /// <param name="references">Fetches what <c>tiresias:</c> values name, or <c>null</c> where nothing can (<c>tir agent</c> without a broker).</param>
     public UserSecretsService(string userSecretsRoot, IUserSecretsKeys keys, IUserSecretsConsentPrompt prompt, TimeProvider time, AuditLog? audit = null,
-        ISecretReferenceResolver? references = null)
+        ISecretReferenceResolver? references = null, Func<string?, CancellationToken, Task<ReleasePolicy>>? checkProgram = null)
     {
         this.references = references;
+        this.checkProgram = checkProgram ?? ((_, _) => Task.FromResult(default(ReleasePolicy)));
         this.userSecretsRoot = userSecretsRoot;
         this.keys = keys;
         this.prompt = prompt;
@@ -109,15 +111,31 @@ public sealed class UserSecretsService : IDisposable
             return new(AgentStatus.Error, Message: invalid);
         }
 
+        AgentReply Refuse(string why)
+        {
+            Record(AuditKind.Deny, request, caller, why);
+            return new(AgentStatus.Denied, Message: why);
+        }
+
+        var policy = await checkProgram(caller, ct);
+        if (policy.Refusal is { } refusal)
+            return Refuse(refusal);
+        async Task<string?> Recheck() => (await checkProgram(caller, ct)).RefusalSince(policy);
+
         var path = Path.Combine(request.SecretsDirectory, SecretsFile.FileName);
         var text = File.Exists(path) ? await File.ReadAllTextAsync(path, ct) : null;
         var kind = SecretsFile.Classify(text);
         var additions = kind == SecretsFileKind.Sealed && SecretsFile.Read(text!).PlainAdditions is not null;
         var wrapper = keys.Unlocked;
-        if (kind == SecretsFileKind.Sealed && wrapper is null && await AskUnlockAsync(caller, request.UserSecretsId, ct))
-            wrapper = keys.Unlocked;
+        if (kind == SecretsFileKind.Sealed && wrapper is null)
+        {
+            if (await AskUnlockAsync(caller, request.UserSecretsId, ct))
+                wrapper = keys.Unlocked;
+            if (await Recheck() is { } changedWhileLocked)
+                return Refuse(changedWhileLocked);
+        }
         var plan = UserSecretsPolicy.Decide(kind, additions, wrapper is not null, keys.Recovery is not null,
-            Memory.IsAllowed(caller, request.UserSecretsId, time.GetUtcNow()));
+            Memory.IsAllowed(caller, request.UserSecretsId, time.GetUtcNow(), scope: policy.Scope));
 
         switch (plan.Action)
         {
@@ -132,7 +150,7 @@ public sealed class UserSecretsService : IDisposable
                 }
                 if (plan.Message is not null)
                     Say($"{request.UserSecretsId}: {plan.Message}");
-                return new(AgentStatus.Ok, text);
+                return await Recheck() is { } refused ? Refuse(refused) : new(AgentStatus.Ok, text);
             case UserSecretsAction.Deny:
                 Record(AuditKind.Deny, request, caller, plan.Message);
                 return new(AgentStatus.Denied, Message: plan.Message);
@@ -153,7 +171,9 @@ public sealed class UserSecretsService : IDisposable
             var referenced = requested.Select(item => item.Key).ToHashSet(StringComparer.Ordinal);
             var entries = load.Keys.Where(key => !referenced.Contains(key))
                 .Concat(requested.Select(item => $"{item.Key} → {item.Reference}")).ToArray();
-            var (answer, why) = await AskAsync(new(caller, request.UserSecretsId, entries), scope, ct);
+            var (answer, why) = await AskAsync(new(caller, request.UserSecretsId, entries), scope, policy.Scope, ct);
+            if (await Recheck() is { } changed)
+                return Refuse(changed);
             if (answer == ConsentAnswer.Deny)
             {
                 Record(AuditKind.Deny, request, caller, why);
@@ -199,6 +219,8 @@ public sealed class UserSecretsService : IDisposable
             Record(AuditKind.Deny, request, caller, e.Message);
             return new(AgentStatus.Error, Message: e.Message);
         }
+        if (await Recheck() is { } finalRefusal)
+            return Refuse(finalRefusal);
         Record(AuditKind.Allow, request, caller, $"{reason}; {load.Keys.Count} key(s)");
         return new(AgentStatus.Ok, load.Document.ToJsonString(), RefreshAt: refreshAt?.ToUnixTimeSeconds());
     }
@@ -230,7 +252,7 @@ public sealed class UserSecretsService : IDisposable
         }
     }
 
-    async Task<(ConsentAnswer Answer, string Reason)> AskAsync(UserSecretsConsentRequest consent, string scope, CancellationToken ct)
+    async Task<(ConsentAnswer Answer, string Reason)> AskAsync(UserSecretsConsentRequest consent, string scope, ReleaseScope revision, CancellationToken ct)
     {
         using var timeout = new CancellationTokenSource(ConsentTimeout, time);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token, locked.Token);
@@ -245,11 +267,13 @@ public sealed class UserSecretsService : IDisposable
         try
         {
             // The user may have allowed this program for the session while this request waited.
-            if (Memory.IsAllowed(consent.Executable, consent.UserSecretsId, time.GetUtcNow(), scope))
+            if ((await checkProgram(consent.Executable, linked.Token)).RefusalSince(new(revision)) is { } refusal)
+                return (ConsentAnswer.Deny, refusal);
+            if (Memory.IsAllowed(consent.Executable, consent.UserSecretsId, time.GetUtcNow(), scope, revision))
                 return (ConsentAnswer.AllowOnce, "allowed for this session");
             var answer = await prompt.AskAsync(consent, linked.Token);
             if (answer == ConsentAnswer.AllowForSession)
-                Memory.Remember(consent.Executable, consent.UserSecretsId, time.GetUtcNow() + SessionLength, scope);
+                Memory.Remember(consent.Executable, consent.UserSecretsId, time.GetUtcNow() + SessionLength, scope, revision);
             return answer switch
             {
                 ConsentAnswer.Deny => (answer, "You declined on the Tiresias consent screen."),
