@@ -13,7 +13,8 @@ namespace Tiresias.Admin;
 /// queued for its user (<c>events\&lt;sid&gt;.json</c>) until that user's app acknowledges it. A
 /// set whose ports are taken is tried again every few seconds: the user's agent may still hold them
 /// for a moment after adopting. Reads of each set's files are audited (<see cref="ReadAudit"/>)
-/// and queued the same way.
+/// and queued the same way. A use (never a read) by a process that can be named freezes it and
+/// blocks its network (<see cref="Freezer"/>), before it is queued.
 /// </summary>
 sealed class DecoyHold : IAsyncDisposable
 {
@@ -28,6 +29,8 @@ sealed class DecoyHold : IAsyncDisposable
     readonly Dictionary<string, TaskCompletionSource> arrived = new(StringComparer.OrdinalIgnoreCase);
     readonly Timer retry;
     readonly ReadAudit audit;
+    readonly Freezer freezer;
+    bool tornDown;
 
     sealed class Held(AdminHeldDecoys decoys)
     {
@@ -35,8 +38,9 @@ sealed class DecoyHold : IAsyncDisposable
         public DecoyListener? Listener { get; set; }
     }
 
-    public DecoyHold(string stateFolder, ILogger logger)
+    public DecoyHold(string stateFolder, Freezer freezer, ILogger logger)
     {
+        this.freezer = freezer;
         decoysFolder = Path.Combine(stateFolder, "decoys");
         eventsFolder = Path.Combine(stateFolder, "events");
         this.logger = logger;
@@ -130,7 +134,7 @@ sealed class DecoyHold : IAsyncDisposable
     {
         List<(string Sid, Held Held)> idle;
         lock (gate)
-            idle = [.. held.Where(h => h.Value.Listener is null).Select(h => (h.Key, h.Value))];
+            idle = tornDown ? [] : [.. held.Where(h => h.Value.Listener is null).Select(h => (h.Key, h.Value))];
         foreach (var (sid, h) in idle)
         {
             var set = h.Decoys.Set;
@@ -158,14 +162,28 @@ sealed class DecoyHold : IAsyncDisposable
         }
     }
 
-    void Queue(string sid, DecoyHit hit) =>
-        Queue(sid, hit, hit.ProcessId is { } pid ? [.. ProcessTree.Ancestry(pid).Skip(1).Select(p => $"{p.Program} ({p.ProcessId})")] : [], null);
+    /// <summary>A use: frozen first, while the parents are still there to be named.</summary>
+    void Queue(string sid, DecoyHit hit)
+    {
+        IReadOnlyList<string> parents = hit.ProcessId is { } pid ? [.. ProcessTree.Ancestry(pid).Skip(1).Select(p => $"{p.Program} ({p.ProcessId})")] : [];
+        var frozen = false;
+        if (hit.ProcessId is { } id)
+        {
+            var (done, refusal) = freezer.Freeze(sid, id);
+            frozen = done is not null;
+            if (refusal is not null)
+                logger.LogWarning("A program that used a decoy wasn't frozen: {Reason}", refusal);
+        }
+        Queue(sid, hit, parents, null, frozen);
+    }
 
-    void Queue(string sid, DecoyHit hit, IReadOnlyList<string> parents, string? routine)
+    void Queue(string sid, DecoyHit hit, IReadOnlyList<string> parents, string? routine) => Queue(sid, hit, parents, routine, false);
+
+    void Queue(string sid, DecoyHit hit, IReadOnlyList<string> parents, string? routine, bool frozen)
     {
         lock (gate)
         {
-            var (queue, _) = Queue(sid).Add(hit, parents, routine);
+            var (queue, _) = Queue(sid).Add(hit, parents, routine, frozen);
             Save(sid, queue);
             if (arrived.Remove(sid, out var waiting))
                 waiting.TrySetResult();
@@ -205,6 +223,31 @@ sealed class DecoyHold : IAsyncDisposable
         var temp = path + ".tmp";
         File.WriteAllText(temp, text);
         File.Move(temp, path, overwrite: true);
+    }
+
+    /// <summary>
+    /// For the tier's removal: stops listening and takes the audit rules off (and the policy back),
+    /// for good until the service starts again. The sets stay in the state folder, for the removal
+    /// to hand back once the service has stopped.
+    /// </summary>
+    public async Task TearDownAsync()
+    {
+        List<(string Sid, Held Held)> all;
+        lock (gate)
+        {
+            tornDown = true;
+            all = [.. held.Select(h => (h.Key, h.Value))];
+        }
+        var left = all.Count;
+        foreach (var (sid, h) in all)
+        {
+            audit.Release(sid, h.Decoys.Files, --left);
+            DecoyListener? listener;
+            lock (gate)
+                (listener, h.Listener) = (h.Listener, null);
+            if (listener is not null)
+                await listener.DisposeAsync();
+        }
     }
 
     public async ValueTask DisposeAsync()

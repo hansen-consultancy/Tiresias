@@ -30,6 +30,7 @@ sealed class AdminPipeService(ILogger<AdminPipeService> logger) : BackgroundServ
 
     ActionLog? log;
     DecoyHold? decoys;
+    Freezer? freezer;
 
     protected override async Task ExecuteAsync(CancellationToken stop)
     {
@@ -37,7 +38,8 @@ sealed class AdminPipeService(ILogger<AdminPipeService> logger) : BackgroundServ
             if (!Trusted(folder))
                 throw new InvalidOperationException($"{folder} is missing, a link, or not owned by SYSTEM or Administrators; run the install step again.");
         log = new ActionLog(Path.Combine(StateFolder, "actions.jsonl"));
-        await using var hold = decoys = new DecoyHold(StateFolder, logger);
+        freezer = new Freezer(StateFolder, logger);
+        await using var hold = decoys = new DecoyHold(StateFolder, freezer, logger);
 
         // The next instance is created before a connected one is served, so the name is never free
         // for another process to take.
@@ -130,7 +132,7 @@ sealed class AdminPipeService(ILogger<AdminPipeService> logger) : BackgroundServ
         {
             case AdminOps.Status:
                 var held = decoys!.Status(user);
-                return AdminReply.Ok(new AdminStatusResult(Version, AdminWire.ProtocolVersion, new AdminFeatures(held.Held, held.Listening, held.Auditing)));
+                return AdminReply.Ok(new AdminStatusResult(Version, AdminWire.ProtocolVersion, new AdminFeatures(held.Held, held.Listening, held.Auditing, freezer!.Count(user))));
             case AdminOps.DecoysStatus:
                 return AdminReply.Ok(decoys!.Status(user));
             case AdminOps.DecoysAdopt:
@@ -147,6 +149,16 @@ sealed class AdminPipeService(ILogger<AdminPipeService> logger) : BackgroundServ
                 var ack = AdminWire.FromNode<long[]>(args["ack"]) ?? [];
                 var wait = TimeSpan.FromSeconds(args["wait"]!.GetValue<int>());
                 return AdminReply.Ok(new AdminEvents(await decoys!.WaitAsync(user, ack, wait, stop)));
+            case AdminOps.Freeze:
+                var (froze, notFrozen) = freezer!.Freeze(user, args["pid"]!.GetValue<int>());
+                return froze is not null ? AdminReply.Ok(froze) : AdminReply.Refused(notFrozen!);
+            case AdminOps.Thaw:
+                var (thawed, notThawed) = freezer!.Thaw(user, args["program"]!.GetValue<string>());
+                return thawed is not null ? AdminReply.Ok(thawed) : AdminReply.Refused(notThawed!);
+            case AdminOps.Teardown:
+                var all = freezer!.ThawAll();
+                await decoys!.TearDownAsync();
+                return AdminReply.Ok(all);
             default:
                 // The policy refuses every op not built yet; reaching here is a bug, not a request to act on.
                 return new AdminReply(AdminStatus.Error, Message: "not built");

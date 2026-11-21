@@ -1,7 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics.Eventing.Reader;
 using Microsoft.Extensions.Logging;
-using Microsoft.Win32;
 using Tiresias.Agent;
 using Tiresias.AdminTier;
 using Tiresias.Decoys;
@@ -219,8 +218,7 @@ sealed class ReadAudit : IDisposable
     {
         if (!routine.TryGetValue(sid, out var folders))
         {
-            using var key = Registry.LocalMachine.OpenSubKey($@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\{sid}");
-            var profile = key?.GetValue("ProfileImagePath") is string path ? Environment.ExpandEnvironmentVariables(path) : null;
+            var profile = UserProfile.Folder(sid);
             routine[sid] = folders = AdminAudit.Routine(
                 Environment.GetFolderPath(Environment.SpecialFolder.Windows),
                 [Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86)],
