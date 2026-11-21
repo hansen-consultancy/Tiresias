@@ -1865,6 +1865,30 @@ Store them in clear?</value>
   <data name="Nav_Installed" xml:space="preserve">
     <value>Installed</value>
   </data>
+  <data name="Installed_Search" xml:space="preserve">
+    <value>Search</value>
+  </data>
+  <data name="Installed_ColFolder" xml:space="preserve">
+    <value>Folder</value>
+  </data>
+  <data name="Installed_ShortUnused" xml:space="preserve">
+    <value>{0} (unused)</value>
+  </data>
+  <data name="Installed_ShortBackground" xml:space="preserve">
+    <value>Unknown (background)</value>
+  </data>
+  <data name="Installed_ShortNotRecorded" xml:space="preserve">
+    <value>Unknown</value>
+  </data>
+  <data name="Installed_ReachedNone" xml:space="preserve">
+    <value>None</value>
+  </data>
+  <data name="Installed_FolderUnknown" xml:space="preserve">
+    <value>Not known</value>
+  </data>
+  <data name="Installed_ShortRecentNoRun" xml:space="preserve">
+    <value>Uses credentials</value>
+  </data>
   <data name="Installed_Heading" xml:space="preserve">
     <value>Installed programs</value>
   </data>
@@ -1908,13 +1932,13 @@ Store them in clear?</value>
     <value>{0}, over 90 days ago</value>
   </data>
   <data name="Installed_UseBackground" xml:space="preserve">
-    <value>Unknown: works in the background</value>
+    <value>Unknown: part of it works without being opened (a tray icon, a service, a driver, something that starts at log-on, or a command on PATH), which Windows doesn't record</value>
   </data>
   <data name="Installed_UseNotRecorded" xml:space="preserve">
-    <value>Unknown: not recorded</value>
+    <value>Unknown: Windows has no record of you opening anything in its folder, or it names no folder of its own</value>
   </data>
   <data name="Installed_UseRecentNoRun" xml:space="preserve">
-    <value>Uses credentials</value>
+    <value>Not recorded, but it used credentials through Tiresias in the last 90 days</value>
   </data>
   <data name="Installed_Summary" xml:space="preserve">
     <value>{0} programs, {1} not opened in 90 days</value>
@@ -1929,7 +1953,7 @@ Store them in clear?</value>
     <value>Refresh</value>
   </data>
   <data name="Installed_OpenSettings" xml:space="preserve">
-    <value>Uninstall in Settings</value>
+    <value>Open Installed apps in Settings</value>
   </data>
   <data name="Finding_FixRemoveEntry" xml:space="preserve">
     <value>Remove entry...</value>

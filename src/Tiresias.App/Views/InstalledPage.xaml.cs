@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Tiresias.Agent;
+using Tiresias.App.Logic;
 using Tiresias.Client;
 
 namespace Tiresias.App.Views;
@@ -27,7 +28,12 @@ public partial class InstalledPage : UserControl
     void OnOpenSettings(object sender, RoutedEventArgs e) => Desktop.Open("ms-settings:appsfeatures");
 }
 
-public sealed record InstalledRow(string Name, string Version, string For, string Use, string Reached);
+/// <param name="ShortUse">The list's column: a date or a few words.</param>
+/// <param name="Use">The details panel's line: what is known of its use, in full.</param>
+public sealed record InstalledRow(string Name, string Version, string For, string ShortUse, string Use, string Reached, string Folder)
+{
+    public string Spoken => $"{Name}. {Use}";
+}
 
 public sealed partial class InstalledViewModel : ObservableObject
 {
@@ -45,6 +51,15 @@ public sealed partial class InstalledViewModel : ObservableObject
     public partial bool UnusedOnly { get; set; }
 
     [ObservableProperty]
+    public partial string Search { get; set; } = "";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DetailsVisibility))]
+    public partial InstalledRow? Selected { get; set; }
+
+    public Visibility DetailsVisibility => Selected is null ? Visibility.Collapsed : Visibility.Visible;
+
+    [ObservableProperty]
     public partial string Summary { get; set; } = Text.Get("Installed_Loading");
 
     [ObservableProperty]
@@ -53,6 +68,8 @@ public sealed partial class InstalledViewModel : ObservableObject
     public string EmptyText { get; } = Text.Get("Installed_Empty");
 
     partial void OnUnusedOnlyChanged(bool value) => Apply();
+
+    partial void OnSearchChanged(string value) => Apply();
 
     [RelayCommand]
     async Task LoadAsync()
@@ -67,12 +84,28 @@ public sealed partial class InstalledViewModel : ObservableObject
 
     void Apply()
     {
+        var selected = Selected?.Name;
         Rows.Clear();
-        foreach (var program in all.Where(p => !UnusedOnly || p.Use == ProgramUse.Unused))
-            Rows.Add(new(program.Entry.Name, program.Entry.Version ?? "", Text.Get(program.Entry.Machine ? "Installed_ForEveryone" : "Installed_ForYou"),
-                UseText(program), string.Join(", ", program.Reached)));
+        foreach (var program in InstalledFilter.Apply(all, Search, UnusedOnly))
+            Rows.Add(Row(program));
+        Selected = Rows.FirstOrDefault(r => r.Name == selected);
         IsEmpty = Rows.Count == 0;
         Summary = Text.Format("Installed_Summary", all.Count, all.Count(p => p.Use == ProgramUse.Unused));
+    }
+
+    static InstalledRow Row(InstalledProgram program)
+    {
+        var date = program.LastOpened?.ToLocalTime().ToString("d", CultureInfo.CurrentCulture);
+        var shortUse = program.Use switch
+        {
+            ProgramUse.Unused => Text.Format("Installed_ShortUnused", date!),
+            ProgramUse.Background => Text.Get("Installed_ShortBackground"),
+            ProgramUse.NotRecorded => Text.Get("Installed_ShortNotRecorded"),
+            _ => date ?? Text.Get("Installed_ShortRecentNoRun"),
+        };
+        return new(program.Entry.Name, program.Entry.Version ?? "", Text.Get(program.Entry.Machine ? "Installed_ForEveryone" : "Installed_ForYou"),
+            shortUse, UseText(program), program.Reached.Count > 0 ? string.Join(", ", program.Reached) : Text.Get("Installed_ReachedNone"),
+            program.Entry.Folder ?? Text.Get("Installed_FolderUnknown"));
     }
 
     static string UseText(InstalledProgram program)

@@ -125,6 +125,26 @@ public class UnusedApplicationTests
     }
 
     [Test]
+    public void The_Installed_search_matches_every_word_in_name_version_folder_or_service()
+    {
+        InstalledProgram[] list =
+        [
+            new(Program("Acme Editor"), ProgramUse.Recent, Now, ["github"]),
+            new(Program("Zeta Tool") with { Version = "9.1" }, ProgramUse.Unused, Now.AddDays(-200), []),
+            new(Program("Other", folder: @"D:\Apps\Other"), ProgramUse.NotRecorded, null, []),
+        ];
+
+        string[] Names(string search, bool unusedOnly = false) => [.. InstalledFilter.Apply(list, search, unusedOnly).Select(p => p.Entry.Name)];
+
+        Assert.That(Names(""), Is.EqualTo(new[] { "Acme Editor", "Zeta Tool", "Other" }));
+        Assert.That(Names("GITHUB"), Is.EqualTo(new[] { "Acme Editor" }));
+        Assert.That(Names("zeta 9.1"), Is.EqualTo(new[] { "Zeta Tool" }));
+        Assert.That(Names(@"d:\apps"), Is.EqualTo(new[] { "Other" }));
+        Assert.That(Names("acme zeta"), Is.Empty);
+        Assert.That(Names("", unusedOnly: true), Is.EqualTo(new[] { "Zeta Tool" }));
+    }
+
+    [Test]
     public void A_group_of_findings_with_their_own_fixes_has_no_shared_button()
     {
         static DoctorCheck Unsigned(string path) => new($"{path} unsigned", DoctorStatus.Warn, "detail", new RevealFile(path), Kind: Doctor.UnsignedStartupKind);

@@ -15,8 +15,9 @@ its section below.
   `PATH`) is never counted, nor one that used a credential. On Home they are one line, last, that
   doesn't light the tray badge.
 - A new **Installed** page lists every installed program with when you last opened it (or why
-  that's unknown) and the credentials it used in the last 90 days, unused ones first, with
-  **Uninstall in Settings**.
+  that's unknown), unused ones first, with a search box. Select one to see its version, who it is
+  installed for, the credentials it used in the last 90 days and its folder. **Open Installed apps
+  in Settings** is where you uninstall it.
 - Home and `tir doctor` point out programs that start at log-on but that you haven't opened in 90
   days, with **Turn off at log-on...**: the same switch as Task Manager's Startup tab, so Settings,
   Apps, Startup turns it back on. Programs with a tray icon are never counted as unused, and
