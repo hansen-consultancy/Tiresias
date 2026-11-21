@@ -15,7 +15,8 @@ namespace Tiresias.App;
 /// finished); the right-click menu keeps the lock state (plus "Solo"), Unlock or Lock, Home, Add...
 /// (<i>What do you need?</i>) and Activity once anything is recorded; every other window is reached
 /// from those. The icon follows the taskbar's light or dark theme, and a development build's icon has
-/// an orange corner and a menu line saying which build it is.
+/// an orange corner and a menu line saying which build it is. Findings Home hasn't shown yet
+/// (<see cref="FindingWatch"/>) put a dot on the icon and their count on Status... and the tooltip.
 /// </summary>
 sealed class TrayController : IDisposable
 {
@@ -30,6 +31,7 @@ sealed class TrayController : IDisposable
     readonly MenuItem update = new() { Visibility = Visibility.Collapsed };
     readonly Separator updateSeparator = new() { Visibility = Visibility.Collapsed };
     readonly TrayFlyout flyout = new();
+    readonly MenuItem status;
     TrayView? view;
     string? updateVersion;
     Action? updateApply;
@@ -40,7 +42,7 @@ sealed class TrayController : IDisposable
         unlock.Click += async (_, _) => await app.UnlockAsync(interactive: true);
         lockItem.Click += async (_, _) => await app.LockAsync();
         setup.Click += (_, _) => app.ShowWindow<FirstRunWindow>();
-        var status = Item("Tray_Status", () => app.ShowWindow<StatusWindow>());
+        status = Item("Tray_Status", () => app.ShowWindow<StatusWindow>());
         var add = Item("Tray_Add", () => app.ShowWindow<NeedsWindow>());
         var activity = Item("Tray_Activity", () => app.ShowPage<ActivityPage>());
         var quit = Item("Tray_Quit", app.Quit);
@@ -78,6 +80,7 @@ sealed class TrayController : IDisposable
 
         UpdateIcon();
         SystemEvents.UserPreferenceChanged += OnPreferenceChanged;
+        FindingWatch.Changed += OnFindingsChanged;
         icon.ForceCreate(enablesEfficiencyMode: false);
     }
 
@@ -108,8 +111,25 @@ sealed class TrayController : IDisposable
         unlock.Visibility = view.CanUnlock ? Visibility.Visible : Visibility.Collapsed;
         lockItem.Visibility = view.CanLock ? Visibility.Visible : Visibility.Collapsed;
         setup.Visibility = view.OfferSetup ? Visibility.Visible : Visibility.Collapsed;
+        ShowTooltip();
+    }
+
+    void ShowTooltip()
+    {
+        if (view is null)
+            return;
+        var unseen = FindingWatch.NewCount;
         icon.ToolTipText = $"{Text.Get("App_Name")} - {Text.Of(view.Tooltip)}"
+            + (unseen > 0 ? $"{Environment.NewLine}{Text.Format("Tray_NewFindings", unseen)}" : "")
             + (AppBuild.Current.Development ? $"{Environment.NewLine}{Text.Of(AppBuild.Current.Label)}" : "");
+    }
+
+    void OnFindingsChanged()
+    {
+        var unseen = FindingWatch.NewCount;
+        status.Header = unseen > 0 ? Text.Format("Tray_StatusNew", unseen) : Text.Get("Tray_Status");
+        UpdateIcon();
+        ShowTooltip();
     }
 
     /// <summary>Offers "Update available - restart to apply" in the menu; <c>null</c> hides it.</summary>
@@ -140,38 +160,52 @@ sealed class TrayController : IDisposable
     {
         var file = Desktop.TaskbarIsLight() ? "tray-light-theme.ico" : "tray-dark-theme.ico";
         var uri = new Uri($"pack://application:,,,/Assets/{file}");
-        if (AppBuild.Current.Development)
-            icon.Icon = WithDevelopmentCorner(uri);
+        var dot = FindingWatch.NewCount > 0;
+        // Icon in both branches: once set, an Icon wins over a later IconSource, so a cleared dot would stay drawn.
+        if (AppBuild.Current.Development || dot)
+            icon.Icon = Decorated(uri, AppBuild.Current.Development, dot);
         else
-            icon.IconSource = BitmapFrame.Create(uri);
+        {
+            using var stream = Application.GetResourceStream(uri)!.Stream;
+            icon.Icon = new System.Drawing.Icon(stream);
+        }
     }
 
     static readonly SolidColorBrush DevelopmentOrange = Frozen(Color.FromRgb(0xF7, 0x63, 0x0C));
 
-    /// <summary>The icon with its bottom-right corner filled orange: visible at 16 pixels, where text isn't.</summary>
+    /// <summary>Windows' caution yellow, readable on a light and a dark taskbar.</summary>
+    static readonly SolidColorBrush FindingDot = Frozen(Color.FromRgb(0xFC, 0xE1, 0x00));
+
+    /// <summary>
+    /// The icon with its bottom-right corner filled orange (a development build) and a dot top right
+    /// (findings not yet seen): visible at 16 pixels, where text isn't.
+    /// </summary>
     /// <remarks>
     /// Handed over as a System.Drawing icon: H.NotifyIcon's ImageSource conversion only takes decoded
     /// images, not a rendered bitmap. The icon file wraps one PNG image, which Windows reads since Vista.
     /// </remarks>
-    static System.Drawing.Icon WithDevelopmentCorner(Uri uri)
+    static System.Drawing.Icon Decorated(Uri uri, bool corner, bool dot)
     {
         const int size = 32;
         using var stream = Application.GetResourceStream(uri)!.Stream;
         var frames = new IconBitmapDecoder(stream, BitmapCreateOptions.None, BitmapCacheOption.OnLoad).Frames;
         var frame = frames.OrderBy(f => Math.Abs(f.PixelWidth - size)).First();
-        var corner = new StreamGeometry();
-        using (var g = corner.Open())
+        var triangle = new StreamGeometry();
+        using (var g = triangle.Open())
         {
             g.BeginFigure(new Point(size, size * 0.45), isFilled: true, isClosed: true);
             g.LineTo(new Point(size, size), isStroked: false, isSmoothJoin: false);
             g.LineTo(new Point(size * 0.45, size), isStroked: false, isSmoothJoin: false);
         }
-        corner.Freeze();
+        triangle.Freeze();
         var visual = new DrawingVisual();
         using (var dc = visual.RenderOpen())
         {
             dc.DrawImage(frame, new Rect(0, 0, size, size));
-            dc.DrawGeometry(DevelopmentOrange, null, corner);
+            if (corner)
+                dc.DrawGeometry(DevelopmentOrange, null, triangle);
+            if (dot)
+                dc.DrawEllipse(FindingDot, new Pen(Brushes.Black, 1.5), new Point(size * 0.78, size * 0.22), size * 0.2, size * 0.2);
         }
         var bitmap = new RenderTargetBitmap(size, size, 96, 96, PixelFormats.Pbgra32);
         bitmap.Render(visual);
@@ -212,6 +246,7 @@ sealed class TrayController : IDisposable
     public void Dispose()
     {
         SystemEvents.UserPreferenceChanged -= OnPreferenceChanged;
+        FindingWatch.Changed -= OnFindingsChanged;
         icon.Dispose();
     }
 }
