@@ -267,6 +267,12 @@ public partial class StatusWindow : Window
             case RevealFile { Path: var path }:
                 Desktop.Reveal(path);
                 break;
+            case RemoveEntry { Machine: false } entry:
+                _ = RemoveEntryAsync(entry);
+                break;
+            case RemoveEntry or Repair { Command: not null }:
+                model.CopyFix(fix.Instruction);
+                break;
             case UnblockProgram { Path: var program }:
                 AppLog.Info($"unblocked {program}: the decoy use was the user's");
                 App.Current.Guard.Unblock(program);
@@ -311,6 +317,19 @@ public partial class StatusWindow : Window
             ? Text.Format("Finding_Removed", remove.Id, remove.Host.Name)
             : Text.Format("Finding_RemoveFailed", remove.Id, remove.Instruction);
         if (removed)
+            model.Refresh();
+    }
+
+    /// <summary>Saves and deletes an uninstall entry once the user approves, then checks again.</summary>
+    async Task RemoveEntryAsync(RemoveEntry remove)
+    {
+        if (!AskWindow.Confirm(this, Text.Format("Finding_RemoveEntryHeading", remove.Name), Text.Get("Finding_RemoveEntryBody"), Text.Get("Finding_Remove")))
+            return;
+        var backup = await Desktop.RemoveEntryAsync(remove);
+        model.FindingMessage = backup is not null
+            ? Text.Format("Finding_EntryRemoved", remove.Name, backup)
+            : Text.Format("Finding_RemoveFailed", remove.Name, remove.Instruction);
+        if (backup is not null)
             model.Refresh();
     }
 

@@ -104,6 +104,9 @@ public interface IDoctorProbe
     /// <summary>Paths of blocked programs whose file still exists.</summary>
     IEnumerable<string> BlockedPrograms() => [];
 
+    /// <summary>The uninstall registry entries, machine and user, each with whether its uninstaller and folder are on disk.</summary>
+    IEnumerable<UninstallEntry> UninstallEntries() => [];
+
     /// <summary>Uses of a decoy, from the activity log.</summary>
     IEnumerable<DecoyUseRecord> DecoyUses() => [];
 
@@ -179,6 +182,7 @@ public static partial class Doctor
         checks.AddRange(CliSignIns(probe.CliConfigs, probe.GitHubAppService));
         checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), probe.CredentialUses(),
             blocked.Where(b => !decoyUses.Any(u => !u.IsRead && SamePath(u.Program, b))), DateTimeOffset.UtcNow));
+        checks.AddRange(UninstallEntries(probe.UninstallEntries()));
         return checks;
     }
 

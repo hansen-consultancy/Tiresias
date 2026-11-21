@@ -198,7 +198,9 @@ Existing windows remain the places where the work happens; this changes how peop
    with a position: an extension with an unknown publisher or unchanged for two years inside a
    program that used a credential (**Remove...** runs the host's `--uninstall-extension` after
    approval), an unsigned program that starts at log-on, and a blocked program still on the PC
-   (both **Show file**). A finding's reasons are in its name, so a dismissal survives a version
+   (both **Show file**). Uninstall entries are checked against the disk: an entry for software
+   that is gone and an older version's stale duplicate (**Remove entry...** saves it to a `.reg`
+   file first), and a program whose uninstaller is missing (reinstall it over itself). A finding's reasons are in its name, so a dismissal survives a version
    update and a new reason brings it back. Still design: the opt-in trust lookups (OSV,
    deps.dev, marketplaces, winget-pkgs) and the vulnerability and unverified-publisher findings
    they raise; **Update** and `winget`/`dotnet tool`/`npm` uninstalls; "not used in 90 days" with
