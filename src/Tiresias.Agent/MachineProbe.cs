@@ -159,6 +159,8 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public IEnumerable<string> BlockedPrograms() => SurfaceProbe.BlockedPrograms();
 
+    public IEnumerable<DecoyUseRecord> DecoyUses() => SurfaceProbe.DecoyUses();
+
     /// <summary>Where each tool keeps them, honouring <c>GH_CONFIG_DIR</c> and <c>AZURE_CONFIG_DIR</c> as the tools do.</summary>
     public DoctorCliConfigs CliConfigs
     {

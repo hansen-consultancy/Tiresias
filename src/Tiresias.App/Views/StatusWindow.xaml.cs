@@ -34,14 +34,19 @@ public partial class StatusWindow : Window
         Activated += (_, _) => model.ShowAreas();
         App.Current.Host.StateChanged += OnAgentStateChanged;
         App.Current.Guard.Changed += OnGuardChanged;
+        App.Current.Host.DecoyTouched += OnDecoyTouched;
         Closed += (_, _) =>
         {
             App.Current.Host.StateChanged -= OnAgentStateChanged;
             App.Current.Guard.Changed -= OnGuardChanged;
+            App.Current.Host.DecoyTouched -= OnDecoyTouched;
         };
     }
 
     void OnGuardChanged() => Dispatcher.BeginInvoke(model.ShowGuard);
+
+    /// <summary>A decoy use is a new finding: run the checks again.</summary>
+    void OnDecoyTouched(DecoyTouch _) => Dispatcher.BeginInvoke(model.Refresh);
 
     void OnUnblock(object sender, RoutedEventArgs e)
     {
@@ -218,6 +223,11 @@ public partial class StatusWindow : Window
                 break;
             case RevealFile { Path: var path }:
                 Desktop.Reveal(path);
+                break;
+            case UnblockProgram { Path: var program }:
+                AppLog.Info($"unblocked {program}: the decoy use was the user's");
+                App.Current.Guard.Unblock(program);
+                model.Refresh();
                 break;
             case RunThroughExec { Setup: { } setup }:
                 Navigate<ServicesPage>()?.Add(setup.Upstream);

@@ -115,6 +115,10 @@ public class DoctorTests
         public List<DoctorFile> Config { get; } = [];
         public List<string> Keys { get; } = [];
         public DoctorDecoys? Decoys { get; set; }
+        public List<string> Blocked { get; } = [];
+        public List<DecoyUseRecord> Uses { get; } = [];
+        public IEnumerable<string> BlockedPrograms() => Blocked;
+        public IEnumerable<DecoyUseRecord> DecoyUses() => Uses;
 
         public Task<int?> BrokerStatusAsync() => Task.FromResult(BrokerStatus);
         public Task<bool> ForwarderListeningAsync() => Task.FromResult(Forwarder);
@@ -135,6 +139,20 @@ public class DoctorTests
         Assert.That(listening.Status, Is.EqualTo(DoctorStatus.Ok));
         Assert.That(deaf.Status, Is.EqualTo(DoctorStatus.Warn));
         Assert.That(deaf.Detail, Does.Contain("goes unseen"));
+    }
+
+    [Test]
+    public async Task A_program_blocked_for_a_decoy_is_that_finding_not_this_wasnt_mes()
+    {
+        const string evil = @"C:\Temp\evil.exe", other = @"C:\Temp\other.exe";
+        var probe = new FakeProbe();
+        probe.Blocked.AddRange([evil, other]);
+        probe.Uses.Add(new(evil, "the decoy API key", DateTimeOffset.UtcNow));
+
+        var checks = await Doctor.RunAsync(probe);
+
+        Assert.That(checks.Where(c => c.Kind == Doctor.DecoyKind).Select(c => c.Subject), Is.EqualTo(new[] { evil }));
+        Assert.That(checks.Where(c => c.Kind == Doctor.BlockedKind).Select(c => c.Fix), Is.EqualTo(new DoctorFix[] { new RevealFile(other) }));
     }
 
     static readonly Position Plaintext = new(Exposure.Readable, Control.Silent);
