@@ -1,8 +1,8 @@
 # Decoys: catching what goes looking for secrets
 
-Status: **phase 1's decoys and listeners built** (#39): `tir decoys place|list|remove`, the agent's
-loopback endpoints, the activity record and the doctor's line. The app's response (block, notify,
-finding) and the read tripwire are next. Its alerts land as findings in [guided setup](guided-setup.md)
+Status: **phase 1 built** (#39): `tir decoys place|list|remove`, the agent's loopback endpoints,
+the activity record, the doctor's line, and the app's response (block, notify, finding). Placing
+decoys from the app and the read tripwire are next. Its alerts land as findings in [guided setup](guided-setup.md)
 and use the program block list that **This wasn't me** already fills.
 
 Consent stops a program using a credential through Tiresias without asking. It does nothing about
@@ -52,20 +52,17 @@ alphabet), never like a Tiresias placeholder (`tirph_`), which would give them a
 the forwarder already do. Any connection to a decoy port is a hit, since only a decoy names it; the
 record says which value was presented (the SQL password, the admin token, the API key) or that none
 was. Repeats by the same program with the same value within a minute are one hit, so a flood of
-connections can't bury the first in the log or the notifications. Built today: the agent
+connections can't bury the first in the log or the notifications. Tiresias then:
 
 - records it in the activity log (`consumer: decoy`), with the decoy, the endpoint, the process and
-  the processes that started it, never a value;
-- prints it in `tir agent`.
-
-Next, in the app, Tiresias:
-
-- records it in the activity log, with the decoy, the process path and its signer;
-- shows a notification and badges the tray;
-- adds the program to the block list, so it gets no lease, placeholder or consent dialog until the
-  user reviews it;
-- raises a finding on Home: **Unblock (that was me)** or **Keep blocked**, with the process's path,
-  signature and parent.
+  the processes that started it, never a value (`tir agent` also prints it);
+- in the app, adds the program to the block list, without the lockdown **This wasn't me** brings,
+  so it gets no lease, placeholder or consent dialog until the user reviews it;
+- shows a notification;
+- raises a finding on Home (`tir doctor` too) naming the program and the decoy it used, with
+  **Unblock (that was me)**; dismissing it keeps the program blocked. A process that couldn't be
+  named can't be blocked: its uses in the last 30 days are one warning. The program's signature and parents are
+  in the activity record, not yet in the finding.
 
 The listener answers like the real service would refuse a bad password, so the caller learns
 nothing. Nothing the decoy holds is ever valid anywhere.
