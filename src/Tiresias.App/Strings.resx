@@ -1934,6 +1934,9 @@ Store them in clear?</value>
   <data name="Window_DevTitle" xml:space="preserve">
     <value>{0} (dev)</value>
   </data>
+  <data name="Window_DevCapturableTitle" xml:space="preserve">
+    <value>{0} (dev, capturable)</value>
+  </data>
   <data name="Status_PassedHeader" xml:space="preserve">
     <value>{0} checks passed</value>
   </data>

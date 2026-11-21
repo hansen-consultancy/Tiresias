@@ -29,7 +29,8 @@ public enum WindowSize
 /// one scroll region rather than growing it. Its height is its content's, up to most of the work
 /// area; a window whose list loads after it opens says <c>l:WindowFit.Tall="True"</c> and opens at a
 /// fixed share of the work area instead, since its content's height is not known yet. A
-/// development build says "(dev)" in every title. No window sets its own Width, Height or
+/// development build says "(dev)" in every title, and "(dev, capturable)" while it lets windows be
+/// captured (<see cref="Desktop.CaptureAllowed"/>). No window sets its own Width, Height or
 /// WindowStartupLocation.
 /// </summary>
 public static partial class WindowFit
@@ -72,7 +73,9 @@ public static partial class WindowFit
     {
         var window = (Window)sender!;
         window.SourceInitialized -= OnSourceInitialized;
-        if (AppBuild.Current.Development)
+        if (Desktop.CaptureAllowed)
+            window.Title = Text.Format("Window_DevCapturableTitle", window.Title);
+        else if (AppBuild.Current.Development)
             window.Title = Text.Format("Window_DevTitle", window.Title);
 
         var hwnd = new WindowInteropHelper(window).Handle;

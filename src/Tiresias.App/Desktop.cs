@@ -14,7 +14,16 @@ namespace Tiresias.App;
 /// <summary>The bits of Windows the app touches directly: capture exclusion, the taskbar theme, shell links, the Recycle Bin.</summary>
 static partial class Desktop
 {
+    const uint WdaNone = 0;
     const uint WdaExcludeFromCapture = 0x11;
+
+    /// <summary>A debug build started with <c>TIRESIAS_ALLOW_CAPTURE=1</c> (<see cref="CaptureRule"/>); a release build never reads it.</summary>
+    public static bool CaptureAllowed { get; } =
+#if DEBUG
+        CaptureRule.Allowed(Environment.GetEnvironmentVariable(CaptureRule.Variable));
+#else
+        false;
+#endif
 
     /// <summary>
     /// Keeps a window out of screenshots, screen recordings and screen sharing (it shows as black),
@@ -22,6 +31,18 @@ static partial class Desktop
     /// </summary>
     public static void ExcludeFromCapture(Window window) =>
         window.SourceInitialized += (_, _) => SetWindowDisplayAffinity(new WindowInteropHelper(window).Handle, WdaExcludeFromCapture);
+
+    /// <summary>
+    /// Excludes a window from capture or lets it be captured, by <see cref="CaptureRule.Excluded"/>,
+    /// for a window whose content changes; before it has a handle this does nothing, so it is also
+    /// called once the handle exists.
+    /// </summary>
+    public static void ExcludeFromCapture(Window window, bool showsValues)
+    {
+        var hwnd = new WindowInteropHelper(window).Handle;
+        if (hwnd != 0)
+            SetWindowDisplayAffinity(hwnd, CaptureRule.Excluded(CaptureAllowed, showsValues) ? WdaExcludeFromCapture : WdaNone);
+    }
 
     /// <summary>Whether the taskbar is light, which picks the tray icon that stays visible on it.</summary>
     public static bool TaskbarIsLight()

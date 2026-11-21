@@ -141,7 +141,9 @@ list only when this machine uses it (the same rule as Home's area buttons, which
 the rest are reached through Add.... A page is made new each time it is opened, so it never shows
 what it held last time. Leaving the secrets editor with unsaved changes asks first, whether by the
 list, by Escape (a page's Escape goes back Home) or by closing the window. Because the secrets,
-services and environment pages show values, the whole window is excluded from screen capture.
+services and environment pages show values, the whole window is excluded from screen capture (a
+Debug build started with `TIRESIAS_ALLOW_CAPTURE=1` lets the pages without values be captured,
+[testing](testing-on-windows.md#sharing-your-screen-while-you-develop)).
 Coming back Home after Environment variables re-runs the checks, since a change there can clear a
 finding. Dialogs (Add..., the approval prompt, setup, the forms a page opens) stay windows.
 

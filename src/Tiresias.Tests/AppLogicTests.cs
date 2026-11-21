@@ -266,13 +266,17 @@ public class AppStringsTests
     static HashSet<string> Defined() =>
         XDocument.Load(Path.Combine(App, "Strings.resx")).Root!.Elements("data").Select(d => (string)d.Attribute("name")!).ToHashSet();
 
-    /// <summary>Keys are <c>Area_Name</c> string literals in code and <c>{l:S Key}</c> in XAML; problem keys are built from the enum.</summary>
+    /// <summary>
+    /// Keys are <c>Area_Name</c> string literals in code and <c>{l:S Key}</c> in XAML; problem keys are built from the enum.
+    /// An all-capitals literal is an environment variable's name, not a key.
+    /// </summary>
     static HashSet<string> Used()
     {
         var used = new HashSet<string>();
         foreach (var file in Directory.EnumerateFiles(App, "*.cs", SearchOption.AllDirectories))
             foreach (Match m in Regex.Matches(File.ReadAllText(file), "\"([A-Z][A-Za-z0-9]*_[A-Za-z0-9_]+)\""))
-                used.Add(m.Groups[1].Value);
+                if (m.Groups[1].Value != m.Groups[1].Value.ToUpperInvariant())
+                    used.Add(m.Groups[1].Value);
         foreach (var file in Directory.EnumerateFiles(App, "*.xaml", SearchOption.AllDirectories))
             foreach (Match m in Regex.Matches(File.ReadAllText(file), @"\{l:S ([A-Za-z0-9_]+)\}"))
                 used.Add(m.Groups[1].Value);

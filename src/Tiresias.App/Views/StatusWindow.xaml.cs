@@ -24,8 +24,9 @@ public partial class StatusWindow : Window
     public StatusWindow()
     {
         InitializeComponent();
-        // Pages show secret values (Secrets, Services, Environment), so the whole window stays out of capture.
-        Desktop.ExcludeFromCapture(this);
+        // Pages show secret values (Secrets, Services, Environment), so the window stays out of capture
+        // (a debug build may allow it on the others: ShowsValues).
+        SourceInitialized += (_, _) => Desktop.ExcludeFromCapture(this, ShowsValues);
         // Selected here, not in XAML: selecting there runs OnNav before the page host exists.
         Show(null);
         DataContext = model;
@@ -103,7 +104,11 @@ public partial class StatusWindow : Window
             _ => NavHome,
         };
         navigating = false;
+        Desktop.ExcludeFromCapture(this, ShowsValues);
     }
+
+    /// <summary>The page open now can show a value. Named the other way round, so a new page counts as one until it is added here.</summary>
+    bool ShowsValues => PageHost.Content is not (null or ActivityPage or AboutPage);
 
     /// <summary>A page that edits what the agent serves is open, so the app must not quit or update under it.</summary>
     internal bool Editing => PageHost.Content is SecretsPage or ServicesPage;

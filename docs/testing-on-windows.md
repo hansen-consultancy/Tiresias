@@ -320,6 +320,21 @@ personal access token.
 7. Quit the app: the restore says the app isn't running.
 8. Clean up: `tir env nuget remove <source-url>`, `tir env remove FEED_PAT`.
 
+## Sharing your screen while you develop
+
+Windows that can show values are black in screenshots and screen shares. To demonstrate the app,
+start a **Debug** build with `TIRESIAS_ALLOW_CAPTURE` set to `1`:
+
+```powershell
+$env:TIRESIAS_ALLOW_CAPTURE = "1"
+dotnet run --project src/Tiresias.App
+```
+
+Every title then says "(dev, capturable)". The main window can be captured on Home, Activity and
+About; it turns black again on the secrets, services and environment pages, and the recovery key,
+first run and database setup windows stay excluded. A Release build ignores the variable. The
+Debug build serves your real vault, so close anything that shows values before you share.
+
 ## What you can't test yet
 
 These are not built yet (see [desktop-app.md](desktop-app.md#what-is-built)):

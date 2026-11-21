@@ -24,7 +24,8 @@ CI and people who prefer it, and it talks to the same agent.
   ([design](what-do-you-need.md)). `tir advise "<words>"` prints the same list.
 - **One window**: Home, the secrets editor, Services, Environment variables, Activity and About
   are pages listed on the left, the ones this machine uses, each with its count (Activity's is
-  today's), and About at the bottom; the whole window is excluded from screen capture. Escape on a
+  today's), and About at the bottom; the whole window is excluded from screen capture (except, on
+  request, in a Debug build: [testing](testing-on-windows.md#sharing-your-screen-while-you-develop)). Escape on a
   page goes back Home, and on Home closes the window ([design](app-design.md#10-one-window)).
 - **Home leads with the next step**: the lock state with Lock and Add..., then a heading that
   counts what could be safer over a bar of the checks that pass. The findings are numbered; the
