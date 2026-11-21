@@ -121,7 +121,7 @@ public sealed record DecoySet(int HttpPort, int SqlPort, DecoyValues Values, IRe
             var file = JsonSerializer.Deserialize<File>(json, Json);
             if (file is not { V: Version, Values: { } values } || file.HttpPort is < 1 or > IPEndPoint.MaxPort || file.SqlPort is < 1 or > IPEndPoint.MaxPort)
                 return null;
-            return new(file.HttpPort, file.SqlPort, values, [.. (file.Placed ?? []).Where(p => !string.IsNullOrEmpty(p.Where))]);
+            return new(file.HttpPort, file.SqlPort, values, [.. (file.Placed ?? []).Where(p => !string.IsNullOrEmpty(p.Where) && Enum.IsDefined(p.Kind))]);
         }
         catch (JsonException)
         {

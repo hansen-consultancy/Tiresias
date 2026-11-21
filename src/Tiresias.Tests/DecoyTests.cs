@@ -66,6 +66,20 @@ public class DecoyTests
     }
 
     [Test]
+    public void A_placed_decoy_of_an_unknown_kind_is_dropped()
+    {
+        var set = Minted().With(new(DecoyKind.PasswordsFile, @"C:\Users\alice\Documents\passwords.txt", Now));
+        var json = set.ToJson();
+        var kind = $"\"kind\": {(int)DecoyKind.PasswordsFile}";
+        Assert.That(json, Does.Contain(kind));
+
+        var read = DecoySet.Parse(json.Replace(kind, "\"kind\": 99"))!;
+
+        Assert.That(read.Placed, Is.Empty);
+        Assert.That(DecoyPlan.Files(read), Is.Empty);
+    }
+
+    [Test]
     public void Each_value_is_recognised_and_anything_else_is_not()
     {
         var set = Minted();
