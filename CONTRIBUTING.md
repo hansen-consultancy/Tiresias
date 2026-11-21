@@ -13,6 +13,8 @@ Issues and pull requests are welcome.
   for the people who use Tiresias: what they can now do or what no longer goes wrong, not how it
   was built. Refactors, tests and CI changes need no line. Releases turn that section into the
   release notes; see [docs/releasing.md](docs/releasing.md).
+- A PR that finishes, starts or adds an item on the [roadmap](docs/roadmap.md) updates that item in
+  the same PR.
 - Commits follow [Conventional Commits](https://www.conventionalcommits.org/): `type(scope): summary`.
   Types: `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `build`, `ci`, `chore`. Scopes: `core`,
   `protocol`, `config` (Extensions.Configuration and its generator), `broker`, `forwarder`,
