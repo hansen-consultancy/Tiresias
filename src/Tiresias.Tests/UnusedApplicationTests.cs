@@ -144,6 +144,24 @@ public class UnusedApplicationTests
         Assert.That(Names("", unusedOnly: true), Is.EqualTo(new[] { "Zeta Tool" }));
     }
 
+    [TestCase(@"""C:\Program Files\Acme\acme.exe"",0", @"C:\Program Files\Acme\acme.exe", 0)]
+    [TestCase(@"C:\Program Files\Acme\acme.exe,-101", @"C:\Program Files\Acme\acme.exe", -101)]
+    [TestCase(@"C:\Users\alice\AppData\Local\Acme\app.ico", @"C:\Users\alice\AppData\Local\Acme\app.ico", 0)]
+    [TestCase(@" ""C:\Acme, Inc\acme.exe"" ", @"C:\Acme, Inc\acme.exe", 0)]
+    public void An_entrys_icon_names_a_local_file_and_index(string displayIcon, string path, int index)
+    {
+        Assert.That(Program("Acme") with { Icon = displayIcon } is { IconLocation: var location } ? location : null, Is.EqualTo((path, index)));
+    }
+
+    [TestCase(@"\\files.example.com\share\acme.ico")]
+    [TestCase(@"acme.exe,0")]
+    [TestCase("")]
+    [TestCase(null)]
+    public void An_icon_on_the_network_or_without_a_full_path_is_never_read(string? displayIcon)
+    {
+        Assert.That((Program("Acme") with { Icon = displayIcon }).IconLocation, Is.Null);
+    }
+
     [Test]
     public void A_group_of_findings_with_their_own_fixes_has_no_shared_button()
     {

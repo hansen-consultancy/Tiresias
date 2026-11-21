@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Tiresias.Agent;
@@ -30,14 +31,22 @@ public partial class InstalledPage : UserControl
 
 /// <param name="ShortUse">The list's column: a date or a few words.</param>
 /// <param name="Use">The details panel's line: what is known of its use, in full.</param>
-public sealed record InstalledRow(string Name, string Version, string For, string ShortUse, string Use, string Reached, string Folder)
+/// <param name="Icon">The icon its entry names; <c>null</c> shows a generic one.</param>
+public sealed record InstalledRow(string Name, string Version, string For, string ShortUse, string Use, string Reached, string Folder, ImageSource? Icon)
 {
     public string Spoken => $"{Name}. {Use}";
+
+    public Visibility IconVisibility => Icon is null ? Visibility.Collapsed : Visibility.Visible;
+
+    public Visibility GenericIconVisibility => Icon is null ? Visibility.Visible : Visibility.Collapsed;
 }
 
 public sealed partial class InstalledViewModel : ObservableObject
 {
     IReadOnlyList<InstalledProgram> all = [];
+
+    /// <summary>Icons by the entry's <c>DisplayIcon</c>, read with the list, off the UI thread.</summary>
+    IReadOnlyDictionary<string, ImageSource> icons = new Dictionary<string, ImageSource>();
 
     public IReadOnlyList<Choice<bool>> Filters { get; } =
     [
@@ -74,10 +83,15 @@ public sealed partial class InstalledViewModel : ObservableObject
     [RelayCommand]
     async Task LoadAsync()
     {
-        all = await Task.Run(() =>
+        (all, icons) = await Task.Run(() =>
         {
             var probe = new MachineProbe();
-            return Doctor.InstalledPrograms(probe.UninstallEntries(), probe.ProgramRuns(), probe.CredentialUses(), DateTimeOffset.UtcNow);
+            var programs = Doctor.InstalledPrograms(probe.UninstallEntries(), probe.ProgramRuns(), probe.CredentialUses(), DateTimeOffset.UtcNow);
+            Dictionary<string, ImageSource> read = new(StringComparer.OrdinalIgnoreCase);
+            foreach (var entry in programs.Select(p => p.Entry).Where(e => e.Icon is not null && e.IconLocation is not null))
+                if (!read.ContainsKey(entry.Icon!) && Desktop.SmallIcon(entry.IconLocation!.Value.Path, entry.IconLocation.Value.Index) is { } image)
+                    read[entry.Icon!] = image;
+            return (programs, (IReadOnlyDictionary<string, ImageSource>)read);
         });
         Apply();
     }
@@ -87,13 +101,13 @@ public sealed partial class InstalledViewModel : ObservableObject
         var selected = Selected?.Name;
         Rows.Clear();
         foreach (var program in InstalledFilter.Apply(all, Search, UnusedOnly))
-            Rows.Add(Row(program));
+            Rows.Add(Row(program, program.Entry.Icon is { } icon ? icons.GetValueOrDefault(icon) : null));
         Selected = Rows.FirstOrDefault(r => r.Name == selected);
         IsEmpty = Rows.Count == 0;
         Summary = Text.Format("Installed_Summary", all.Count, all.Count(p => p.Use == ProgramUse.Unused));
     }
 
-    static InstalledRow Row(InstalledProgram program)
+    static InstalledRow Row(InstalledProgram program, ImageSource? icon)
     {
         var date = program.LastOpened?.ToLocalTime().ToString("d", CultureInfo.CurrentCulture);
         var shortUse = program.Use switch
@@ -105,7 +119,7 @@ public sealed partial class InstalledViewModel : ObservableObject
         };
         return new(program.Entry.Name, program.Entry.Version ?? "", Text.Get(program.Entry.Machine ? "Installed_ForEveryone" : "Installed_ForYou"),
             shortUse, UseText(program), program.Reached.Count > 0 ? string.Join(", ", program.Reached) : Text.Get("Installed_ReachedNone"),
-            program.Entry.Folder ?? Text.Get("Installed_FolderUnknown"));
+            program.Entry.Folder ?? Text.Get("Installed_FolderUnknown"), icon);
     }
 
     static string UseText(InstalledProgram program)

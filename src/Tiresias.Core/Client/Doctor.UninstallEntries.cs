@@ -15,9 +15,31 @@ namespace Tiresias.Client;
 /// <param name="Folder">Its <c>InstallLocation</c>, or the uninstaller's folder when it names none; <c>null</c> when that is in Windows' own folder.</param>
 /// <param name="RunsUnseen">Part of it runs without the user opening it (a tray icon, a service, a driver, a log-on entry, a
 /// folder on <c>PATH</c>), which Windows doesn't record, so its last use is unknown.</param>
+/// <param name="Icon">Its <c>DisplayIcon</c>, environment variables expanded: a file and, after a comma, an icon index.</param>
 public sealed record UninstallEntry(string Key, string Name, string? Version, string? Uninstaller, bool UninstallerExists, bool FolderExists,
-    string? Command = null, string? Folder = null, bool RunsUnseen = false)
+    string? Command = null, string? Folder = null, bool RunsUnseen = false, string? Icon = null)
 {
+    /// <summary>
+    /// The file and index <see cref="Icon"/> names, as Settings reads them: <c>"C:\app\app.exe",0</c>,
+    /// <c>C:\app\app.ico</c>, a negative index for a resource id. Only a local, fully qualified
+    /// path: a network one would make Windows connect to that host, as the user, just to draw a list.
+    /// </summary>
+    public (string Path, int Index)? IconLocation
+    {
+        get
+        {
+            if (Icon is not { Length: > 0 } icon)
+                return null;
+            var comma = icon.LastIndexOf(',');
+            var index = 0;
+            if (comma > 0 && int.TryParse(icon[(comma + 1)..].Trim(), System.Globalization.NumberStyles.AllowLeadingSign,
+                    System.Globalization.CultureInfo.InvariantCulture, out var parsed))
+                (icon, index) = (icon[..comma], parsed);
+            var path = icon.Trim().Trim('"');
+            return path.Length > 3 && path[1] == ':' && path[2] == '\\' && System.IO.Path.IsPathFullyQualified(path) ? (path, index) : null;
+        }
+    }
+
     /// <summary>A machine-wide entry, which only an administrator can change.</summary>
     public bool Machine => Key.StartsWith(@"HKLM\", StringComparison.OrdinalIgnoreCase);
 }

@@ -151,7 +151,8 @@ static partial class SurfaceProbe
                 var own = folder is not null && !SameOrUnder(folder, windows) ? folder : null;
                 entries.Add(new($@"{prefix}\{name}", display, key.GetValue("DisplayVersion") as string, uninstaller,
                     uninstaller is not null && File.Exists(uninstaller), folder is not null && Directory.Exists(folder), command,
-                    own, own is not null && (unseen.Any(p => SameOrUnder(p, own)) || HasDriver(own))));
+                    own, own is not null && (unseen.Any(p => SameOrUnder(p, own)) || HasDriver(own)),
+                    key.GetValue("DisplayIcon") is string { Length: > 0 } icon ? Environment.ExpandEnvironmentVariables(icon) : null));
             }
         }
         return entries;

@@ -313,7 +313,8 @@ status `ok`, so it sorts last and doesn't count for the badge; all of them are o
 page is built too: every entry of the installed-apps list once (Windows Installer entries
 included), for you or for everyone, its last opening or why its use is unknown (works in the
 background, not recorded), and the credentials its folder's programs used in 90 days; unused
-first, longest unused first. Two columns (program, last opened) fit any width; selecting one shows
+first, longest unused first. Two columns (program with the icon its entry names, last opened) fit any width; an icon is read
+from a local file only, never a network path; selecting one shows
 the rest below the list, and a search box matches every word against name, version, folder and
 services. Uninstalling goes through Settings, Apps, Installed apps
 (`UninstallApp`) until the inventory knows each program's installer command.

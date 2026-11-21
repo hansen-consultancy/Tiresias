@@ -35,7 +35,20 @@
                 GridLinesVisibility="None" CanUserAddRows="False" SelectionMode="Single"
                 AutomationProperties.Name="{l:S Installed_ListName}">
         <DataGrid.Columns>
-          <DataGridTextColumn Header="{l:S Installed_ColName}" Binding="{Binding Name}" Width="3*" />
+          <DataGridTemplateColumn Header="{l:S Installed_ColName}" Width="3*" SortMemberPath="Name">
+            <DataGridTemplateColumn.CellTemplate>
+              <DataTemplate>
+                <DockPanel Margin="4,2">
+                  <Grid Width="16" Height="16" Margin="0,0,8,0" DockPanel.Dock="Left" VerticalAlignment="Center">
+                    <Image Source="{Binding Icon}" Visibility="{Binding IconVisibility}" RenderOptions.BitmapScalingMode="HighQuality" />
+                    <TextBlock Text="&#xE74C;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14" Visibility="{Binding GenericIconVisibility}"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Grid>
+                  <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                </DockPanel>
+              </DataTemplate>
+            </DataGridTemplateColumn.CellTemplate>
+          </DataGridTemplateColumn>
           <DataGridTextColumn Header="{l:S Installed_ColUse}" Binding="{Binding ShortUse}" Width="2*" />
         </DataGrid.Columns>
       </DataGrid>
