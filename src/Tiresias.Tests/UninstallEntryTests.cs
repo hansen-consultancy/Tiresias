@@ -128,6 +128,11 @@ public class UninstallEntryTests
         Assert.That(RemoveEntry.IsSafeKey(key), Is.EqualTo(safe));
 
     [Test]
+    public void The_subkey_deleted_has_no_hive_or_leading_backslash() =>
+        Assert.That(new RemoveEntry(@"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\Acme", "Acme").Subkey,
+            Is.EqualTo(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\Acme"));
+
+    [Test]
     public void An_entry_whose_key_isnt_plain_is_reported_without_a_command()
     {
         var check = Run(Entry("Acme\" & start calc & rem", uninstallerExists: false, folderExists: false)).Single();
