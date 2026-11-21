@@ -1,8 +1,8 @@
 # Decoys: catching what goes looking for secrets
 
 Status: **phase 1 built** (#39): `tir decoys place|list|remove`, the agent's loopback endpoints,
-the activity record, the doctor's line, and the app's response (block, notify, finding). Placing
-decoys from the app and the read tripwire are next. Its alerts land as findings in [guided setup](guided-setup.md)
+the activity record, the doctor's line, the app's response (block, notify, finding), and Home's
+**Decoys** card. The read tripwire is next. Its alerts land as findings in [guided setup](guided-setup.md)
 and use the program block list that **This wasn't me** already fills.
 
 Consent stops a program using a credential through Tiresias without asking. It does nothing about
@@ -71,7 +71,7 @@ nothing. Nothing the decoy holds is ever valid anywhere.
 an external canary service (a key that alerts when used anywhere) catches that, which means
 registering decoys with a third party. That is a later, opt-in phase.
 
-## Layer 2: tripwires on reads (spike first)
+## Layer 2: tripwires on reads
 
 Seeing the read itself, before anything is tried, is harder on Windows without admin rights:
 
@@ -80,10 +80,51 @@ Seeing the read itself, before anything is tried, is harder on Windows without a
 | Last-access time, `FileSystemWatcher` | No | Unusable: no process, and access times are often not updated |
 | Auditing with a SACL (Security log event 4663) | Yes, to set the audit policy and read the log | Works; offered only where the user is an administrator |
 | Kernel ETW file events, a minifilter driver | Yes, or a driver | Out of scope |
-| **An oplock on the decoy, plus Restart Manager** | **No** | **To be proven.** Tiresias holds an oplock on each decoy file; another process opening it breaks the oplock, and while the opener waits, Restart Manager (`RmGetList`) names who has the file open |
+| An oplock on the decoy, naming the reader by Restart Manager | No | **Dropped** after a spike: it sees a read but can't say who read it (below) |
+| **An oplock on the decoy, naming the reader by the thread that wakes when the oplock is released** | **No** | **Works** (second spike, below): never named the wrong process |
 
-The spike answers: does the break fire for a read-only open, can the opener be named before it
-continues, and how much does holding the oplock delay a legitimate opener?
+**The oplock spike** (Windows 11, NTFS, ordinary user; 5 oplock levels, 2 share modes, 11 kinds of
+opener, each in its own process):
+
+- **The break fires on a read** with a read-handle-write (RWH), read-write (RW), Level 1 or batch
+  oplock and a file shared for everything, and the break says it was a read (the opener's access
+  mask). A read oplock (RH) on a shared file does not break: read oplocks are shared. Without
+  sharing, an RW or Level 1 oplock just fails the reader with a sharing violation, which is neither
+  detection nor harmless. Metadata (attributes, `dir`, Explorer's details) breaks nothing.
+- **The opener can't be named while it waits.** It has no handle yet, so asking Windows which
+  processes use the file (`FileProcessIdsUsingFileInformation`) returns none, even with the break
+  held for two seconds. Restart Manager opens the file itself, so it queues behind the break and
+  deadlocks the holder. After the break is acknowledged, only a reader that keeps its handle open
+  is seen; `type`, `Get-Content` and `File.ReadAllText` close it first and never were.
+- **It fires once.** After a break, later reads don't break again until every other handle has
+  closed and the oplock is taken anew.
+- Holding the oplock costs a legitimate reader about a millisecond.
+
+So an ordinary user can learn that *something* read a decoy file, once, but not what. Without a
+name, the indexer, antivirus and backup openers below can't be told apart from a thief, so the
+signal would be mostly noise. A read alert without a name would break principle 5, so this way of
+naming the reader was dropped. For now, files are covered only when a credential in them is *used* (layer 1).
+
+**The second spike** (method from prior art, below; ordinary user, no privilege): when the oplock
+breaks, the opener's thread is stuck in a wait that began at that tick. Tiresias lists every thread
+on the machine (`NtQuerySystemInformation`, which shows state and wait start even for processes
+it can't open), keeps those waiting since the break and unchanged across two snapshots, releases
+the oplock, and looks again: the thread whose wait ended is the opener. If threads of more than one
+process woke, it says it can't tell rather than guess.
+
+- 295 opens from separate processes (`type`, `Get-Content`, `File.ReadAllText`, a raw read):
+  267 named correctly, 28 "can't tell", **none wrong**. Busy processes doing file I/O alongside never
+  became candidates. The "can't tell" cases were long-waiting threads that happened to wake at the
+  same instant (OneDrive's sync service most often).
+- The reader waits about 55 ms (snapshots 20 ms apart) to 90 ms; unarmed, under 1 ms. Naming takes
+  15 to 20 ms after the release. The reader still gets the file: this layer names, it doesn't stop.
+- Elevated and SYSTEM openers are seen too: a same-user elevated process by path, a service by
+  image name only.
+- Short-lived openers exit within milliseconds, so the name comes from the thread list itself, not
+  a later lookup. A program that opens a file for another (Explorer's preview, Defender, the indexer)
+  is named as itself: right process, innocent identity, which is why the publisher check below matters.
+- An attacker can force "can't tell" by waking a helper at the same moment; it can't make Tiresias
+  name the wrong program. Each break uses the oplock up; it is taken again within about 0.15 s.
 
 **False positives** are the cost of this layer: Windows Search, Defender, OneDrive and backup tools
 open files they find. Decoys go in a folder those tools are told to skip where possible, and an
@@ -94,6 +135,43 @@ needs the user.
 An AI agent listing and reading files in the home folder will trip this layer. That is a reason to
 have it, and a reason the wording must stay factual.
 
+## With admin rights (optional)
+
+Everything above works for an ordinary user, and stays that way. A user who can approve one UAC
+prompt gets more, through the same step that installs the broker as a Windows service
+([desktop app](desktop-app.md#what-runs-where)): one service, not a second installer.
+
+| Gain | Why it needs admin |
+|---|---|
+| **The decoys' secrets stay out of reach.** Malware running as the user can read `decoys.json` today, learn the two ports and the values, and steer around them. Held by the service, under its own account, it can't | A service account's files and memory are closed to the user's processes |
+| **Listening while the app is closed**, from boot: no "nothing listens" gap | Installing a service |
+| **Every read named, every time**, by auditing: an audit rule on each decoy file, read from the Security log (event 4663). Repeatable where the oplock fires once, and it covers openers that avoid an oplock break. The log keeps what happened while Tiresias wasn't running | Setting audit rules and the audit policy, and reading the Security log |
+| **Stopping the program, not only refusing it**: suspend it and what it started in a job object the user can't thaw, and cut its network (Windows Filtering Platform) until the user decides | Suspending another process and adding firewall filters, from a privileged service |
+| Richer facts for the finding: process start history (Prefetch, Background Activity Moderator), as [attack surface](attack-surface.md) wants too | Both need admin to read |
+
+**The cost.** A privileged service is the most valuable thing on the machine to attack: a bug in it
+is a privilege escalation. It stays small, takes requests only from the app, does only the
+actions above, and the parts that read or suspend user processes run as SYSTEM only if the
+virtual account can't do them. Every action it takes is in the activity log and undoable from
+Home.
+
+## Prior art: A Better Antivirus
+
+[A Better Antivirus](https://github.com/vulnix0x4/a-better-antivirus) (MIT) plants bait files for
+infostealers and freezes the program that opens one. It watches reads, runs a SYSTEM service and
+sets audit rules; Tiresias watches use and needs no admin rights. What fits Tiresias:
+
+| Idea | Fit | Where |
+|---|---|---|
+| Name the opener by the thread that wakes when the oplock is released | Yes: proven without admin rights | Layer 2 |
+| Decoys for tools that **aren't installed**, so nothing legitimate reads them, retired when the real tool appears | Yes, for developer credentials pointing home: `~/.aws/credentials` with an `endpoint_url` on loopback, a `~/.kube/config` whose server is the HTTP decoy, a `pgpass.conf`. Only where the file doesn't exist (principle 4) | Layer 1, #92 |
+| Different file names per install, from the names grabbers search for | Yes: `passwords.txt` is one fixed name today | Placement, #92 |
+| A program using **several** decoys is a sweep: say so | Yes, as a fact in the finding ("used 3 decoys in 2 minutes") | Finding, #92 |
+| Say whether the program is signed and where it runs from (Downloads, Temp) | Yes: the activity record has the signature; the finding should too | Finding, #92 |
+| Freeze the process tree, cut its network | With admin rights only (above), undoable from Home; isolating the whole PC is not taken | Admin tier, #91 |
+| Canary tokens registered with a public service | Yes, opt-in | Phase 3, #93 |
+| A fake browser profile, fake wallets and chat sessions | No: outside developer credentials | Not taken |
+
 ## Placement
 
 - **What is placed:** `passwords.txt` in Documents, a decoy project folder (a new folder,
@@ -101,6 +179,14 @@ have it, and a reason the wording must stay factual.
   `.env`, and optionally the user environment variables `ADMIN_API_URL` and `ADMIN_API_TOKEN`. The user picks
   from a short list (`tir decoys place passwords|project|variables [<path>]`); nothing is placed
   silently, and a file, folder or variable that exists is refused.
+- **In the app:** a **Decoys** card on Home, below the blocked programs, lists what is placed and
+  offers each kind not yet placed as a link (**Place passwords.txt**, **Place a decoy project**,
+  **Set decoy variables**) at its default place, plus **Remove decoys**. Each asks first, saying
+  what will be created; the page keeps its one button row (app-design.md, section 11). Another
+  place is `tir decoys place <kind> <path>`'s. Considered and not taken: an entry in **What do you
+  need?** (its catalogue is of things to protect, and a decoy protects nothing, so it doesn't fit
+  the Exposure/Control model), a finding offering decoys (a finding is something wrong, and having
+  none isn't), and the command line only (most users never open it).
 - **Where:** the home folder and Documents by default, and inside the project folders the user
   gave the secrets editor, where an agent working on code is most likely to look.
 - **Bookkeeping:** Tiresias records each decoy's path, the values and the two ports in
@@ -127,6 +213,6 @@ have it, and a reason the wording must stay factual.
 
 1. **Decoy credentials with loopback endpoints:** files, listeners, process identification, activity,
    block list, finding.
-2. **Read tripwire spike:** prove or drop the oplock and Restart Manager approach; SACL auditing for
-   administrators if it fails.
+2. **Read tripwire:** an oplock on each decoy file, naming the reader by the thread that wakes
+   (proven without admin rights). With admin rights, auditing names every read as well (#91).
 3. **External canaries** (opt-in): decoys registered with a canary service, for use off the machine.

@@ -1,6 +1,6 @@
 # Attack surface: less software, less to trust
 
-Status: **first slice, log-on use, uninstall-entry checks and unused applications built** (#34, #55); the rest is design. [Guided setup](guided-setup.md) phase 5: it builds on the
+Status: **first slice, log-on use, uninstall-entry checks, unused applications and `tir doctor --surface` built** (#34, #55); the rest is design. [Guided setup](guided-setup.md) phase 5: it builds on the
 findings `tir doctor` reports since phase 1 and the findings section, fixes and dismissals the app
 gets in phase 2.
 
@@ -215,7 +215,10 @@ planner stays pure and an offline machine gets the same findings minus those tha
 each saying "not checked online".
 
 Listing every package manager takes seconds, so the inventory runs once a day and on request
-(`tir doctor --surface`, **Check now**), not each time the app opens.
+(`tir doctor --surface`, **Check now**), not each time the app opens. `tir doctor --surface` is
+built: after the checks it lists each extension host with what it reached in 90 days and its
+extensions, the global `dotnet`, `npm`, `pipx` and `cargo` tools (each manager given half a minute,
+a missing one lists nothing), and what starts at log-on with its signature and last use.
 
 ## Tests
 
