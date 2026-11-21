@@ -25,7 +25,7 @@ public static class DecoyPlan
     {
         IReadOnlyList<DecoyStep> steps = kind switch
         {
-            DecoyKind.PasswordsFile => [new WriteDecoyFile(where, PasswordsText(set))],
+            DecoyKind.PasswordsFile => [new WriteDecoyFile(where, DecoyListText(set))],
             DecoyKind.Project =>
             [
                 new WriteDecoyFile(Path.Combine(where, "appsettings.Production.json"), AppSettings(set)),
@@ -49,7 +49,7 @@ public static class DecoyPlan
         _ => VariableNames,
     };
 
-    public static string PasswordsText(DecoySet set) => $"""
+    public static string DecoyListText(DecoySet set) => $"""
         Billing database (production)
         {set.ConnectionString}
 
