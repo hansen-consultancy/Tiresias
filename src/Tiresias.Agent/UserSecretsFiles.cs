@@ -25,7 +25,12 @@ public static class UserSecretsFiles
     /// <summary><c>%APPDATA%\Microsoft\UserSecrets</c>: where every project's folder lives.</summary>
     public static string Root => UserMachine.UserSecretsRoot;
 
-    public static UserSecretsFolder Folder(string id) => new(id, Path.Combine(Root, id));
+    /// <summary>The folder for <paramref name="id"/>, which must name one folder: a project's id is untrusted input.</summary>
+    /// <exception cref="InvalidOperationException">The id has a path separator or another character a file name can't hold, or is only dots.</exception>
+    public static UserSecretsFolder Folder(string id) =>
+        id.Length == 0 || id.Trim('.').Length == 0 || id.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0
+            ? throw new InvalidOperationException($"'{id}' is not a user-secrets id: it must name one folder.")
+            : new(id, Path.Combine(Root, id));
 
     /// <summary>Every folder holding a <c>secrets.json</c>, by id.</summary>
     public static IReadOnlyList<UserSecretsFolder> All() =>

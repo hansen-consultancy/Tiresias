@@ -454,7 +454,19 @@ public sealed partial class SecretsViewModel : ObservableObject
         Message = "";
         if (SelectedProject is not { } project)
             return;
-        folder = UserSecretsFiles.Folder(project.Id);
+        try
+        {
+            folder = UserSecretsFiles.Folder(project.Id);
+        }
+        catch (InvalidOperationException e)
+        {
+            // A cloned project's <UserSecretsId> that would leave the user-secrets folder.
+            folder = null;
+            Forget();
+            State = Text.Get("Secrets_StateUnreadable");
+            ProblemWindow.Show(e, $"opening user secrets {project.Id}");
+            return;
+        }
         if (App.Current.Host.Keys.Hello is not { } hello)
         {
             Forget();
