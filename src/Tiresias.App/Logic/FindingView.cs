@@ -23,6 +23,8 @@ public enum FixAction
     RevealFile,
     /// <summary>Take a program off the blocklist.</summary>
     Unblock,
+    /// <summary>The Services page's add form, its address filled in.</summary>
+    AddService,
 }
 
 /// <summary>
@@ -81,6 +83,8 @@ public static class FindingView
         RemoveExtension => (FixAction.RemoveExtension, "Finding_FixRemoveExtension"),
         RevealFile => (FixAction.RevealFile, "Finding_FixReveal"),
         UnblockProgram => (FixAction.Unblock, "Finding_FixUnblock"),
+        RunThroughExec { Setup: not null } => (FixAction.AddService, "Finding_FixGitHubApp"),
+        RunThroughExec => (FixAction.CopyCommand, "Finding_FixCopy"),
         _ => null,
     };
 

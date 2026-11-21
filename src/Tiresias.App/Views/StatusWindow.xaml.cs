@@ -229,6 +229,12 @@ public partial class StatusWindow : Window
                 App.Current.Guard.Unblock(program);
                 model.Refresh();
                 break;
+            case RunThroughExec { Setup: { } setup }:
+                Navigate<ServicesPage>()?.Add(setup.Upstream);
+                break;
+            case RunThroughExec exec:
+                model.CopyFix(exec.Instruction);
+                break;
         }
     }
 

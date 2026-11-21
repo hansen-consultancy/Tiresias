@@ -109,6 +109,12 @@ public interface IDoctorProbe
 
     /// <summary>The decoys placed (docs/decoys.md), or <c>null</c> when there are none.</summary>
     DoctorDecoys? Decoys => null;
+
+    /// <summary>The config files of the CLIs that sign in as the user. See <see cref="Doctor.CliSignIns"/>.</summary>
+    DoctorCliConfigs CliConfigs => new(null, null);
+
+    /// <summary>The slug of a vault GitHub App service, for <c>tir exec gh</c>; <c>null</c> when there is none.</summary>
+    string? GitHubAppService => null;
 }
 
 /// <summary>How many decoys are placed, and whether something listens on their endpoints (checked without connecting, which would be a hit).</summary>
@@ -170,6 +176,7 @@ public static partial class Doctor
         var decoyUses = probe.DecoyUses().ToArray();
         var blocked = probe.BlockedPrograms().ToArray();
         checks.AddRange(Decoys(decoyUses, blocked, DateTimeOffset.UtcNow));
+        checks.AddRange(CliSignIns(probe.CliConfigs, probe.GitHubAppService));
         checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), probe.CredentialUses(),
             blocked.Where(b => !decoyUses.Any(u => SamePath(u.Program, b))), DateTimeOffset.UtcNow));
         return checks;
