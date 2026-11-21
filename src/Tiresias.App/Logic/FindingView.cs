@@ -21,6 +21,8 @@ public enum FixAction
     RemoveExtension,
     /// <summary>Show a file in Explorer.</summary>
     RevealFile,
+    /// <summary>Take a program off the blocklist.</summary>
+    Unblock,
 }
 
 /// <summary>
@@ -78,6 +80,7 @@ public static class FindingView
         UsePlaceholder => (FixAction.UsePlaceholder, "Finding_FixPlaceholder"),
         RemoveExtension => (FixAction.RemoveExtension, "Finding_FixRemoveExtension"),
         RevealFile => (FixAction.RevealFile, "Finding_FixReveal"),
+        UnblockProgram => (FixAction.Unblock, "Finding_FixUnblock"),
         _ => null,
     };
 

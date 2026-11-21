@@ -15,6 +15,8 @@ its section below.
   credentials that open nothing and point to ports only Tiresias listens on. A program that finds
   and uses one is named in the activity log while the app or `tir agent` runs. `tir decoys remove`
   takes them all away, and `tir doctor` warns when nothing listens.
+- When a program uses a decoy credential, the app blocks it (no lockdown), shows a notification,
+  and raises a finding on Home naming the program, with **Unblock (that was me)**.
 
 ### Changed
 

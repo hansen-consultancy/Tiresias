@@ -159,6 +159,8 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public IEnumerable<string> BlockedPrograms() => SurfaceProbe.BlockedPrograms();
 
+    public IEnumerable<DecoyUseRecord> DecoyUses() => SurfaceProbe.DecoyUses();
+
     /// <summary>How long the walk of the project roots took and what it covered; <c>null</c> until a check needed it.</summary>
     public ScanStats? Scan => found?.Stats;
 

@@ -104,6 +104,9 @@ public interface IDoctorProbe
     /// <summary>Paths of blocked programs whose file still exists.</summary>
     IEnumerable<string> BlockedPrograms() => [];
 
+    /// <summary>Uses of a decoy, from the activity log.</summary>
+    IEnumerable<DecoyUseRecord> DecoyUses() => [];
+
     /// <summary>The decoys placed (docs/decoys.md), or <c>null</c> when there are none.</summary>
     DoctorDecoys? Decoys => null;
 }
@@ -163,7 +166,12 @@ public static partial class Doctor
         checks.AddRange(PublishingKeys(probe.ToolFiles(), probe.UserVariableNames));
         checks.AddRange(RavenExpiry(probe.RavenCertificates(), DateTimeOffset.UtcNow));
         checks.AddRange(KeysAsValues(probe.SealedEnvironment));
-        checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), probe.CredentialUses(), probe.BlockedPrograms(), DateTimeOffset.UtcNow));
+        // A program blocked for using a decoy is that finding, not "This wasn't me"'s.
+        var decoyUses = probe.DecoyUses().ToArray();
+        var blocked = probe.BlockedPrograms().ToArray();
+        checks.AddRange(Decoys(decoyUses, blocked, DateTimeOffset.UtcNow));
+        checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), probe.CredentialUses(),
+            blocked.Where(b => !decoyUses.Any(u => SamePath(u.Program, b))), DateTimeOffset.UtcNow));
         return checks;
     }
 
