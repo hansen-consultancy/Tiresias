@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
 using Tiresias.Client;
@@ -107,6 +108,43 @@ static partial class SurfaceProbe
         if (key is null)
             return [];
         return Doctor.UserAssistRuns([.. key.GetValueNames().Select(n => (n, key.GetValue(n) as byte[]))], KnownFolder);
+    }
+
+    /// <summary>
+    /// The global tools each package manager on <c>PATH</c> lists, given half a minute each; a manager
+    /// that is missing, slow or fails lists none. Slow, so only <c>tir doctor --surface</c> asks.
+    /// </summary>
+    public static IEnumerable<GlobalTool> GlobalTools() =>
+        Doctor.ToolManagers.SelectMany(m => Doctor.GlobalTools(m.Manager, Output(m.Manager, m.Arguments)));
+
+    /// <summary>What a fixed command prints. <c>npm</c> is a batch file, so it goes through <c>cmd</c>; no argument comes from the machine.</summary>
+    static string? Output(string program, string[] arguments)
+    {
+        var start = program == "npm" ? new ProcessStartInfo("cmd.exe") : new ProcessStartInfo(program);
+        start.UseShellExecute = false;
+        start.CreateNoWindow = true;
+        start.RedirectStandardOutput = true;
+        start.RedirectStandardError = true;
+        foreach (var argument in program == "npm" ? ["/d", "/c", "npm", .. arguments] : arguments)
+            start.ArgumentList.Add(argument);
+        try
+        {
+            using var process = Process.Start(start);
+            if (process is null)
+                return null;
+            var output = process.StandardOutput.ReadToEndAsync();
+            _ = process.StandardError.ReadToEndAsync();
+            if (!process.WaitForExit(TimeSpan.FromSeconds(30)))
+            {
+                process.Kill(entireProcessTree: true);
+                return null;
+            }
+            return output.Result;
+        }
+        catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            return null;
+        }
     }
 
     const string UninstallKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall";
