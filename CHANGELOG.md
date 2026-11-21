@@ -16,6 +16,9 @@ its section below.
   a token.
 - The app checks for findings in the background, a minute after it starts and every four hours.
   New ones put a dot on the tray icon and "(*n* new)" on **Status...** until you open Home.
+- Home and `tir doctor` ask RavenDB, through the broker, what each RavenDB service's certificate may
+  do, and warn when it can change the server (Cluster Admin, Operator), reaches more than one
+  database, or is Admin on its database. **Edit...** on the service swaps in a narrower one.
 
 ### Changed
 

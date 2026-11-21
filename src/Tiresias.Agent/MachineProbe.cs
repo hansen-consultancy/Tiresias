@@ -121,6 +121,23 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public IEnumerable<DoctorRavenCertificate> RavenCertificates() => RavenCertificateStore.ForVault();
 
+    /// <summary>Asks the broker's <c>/clearance</c>, which needs the lease the unlocked agent holds; refused or unanswered reads as <c>null</c>.</summary>
+    public async Task<DoctorRavenClearance?> RavenClearanceAsync(string service)
+    {
+        if (KeyringStore.Broker is not { } broker)
+            return null;
+        try
+        {
+            using var client = BrokerClient.For(broker);
+            var (status, body) = await client.GetAsync($"/clearance/{Uri.EscapeDataString(service)}").WaitAsync(TimeSpan.FromSeconds(10));
+            return status == System.Net.HttpStatusCode.OK ? DoctorRavenClearance.FromBroker(body) : null;
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or TimeoutException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>The unlocked key, for the checks that need the sealed environment's names; <c>null</c> skips them. Never prompts.</summary>
     public IKeyWrapper? Hello { get; init; }
 

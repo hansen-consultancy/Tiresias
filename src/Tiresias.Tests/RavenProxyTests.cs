@@ -316,6 +316,53 @@ public class RavenProxyTests
 
     sealed record SeenRequest(string Uri, string? Authorization, string? AcceptEncoding);
 
+    /// <summary>The shape RavenDB 7.2 answers, with made-up names and a dummy certificate.</summary>
+    const string Whoami = """
+        {"Name":"orders-app","Thumbprint":"00112233445566778899AABBCCDDEEFF00112233","SecurityClearance":"ValidUser",
+         "Permissions":{"orders":"ReadWrite","billing":"Read"},"NotAfter":"2031-11-21T00:00:00.0000000","Usage":"Client",
+         "PublicKeyPinningHash":"pin-hash","Certificate":"MIIE-not-a-real-certificate"}
+        """;
+
+    HttpRequestMessage SignedGet(string endpoint)
+    {
+        var ts = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var message = new HttpRequestMessage(HttpMethod.Get, endpoint);
+        message.Headers.Add(RequestSignature.DeviceHeader, "laptop");
+        message.Headers.Add(RequestSignature.TimestampHeader, ts.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        message.Headers.Add(RequestSignature.SignatureHeader, Convert.ToBase64String(RequestSignature.Sign(device, "GET", endpoint, ts, [])));
+        return message;
+    }
+
+    [Test]
+    public async Task Clearance_relays_only_the_level_and_databases_asked_with_the_vault_certificate()
+    {
+        await OpenLeaseAndMint();
+        var response = await client.SendAsync(SignedGet("/clearance/ravendb"));
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.That(body, Is.EqualTo("""{"clearance":"ValidUser","databases":{"billing":"Read","orders":"ReadWrite"}}"""));
+        Assert.That(raven.Requests.Single().Uri, Is.EqualTo("https://a.raven.example/certificates/whoami"));
+        Assert.That(raven.Certificates.Single().Thumbprint, Is.EqualTo(issued.Thumbprint));
+        var audit = File.ReadAllText(Path.Combine(dir, "audit.jsonl"));
+        Assert.That(audit, Does.Contain("\"method\":\"CLEARANCE\"").And.Not.Contain("MIIE"));
+    }
+
+    [Test]
+    public async Task Clearance_needs_a_device_signature_and_a_lease()
+    {
+        Assert.That((await client.GetAsync("/clearance/ravendb")).StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+        Assert.That((await client.SendAsync(SignedGet("/clearance/ravendb"))).StatusCode, Is.EqualTo(HttpStatusCode.ServiceUnavailable));
+        Assert.That(raven.Requests, Is.Empty);
+    }
+
+    [Test]
+    public async Task Clearance_of_an_unknown_service_is_a_404()
+    {
+        await OpenLeaseAndMint();
+        Assert.That((await client.SendAsync(SignedGet("/clearance/nope"))).StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+    }
+
     sealed class FakeRaven
     {
         public ConcurrentQueue<SeenRequest> Requests { get; } = new();
@@ -338,6 +385,7 @@ public class RavenProxyTests
                     return await FakeWebSocketNode.UpgradeAsync(keys.Single());
                 var body = request.RequestUri!.AbsolutePath switch
                 {
+                    "/certificates/whoami" => Whoami,
                     "/topology" => """{"Nodes":[{"Url":"https://a.raven.example","ClusterTag":"A"}],"Etag":1}""",
                     "/cluster/topology" => """{"Topology":{"AllNodes":{"A":"https://a.raven.example"}},"Leader":"A"}""",
                     _ => """{"ok":true}""",
