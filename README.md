@@ -104,8 +104,10 @@ so pick one that says nothing more).
   that expects it (a dead man's switch such as a cron monitor) notices when alerts stop.
 - **Add LcdHub...** puts a line such as "Decoy credential used ×1" in the status strip of the LcdHub
   running on this PC, warnings and worse by default. It goes when Home shows your findings, or after
-  24 hours. LcdHub shows nothing while the PC is locked and keeps the line for when you unlock; if
-  LcdHub isn't running, the line waits for it. It never shows more than the event and how often.
+  24 hours. A critical event, such as a used decoy, also takes the screen over in red with the
+  event and its count until then. LcdHub shows nothing while the PC is locked and keeps both for when
+  you unlock; if LcdHub isn't running, they wait for it. It never shows more than the event and how
+  often.
 
 Topics, tokens, URLs and headers are sealed like your secrets and saving needs Windows Hello;
 muting or removing one doesn't. **Send a test alert** checks it arrives. One you mark trusted also

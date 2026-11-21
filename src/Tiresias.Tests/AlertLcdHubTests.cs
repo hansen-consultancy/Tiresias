@@ -313,6 +313,156 @@ public class AlertLcdHubTests
         Assert.That((AlertsCard.HasLcdHub([new LcdHubSink("desk")]), AlertsCard.HasLcdHub(null)), Is.EqualTo((true, false)));
     }
 
+    // ---- The alert frame for critical (docs/alerts.md, LcdHub alert frame) ----
+
+    static readonly LcdHubPanel Wide = new("main", 32, 8);
+    static readonly LcdHubPanel Small = new("side", 16, 4);
+
+    /// <summary>A renderer that records what it was asked to draw and paints every pixel one colour.</summary>
+    sealed class FakeRenderer
+    {
+        public readonly ConcurrentQueue<(LcdHubCard Card, int Width, int Height)> Drawn = new();
+        public Func<LcdHubCard, int, int, uint[]>? Instead;
+
+        public uint[] Render(LcdHubCard card, int width, int height)
+        {
+            Drawn.Enqueue((card, width, height));
+            return Instead?.Invoke(card, width, height) ?? Enumerable.Repeat(0x007F1D1Du, width * height).ToArray();
+        }
+    }
+
+    [Test]
+    public void Frame_and_panels_are_lcdhub_wire_v4_bytes()
+    {
+        Assert.That(Convert.ToHexStringLower(LcdHubWire.Frame("p", alert: true, 1000, [0x00112233u])),
+            Is.EqualTo("0d0000000301007005e803000033221100"), "id, flags alert|lifetime, lifetime, one BGRX pixel");
+        Assert.That(Convert.ToHexStringLower(LcdHubWire.Frame("p", alert: false, 0, [])), Is.EqualTo("0500000003010070" + "00"), "no pixels withdraws");
+        Assert.That(LcdHubWire.Panels(FakeHub.PanelsMessage([Wide, Small]).AsSpan(5)), Is.EqualTo(new[] { Wide, Small }));
+        Assert.Throws<IOException>(() => LcdHubWire.Panels(new byte[] { 1, 0, 9, 0 }));
+    }
+
+    [Test]
+    public void The_card_shows_the_severity_the_title_and_the_count_only()
+    {
+        var detail = new TrustedDetail("C:\\Users\\alice\\x.exe", 4242, ["y.exe"], "the decoy admin token", "svc", ["NAME"], ["finding"]);
+        var item = LcdHubFormat.Merge(null, Payload(count: 3, detail: detail), T0, LcdHubFormat.Lifetime);
+        var card = LcdHubFormat.Card(item, AlertSeverity.Critical);
+
+        Assert.That(card.Lines, Is.EqualTo(new[] { "CRITICAL", "Decoy credential used", "×3 · Open Tiresias" }));
+        Assert.That(LcdHubFormat.TakesOver(Payload()), Is.True);
+        Assert.That(LcdHubFormat.TakesOver(Payload("program.blocked", AlertSeverity.High)), Is.False);
+    }
+
+    [Test]
+    public async Task A_critical_alert_takes_every_panel_over_at_its_size()
+    {
+        await using var hub = FakeHub.Start(null, Wide, Small);
+        var renderer = new FakeRenderer();
+        await using var link = new LcdHubLink(TimeProvider.System, _ => { }, hub.PipeName, renderer.Render);
+
+        link.Show(Payload("program.blocked", AlertSeverity.High, title: "Blocked program asked again"));
+        await Until(() => hub.Statuses.Count == 1);
+        await Task.Delay(100);
+        Assert.That(hub.Frames, Is.Empty, "below critical: the strip only");
+
+        link.Show(Payload());
+        await Until(() => hub.Frames.Count == 2);
+
+        Assert.That(hub.Frames.Select(f => (f.PanelId, f.Alert, f.Pixels)), Is.EquivalentTo(new[] { ("main", true, 32 * 8), ("side", true, 16 * 4) }));
+        Assert.That(hub.Frames.Select(f => f.LifetimeMs), Is.All.InRange(86_000_000u, 86_400_000u));
+        Assert.That(renderer.Drawn.Select(d => (d.Width, d.Height)), Is.EquivalentTo(new[] { (32, 8), (16, 4) }));
+        Assert.That(link.Card!.Lines[1], Is.EqualTo("Decoy credential used"));
+    }
+
+    [Test]
+    public async Task Home_showing_the_findings_withdraws_the_frame()
+    {
+        await using var hub = FakeHub.Start(null, Wide);
+        await using var link = new LcdHubLink(TimeProvider.System, _ => { }, hub.PipeName, new FakeRenderer().Render);
+        link.Show(Payload());
+        await Until(() => hub.Frames.Count == 1);
+
+        link.ClearAll();
+
+        await hub.Closed.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.That(hub.Frames[^1], Is.EqualTo(new FakeHub.Frame("main", false, 0, 0)));
+        Assert.That(link.Card, Is.Null);
+    }
+
+    [Test]
+    public async Task New_panels_get_the_frame_again_at_their_size()
+    {
+        await using var hub = FakeHub.Start(null, Wide);
+        var renderer = new FakeRenderer();
+        await using var link = new LcdHubLink(TimeProvider.System, _ => { }, hub.PipeName, renderer.Render);
+        link.Show(Payload());
+        await Until(() => hub.Frames.Count == 1);
+
+        await hub.AnnounceAsync(Small);
+
+        await Until(() => hub.Frames.Count == 2);
+        Assert.That((hub.Frames[1].PanelId, hub.Frames[1].Pixels), Is.EqualTo(("side", 16 * 4)));
+    }
+
+    [Test]
+    public async Task Without_a_renderer_or_when_it_fails_the_strip_still_shows()
+    {
+        await using (var hub = FakeHub.Start(null, Wide))
+        await using (var link = new LcdHubLink(TimeProvider.System, _ => { }, hub.PipeName))
+        {
+            link.Show(Payload());
+            await Until(() => hub.Statuses.Count == 1);
+            await Task.Delay(100);
+            Assert.That(hub.Frames, Is.Empty);
+        }
+
+        await using var failing = FakeHub.Start(null, Wide);
+        var log = new ConcurrentQueue<string>();
+        var renderer = new FakeRenderer { Instead = (_, _, _) => throw new InvalidOperationException("CANARY-render") };
+        await using var link2 = new LcdHubLink(TimeProvider.System, log.Enqueue, failing.PipeName, renderer.Render);
+        link2.Show(Payload());
+        await Until(() => failing.Frames.Count == 1);
+        Assert.That((failing.Frames[0].Pixels, failing.Statuses.Count), Is.EqualTo((32 * 8, 1)), "a black frame of the right size; the item went too");
+        Assert.That(log, Has.Some.Contains(nameof(InvalidOperationException)).And.All.Not.Contains("CANARY"));
+    }
+
+    [TestCase(AlertRedaction.Public)]
+    [TestCase(AlertRedaction.Trusted)]
+    public async Task No_canary_reaches_the_frame_public_or_trusted(AlertRedaction redaction)
+    {
+        var hit = new DecoyHit(DecoyUse.AdminToken, "http://127.0.0.1:5999/admin?token=CANARY-value&placeholder=CANARY-placeholder", 4242,
+            "C:\\Users\\alice\\CANARY-1\\CANARY-5.exe", T0);
+        var alert = AlertSources.DecoyUsed(hit, ["CANARY-2.exe (7)", "CANARY-3.exe (8)"], "CANARY-4")!;
+
+        await using var hub = FakeHub.Start(null, Wide);
+        var renderer = new FakeRenderer();
+        var time = TimeProvider.System;
+        await using var center = new AlertCenter(new HttpAlertTransport(), time, _ => { }, new LcdHubLink(time, _ => { }, hub.PipeName, renderer.Render));
+        center.Use(Config(new LcdHubSink("desk", Redaction: redaction)), null);
+        center.Raise(alert);
+        await Until(() => hub.Frames.Count == 1);
+
+        var drawn = string.Join("\n", renderer.Drawn.SelectMany(d => d.Card.Lines));
+        Assert.That(drawn, Is.EqualTo("CRITICAL\nDecoy credential used\n×1 · Open Tiresias"));
+        Assert.That(drawn + Encoding.UTF8.GetString(hub.Raw), Does.Not.Contain("CANARY").And.Not.Contain("alice").And.Not.Contain("4242").And.Not.Contain("workstation"));
+    }
+
+    [Test]
+    public async Task A_test_alert_shows_the_frame_for_its_minute()
+    {
+        await using var hub = FakeHub.Start(null, Wide);
+        var renderer = new FakeRenderer();
+        var time = TimeProvider.System;
+        await using var center = new AlertCenter(new HttpAlertTransport(), time, _ => { }, new LcdHubLink(time, _ => { }, hub.PipeName, renderer.Render));
+        center.Use(Config(new LcdHubSink("desk")), null);
+
+        await center.SendTestAsync("desk", CancellationToken.None);
+        await Until(() => hub.Frames.Count == 1);
+
+        Assert.That(hub.Frames[0].LifetimeMs, Is.InRange(50_000u, 60_000u));
+        Assert.That(renderer.Drawn.Single().Card, Has.Property("Severity").EqualTo(AlertSeverity.Info));
+    }
+
     /// <summary>
     /// A stand-in for LcdHub on a pipe of its own: reads the hello, answers with an empty Panels message
     /// (so the link has something to skip), and records every status item and every byte it gets.
@@ -320,6 +470,12 @@ public class AlertLcdHubTests
     sealed class FakeHub : IAsyncDisposable
     {
         public sealed record Status(string Key, string Text, LcdHubLevel Level, uint LifetimeMs);
+
+        /// <param name="Pixels">How many pixels came; 0 withdraws.</param>
+        public sealed record Frame(string PanelId, bool Alert, uint LifetimeMs, int Pixels);
+
+        readonly LcdHubPanel[] announce;
+        readonly ConcurrentQueue<Frame> frames = new();
 
         readonly NamedPipeServerStream server;
         readonly CancellationTokenSource stop = new();
@@ -329,16 +485,37 @@ public class AlertLcdHubTests
         readonly TaskCompletionSource closed = new(TaskCreationOptions.RunContinuationsAsynchronously);
         readonly Task serving;
 
-        FakeHub(string pipeName)
+        FakeHub(string pipeName, LcdHubPanel[] announce)
         {
             PipeName = pipeName;
+            this.announce = announce;
             server = new(pipeName, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.CurrentUserOnly | PipeOptions.Asynchronous);
             serving = ServeAsync();
         }
 
         public static string NewPipeName() => $"tiresias-test-lcdhub-{Guid.NewGuid():N}";
 
-        public static FakeHub Start(string? pipeName = null) => new(pipeName ?? NewPipeName());
+        public static FakeHub Start(string? pipeName = null, params LcdHubPanel[] panels) => new(pipeName ?? NewPipeName(), panels);
+
+        public IReadOnlyList<Frame> Frames => [.. frames];
+
+        /// <summary>A Panels message, as the hub sends after hello and whenever its panels change.</summary>
+        public static byte[] PanelsMessage(IReadOnlyList<LcdHubPanel> panels)
+        {
+            var body = new List<byte>();
+            body.AddRange(BitConverter.GetBytes((ushort)panels.Count));
+            foreach (var panel in panels)
+            {
+                var id = Encoding.UTF8.GetBytes(panel.Id);
+                body.AddRange(BitConverter.GetBytes((ushort)id.Length));
+                body.AddRange(id);
+                body.AddRange(BitConverter.GetBytes((ushort)panel.Width));
+                body.AddRange(BitConverter.GetBytes((ushort)panel.Height));
+            }
+            return Message(2, [.. body]);
+        }
+
+        public Task AnnounceAsync(params LcdHubPanel[] panels) => server.WriteAsync(PanelsMessage(panels), stop.Token).AsTask();
 
         public string PipeName { get; }
         public (ushort Version, string Name)? Hello { get; private set; }
@@ -382,16 +559,33 @@ public class AlertLcdHubTests
                     {
                         var name = Encoding.UTF8.GetString(body, 4, BinaryPrimitives.ReadUInt16LittleEndian(body.AsSpan(2)));
                         Hello = (BinaryPrimitives.ReadUInt16LittleEndian(body), name);
-                        await server.WriteAsync(Message(2, [0, 0]), stop.Token);
+                        await server.WriteAsync(PanelsMessage(announce), stop.Token);
                     }
                     else if (head[4] == 6)
                         statuses.Enqueue(ParseStatus(body));
+                    else if (head[4] == 3)
+                        frames.Enqueue(ParseFrame(body));
                 }
             }
             catch (Exception e) when (e is OperationCanceledException or IOException or ObjectDisposedException)
             {
             }
             closed.TrySetResult();
+        }
+
+        static Frame ParseFrame(byte[] body)
+        {
+            var n = BinaryPrimitives.ReadUInt16LittleEndian(body);
+            var id = Encoding.UTF8.GetString(body, 2, n);
+            var at = 2 + n;
+            var flags = body[at++];
+            var lifetime = 0u;
+            if ((flags & 4) != 0)
+            {
+                lifetime = BinaryPrimitives.ReadUInt32LittleEndian(body.AsSpan(at));
+                at += 4;
+            }
+            return new(id, (flags & 1) != 0, lifetime, (body.Length - at) / 4);
         }
 
         static Status ParseStatus(byte[] body)

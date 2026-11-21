@@ -10,6 +10,9 @@ its section below.
 
 ### Added
 
+- A critical alert, such as a used decoy credential, takes the LcdHub screen over in red with the
+  event and its count, until Home shows your findings or for 24 hours. **Send a test alert** shows
+  what it looks like for a minute.
 - Signed webhook alerts and a heartbeat: **Add a webhook...** can sign each alert the Standard
   Webhooks way, so the receiver can prove it came from your PC, and can send "Tiresias is running"
   every 5 to 60 minutes, so a receiver that expects it notices when alerts stop arriving. Both are

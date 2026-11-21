@@ -1,6 +1,6 @@
 # Out-of-band alerts
 
-Status: **phase 4 built**, and from phase 7 signed webhooks and the heartbeat: webhook, ntfy and LcdHub end to end, with `decoy.used` the only event wired so far. Tracks issue #101. This page designs how Tiresias tells you about a
+Status: **phase 4 built**, and from phase 7 signed webhooks, the heartbeat and the LcdHub alert frame: webhook, ntfy and LcdHub end to end, with `decoy.used` the only event wired so far. Tracks issue #101. This page designs how Tiresias tells you about a
 serious event when you aren't looking at the app: a push to your phone through
 [ntfy](https://ntfy.sh), a line on a [LcdHub](https://github.com/stevehansen/LcdHub) screen beside
 the machine, or a JSON POST to a webhook of your choice.
@@ -159,7 +159,7 @@ Default thresholds: ntfy and webhook `high`, LcdHub `warning`. Mutes and raised 
 | Transport | HTTPS `POST` to the topic URL (any ntfy server) | Named pipe `LcdHub`, `CurrentUserOnly`, binary wire v4 | HTTPS `POST`, `application/json` |
 | Credential | `Authorization: Bearer <token>`, optional | None: the pipe is per user | The headers you set, e.g. `Authorization` |
 | Severity | ntfy `Priority` 2/3/4/5 for info/warning/high/critical | Status level `Info` / `Warn` / `Bad` (high and critical) | `severity` field |
-| What shows | `Title` header: the title; body: "<severity> on <machine>, ×<count>. Open Tiresias." `Tags` from the severity. Trusted adds the program's file name to the body | A status-strip item: key `tiresias:<event>`, text "<title> ×<count>", lifetime 24 hours | The payload |
+| What shows | `Title` header: the title; body: "<severity> on <machine>, ×<count>. Open Tiresias." `Tags` from the severity. Trusted adds the program's file name to the body | A status-strip item: key `tiresias:<event>`, text "<title> ×<count>", lifetime 24 hours; for `critical`, also an alert frame (below) | The payload |
 | Cleared | Never | When Home shows the findings (`FindingWatch.Shown`), or when the lifetime ends | Never |
 
 Rules for every HTTP sink: HTTPS only (plain HTTP to loopback is allowed, for a local relay); no
@@ -171,8 +171,34 @@ ntfy is the first choice for a phone. Use an access token that can only **write*
 a stolen token can't read your alerts back, and a long random topic name.
 
 LcdHub shows nothing while the session is locked, by its own design, and keeps the status item
-until you unlock, so it is the "while you were away" view. A rendered alert frame that takes over
-the panel for `critical` is a later phase: the protocol's alerts are pictures, not text.
+until you unlock, so it is the "while you were away" view.
+
+#### LcdHub alert frame
+
+A `critical` alert also takes the panels over. LcdHub's alerts are pictures: a Frame message
+(type 3) with the alert flag and the panel's exact width × height in BGRX pixels, which the hub
+shows over rotation, pinned apps and video until the producer withdraws it.
+
+- **What it shows: three lines, the same on a public and a trusted sink.** "CRITICAL", the event's
+  title, and "×<count> · Open Tiresias", on red. Never `detail`, the machine label or a time: the
+  screen faces whoever stands at the desk, and is on the machine it would name. `LcdHubFormat.Card`
+  builds the lines from the status item alone, so the frame can't show more than the strip.
+- **Drawn by the app, decided in Core.** `LcdHubLink` takes an `LcdHubRenderer` (card, width,
+  height → pixels); the app's draws it with WPF on its UI thread, outside the link's lock. A renderer
+  that fails or gets the size wrong yields a black frame and a log line with the exception type, and
+  the status item still goes.
+- **Panels.** The link now reads the hub's Panels message (type 2) instead of skipping it, and draws
+  the frame at each panel's size. A new panel list means the hub forgot every frame, so the frame is
+  drawn again. It is sent to hidden panels too, as LcdHub asks of alerts. Style and visibility stay
+  skipped: the frame has its own colours.
+- **How long, and how it goes.** It shows the latest `critical` event's item, and lasts as long as
+  that item: 24 hours from the last occurrence, sent as the frame's lifetime so the hub drops it by
+  itself. Home showing the findings, or removing the sink, withdraws it (a frame without pixels or
+  the alert flag) along with the strip. Muting stops new frames and leaves the shown one, like the
+  strip. While the session is locked the hub shows only its Today view, so the frame waits for the
+  unlock.
+- **Send a test alert** shows the frame too, as "INFO / Test alert / ×1 · Open Tiresias" on dark
+  grey, for the test's minute: the one way to see what a takeover looks like.
 
 ### Dedupe and rate limits
 
@@ -407,13 +433,16 @@ leaving.
 5. **The other events.** Blocklist and lockdown refusals, "This wasn't me", `consent.while-locked`,
    broker audit events from the solo broker, `findings.new`.
 6. **Failing sinks.** The finding on Home, `alerts.failing`, D-alerts-silenced updated.
-7. **Later.** Signed webhooks and the heartbeat **done** (*Heartbeat*, *Signed webhooks* above);
-   an LcdHub alert frame for `critical` follows in its own PR. What it settled or changed:
+7. **Later. Done.** Signed webhooks and the heartbeat (*Heartbeat*, *Signed webhooks* above), and
+   the LcdHub alert frame for `critical` (*LcdHub alert frame*), in two PRs. What it settled or changed:
    - **Signing is Standard Webhooks**, not a scheme of Tiresias's own: the HMAC-SHA-256 over
      timestamp and body the design sketched, with header names and a secret format receivers'
      libraries already check. The id in the signature is the payload's.
    - **The heartbeat is for webhooks only**, 5 to 60 minutes, off by default, and is a payload of
      the existing schema rather than a new one, so a receiver needs no second parser.
    - The form only adds sinks: to sign or beat on an existing webhook, remove it and add it again.
+   - **The frame lasts as long as its status item**, 24 hours, cleared with it, rather than a
+     shorter takeover: the hub hides it while locked, so a shorter one could end before you are back.
+   - **The frame shows no machine label**, unlike the design's first sketch, for the strip's reason.
 
 Each phase merges on its own, and only phase 2 onwards is user-facing.
