@@ -354,10 +354,11 @@ static class Commands
             Console.WriteLine(line);
         if (!await AppLink.ApproveAsync($"tir grant {serviceSlug}", lines))
             return Fail("Not approved.");
-        HelloKeyWrapper.ConfirmPresence($"grant\n{serviceSlug}\n{request.Consumer}");
-
         using var client = BrokerClient.For(await ReachableBrokerAsync());
-        var minted = await client.PostAsync("/placeholder", request);
+        SignedApproval approval;
+        using (var hello = HelloKeyWrapper.Open(create: false))
+            approval = Approvals.Mint(hello, request);
+        var minted = await client.PostAsync("/placeholder", approval);
         if (!minted.Ok || minted.Body is not { } body)
             return Fail($"Not minted: {minted.Describe()}");
         Console.WriteLine($"Expires {body.GetProperty("expiresAt").GetDateTimeOffset().ToLocalTime():HH:mm}. Placeholder:");
@@ -372,10 +373,11 @@ static class Commands
         var duration = Terminal.ParseDuration(args.Option("--for") ?? "15m");
 
         Console.WriteLine($"Elevating {service}/{grant} for {duration.TotalMinutes:0} min; confirm with Windows Hello.");
-        HelloKeyWrapper.ConfirmPresence($"elevate\n{service}\n{grant}");
-
         using var client = BrokerClient.For(await ReachableBrokerAsync());
-        var elevated = await client.PostAsync("/elevate", new { service, grant, minutes = (int)Math.Ceiling(duration.TotalMinutes) });
+        SignedApproval approval;
+        using (var hello = HelloKeyWrapper.Open(create: false))
+            approval = Approvals.Sign(hello, (lease, now) => Approval.ForElevate(lease, service, grant, duration, "tir elevate", now));
+        var elevated = await client.PostAsync("/elevate", approval);
         if (!elevated.Ok || elevated.Body is not { } body)
             return Fail($"Not elevated: {elevated.Describe()}");
         Console.WriteLine($"Elevated until {body.GetProperty("expiresAt").GetDateTimeOffset().ToLocalTime():HH:mm}.");

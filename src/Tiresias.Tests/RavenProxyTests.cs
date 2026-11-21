@@ -143,9 +143,9 @@ public class RavenProxyTests
         var offer = new LeaseOffer(offerJson.GetProperty("leaseId").GetString()!,
             Convert.FromBase64String(offerJson.GetProperty("leaseKey").GetString()!),
             DateTimeOffset.FromUnixTimeSeconds(offerJson.GetProperty("hardCapAt").GetInt64()));
-        await client.SendAsync(Signed("/lease/seal", new { offer.LeaseId, deks = vault.SealTo(offer) }));
+        await client.SendAsync(Signed("/lease/seal", vault.SealBody(offer)));
         var mint = await client.SendAsync(Signed("/placeholder",
-            new { consumer = "claude:test", serviceSlug = "ravendb", purpose = "testing", duration = "01:00:00" }));
+            vault.MintApproval(new("claude:test", null, "ravendb", null, "testing", TimeSpan.FromHours(1)))));
         return (await mint.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("token").GetString()!;
     }
 

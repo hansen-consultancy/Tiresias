@@ -1,6 +1,6 @@
 # Step-up at the broker
 
-Status: **design, not built**. Tracks issue #23. This page designs how the broker refuses to mint a
+Status: **built**. Tracks issue #23. This page designs how the broker refuses to mint a
 placeholder, switch on an elevation or issue a token unless the user approved that exact operation.
 
 ## The problem
@@ -57,8 +57,10 @@ already loses everything else.
 
 ### The approval key
 
-`ApprovalKey.Derive(wrapKey, leaseId)`: HKDF-SHA-256 of the Hello wrap key with info
-`tiresias/v1/approval\n{leaseId}`, used as an Ed25519 seed. The Hello signature behind the wrap key
+`ApprovalKey.Derive(root, leaseId)`: HKDF-SHA-256 of the approval root with info
+`tiresias/v1/approval\n{leaseId}`, used as an Ed25519 seed. The approval root is derived from the
+same Hello signature as the wrap key (HKDF, info `tiresias/v1/approval-root`), so whoever holds the
+wrap key holds it, and nothing else does. The Hello signature behind the wrap key
 is deterministic (the wrap already depends on that), so a later prompt derives the same key for the
 same lease. A new lease gives a new key, so an approval key can't outlive its lease.
 
@@ -99,7 +101,7 @@ away.
 | Flow | Who asks the user | Who signs |
 |---|---|---|
 | `tir grant`, `tir elevate`, `tir exec`, app not running | `tir`, in the terminal | `tir`: its Hello prompt (in place of `ConfirmPresence`) opens the wrapper and derives the key |
-| `tir grant`, `tir exec`, app running | The app's consent dialog (`ControlRequest.Consent`) | The app: the reply carries the signed approvals, and `tir` posts them |
+| `tir grant`, `tir exec`, app running | The app's consent dialog (`ControlRequest.Consent`) | `tir`: its Hello prompt after the dialog, as before, derives the key. The pipe protocol is unchanged |
 | Terminal environment, `tir run`, NuGet, user-secrets references | The app's dialogs, or a consent the user saved there | The app, with the wrap key it holds while unlocked (`AgentKeys`) |
 
 A consent the user saved in the app (for example "allow this program") still approves without a new
@@ -131,6 +133,10 @@ dialog. That is the user's standing decision, made in the app. The broker now kn
   can click Allow. Hello prompts can't be driven that way; app dialogs can.
 
 ## Phases
+
+All three shipped in one release. A seal without an approval key is refused with 400
+`approval-key-required`; an approval that is stale or reused gets 401 `approval-stale` or
+`approval-replayed`.
 
 1. Core: `ApprovalKey`, the approval record, signing and verifying, all pure. Broker: register the
    approval key at seal and verify approvals when they are present.

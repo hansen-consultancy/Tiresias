@@ -23,7 +23,7 @@ public sealed class AgentHost : IAsyncDisposable
     {
         System.IO.Directory.CreateDirectory(KeyringStore.Directory);
         activity = new AuditLog(ActivityPath, TimeProvider.System);
-        UserSecrets = new UserSecretsService(UserSecretsFiles.Root, Keys, prompt, TimeProvider.System, activity, new BrokerSecretReferences());
+        UserSecrets = new UserSecretsService(UserSecretsFiles.Root, Keys, prompt, TimeProvider.System, activity, new BrokerSecretReferences(Keys));
         UserSecrets.Log += Say;
         keeper.Log += Say;
         keeper.Locked += reason => Lock(reason);

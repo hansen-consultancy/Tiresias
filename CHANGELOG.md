@@ -10,6 +10,10 @@ its section below.
 
 ### Changed
 
+- The broker now checks that you approved each placeholder, elevation and GitHub App token itself,
+  instead of trusting any program that can sign as this PC. Approvals are signed with a key only
+  the unlocked app or a Windows Hello prompt can derive; prompts are unchanged. Update `tir` and
+  the app together: an older `tir` gets `approval-required`.
 - The secrets editor hides user-secrets folders that hold no keys behind a line, "*N* empty
   folders", with **Move *N* empty to Recycle Bin**. Folders holding only settings (flags, numbers,
   plain URLs) say "(settings only)" and are listed after those holding secrets. Saving an empty file

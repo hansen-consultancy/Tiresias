@@ -47,8 +47,9 @@ public static class LeaseControl
         if (!offer.Verify(identity, Convert.FromBase64String(body.GetProperty("signature").GetString()!)))
             return Failed("The lease offer is not signed by the pinned broker identity. Nothing was sealed.");
 
-        var sealedDeks = SealDeks(secrets, hello, offer.LeaseId, offer.LeaseKey, notes);
-        var seal = await client.PostAsync("/lease/seal", new { offer.LeaseId, deks = sealedDeks });
+        var approvalKey = ApprovalPublicKey(hello, offer.LeaseId);
+        var sealedDeks = SealDeks(secrets, hello, offer.LeaseId, offer.LeaseKey, approvalKey, notes);
+        var seal = await client.PostAsync("/lease/seal", new { offer.LeaseId, deks = sealedDeks, approvalKey });
         if (!seal.Ok || seal.Body is not { } result)
             return Failed($"DEKs not accepted: {seal.Describe()}");
 
@@ -75,9 +76,10 @@ public static class LeaseControl
         if (secrets.Length == 0)
             return null;
         var notes = new List<string>();
-        var sealedDeks = SealDeks(secrets, hello, lease.LeaseId, Convert.FromBase64String(lease.LeaseKey), notes);
+        var approvalKey = ApprovalPublicKey(hello, lease.LeaseId);
+        var sealedDeks = SealDeks(secrets, hello, lease.LeaseId, Convert.FromBase64String(lease.LeaseKey), approvalKey, notes);
         using var client = BrokerClient.For(broker);
-        var seal = await client.PostAsync("/lease/seal", new { lease.LeaseId, deks = sealedDeks });
+        var seal = await client.PostAsync("/lease/seal", new { lease.LeaseId, deks = sealedDeks, approvalKey });
         if (!seal.Ok || seal.Body is not { } result)
             return $"Couldn't add {string.Join(", ", sealedDeks.Keys)} to lease {lease.LeaseId}: {seal.Describe()}";
         var accepted = Strings(result.GetProperty("accepted"));
@@ -91,7 +93,14 @@ public static class LeaseControl
     }
 
     /// <summary>Each secret's DEK, unwrapped with Hello and sealed to the lease key; a secret Hello can't open gets a note instead.</summary>
-    static Dictionary<string, byte[]> SealDeks(IEnumerable<SealedSecret> secrets, HelloKeyWrapper hello, string leaseId, byte[] leaseKey, List<string> notes)
+    /// <summary>The public half of the lease's approval key, which the seal registers with the broker.</summary>
+    static byte[] ApprovalPublicKey(HelloKeyWrapper hello, string leaseId)
+    {
+        using var key = hello.ApprovalKey(leaseId);
+        return Access.ApprovalKey.Public(key);
+    }
+
+    static Dictionary<string, byte[]> SealDeks(IEnumerable<SealedSecret> secrets, HelloKeyWrapper hello, string leaseId, byte[] leaseKey, byte[] approvalKey, List<string> notes)
     {
         var sealedDeks = new Dictionary<string, byte[]>();
         foreach (var secret in secrets)
@@ -104,7 +113,7 @@ public static class LeaseControl
             }
             try
             {
-                sealedDeks[secret.Slug] = SealedBox.Seal(leaseKey, dek, LeaseOffer.DekContext(leaseId, secret.Slug));
+                sealedDeks[secret.Slug] = SealedBox.Seal(leaseKey, dek, LeaseOffer.DekContext(leaseId, secret.Slug, approvalKey));
             }
             finally
             {
