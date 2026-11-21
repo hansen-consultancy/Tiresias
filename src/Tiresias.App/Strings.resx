@@ -2551,6 +2551,33 @@ Store them in clear?</value>
   <data name="Alerts_HeaderHint" xml:space="preserve">
     <value>For example Authorization with Bearer and a token. Sent with every alert, to this URL only.</value>
   </data>
+  <data name="Alerts_Signing" xml:space="preserve">
+    <value>Signing secret (optional)</value>
+  </data>
+  <data name="Alerts_SigningNew" xml:space="preserve">
+    <value>New secret</value>
+  </data>
+  <data name="Alerts_SigningHint" xml:space="preserve">
+    <value>Signs every alert the Standard Webhooks way (webhook-signature header), so the receiver can prove it came from this PC. Paste a whsec_ secret from the receiver, or make one here and copy it there. Sealed like the header.</value>
+  </data>
+  <data name="Alerts_Heartbeat" xml:space="preserve">
+    <value>Heartbeat</value>
+  </data>
+  <data name="Alerts_HeartbeatOff" xml:space="preserve">
+    <value>Off</value>
+  </data>
+  <data name="Alerts_HeartbeatEvery" xml:space="preserve">
+    <value>Every {0} minutes</value>
+  </data>
+  <data name="Alerts_HeartbeatHint" xml:space="preserve">
+    <value>Sends “Tiresias is running”, with this PC’s name and the time only, so a receiver that expects it notices when alerts stop. Not before the first unlock after a restart.</value>
+  </data>
+  <data name="Alerts_SigningBad" xml:space="preserve">
+    <value>The signing secret is whsec_ followed by base64 of 24 to 64 bytes. Use New secret to make one.</value>
+  </data>
+  <data name="Alerts_HeartbeatBad" xml:space="preserve">
+    <value>Pick a heartbeat from the list.</value>
+  </data>
   <data name="Alerts_Threshold" xml:space="preserve">
     <value>Send alerts that are at least</value>
   </data>

@@ -10,6 +10,10 @@ its section below.
 
 ### Added
 
+- Signed webhook alerts and a heartbeat: **Add a webhook...** can sign each alert the Standard
+  Webhooks way, so the receiver can prove it came from your PC, and can send "Tiresias is running"
+  every 5 to 60 minutes, so a receiver that expects it notices when alerts stop arriving. Both are
+  off unless you turn them on, and the heartbeat carries only the PC's name and the time.
 - Alerts on an LcdHub screen: **About**, **Alerts**, **Add LcdHub...** shows serious events as a
   line in the status strip of the LcdHub running on this PC, such as "Decoy credential used ×1",
   until Home shows your findings or for 24 hours. It shows only the event and its count.

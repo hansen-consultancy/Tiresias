@@ -37,12 +37,17 @@ public static class AlertsCard
         _ => new("Alerts_TestUnreachable", sinkId, result.Error),
     };
 
+    /// <summary>What the webhook form's heartbeat box offers, in minutes; 0 is off, the default.</summary>
+    public static IReadOnlyList<int> HeartbeatChoices { get; } = [0, 5, 15, 30, 60];
+
     /// <summary>
     /// The webhook form's fields as a sink, or the first problem with them. <paramref name="machine"/> is
     /// asked only for the first sink (<paramref name="needsMachine"/>) and is required then: never the host name.
+    /// An empty <paramref name="signing"/> sends unsigned; <paramref name="heartbeatMinutes"/> 0 sends no heartbeat.
     /// </summary>
     public static (WebhookSink? Sink, Phrase? Problem) Build(bool needsMachine, string machine, string id, string url,
-        string headerName, string headerValue, AlertSeverity threshold, bool trusted, IEnumerable<string> existingIds)
+        string headerName, string headerValue, AlertSeverity threshold, bool trusted, IEnumerable<string> existingIds,
+        string signing = "", int heartbeatMinutes = 0)
     {
         if (CheckCommon(needsMachine, machine, ref id, existingIds) is { } common)
             return (null, common);
@@ -62,7 +67,13 @@ public static class AlertsCard
                     return (null, new("Alerts_HeaderValue"));
             }
         }
-        return (new WebhookSink(id, parsed!, headers, threshold, Redaction(trusted)), null);
+        signing = signing.Trim();
+        if (signing.Length > 0 && SinkRules.CheckSigning(signing) != SinkProblem.None)
+            return (null, new("Alerts_SigningBad"));
+        TimeSpan? heartbeat = heartbeatMinutes == 0 ? null : TimeSpan.FromMinutes(heartbeatMinutes);
+        if (heartbeat is { } every && SinkRules.CheckHeartbeat(every) != SinkProblem.None)
+            return (null, new("Alerts_HeartbeatBad"));
+        return (new WebhookSink(id, parsed!, headers, threshold, Redaction(trusted), signing.Length > 0 ? signing : null, heartbeat), null);
     }
 
     /// <summary>The ntfy form's fields as a sink, or the first problem with them. An empty token is an open topic.</summary>

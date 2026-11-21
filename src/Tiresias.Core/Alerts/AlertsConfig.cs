@@ -24,16 +24,24 @@ public abstract record AlertSink(string Id, AlertSeverity Threshold, AlertRedact
 }
 
 /// <summary>A webhook: <c>tiresias.alert/v1</c> JSON posted to <see cref="Url"/> with the user's headers.</summary>
+/// <param name="Signing">A <c>whsec_</c> secret: each request is signed with it (<see cref="WebhookSignature"/>); <c>null</c> for unsigned.</param>
+/// <param name="Heartbeat">How often an <c>alerts.alive</c> goes out, between <see cref="MinHeartbeat"/> and <see cref="MaxHeartbeat"/>; <c>null</c> for none.</param>
 public sealed record WebhookSink(
     string Id,
     Uri Url,
     IReadOnlyList<KeyValuePair<string, string>> Headers,
     AlertSeverity Threshold = AlertSeverity.High,
-    AlertRedaction Redaction = AlertRedaction.Public) : AlertSink(Id, Threshold, Redaction)
+    AlertRedaction Redaction = AlertRedaction.Public,
+    string? Signing = null,
+    TimeSpan? Heartbeat = null) : AlertSink(Id, Threshold, Redaction)
 {
+    public static readonly TimeSpan MinHeartbeat = TimeSpan.FromMinutes(5);
+    public static readonly TimeSpan MaxHeartbeat = TimeSpan.FromMinutes(60);
+
     public override string Kind => "webhook";
 
-    public override bool SameTarget(AlertSink other) => other is WebhookSink o && Url == o.Url && Headers.SequenceEqual(o.Headers);
+    public override bool SameTarget(AlertSink other) =>
+        other is WebhookSink o && Url == o.Url && Headers.SequenceEqual(o.Headers) && Signing == o.Signing;
 }
 
 /// <summary>An ntfy topic on any ntfy server (docs/alerts.md, <i>Sinks</i>), with an optional access token.</summary>
@@ -116,7 +124,7 @@ public sealed record AlertsConfig
         {
             var narrowed = narrowing?.GetValueOrDefault(s.Id);
             var threshold = narrowed?.Threshold is { } raised && raised > s.Threshold ? raised : s.Threshold;
-            return new SinkDefinition(s.Id, threshold, s.Redaction, narrowed?.Muted == true);
+            return new SinkDefinition(s.Id, threshold, s.Redaction, narrowed?.Muted == true, (s as WebhookSink)?.Heartbeat);
         })]);
 
     public JsonObject ToDocument()
@@ -133,6 +141,10 @@ public sealed record AlertsConfig
                         headers[name] = value;
                     node["url"] = webhook.Url.OriginalString;
                     node["headers"] = headers;
+                    if (webhook.Signing is not null)
+                        node["signing"] = webhook.Signing;
+                    if (webhook.Heartbeat is { } every)
+                        node["heartbeatMinutes"] = (int)every.TotalMinutes;
                     break;
                 case NtfySink ntfy:
                     node["url"] = ntfy.Topic.OriginalString;
@@ -172,7 +184,8 @@ public sealed record AlertsConfig
                 return (string?)sink["kind"] switch
                 {
                     "webhook" => (AlertSink)new WebhookSink(id, Url(sink),
-                        (sink["headers"] as JsonObject ?? []).Select(h => KeyValuePair.Create(h.Key, (string)h.Value!)).ToArray(), threshold, redaction),
+                        (sink["headers"] as JsonObject ?? []).Select(h => KeyValuePair.Create(h.Key, (string)h.Value!)).ToArray(), threshold, redaction,
+                        (string?)sink["signing"], (int?)sink["heartbeatMinutes"] is { } minutes ? TimeSpan.FromMinutes(minutes) : null),
                     "ntfy" => new NtfySink(id, Url(sink), (string?)sink["token"], threshold, redaction),
                     "lcdhub" => new LcdHubSink(id, threshold, redaction),
                     var kind => throw new InvalidDataException($"Alert sink kind '{kind}' is not one this build knows."),

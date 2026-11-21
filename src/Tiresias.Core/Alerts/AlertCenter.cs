@@ -85,6 +85,9 @@ public sealed class AlertCenter : IAsyncDisposable
                 hub?.ClearAll();
             while (waiting.TryDequeue(out var e))
                 Plan(e);
+            // The first heartbeat goes at unlock, not a minute later.
+            if (setup is not null)
+                Send(AlertPlanner.Tick(setup, state, time.GetUtcNow()));
         }
     }
 
@@ -134,7 +137,7 @@ public sealed class AlertCenter : IAsyncDisposable
     /// <summary>Home showed the findings: the user is back, so the LcdHub's "while you were away" items go.</summary>
     public void FindingsShown() => hub?.ClearAll();
 
-    /// <summary>Releases what time alone sends: dedupe <c>count</c> summaries and <c>alerts.suppressed</c>.</summary>
+    /// <summary>Releases what time alone sends: dedupe <c>count</c> summaries, <c>alerts.suppressed</c> and heartbeats.</summary>
     public void Tick()
     {
         lock (gate)

@@ -97,6 +97,16 @@ public sealed class AlertSender : IAsyncDisposable
             if (!queues.TryGetValue(delivery.SinkId, out var queue))
                 return;
             var now = time.GetUtcNow();
+            // A heartbeat says "running now": a newer one makes a waiting one pointless, and a receiver that
+            // was down would otherwise get a day of them at once.
+            if (delivery.Payload.Event == AlertKind.AlertsAlive.Event)
+                for (var node = queue.Items.First; node is not null;)
+                {
+                    var next = node.Next;
+                    if (node.Value.Payload.Event == AlertKind.AlertsAlive.Event)
+                        queue.Items.Remove(node);
+                    node = next;
+                }
             queue.Items.AddLast(new Pending(delivery.Payload, now, 0, now));
             Wake();
         }

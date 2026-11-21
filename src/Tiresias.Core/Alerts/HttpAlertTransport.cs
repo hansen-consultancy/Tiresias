@@ -26,14 +26,19 @@ public enum SinkProblem
     Topic,
     /// <summary>An ntfy token that isn't 1 to 256 visible ASCII characters.</summary>
     Token,
+    /// <summary>A webhook signing secret that isn't <c>whsec_</c> and base64 of 24 to 64 bytes.</summary>
+    Signing,
+    /// <summary>A heartbeat that isn't a whole number of minutes from 5 to 60.</summary>
+    Heartbeat,
 }
 
 /// <summary>What a sink definition may hold (docs/alerts.md, <i>Sinks</i>): checked by the form and again before every send.</summary>
 public static class SinkRules
 {
-    /// <summary>Set by the transport itself; a user header could otherwise smuggle a second body or retarget the request.</summary>
-    public static readonly IReadOnlySet<string> Reserved =
-        new HashSet<string>(["Host", "Content-Length", "Content-Type", "Idempotency-Key"], StringComparer.OrdinalIgnoreCase);
+    /// <summary>Set by the transport itself; a user header could otherwise smuggle a second body, retarget the request or fake a signature.</summary>
+    public static readonly IReadOnlySet<string> Reserved = new HashSet<string>(
+        ["Host", "Content-Length", "Content-Type", "Idempotency-Key", WebhookSignature.IdHeader, WebhookSignature.TimestampHeader, WebhookSignature.SignatureHeader],
+        StringComparer.OrdinalIgnoreCase);
 
     public static SinkProblem CheckId(string id) =>
         id.Length is >= 1 and <= 32 && id.All(c => c is (>= 'a' and <= 'z') or (>= '0' and <= '9') or '-') ? SinkProblem.None : SinkProblem.Id;
@@ -76,6 +81,13 @@ public static class SinkRules
     public static SinkProblem CheckToken(string token) =>
         token.Length is >= 1 and <= 256 && token.All(c => c is > ' ' and < (char)0x7F) ? SinkProblem.None : SinkProblem.Token;
 
+    public static SinkProblem CheckSigning(string secret) =>
+        WebhookSignature.TryParseSecret(secret, out _) ? SinkProblem.None : SinkProblem.Signing;
+
+    public static SinkProblem CheckHeartbeat(TimeSpan every) =>
+        every >= WebhookSink.MinHeartbeat && every <= WebhookSink.MaxHeartbeat && every.Ticks % TimeSpan.TicksPerMinute == 0
+            ? SinkProblem.None : SinkProblem.Heartbeat;
+
     public static SinkProblem Check(AlertSink sink) => sink switch
     {
         WebhookSink webhook => Check(webhook),
@@ -106,6 +118,10 @@ public static class SinkRules
                 problem = CheckHeader(name, value);
         if (problem == SinkProblem.None && sink.Headers.Select(h => h.Key).Distinct(StringComparer.OrdinalIgnoreCase).Count() != sink.Headers.Count)
             problem = SinkProblem.HeaderTwice;
+        if (problem == SinkProblem.None && sink.Signing is not null)
+            problem = CheckSigning(sink.Signing);
+        if (problem == SinkProblem.None && sink.Heartbeat is { } every)
+            problem = CheckHeartbeat(every);
         return problem;
     }
 
@@ -176,7 +192,7 @@ public sealed class HttpAlertTransport : IDisposable
 
         using var request = sink switch
         {
-            WebhookSink webhook => WebhookRequest(payload, webhook),
+            WebhookSink webhook => WebhookRequest(payload, webhook, time.GetUtcNow()),
             NtfySink ntfy => NtfyFormat.Request(payload, ntfy),
             _ => throw new ArgumentOutOfRangeException(nameof(sink), sink.Kind, "Not a sink kind this build knows."),
         };
@@ -199,13 +215,18 @@ public sealed class HttpAlertTransport : IDisposable
         }
     }
 
-    static HttpRequestMessage WebhookRequest(AlertPayload payload, WebhookSink sink)
+    /// <summary>The payload as JSON with the sink's headers and, for a signing sink, the signature over exactly these bytes, timed <paramref name="now"/>.</summary>
+    static HttpRequestMessage WebhookRequest(AlertPayload payload, WebhookSink sink, DateTimeOffset now)
     {
-        var request = new HttpRequestMessage(HttpMethod.Post, sink.Url) { Content = new ByteArrayContent(AlertWire.Serialize(payload)) };
+        var body = AlertWire.Serialize(payload);
+        var request = new HttpRequestMessage(HttpMethod.Post, sink.Url) { Content = new ByteArrayContent(body) };
         request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
         foreach (var (name, value) in sink.Headers)
             if (!request.Headers.TryAddWithoutValidation(name, value))
                 request.Content.Headers.TryAddWithoutValidation(name, value);
+        if (sink.Signing is not null)
+            foreach (var (name, value) in WebhookSignature.Headers(sink.Signing, payload.Id, now, body))
+                request.Headers.TryAddWithoutValidation(name, value);
         return request;
     }
 
