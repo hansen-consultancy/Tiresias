@@ -69,8 +69,10 @@ static partial class PipeCallerIdentity
         {
             return new NTAccount(SessionString(session, WtsDomainName) ?? "", name).Translate(typeof(SecurityIdentifier)).Value;
         }
-        catch (IdentityNotMappedException)
+        catch (SystemException)
         {
+            // NTAccount.Translate throws IdentityNotMappedException, or a bare SystemException when a domain can't be reached.
+            // Can't be told: the caller is refused, as if nobody were signed in to its session.
             return null;
         }
     }
