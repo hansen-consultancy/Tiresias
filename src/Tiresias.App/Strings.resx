@@ -1859,8 +1859,77 @@ Store them in clear?</value>
   <data name="Finding_StartupOff" xml:space="preserve">
     <value>{0} no longer starts at log-on. Turn it back on in Settings, Apps, Startup.</value>
   </data>
-  <data name="Finding_FixInstalledApps" xml:space="preserve">
-    <value>Open Installed apps</value>
+  <data name="Finding_FixInstalledList" xml:space="preserve">
+    <value>Show installed programs</value>
+  </data>
+  <data name="Nav_Installed" xml:space="preserve">
+    <value>Installed</value>
+  </data>
+  <data name="Installed_Heading" xml:space="preserve">
+    <value>Installed programs</value>
+  </data>
+  <data name="Installed_Intro" xml:space="preserve">
+    <value>Every program in the installed-apps list, those you haven't opened in 90 days first. Last opened is the last time you started something in its folder from Start, the taskbar or Explorer; Windows doesn't record other use, so that shows as unknown, never as unused.</value>
+  </data>
+  <data name="Installed_ShowLabel" xml:space="preserve">
+    <value>Show</value>
+  </data>
+  <data name="Installed_ShowAll" xml:space="preserve">
+    <value>All programs</value>
+  </data>
+  <data name="Installed_ShowUnused" xml:space="preserve">
+    <value>Not opened in 90 days</value>
+  </data>
+  <data name="Installed_ListName" xml:space="preserve">
+    <value>Installed programs</value>
+  </data>
+  <data name="Installed_ColName" xml:space="preserve">
+    <value>Program</value>
+  </data>
+  <data name="Installed_ColVersion" xml:space="preserve">
+    <value>Version</value>
+  </data>
+  <data name="Installed_ColFor" xml:space="preserve">
+    <value>Installed for</value>
+  </data>
+  <data name="Installed_ColUse" xml:space="preserve">
+    <value>Last opened</value>
+  </data>
+  <data name="Installed_ColReached" xml:space="preserve">
+    <value>Credentials used (90 days)</value>
+  </data>
+  <data name="Installed_ForYou" xml:space="preserve">
+    <value>You</value>
+  </data>
+  <data name="Installed_ForEveryone" xml:space="preserve">
+    <value>Everyone (administrator)</value>
+  </data>
+  <data name="Installed_UseUnused" xml:space="preserve">
+    <value>{0}, over 90 days ago</value>
+  </data>
+  <data name="Installed_UseBackground" xml:space="preserve">
+    <value>Unknown: works in the background</value>
+  </data>
+  <data name="Installed_UseNotRecorded" xml:space="preserve">
+    <value>Unknown: not recorded</value>
+  </data>
+  <data name="Installed_UseRecentNoRun" xml:space="preserve">
+    <value>Uses credentials</value>
+  </data>
+  <data name="Installed_Summary" xml:space="preserve">
+    <value>{0} programs, {1} not opened in 90 days</value>
+  </data>
+  <data name="Installed_Loading" xml:space="preserve">
+    <value>Reading the installed-apps list...</value>
+  </data>
+  <data name="Installed_Empty" xml:space="preserve">
+    <value>Nothing to show.</value>
+  </data>
+  <data name="Installed_Refresh" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="Installed_OpenSettings" xml:space="preserve">
+    <value>Uninstall in Settings</value>
   </data>
   <data name="Finding_FixRemoveEntry" xml:space="preserve">
     <value>Remove entry...</value>

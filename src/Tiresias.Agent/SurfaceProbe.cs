@@ -113,9 +113,9 @@ static partial class SurfaceProbe
 
     /// <summary>
     /// The uninstall entries a person would see in Settings, machine (64- and 32-bit) and user, each
-    /// with whether the uninstaller its command names and its folder exist. Windows components,
-    /// updates and Windows Installer entries are left out: the first two aren't apps, and the last
-    /// names <c>msiexec</c>, which says nothing about the program's own files.
+    /// with whether the uninstaller its command names and its folder exist. Windows components and
+    /// updates are left out: they aren't apps. A Windows Installer entry names <c>msiexec</c>, which
+    /// says nothing about the program's own files, so its uninstaller is <c>null</c>.
     /// </summary>
     public static IEnumerable<UninstallEntry> UninstallEntries()
     {
@@ -139,7 +139,7 @@ static partial class SurfaceProbe
             {
                 using var key = uninstall.OpenSubKey(name);
                 if (key?.GetValue("DisplayName") is not string { Length: > 0 } display
-                    || key.GetValue("SystemComponent") is 1 || key.GetValue("ParentKeyName") is not null || key.GetValue("WindowsInstaller") is 1
+                    || key.GetValue("SystemComponent") is 1 || key.GetValue("ParentKeyName") is not null
                     || key.GetValue("UninstallString") is not string command)
                     continue;
                 command = Environment.ExpandEnvironmentVariables(command).Trim();

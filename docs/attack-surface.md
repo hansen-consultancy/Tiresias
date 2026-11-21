@@ -1,6 +1,6 @@
 # Attack surface: less software, less to trust
 
-Status: **first slice, log-on use, uninstall-entry checks and unused applications built** (#34, #55); the rest is design. [Guided setup](guided-setup.md) phase 5: it builds on the
+Status: **first slice, log-on use, uninstall-entry checks, unused applications and the Installed list built** (#34, #55); the rest is design. [Guided setup](guided-setup.md) phase 5: it builds on the
 findings `tir doctor` reports since phase 1 and the findings section, fixes and dismissals the app
 gets in phase 2.
 
@@ -308,8 +308,13 @@ names winget's command once the inventory knows the package id, and the steps un
 **Unused applications are found**: an installed program whose folder had nothing opened in 90
 days (UserAssist), never one with no recorded run or one that runs unseen (a tray icon, a service,
 a driver, a log-on entry, a folder on `PATH`), nor one that used a credential. It is a finding with
-status `ok`, so it sorts last and doesn't count for the badge, and its fix, `UninstallApp`, opens
-Settings, Apps, Installed apps until the inventory knows each program's installer command.
+status `ok`, so it sorts last and doesn't count for the badge; all of them are one line on Home,
+"*n* programs you haven't opened in 90 days", whose one button opens the **Installed** page. That
+page is built too: every entry of the installed-apps list once (Windows Installer entries
+included), for you or for everyone, its last opening or why its use is unknown (works in the
+background, not recorded), and the credentials its folder's programs used in 90 days; unused
+first, longest unused first. Uninstalling goes through Settings, Apps, Installed apps
+(`UninstallApp`) until the inventory knows each program's installer command.
 [Guided setup](guided-setup.md#phases) lists what is still design.
 
 1. **Inventory**: applications, extensions, global tools and startup entries, with last use where
