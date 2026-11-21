@@ -51,6 +51,8 @@
     <Compile Include="..\Tiresias.Agent\BrokerVaultAccess.cs" Link="Agent\BrokerVaultAccess.cs" />
     <Compile Include="..\Tiresias.Agent\BrokerJournalAccess.cs" Link="Agent\BrokerJournalAccess.cs" />
     <Compile Include="..\Tiresias.Agent\ServicePipeIdentity.cs" Link="Agent\ServicePipeIdentity.cs" />
+    <Compile Include="..\Tiresias.Agent\HelloException.cs" Link="Agent\HelloException.cs" />
+    <Compile Include="..\Tiresias.Agent\UnlockActivity.cs" Link="Agent\UnlockActivity.cs" />
   </ItemGroup>
 
   <!-- Likewise tir's usage and agent guide, plain text checked against each other. -->

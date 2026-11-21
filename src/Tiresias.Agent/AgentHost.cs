@@ -192,7 +192,7 @@ public sealed class AgentHost : IAsyncDisposable
     /// </summary>
     public async Task<UnlockResult?> UnlockAsync()
     {
-        await Task.Run(() => Keys.Unlock());
+        await Task.Run(() => UnlockActivity.Run(() => Keys.Unlock(), activity));
         StateChanged?.Invoke();
         if (KeyringStore.Broker is null)
             return null;

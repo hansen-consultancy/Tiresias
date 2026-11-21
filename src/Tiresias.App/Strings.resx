@@ -1029,7 +1029,7 @@ Switch to this copy, {2}, from {3}? The other copy quits first, ending its lease
     <value>All sources</value>
   </data>
   <data name="Activity_SourceUserSecrets" xml:space="preserve">
-    <value>App (user secrets, environment, NuGet)</value>
+    <value>App (unlock, user secrets, environment, NuGet)</value>
   </data>
   <data name="Activity_SourceBroker" xml:space="preserve">
     <value>Broker</value>
