@@ -16,7 +16,7 @@ public partial class RecoveryWindow : Window
     public RecoveryWindow()
     {
         InitializeComponent();
-        Desktop.ExcludeFromCapture(this);
+        Desktop.ExcludeFromCapture(this, evenInDemo: true);
         DataContext = new RecoveryViewModel();
         Loaded += (_, _) => TypedKey.Focus();
     }

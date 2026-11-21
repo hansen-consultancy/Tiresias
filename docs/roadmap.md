@@ -1,8 +1,8 @@
-# Road to a public 0.1
+# Roadmap
 
 Tiresias has to be easy to install, easy to understand and well documented, or nobody will trust
-it with their credentials. This is the list that has to be done before the repository goes
-public.
+it with their credentials. This page lists what is built and what comes next; each item links its
+design and issue. A PR that finishes, starts or adds an item edits this page in the same PR.
 
 ## Product
 
@@ -12,23 +12,32 @@ public.
 - [x] Local activity log and the app's activity window
 - [ ] `tir activity`
 - [x] Solo mode, with the broker hosted in the app ([design](desktop-app.md#solo-mode))
-- [ ] Solo mode: local broker as a Windows service
-- [ ] Step-up at the broker: minting, elevation and tokens need an approval only the vault can
+- [ ] Solo mode: local broker as a Windows service (in review)
+- [ ] Policy integrity: the broker refuses a service policy the user didn't approve
+      ([design](policy-integrity.md), #24). Phases 1 to 3 and the rollback high-water mark within a
+      lease built; keeping it across locks and restarts waits for the Windows service
+- [x] Step-up at the broker: minting, elevation and tokens need an approval only the vault can
       produce ([design](step-up.md), #23)
-- [ ] Trust-chain links that add a key need a Windows Hello signature ([design](trust-links.md), #41)
-- [ ] Seal user environment variables and hand them back per shell session ([design](environment-variables.md))
+- [x] Trust-chain links that add a key need a Windows Hello signature ([design](trust-links.md), #41)
+- [x] Seal user environment variables and hand them back per shell session ([design](environment-variables.md))
 - [x] Databases for applications: SQL Server logins per lease, RavenDB through the broker ([design](databases.md))
 - [ ] RavenDB subscriptions through the broker (the TCP relay, [phase 3](databases.md#phases))
-- [ ] Guided setup: the strongest option first, findings with one-click fixes, and a "What do you
+- [x] Guided setup: the strongest option first, findings with one-click fixes, and a "What do you
       need?" flow ([design](guided-setup.md), #32)
-- [ ] Attack surface: installed software, extensions and global tools, ranked by what uses
+- [x] Attack surface: installed software, extensions and global tools, ranked by what uses
       credentials ([design](attack-surface.md), #34)
 - [ ] Decoys: canary credentials that point home, and tripwires on decoy files
-      ([design](decoys.md), #39)
-- [ ] Out-of-band alerts: ntfy, LcdHub and a webhook, public by default ([design](alerts.md), #101); the webhook is built
+      ([design](decoys.md), #39). Canary credentials, the read tripwire and the Home card built;
+      decoys held by the admin tier in review
+- [ ] Optional admin tier: a privileged service for what the user account can't protect
+      ([design](admin-tier.md), #91). Step 1 built (the service, its pipe, setup)
+- [ ] Out-of-band alerts: ntfy, LcdHub and a webhook, public by default ([design](alerts.md), #101).
+      The planner and the webhook built
+- [ ] Secrets reachable in containers, WSL and VMs from the user's account
+      ([design](containers-and-vms.md), #113). Design in review
+- [x] `tir ai`: instructions for AI coding agents ([guide](ai-agents.md))
 - [x] Velopack installer and auto-update from GitHub Releases (`app-release.yml`)
-- [ ] Signed with Azure Artifact Signing (the workflow is ready; it needs the Azure setup in
-      [releasing.md](releasing.md))
+- [x] Signed with Azure Artifact Signing ([releasing.md](releasing.md))
 - [ ] winget
 
 ## Identity
@@ -60,7 +69,7 @@ ships it.
 
 ## Launch
 
-- [ ] Review the import for names that must not be public
-- [ ] Add the `DENYLIST` secret; set up nuget.org trusted publishing; enable private
+- [x] Review the import for names that must not be public
+- [x] Add the `DENYLIST` secret; set up nuget.org trusted publishing; enable private
       vulnerability reporting
-- [ ] Make the repository public, tag `v0.1.0-preview.1`
+- [x] Make the repository public, tag `v0.1.0-preview.1`

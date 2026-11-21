@@ -5,6 +5,7 @@ using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.Input;
 using H.NotifyIcon;
 using Microsoft.Win32;
+using Tiresias.Agent;
 using Tiresias.App.Logic;
 using Tiresias.App.Views;
 
@@ -121,7 +122,8 @@ sealed class TrayController : IDisposable
         var unseen = FindingWatch.NewCount;
         icon.ToolTipText = $"{Text.Get("App_Name")} - {Text.Of(view.Tooltip)}"
             + (unseen > 0 ? $"{Environment.NewLine}{Text.Format("Tray_NewFindings", unseen)}" : "")
-            + (AppBuild.Current.Development ? $"{Environment.NewLine}{Text.Of(AppBuild.Current.Label)}" : "");
+            + (AppBuild.Current.Development ? $"{Environment.NewLine}{Text.Of(AppBuild.Current.Label)}" : "")
+            + (DemoMode.On ? $"{Environment.NewLine}{Text.Get("Tray_Demo")}" : "");
     }
 
     void OnFindingsChanged()

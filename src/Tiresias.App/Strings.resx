@@ -34,6 +34,15 @@
   <data name="About_Development" xml:space="preserve">
     <value>A development build: run from a build folder, not installed, so it doesn't update itself. Its tray icon has an orange corner, so you can tell it from the installed app.</value>
   </data>
+  <data name="About_Demo" xml:space="preserve">
+    <value>Demo mode: the app runs on a made-up machine filled from a scenario file, so its windows can be captured. Everything works, but it changes only the made-up machine, which is emptied when the app quits. The recovery-key, SQL Server and RavenDB windows still take real input, so they stay hidden from capture.</value>
+  </data>
+  <data name="About_DemoScenario" xml:space="preserve">
+    <value>Demo scenario</value>
+  </data>
+  <data name="About_DemoMachine" xml:space="preserve">
+    <value>Made-up machine</value>
+  </data>
   <data name="About_Version" xml:space="preserve">
     <value>Version</value>
   </data>
@@ -2148,6 +2157,12 @@ Store them in clear?</value>
   </data>
   <data name="Window_DevTitle" xml:space="preserve">
     <value>{0} (dev)</value>
+  </data>
+  <data name="Window_DemoTitle" xml:space="preserve">
+    <value>{0} (demo)</value>
+  </data>
+  <data name="Tray_Demo" xml:space="preserve">
+    <value>Demo mode: made-up data, nothing on this PC changes</value>
   </data>
   <data name="Status_PassedHeader" xml:space="preserve">
     <value>{0} checks passed</value>

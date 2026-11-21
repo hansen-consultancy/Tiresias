@@ -197,13 +197,13 @@ public class BrokerPolicyTests
     LeaseOffer OpenLease()
     {
         var (offer, _) = state.BeginLease("laptop");
-        Assert.That(state.Seal(offer.LeaseId, vault.SealTo(offer)).Result!.Rejected, Is.Empty);
+        Assert.That(state.Seal(offer.LeaseId, vault.SealTo(offer), vault.ApprovalKey(offer.LeaseId)).Result!.Rejected, Is.Empty);
         return offer;
     }
 
     string Mint(string service = "llm")
     {
-        var (minted, refusal) = state.Mint(new AccessRequest("claude:test", null, service, null, "testing", TimeSpan.FromHours(1)));
+        var (minted, refusal) = state.Mint(vault.MintApproval(new AccessRequest("claude:test", null, service, null, "testing", TimeSpan.FromHours(1)), time.GetUtcNow()));
         Assert.That(refusal, Is.Null);
         return minted!.Token;
     }
@@ -258,7 +258,7 @@ public class BrokerPolicyTests
         using var tampered = new BrokerState(Tampered(s => s with { Upstream = new Uri("https://attacker.example/") }),
             LeaseTerms.Workday(TimeZoneInfo.FindSystemTimeZoneById("Europe/Brussels")), new AuditLog(auditPath, time), Key.Create(SignatureAlgorithm.Ed25519), time);
         var (offer, _) = tampered.BeginLease("laptop");
-        Assert.That(tampered.Seal(offer.LeaseId, vault.SealTo(offer)).Result!.Accepted, Is.Empty);
+        Assert.That(tampered.Seal(offer.LeaseId, vault.SealTo(offer), vault.ApprovalKey(offer.LeaseId)).Result!.Accepted, Is.Empty);
     }
 
     [Test]
@@ -302,7 +302,7 @@ public class BrokerPolicyTests
     {
         OpenLease();
         var token = Mint();
-        state.Elevate("llm", "admin", TimeSpan.FromMinutes(15));
+        state.Elevate(vault.ElevateApproval("llm", "admin", TimeSpan.FromMinutes(15), time.GetUtcNow()));
         var changed = Tampered(s => s with { Upstream = new Uri("https://llm2.example/") });
         var approved = changed with { Secrets = [.. changed.Secrets.Select(old =>
             SecretEnvelope.Rebind(old, SecretEnvelope.UnwrapDek(old, vault.Tpm)!, PolicyBinding.Hash(changed, old.Slug), [vault.Tpm])!)] };

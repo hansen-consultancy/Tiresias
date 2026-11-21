@@ -24,6 +24,14 @@ public partial class AboutPage : UserControl
         var build = AppBuild.Current;
         Heading.Text = Text.Format("About_Heading", Text.Of(build.Label));
         Summary.Text = Text.Get(build.Installed ? "About_Installed" : "About_Development");
+#if DEBUG
+        if (DemoMode.On)
+        {
+            Summary.Text += Environment.NewLine + Environment.NewLine + Text.Get("About_Demo");
+            Add("About_DemoScenario", $"{Demo.Scenario}: {Demo.Description}");
+            Add("About_DemoMachine", DemoMode.Profile!);
+        }
+#endif
 
         Add("About_Version", build.Version);
         if (build.Development)

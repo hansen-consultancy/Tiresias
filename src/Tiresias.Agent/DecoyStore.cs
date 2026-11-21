@@ -19,8 +19,8 @@ public static class DecoyStore
     /// <summary>The default places: <c>passwords.txt</c> in Documents, and an old-looking project folder beside the user's code.</summary>
     public static string DefaultPath(DecoyKind kind) => kind switch
     {
-        DecoyKind.PasswordsFile => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), DecoyPlan.PasswordsFileName),
-        DecoyKind.Project => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "source", "billing-api-old"),
+        DecoyKind.PasswordsFile => Path.Combine(UserMachine.Folder(Environment.SpecialFolder.MyDocuments), DecoyPlan.PasswordsFileName),
+        DecoyKind.Project => Path.Combine(UserMachine.Folder(Environment.SpecialFolder.UserProfile), "source", "billing-api-old"),
         _ => "",
     };
 
@@ -115,7 +115,7 @@ public static class DecoyStore
                 }
                 break;
             case SetDecoyVariable variable:
-                Environment.SetEnvironmentVariable(variable.Name, variable.Value, EnvironmentVariableTarget.User);
+                UserMachine.SetUserVariable(variable.Name, variable.Value);
                 break;
         }
     }
@@ -126,13 +126,13 @@ public static class DecoyStore
             if (step is WriteDecoyFile file)
                 File.Delete(file.Path);
             else if (step is SetDecoyVariable variable)
-                Environment.SetEnvironmentVariable(variable.Name, null, EnvironmentVariableTarget.User);
+                UserMachine.SetUserVariable(variable.Name, null);
     }
 
     static string? Read(string pathOrVariable)
     {
         if (DecoyPlan.VariableNames.Contains(pathOrVariable))
-            return Environment.GetEnvironmentVariable(pathOrVariable, EnvironmentVariableTarget.User);
+            return UserMachine.UserVariable(pathOrVariable);
         try
         {
             return File.Exists(pathOrVariable) ? File.ReadAllText(pathOrVariable) : null;
@@ -146,7 +146,7 @@ public static class DecoyStore
 
     static bool Exists(string pathOrVariable) =>
         DecoyPlan.VariableNames.Contains(pathOrVariable)
-            ? Environment.GetEnvironmentVariable(pathOrVariable, EnvironmentVariableTarget.User) is not null
+            ? UserMachine.UserVariable(pathOrVariable) is not null
             : Path.Exists(pathOrVariable);
 
     static bool Free(int port)

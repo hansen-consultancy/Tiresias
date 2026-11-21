@@ -80,7 +80,7 @@ public class TokenEndpointTests
         var offer = new LeaseOffer(offerJson.GetProperty("leaseId").GetString()!,
             Convert.FromBase64String(offerJson.GetProperty("leaseKey").GetString()!),
             DateTimeOffset.FromUnixTimeSeconds(offerJson.GetProperty("hardCapAt").GetInt64()));
-        await client.SendAsync(Signed("/lease/seal", new { offer.LeaseId, deks = vault.SealTo(offer) }));
+        await client.SendAsync(Signed("/lease/seal", vault.SealBody(offer)));
     }
 
     string Audit() => File.ReadAllText(Path.Combine(dir, "audit.jsonl"));
@@ -89,7 +89,7 @@ public class TokenEndpointTests
     public async Task A_device_gets_an_installation_token_signed_for_by_the_app_key_which_never_leaves()
     {
         await OpenLease();
-        var response = await client.SendAsync(Signed("/token/gh"));
+        var response = await client.SendAsync(Signed("/token/gh", vault.TokenApproval("gh")));
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK), await response.Content.ReadAsStringAsync());
         var body = await response.Content.ReadAsStringAsync();
@@ -118,7 +118,7 @@ public class TokenEndpointTests
     public async Task Only_a_github_service_issues_tokens()
     {
         await OpenLease();
-        var response = await client.SendAsync(Signed("/token/llm"));
+        var response = await client.SendAsync(Signed("/token/llm", vault.TokenApproval("llm")));
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
         Assert.That(github.Calls, Is.Empty);
     }
@@ -128,14 +128,14 @@ public class TokenEndpointTests
     {
         await OpenLease();
         github.Refuse = true;
-        Assert.That((await client.SendAsync(Signed("/token/gh"))).StatusCode, Is.EqualTo(HttpStatusCode.BadGateway));
+        Assert.That((await client.SendAsync(Signed("/token/gh", vault.TokenApproval("gh")))).StatusCode, Is.EqualTo(HttpStatusCode.BadGateway));
     }
 
     [Test]
     public async Task A_revoked_placeholder_stops_working_at_once()
     {
         await OpenLease();
-        var mint = await client.SendAsync(Signed("/placeholder", new { consumer = "exec:tool", serviceSlug = "llm", purpose = "testing", duration = "01:00:00" }));
+        var mint = await client.SendAsync(Signed("/placeholder", vault.MintApproval(new("exec:tool", null, "llm", null, "testing", TimeSpan.FromHours(1)))));
         var token = (await mint.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("token").GetString()!;
 
         Assert.That((await client.SendAsync(Signed("/placeholder/revoke", new { token }))).StatusCode, Is.EqualTo(HttpStatusCode.NoContent));

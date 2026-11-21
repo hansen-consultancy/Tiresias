@@ -28,6 +28,8 @@ public static class DecoyReads
         new("Windows Search", ["SearchProtocolHost.exe", "SearchIndexer.exe", "SearchFilterHost.exe"], f => [f.Windows]),
         new("Microsoft Defender", ["MsMpEng.exe", "MpDefenderCoreService.exe"],
             f => [.. f.ProgramFiles, Below(f.ProgramData, @"Microsoft\Windows Defender")]),
+        new("Microsoft Defender for Endpoint", ["MsSense.exe"],
+            f => [.. f.ProgramFiles, Below(f.ProgramData, @"Microsoft\Windows Defender Advanced Threat Protection")]),
         new("File Explorer", ["explorer.exe", "prevhost.exe"], f => [f.Windows]),
         new("OneDrive", ["OneDrive.exe", "OneDrive.Sync.Service.exe"],
             // Only the machine-wide install: a per-user one runs from a folder any program the user runs can write to.

@@ -1,7 +1,8 @@
 # Policy integrity
 
-Status: **phases 1 to 3 built** (binding, broker checks, approval, migration); the rollback
-high-water mark waits for the Windows service (see *Phases*). Tracks issue #24. This page designs how the broker refuses a
+Status: **phases 1 to 3 built** (binding, broker checks, approval, migration), and the rollback
+high-water mark within a lease; keeping it across locks and restarts waits for the Windows service
+(see *Phases*). Tracks issue #24. This page designs how the broker refuses a
 service policy the user didn't approve: upstreams, grant rules and which secret each grant uses.
 
 ## The problem
@@ -169,4 +170,8 @@ vault from the admin's machine as today, after `tir vault migrate` there.
    setups and `tir service add`/`remove`; the approved hash stored with each bound secret.
 3. **Built.** Migration on unlock, `tir vault migrate`, doctor line; the broker refuses unbound
    secrets.
-4. Rollback high-water mark, persisted once the Windows service exists.
+4. **Built within a lease.** The broker keeps each secret's highest version from the lease's start
+   and refuses a reload that goes below it (`VaultReload.RolledBack`, audited
+   `secret-rolled-back`), keeping the newer vault. A secret removed and added again in the same
+   lease starts at version 1 and is refused until the next unlock. Persisting the mark across locks
+   and restarts, in storage the user's account can't write, comes with the Windows service.

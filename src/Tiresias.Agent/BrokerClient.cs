@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Text.Json;
 using Tiresias.Transport;
 using NSec.Cryptography;
@@ -33,7 +33,13 @@ public sealed class BrokerClient(BrokerPin broker, string deviceId, Key deviceKe
     public async Task<BrokerResponse> PostAsync(string endpoint, object? body = null)
     {
         var bytes = body is null ? [] : JsonSerializer.SerializeToUtf8Bytes(body, JsonSerializerOptions.Web);
-        var (status, text) = await SendAsync(HttpMethod.Post, endpoint, bytes);
+        return await PostBytesAsync(endpoint, bytes);
+    }
+
+    /// <summary>A signed POST of JSON the caller already serialized, such as a trust chain in its canonical form.</summary>
+    public async Task<BrokerResponse> PostBytesAsync(string endpoint, byte[] json)
+    {
+        var (status, text) = await SendAsync(HttpMethod.Post, endpoint, json);
         return new(status, ParseJson(System.Text.Encoding.UTF8.GetString(text)));
     }
 
