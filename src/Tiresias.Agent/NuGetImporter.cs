@@ -19,13 +19,13 @@ public static class NuGetImporter
     /// </summary>
     public static IReadOnlyList<NuGetImportStep> Plan(SealedEnvironment sealedNow, string? directory)
     {
-        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        var appData = UserMachine.Folder(Environment.SpecialFolder.ApplicationData);
         var found = NuGetConfig.Files(directory, appData)
             .SelectMany(file => NuGetConfig.Read(File.ReadAllText(file)).Select(c => (file, c)));
         var windows = EnvironmentStore.UserVariables().Select(v => v.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
         return NuGetImport.Plan(found, sealedNow, windows.Contains,
             name => sealedNow.Global.FirstOrDefault(v => string.Equals(v.Name, name, StringComparison.OrdinalIgnoreCase))?.Value
-                ?? Environment.GetEnvironmentVariable(name, EnvironmentVariableTarget.User));
+                ?? UserMachine.UserVariable(name));
     }
 
     /// <summary>

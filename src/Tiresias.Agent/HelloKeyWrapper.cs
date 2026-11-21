@@ -28,6 +28,9 @@ public sealed partial class HelloKeyWrapper : IKeyWrapper, IDisposable
 {
     /// <summary>Whether the Tiresias Hello credential exists. Asks Windows without a prompt.</summary>
     public static bool Exists() =>
+#if DEBUG
+        DemoMode.On ? DemoMode.HelloExists :
+#endif
         KeyCredentialManager.IsSupportedAsync().AsTask().GetAwaiter().GetResult()
         && KeyCredentialManager.OpenAsync(CredentialName).AsTask().GetAwaiter().GetResult().Status == KeyCredentialStatus.Success;
 
@@ -35,13 +38,32 @@ public sealed partial class HelloKeyWrapper : IKeyWrapper, IDisposable
 
     readonly SignatureDerivedWrapper inner;
 
-    HelloKeyWrapper(KeyCredential credential) =>
-        inner = new SignatureDerivedWrapper("hello", challenge => Sign(credential, challenge));
+    HelloKeyWrapper(Func<byte[], byte[]> sign) =>
+        inner = new SignatureDerivedWrapper("hello", sign);
 
     public string Id => inner.Id;
 
     /// <param name="create">Create the credential when it doesn't exist yet. Only when sealing: a new credential can't open what an old one wrapped.</param>
-    public static HelloKeyWrapper Open(bool create) => new(OpenCredential(create));
+    public static HelloKeyWrapper Open(bool create)
+    {
+#if DEBUG
+        if (DemoMode.On)
+            return OpenDemo(create);
+#endif
+        var credential = OpenCredential(create);
+        return new(challenge => Sign(credential, challenge));
+    }
+
+#if DEBUG
+    /// <summary>Demo mode's stand-in: a fixed key that "signs" without a prompt, so the real credential is never opened or created.</summary>
+    static HelloKeyWrapper OpenDemo(bool create)
+    {
+        if (!DemoMode.HelloExists && !create)
+            throw new HelloException(HelloProblem.CredentialMissing, $"No Windows Hello credential '{CredentialName}' on this machine. Re-wrap the vault from the recovery key.");
+        DemoMode.HelloExists = true;
+        return new(challenge => System.Security.Cryptography.HMACSHA256.HashData(DemoMode.HelloKey, challenge));
+    }
+#endif
 
     /// <summary>The lease's approval key; no extra prompt once this wrapper has derived its wrap key.</summary>
     public NSec.Cryptography.Key ApprovalKey(string leaseId) => inner.ApprovalKey(leaseId);

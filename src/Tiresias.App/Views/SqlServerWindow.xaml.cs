@@ -25,7 +25,7 @@ public partial class SqlServerWindow : Window
     public SqlServerWindow()
     {
         InitializeComponent();
-        Desktop.ExcludeFromCapture(this);
+        Desktop.ExcludeFromCapture(this, evenInDemo: true);
         DataContext = model;
         model.Saved += slug => Saved?.Invoke(slug);
         Closed += (_, _) => model.Dispose();
