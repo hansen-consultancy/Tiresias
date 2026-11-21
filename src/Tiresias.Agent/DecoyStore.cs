@@ -79,7 +79,15 @@ public static class DecoyStore
                 }
             // The project folder goes too, unless the user put something of their own in it.
             if (placed.Kind == DecoyKind.Project && Directory.Exists(placed.Where) && !Directory.EnumerateFileSystemEntries(placed.Where).Any())
-                Directory.Delete(placed.Where);
+                try
+                {
+                    Directory.Delete(placed.Where);
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+                {
+                    // Open in Explorer or a shell: try again next time.
+                    left.Add(placed.Where);
+                }
         }
         if (left.Count == 0)
             File.Delete(FilePath);

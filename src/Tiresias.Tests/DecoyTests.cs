@@ -219,6 +219,13 @@ public class DecoyTests
     }
 
     [Test]
+    public void A_path_segment_long_enough_to_be_a_token_is_left_out()
+    {
+        Assert.That(DecoyListener.PathShape("/v1/chat/completions"), Is.EqualTo("/v1/chat/completions"));
+        Assert.That(DecoyListener.PathShape("/hooks/" + new string('a', 40) + "/run"), Is.EqualTo("/hooks/…/run"));
+    }
+
+    [Test]
     public async Task A_bare_connection_to_a_decoy_port_is_still_a_hit()
     {
         var set = DecoySet.Mint(Free);

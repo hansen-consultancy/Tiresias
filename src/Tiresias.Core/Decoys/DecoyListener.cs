@@ -97,12 +97,16 @@ public sealed class DecoyListener : IAsyncDisposable
         return clean.Length <= max ? clean : clean[..max] + "…";
     }
 
+    /// <summary>The path's shape: a segment long enough to be a token (a path-token API) is left out, as the query string is.</summary>
+    internal static string PathShape(string path) =>
+        Printable(string.Join('/', path.Split('/').Select(segment => segment.Length > 24 ? "…" : segment)), 200);
+
     async Task<(DecoyUse, string)> ServeHttpAsync(Stream stream, CancellationToken ct)
     {
         var head = await ReadHeadAsync(stream, ct);
         var request = head.Split("\r\n", 2)[0].Split(' ');
         // Only the path: a token in the query string stays out of the record.
-        var endpoint = request.Length >= 2 ? $"HTTP {Printable(request[0], 16)} {Printable(request[1].Split('?')[0], 200)}" : "HTTP";
+        var endpoint = request.Length >= 2 ? $"HTTP {Printable(request[0], 16)} {PathShape(request[1].Split('?')[0])}" : "HTTP";
         var use = set.Recognise(head) ?? DecoyUse.Connected;
         var body = request.Length >= 2 && request[1].StartsWith("/v1", StringComparison.Ordinal)
             ? """{"error":{"message":"Incorrect API key provided.","type":"invalid_request_error","param":null,"code":"invalid_api_key"}}"""
