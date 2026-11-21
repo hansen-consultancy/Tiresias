@@ -5,6 +5,7 @@ using System.Security.Principal;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Tiresias.AdminTier;
+using Tiresias.Decoys;
 using Tiresias.Protocol;
 
 namespace Tiresias.Admin;
@@ -28,6 +29,7 @@ sealed class AdminPipeService(ILogger<AdminPipeService> logger) : BackgroundServ
     static readonly string StateFolder = Path.Combine(StateRoot, "Admin");
 
     ActionLog? log;
+    DecoyHold? decoys;
 
     protected override async Task ExecuteAsync(CancellationToken stop)
     {
@@ -35,6 +37,7 @@ sealed class AdminPipeService(ILogger<AdminPipeService> logger) : BackgroundServ
             if (!Trusted(folder))
                 throw new InvalidOperationException($"{folder} is missing, a link, or not owned by SYSTEM or Administrators; run the install step again.");
         log = new ActionLog(Path.Combine(StateFolder, "actions.jsonl"));
+        await using var hold = decoys = new DecoyHold(StateFolder, logger);
 
         // The next instance is created before a connected one is served, so the name is never free
         // for another process to take.
@@ -101,7 +104,7 @@ sealed class AdminPipeService(ILogger<AdminPipeService> logger) : BackgroundServ
                     read.CancelAfter(RequestTimeout);
                     request = await AdminWire.ReadAsync<AdminRequest>(pipe, read.Token);
                 }
-                var reply = Answer(request, client);
+                var reply = await AnswerAsync(request, client, stop);
                 Record(request.Op, client, reply.Status, reply.Message);
                 await AdminWire.WriteAsync(pipe, reply, stop);
             }
@@ -113,19 +116,54 @@ sealed class AdminPipeService(ILogger<AdminPipeService> logger) : BackgroundServ
         }
     }
 
-    static AdminReply Answer(AdminRequest request, PipeClientInfo client)
+    async Task<AdminReply> AnswerAsync(AdminRequest request, PipeClientInfo client, CancellationToken stop)
     {
         if (client.Caller is not { } caller)
             return AdminReply.Refused($"the caller can't be named: {client.Problem}");
         var decision = AdminCallerPolicy.Decide(request, caller);
         if (!decision.Allowed)
             return AdminReply.Refused(decision.Reason!);
-        return request.Op switch
+        // Every action is the acting user's: the caller's own, or its session's user for an elevated caller.
+        var user = decision.ActingFor!;
+        var args = request.Args ?? [];
+        switch (request.Op)
         {
-            AdminOps.Status => AdminReply.Ok(new AdminStatusResult(Version, AdminWire.ProtocolVersion, new AdminFeatures())),
-            // The policy refuses every op not built yet; reaching here is a bug, not a request to act on.
-            _ => new AdminReply(AdminStatus.Error, Message: "not built"),
-        };
+            case AdminOps.Status:
+                var held = decoys!.Status(user);
+                return AdminReply.Ok(new AdminStatusResult(Version, AdminWire.ProtocolVersion, new AdminFeatures(held.Held, held.Listening)));
+            case AdminOps.DecoysStatus:
+                return AdminReply.Ok(decoys!.Status(user));
+            case AdminOps.DecoysAdopt:
+                var set = AdoptedSet(args["set"]);
+                if (set is null)
+                    return AdminReply.Refused("argument set is out of range");
+                var files = AdminWire.FromNode<string[]>(args["files"]) ?? [];
+                return decoys!.Adopt(user, new(set, files)) is { } refused
+                    ? AdminReply.Refused(refused)
+                    : AdminReply.Ok(decoys.Status(user));
+            case AdminOps.DecoysRelease:
+                return AdminReply.Ok(new AdminDecoysRelease(user, await decoys!.ReleaseAsync(user)));
+            case AdminOps.EventsWait:
+                var ack = AdminWire.FromNode<long[]>(args["ack"]) ?? [];
+                var wait = TimeSpan.FromSeconds(args["wait"]!.GetValue<int>());
+                return AdminReply.Ok(new AdminEvents(await decoys!.WaitAsync(user, ack, wait, stop)));
+            default:
+                // The policy refuses every op not built yet; reaching here is a bug, not a request to act on.
+                return new AdminReply(AdminStatus.Error, Message: "not built");
+        }
+    }
+
+    /// <summary>The wire's set, read back as <c>decoys.json</c> is, so <see cref="DecoySet.Parse"/> judges it as it judges that file.</summary>
+    static DecoySet? AdoptedSet(System.Text.Json.Nodes.JsonNode? node)
+    {
+        try
+        {
+            return AdminWire.FromNode<DecoySet>(node) is { } set ? DecoySet.Parse(set.ToJson()) : null;
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return null;
+        }
     }
 
     void Record(string? op, PipeClientInfo client, AdminStatus result, string? reason)
