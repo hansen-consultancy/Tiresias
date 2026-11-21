@@ -1,6 +1,7 @@
 # Out-of-band alerts
 
-Status: **design, not built**. Tracks issue #101. This page designs how Tiresias tells you about a
+Status: **phase 1 built** (the pure planner and the payload, in `Tiresias.Core` and
+`Tiresias.Protocol`); nothing sends yet. Tracks issue #101. This page designs how Tiresias tells you about a
 serious event when you aren't looking at the app: a push to your phone through
 [ntfy](https://ntfy.sh), a line on a [LcdHub](https://github.com/stevehansen/LcdHub) screen beside
 the machine, or a JSON POST to a webhook of your choice.
@@ -88,8 +89,9 @@ widen. A's only gain is fewer types.
 // Tiresias.Core/Alerts: pure, clock injected, no I/O.
 public sealed record AlertEvent(AlertKind Kind, AlertSubject Subject, DateTimeOffset At);
 public sealed record AlertPlan(IReadOnlyList<Delivery> Now, AlertState Next);
-public static AlertPlan Plan(AlertEvent e, IReadOnlyList<SinkDefinition> sinks, AlertState state, DateTimeOffset now);
-public static AlertPlan Tick(IReadOnlyList<SinkDefinition> sinks, AlertState state, DateTimeOffset now); // window summaries
+public sealed record AlertSetup(string Machine, byte[] InstallKey, IReadOnlyList<SinkDefinition> Sinks);
+public static AlertPlan Plan(AlertEvent e, AlertSetup setup, AlertState state, DateTimeOffset now);
+public static AlertPlan Tick(AlertSetup setup, AlertState state, DateTimeOffset now); // window summaries
 ```
 
 `AlertKind` is the table above: event name, severity and title in one place. `AlertSubject` holds
@@ -257,9 +259,22 @@ leaving.
 
 ## Phases
 
-1. **Core and Protocol, pure.** `AlertKind`, `AlertEvent`, `AlertPlanner` (threshold, dedupe,
-   buckets, redaction), `AlertPayload` v1 and its JSON. Planner, canary and shape tests. Nothing
-   sends.
+1. **Core and Protocol, pure. Done.** `AlertKind`, `AlertEvent`, `AlertPlanner` (threshold, dedupe,
+   buckets, storms, redaction), `AlertPayload` v1 and its JSON. Planner, canary and shape tests.
+   Nothing sends. What it settled that the design left open, or changed:
+   - `Plan` and `Tick` take an `AlertSetup` (sinks, the machine label, a per-install key) instead
+     of the sink list alone: the payload needs the label, and `key` and `id` need the key.
+   - `id` is 48 bits of milliseconds and 80 bits of an HMAC over a sequence number in the state,
+     not a random number, so the planner stays pure. Still unique per install and unguessable.
+   - The critical bucket's burst is 10. `alerts.suppressed` ignores the sink's threshold (it is
+     about that sink's own deliveries) and counts occurrences, so a held-back `count: N` summary
+     adds N, and every event ends up in some delivery's `count`.
+   - A storm's source is the event name, per sink. It ends after a minute with 100 or fewer.
+     Its window has no `detail`: it stands for many subjects.
+   - `TrustedDetail` is `program`, `processId`, `parents`, `what`, `service`, `names`, `findings`.
+   - The canary covers the planner and the payload's JSON. The value and placeholder-token
+     canaries and the per-formatter canaries come with the first source mapping and formatter
+     (phases 2 to 5): `AlertSubject` has no field that can hold a value, and no formatter exists yet.
 2. **Webhook end to end.** Sealed `alerts.json`, an **Alerts** section in Settings to add a webhook
    behind Hello (asking for the required machine label first), **Send a test alert**, the delivery worker, and `decoy.used` wired. README,
    CHANGELOG, I-101 to `mitigated`.
