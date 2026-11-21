@@ -1,7 +1,6 @@
 # Out-of-band alerts
 
-Status: **phase 1 built** (the pure planner and the payload, in `Tiresias.Core` and
-`Tiresias.Protocol`); nothing sends yet. Tracks issue #101. This page designs how Tiresias tells you about a
+Status: **phase 2 built**: webhook end to end, with `decoy.used` the only event wired so far. Tracks issue #101. This page designs how Tiresias tells you about a
 serious event when you aren't looking at the app: a push to your phone through
 [ntfy](https://ntfy.sh), a line on a [LcdHub](https://github.com/stevehansen/LcdHub) screen beside
 the machine, or a JSON POST to a webhook of your choice.
@@ -275,9 +274,34 @@ leaving.
    - The canary covers the planner and the payload's JSON. The value and placeholder-token
      canaries and the per-formatter canaries come with the first source mapping and formatter
      (phases 2 to 5): `AlertSubject` has no field that can hold a value, and no formatter exists yet.
-2. **Webhook end to end.** Sealed `alerts.json`, an **Alerts** section in Settings to add a webhook
-   behind Hello (asking for the required machine label first), **Send a test alert**, the delivery worker, and `decoy.used` wired. README,
-   CHANGELOG, I-101 to `mitigated`.
+2. **Webhook end to end. Done.** Sealed `alerts.json` (`AlertsConfig`, `AlertsFile`, `AlertsStore`),
+   the transport and the delivery worker (`WebhookTransport`, `AlertSender`, `DeliveryPolicy`),
+   `AlertCenter` tying the planner to the worker, an **Alerts** card to add a webhook behind Hello
+   (asking for the required machine label first), **Send a test alert**, and `decoy.used` wired.
+   README, CHANGELOG, I-101 to `mitigated`. What it settled or changed:
+   - **Settings is About.** The app has no separate Settings page; its settings (start with Windows,
+     the admin tier) are cards on **About**, so **Alerts** is one too. Adding opens a dialog, kept out
+     of screen capture.
+   - **Sink ids are the user's**: 1 to 32 of `a-z`, `0-9`, `-`, such as `siem`. Logs and (phase 6)
+     findings name them; they never leave the machine.
+   - **The form takes one header.** `alerts.json` holds any number; a second one waits for a need.
+   - **Narrowing in `app.json`** is `SinkNarrowing`: muted, a raised threshold (a lower one is
+     ignored), removed. The card mutes and removes; a raised threshold has no control yet. A removal
+     stops the sink at once and leaves `alerts.json` at once if unlocked, else at the next unlock,
+     since sealing needs the Hello wrapper.
+   - **`alerts.json` refuses plain keys beside its seal** instead of merging them as a
+     `secrets.json` does, and a plain (never sealed) file: anything that could add a sink goes through
+     a sealed save. A file that doesn't open turns alerts off, logged, and doesn't fail the unlock.
+     The recovery restore gives `alerts.json` back to a new Hello key with everything else sealed.
+   - **`Retry-After`** sets the earliest retry, but never sooner than the backoff, so `Retry-After: 0`
+     can't make the worker spin. A **3xx** stops the sink like a 4xx: it isn't followed, and the
+     definition is what needs fixing. A sink restarts when its URL or headers change, or when a test
+     alert gets through.
+   - **Send a test alert** goes to one sink, now, outside dedupe and rate limits (a second test after
+     fixing the receiver mustn't be deduped away), built by the planner with its redaction. One
+     attempt, no retry; the card shows the status code or the exception type.
+   - The canary now runs through the first source mapping (`AlertSources.DecoyUsed`) and the webhook
+     formatter into captured request bytes, with a value and a placeholder token beside the event.
 3. **ntfy.** Its formatter and the setup form (server, topic, token, a hint to use a write-only
    token).
 4. **LcdHub.** The pipe client (wire v4 status items) and clearing items from `FindingWatch.Shown`.

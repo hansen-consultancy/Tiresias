@@ -23,6 +23,34 @@
         <TextBlock x:Name="StartWithWindowsNote" Style="{StaticResource CaptionText}" />
       </StackPanel>
     </Border>
+    <!-- Out-of-band alerts (docs/alerts.md): adding a sink is a sealed save behind Windows Hello; muting and removing are not. -->
+    <Border Style="{StaticResource Card}">
+      <StackPanel>
+        <TextBlock Text="{l:S Alerts_Heading}" Style="{StaticResource SubtitleText}" AutomationProperties.HeadingLevel="Level2" />
+        <TextBlock x:Name="AlertsText" Style="{StaticResource BodyText}" />
+        <ItemsControl x:Name="AlertSinks" Focusable="False">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <DockPanel Margin="0,4">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                  <Button Content="{l:S Alerts_Test}" Padding="10,4" Margin="8,0,0,0" Tag="{Binding Id}" Click="OnAlertTest" />
+                  <Button Content="{Binding MuteLabel}" Padding="10,4" Margin="8,0,0,0" Tag="{Binding Id}" Click="OnAlertMute" />
+                  <Button Content="{l:S Alerts_Remove}" Padding="10,4" Margin="8,0,0,0" Tag="{Binding Id}" Click="OnAlertRemove" />
+                </StackPanel>
+                <StackPanel VerticalAlignment="Center">
+                  <TextBlock Text="{Binding Id}" FontWeight="SemiBold" />
+                  <TextBlock Text="{Binding Detail}" Style="{StaticResource CaptionText}" Margin="0" />
+                </StackPanel>
+              </DockPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock x:Name="AlertsOutcome" Style="{StaticResource CaptionText}" AutomationProperties.LiveSetting="Polite" />
+        <StackPanel Orientation="Horizontal">
+          <Button x:Name="AlertsAdd" Content="{l:S Alerts_AddWebhook}" Padding="12,6" Click="OnAlertAdd" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
     <!-- The optional admin tier (docs/admin-tier.md): its state, and set up, update or remove, each behind a UAC prompt. -->
     <Border Style="{StaticResource Card}">
       <StackPanel>

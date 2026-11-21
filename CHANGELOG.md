@@ -10,6 +10,12 @@ its section below.
 
 ### Added
 
+- Alerts to a webhook: **About**, **Alerts**, **Add a webhook...** posts serious events (today, a
+  used decoy credential) as JSON to a URL you choose, so you hear about them when you aren't at the
+  PC, even while it is locked. The URL and header are sealed like your secrets and saving needs
+  Windows Hello; mute, remove and **Send a test alert** are on the same card. Alerts carry the
+  event, its time and a name you give the PC, never a secret's name unless you mark the webhook
+  trusted, and never a value.
 - `Tiresias.Core` and `Tiresias.Protocol` carry the groundwork for out-of-band alerts: the
   `tiresias.alert/v1` payload and the planner that decides, per sink, what to send, with dedupe,
   rate limits and redaction. Nothing sends alerts yet.
