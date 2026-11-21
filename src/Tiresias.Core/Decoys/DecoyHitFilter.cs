@@ -11,12 +11,15 @@ public sealed class DecoyHitFilter
     const int PruneAbove = 256;
 
     readonly Lock gate = new();
-    readonly Dictionary<(int?, string?, DecoyUse), DateTimeOffset> reported = [];
+    readonly Dictionary<(int?, string?, DecoyUse, string?), DateTimeOffset> reported = [];
 
-    /// <summary>Whether to report <paramref name="hit"/>: the first of its program and use, or the first since the window passed.</summary>
+    /// <summary>
+    /// Whether to report <paramref name="hit"/>: the first of its program and use, or the first since
+    /// the window passed. A read is per file too: a program opening two decoy files opened two.
+    /// </summary>
     public bool ShouldReport(DecoyHit hit)
     {
-        var key = (hit.ProcessId, hit.Program, hit.Use);
+        var key = (hit.ProcessId, hit.Program, hit.Use, hit.Use == DecoyUse.Read ? hit.Endpoint : null);
         lock (gate)
         {
             if (reported.TryGetValue(key, out var last) && hit.At - last < Window)

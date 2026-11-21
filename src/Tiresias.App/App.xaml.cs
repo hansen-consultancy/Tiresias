@@ -5,6 +5,7 @@ using Microsoft.Win32;
 using Tiresias.Agent;
 using Tiresias.App.Logic;
 using Tiresias.App.Views;
+using Tiresias.Decoys;
 using Tiresias.EnvironmentVariables;
 using Tiresias.UserSecrets;
 
@@ -343,11 +344,20 @@ public partial class App : Application
 
     /// <summary>
     /// A decoy credential was used (docs/decoys.md): block the program, say so, and let Home raise
-    /// the finding where the user says whether it was them. Runs on the listener's thread.
+    /// the finding where the user says whether it was them. A decoy file opened blocks nothing: an
+    /// open may be harmless, so only a program that isn't a routine opener is notified of, and Home
+    /// raises the finding. Runs on the listener's or the tripwire's thread.
     /// </summary>
     void OnDecoyTouched(DecoyTouch touch)
     {
         var program = touch.Hit.Program;
+        if (touch.Hit.Use == DecoyUse.Read)
+        {
+            if (program is not null && touch.Routine is null)
+                Dispatcher.BeginInvoke(() => tray?.Notify(Text.Get("Notify_DecoyRead_Title"),
+                    Text.Format("Notify_DecoyRead_Body", System.IO.Path.GetFileName(program), System.IO.Path.GetFileName(touch.Hit.Endpoint))));
+            return;
+        }
         guard!.BlockForDecoy(program, program is null ? null : guard.Sha256(program));
         Dispatcher.BeginInvoke(() =>
             tray?.Notify(Text.Get("Notify_Decoy_Title"), program is null
