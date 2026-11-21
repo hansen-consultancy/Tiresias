@@ -1,4 +1,4 @@
-using Microsoft.Win32;
+using Tiresias.Agent;
 using Tiresias.App.Logic;
 
 namespace Tiresias.App;
@@ -22,7 +22,7 @@ static class StartWithWindows
         {
             try
             {
-                using var run = Registry.CurrentUser.OpenSubKey(Key);
+                using var run = UserMachine.CurrentUser.OpenSubKey(Key);
                 return SignInStart.Starts(run?.GetValue(Name) as string, Exe);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.SecurityException)
@@ -38,7 +38,7 @@ static class StartWithWindows
     {
         try
         {
-            using var run = Registry.CurrentUser.CreateSubKey(Key, writable: true);
+            using var run = UserMachine.CurrentUser.CreateSubKey(Key, writable: true);
             if (on)
                 run.SetValue(Name, SignInStart.Command(Exe));
             else

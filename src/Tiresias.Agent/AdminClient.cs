@@ -28,6 +28,8 @@ public static partial class AdminClient
     {
         get
         {
+            if (DemoMode.On)
+                return false;
             try
             {
                 return AdminService.Query().Exists;
@@ -42,6 +44,8 @@ public static partial class AdminClient
     /// <summary>The admin tier as it is now, read without a prompt. Never throws: a tier that can't be read reads as not answering.</summary>
     public static async Task<AdminTierFacts> FactsAsync()
     {
+        if (DemoMode.On)
+            return new(false, false, null, AppVersion);
         AdminService.State service;
         try
         {
