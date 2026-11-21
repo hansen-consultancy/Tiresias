@@ -1,11 +1,10 @@
 # The admin tier: a privileged service, optional
 
-Status: **steps 1 to 4 built** (#91): the service, its pipe and `status`, install, update and
+Status: **all 5 steps built** (#91): the service, its pipe and `status`, install, update and
 remove, the first-run and About offers, the doctor line and the action log; the decoys held and
 listened for from boot (`decoys.adopt`, `decoys.status`, `decoys.release`, `events.wait`); every
-read of a held decoy file audited; and a program that used a decoy frozen and cut off the network
-(`freeze`, `thaw`, `teardown`) ([Build order](#build-order)). `lastrun` is not built yet; the
-service refuses it.
+read of a held decoy file audited; a program that used a decoy frozen and cut off the network
+(`freeze`, `thaw`, `teardown`); and `lastrun` ([Build order](#build-order)).
 
 Tiresias works for an ordinary user account and keeps doing so. A user who can approve one UAC
 prompt can add a small Windows service that does what an ordinary account can't: hold the decoys
@@ -257,10 +256,27 @@ thawed. The filters match the image path: a copy of the program elsewhere isn't 
 
 ### Last run
 
-`lastrun` reads `HKLM\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings\<caller SID>` and
-the `C:\Windows\Prefetch\*.pf` files (decompressed with `RtlDecompressBufferEx`) for the paths
-asked. [Attack surface](attack-surface.md) uses it for "last used"; a decoy finding uses it for
-"first ran on".
+`lastrun` takes up to 256 drive-rooted paths, each a program or a folder (it covers the programs
+under it), and answers at most 1024 programs. It reads the acting user's
+`HKLM\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings\<SID>` (the older
+`bam\UserSettings` too): one value per program, named by its device path
+(`\Device\HarddiskVolume3\...`), mapped to a drive path by each fixed or removable drive's device
+name; other values and unmapped volumes are skipped. Then the `C:\Windows\Prefetch\*.pf` files of
+those programs (MAM-compressed ones decompressed with `RtlDecompressBufferEx`, XPRESS Huffman;
+versions 30 and 31), for the run count and the last 8 run times; Prefetch names volumes
+`\VOLUME{<created>-<serial>}`, mapped by serial number. Parsed files are kept until they change.
+The parsing is pure (`AdminLastRun`, `Prefetch`), checks every offset and size, and reads a damaged
+file as nothing.
+
+**Prefetch is the machine's**, every user's runs together, so it is added only to programs the
+acting user's BAM lists: nothing for a path not asked, nothing for a program only another user ran.
+BAM keeps about a week.
+
+The agent's `IDoctorProbe.ProgramRuns` adds these runs to UserAssist's, marked not *opened*: a run
+the user may not have started (at log-on, from a script). [Attack surface](attack-surface.md)
+counts them for unused applications but not for log-on programs, which run at every log-on. It
+asks about startup programs, installed programs' folders and blocked programs. A decoy finding says
+when Windows last saw the program run.
 
 ## Offered where
 
@@ -272,7 +288,7 @@ asked. [Attack surface](attack-surface.md) uses it for "last used"; a decoy find
   is installed but stopped, or runs but gives no answer from its own process, a failing check;
   older than the app, a warning.
 
-The first-run offer names the features and says the rest arrive in the next updates. The Home finding **Update the admin tier** is not built yet: About and the doctor
+The first-run offer names the features. The Home finding **Update the admin tier** is not built yet: About and the doctor
 line say when the service is older.
 
 ## Over-the-shoulder elevation

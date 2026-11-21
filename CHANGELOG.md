@@ -10,6 +10,11 @@ its section below.
 
 ### Added
 
+- Admin tier: it now tells Tiresias when your programs last ran, from Windows' records only an
+  administrator can read (the Background Activity Moderator and Prefetch), for the programs the
+  doctor looks at and only for you. Unused applications are found more reliably, and a decoy
+  finding says when Windows last saw the program run.
+
 - Admin tier: a program that uses a decoy credential is now frozen, together with what it started,
   and cut off the network until you decide. Home's finding offers **Thaw and unblock (that was me)**
   behind an admin prompt; dismissing it keeps the program frozen. **This wasn't me** freezes the
