@@ -58,7 +58,7 @@ nothing. Nothing the decoy holds is ever valid anywhere.
 an external canary service (a key that alerts when used anywhere) catches that, which means
 registering decoys with a third party. That is a later, opt-in phase.
 
-## Layer 2: tripwires on reads (spike first)
+## Layer 2: tripwires on reads
 
 Seeing the read itself, before anything is tried, is harder on Windows without admin rights:
 
@@ -67,10 +67,29 @@ Seeing the read itself, before anything is tried, is harder on Windows without a
 | Last-access time, `FileSystemWatcher` | No | Unusable: no process, and access times are often not updated |
 | Auditing with a SACL (Security log event 4663) | Yes, to set the audit policy and read the log | Works; offered only where the user is an administrator |
 | Kernel ETW file events, a minifilter driver | Yes, or a driver | Out of scope |
-| **An oplock on the decoy, plus Restart Manager** | **No** | **To be proven.** Tiresias holds an oplock on each decoy file; another process opening it breaks the oplock, and while the opener waits, Restart Manager (`RmGetList`) names who has the file open |
+| An oplock on the decoy, plus Restart Manager | No | **Dropped** after a spike: it sees a read but can't say who read it (below) |
 
-The spike answers: does the break fire for a read-only open, can the opener be named before it
-continues, and how much does holding the oplock delay a legitimate opener?
+**The oplock spike** (Windows 11, NTFS, ordinary user; 5 oplock levels, 2 share modes, 11 kinds of
+opener, each in its own process):
+
+- **The break fires on a read** with a read-handle-write (RWH), read-write (RW), Level 1 or batch
+  oplock and a file shared for everything, and the break says it was a read (the opener's access
+  mask). A read oplock (RH) on a shared file does not break: read oplocks are shared. Without
+  sharing, an RW or Level 1 oplock just fails the reader with a sharing violation, which is neither
+  detection nor harmless. Metadata (attributes, `dir`, Explorer's details) breaks nothing.
+- **The opener can't be named while it waits.** It has no handle yet, so asking Windows which
+  processes use the file (`FileProcessIdsUsingFileInformation`) returns none, even with the break
+  held for two seconds. Restart Manager opens the file itself, so it queues behind the break and
+  deadlocks the holder. After the break is acknowledged, only a reader that keeps its handle open
+  is seen; `type`, `Get-Content` and `File.ReadAllText` close it first and never were.
+- **It fires once.** After a break, later reads don't break again until every other handle has
+  closed and the oplock is taken anew.
+- Holding the oplock costs a legitimate reader about a millisecond.
+
+So an ordinary user can learn that *something* read a decoy file, once, but not what. Without a
+name, the indexer, antivirus and backup openers below can't be told apart from a thief, so the
+signal would be mostly noise. A read alert without a name would break principle 5, and it was not
+built. For now, files are covered only when a credential in them is *used* (layer 1).
 
 **False positives** are the cost of this layer: Windows Search, Defender, OneDrive and backup tools
 open files they find. Decoys go in a folder those tools are told to skip where possible, and an
@@ -108,6 +127,6 @@ have it, and a reason the wording must stay factual.
 
 1. **Decoy credentials with loopback endpoints:** files, listeners, process identification, activity,
    block list, finding.
-2. **Read tripwire spike:** prove or drop the oplock and Restart Manager approach; SACL auditing for
-   administrators if it fails.
+2. **Read tripwire:** the oplock spike is done and the approach dropped (it can't name the reader).
+   What remains is SACL auditing, for administrators only.
 3. **External canaries** (opt-in): decoys registered with a canary service, for use off the machine.
