@@ -62,6 +62,16 @@ public sealed record Blocklist(bool LockedDown, IReadOnlyList<BlockedProgram> Pr
         return new(true, [.. others, new BlockedProgram(program, sha256, now)]);
     }
 
+    /// <summary>
+    /// A decoy credential was used: block the program without a lockdown, since nothing was asked
+    /// of the user and their other programs are not in doubt. A program known only by its pid can't
+    /// be blocked, and the list stays as it is.
+    /// </summary>
+    public Blocklist Block(string? program, string? sha256, DateTimeOffset now) =>
+        program is null || !IsWindowsPath(program) || Programs.Any(p => SamePath(p.Path, program))
+            ? this
+            : this with { Programs = [.. Programs, new BlockedProgram(program, sha256, now)] };
+
     /// <summary>The user unlocked with Windows Hello from the app: requests are asked about again, blocked programs stay blocked.</summary>
     public Blocklist Unlocked() => this with { LockedDown = false };
 
