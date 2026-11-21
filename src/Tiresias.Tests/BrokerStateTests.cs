@@ -44,7 +44,7 @@ public class BrokerStateTests
     LeaseOffer OpenLease()
     {
         var (offer, _) = state.BeginLease("laptop");
-        var (result, refusal) = state.Seal(offer.LeaseId, vault.SealTo(offer));
+        var (result, refusal) = state.Seal(offer.LeaseId, vault.SealTo(offer), vault.ApprovalKey(offer.LeaseId));
         Assert.That(refusal, Is.Null);
         Assert.That(result!.Rejected, Is.Empty);
         return offer;
@@ -52,7 +52,7 @@ public class BrokerStateTests
 
     string Mint(string? ceiling = null)
     {
-        var (minted, refusal) = state.Mint(new AccessRequest("claude:test", null, "llm", ceiling, "testing", TimeSpan.FromHours(1)));
+        var (minted, refusal) = state.Mint(vault.MintApproval(new AccessRequest("claude:test", null, "llm", ceiling, "testing", TimeSpan.FromHours(1)), time.GetUtcNow()));
         Assert.That(refusal, Is.Null);
         return minted!.Token;
     }
@@ -128,7 +128,7 @@ public class BrokerStateTests
 
         Assert.That(state.Authorize($"Bearer {token}", "llm", delete).Refusal, Is.EqualTo(new Refusal(403, "elevation-required", "admin")));
 
-        var (expires, refusal) = state.Elevate("llm", "admin", TimeSpan.FromMinutes(15));
+        var (expires, refusal) = state.Elevate(vault.ElevateApproval("llm", "admin", TimeSpan.FromMinutes(15), time.GetUtcNow()));
         Assert.That(refusal, Is.Null);
         Assert.That(expires, Is.EqualTo(T0.AddMinutes(15)));
         using var allowed = state.Authorize($"Bearer {token}", "llm", delete).Allowed;
@@ -139,7 +139,7 @@ public class BrokerStateTests
     public void Only_elevation_grants_can_be_elevated()
     {
         OpenLease();
-        Assert.That(state.Elevate("llm", "read", TimeSpan.FromMinutes(5)).Refusal?.Reason, Is.EqualTo("not-elevatable"));
+        Assert.That(state.Elevate(vault.ElevateApproval("llm", "read", TimeSpan.FromMinutes(5), time.GetUtcNow())).Refusal?.Reason, Is.EqualTo("not-elevatable"));
     }
 
     [Test]
@@ -165,7 +165,7 @@ public class BrokerStateTests
         var stale = vault.SealTo(first);
         var (second, _) = state.BeginLease("laptop");
 
-        var (result, _) = state.Seal(second.LeaseId, new Dictionary<string, byte[]>(stale) { ["nope"] = [1, 2, 3] });
+        var (result, _) = state.Seal(second.LeaseId, new Dictionary<string, byte[]>(stale) { ["nope"] = [1, 2, 3] }, vault.ApprovalKey(second.LeaseId));
         Assert.That(result!.Accepted, Is.Empty);
         Assert.That(result.Rejected, Is.EquivalentTo(new[] { "llm-read", "llm-write", "llm-admin", "nope" }));
     }
@@ -174,14 +174,14 @@ public class BrokerStateTests
     public void Sealing_to_a_lease_that_is_not_current_is_a_conflict()
     {
         OpenLease();
-        Assert.That(state.Seal("other", new Dictionary<string, byte[]>()).Refusal?.Status, Is.EqualTo(409));
+        Assert.That(state.Seal("other", new Dictionary<string, byte[]>(), vault.ApprovalKey("other")).Refusal?.Status, Is.EqualTo(409));
     }
 
     [Test]
     public void An_invalid_access_request_is_refused_with_its_problems()
     {
         OpenLease();
-        var (_, refusal) = state.Mint(new AccessRequest("claude:test", null, "llm", null, "", TimeSpan.FromHours(1)));
+        var (_, refusal) = state.Mint(vault.MintApproval(new AccessRequest("claude:test", null, "llm", null, "", TimeSpan.FromHours(1)), time.GetUtcNow()));
         Assert.That(refusal!.Status, Is.EqualTo(400));
         Assert.That(refusal.Problems, Has.Some.Contains("purpose"));
     }
@@ -267,6 +267,34 @@ public class BrokerStateTests
     }
 
     [Test]
+    public void Restoring_an_older_vault_mid_lease_is_refused_and_the_newer_one_kept()
+    {
+        OpenLease();
+        var token = Mint();
+        var newer = SecretEnvelope.Seal("llm-read", 2, "Bearer sk-read-2"u8, [vault.Tpm], PolicyBinding.Hash(vault.Document, "llm-read"));
+        state.ReplaceVault(vault.Document with { Secrets = [.. vault.Document.Secrets.Where(s => s.Slug != "llm-read"), newer] });
+
+        var reload = state.ReplaceVault(vault.Document);
+
+        Assert.That(reload.Refused, Is.True);
+        Assert.That(reload.RolledBack, Is.EqualTo(new[] { "llm-read" }));
+        Assert.That(AuditLines(), Has.Exactly(1).Contains("secret-rolled-back: llm-read"));
+        Assert.That(state.Authorize($"Bearer {token}", "llm", Get("/v1/models")).Refusal?.Reason, Is.EqualTo("secret-not-leased"),
+            "still the newer vault, waiting for its DEK");
+    }
+
+    [Test]
+    public void A_new_lease_starts_its_own_high_water_mark()
+    {
+        OpenLease();
+        var newer = SecretEnvelope.Seal("llm-read", 2, "Bearer sk-read-2"u8, [vault.Tpm], PolicyBinding.Hash(vault.Document, "llm-read"));
+        state.ReplaceVault(vault.Document with { Secrets = [.. vault.Document.Secrets.Where(s => s.Slug != "llm-read"), newer] });
+        state.End();
+
+        Assert.That(state.ReplaceVault(vault.Document).Refused, Is.False, "without a lease there is nothing to compare with");
+    }
+
+    [Test]
     public void A_re_sealed_secret_loses_its_old_dek_until_the_new_one_is_sealed()
     {
         var offer = OpenLease();
@@ -279,7 +307,7 @@ public class BrokerStateTests
 
         var dek = SecretEnvelope.UnwrapDek(resealed, vault.Tpm)!;
         var (result, _) = state.Seal(offer.LeaseId, new Dictionary<string, byte[]>
-            { ["llm-read"] = SealedBox.Seal(offer.LeaseKey, dek, LeaseOffer.DekContext(offer.LeaseId, "llm-read")) });
+            { ["llm-read"] = vault.SealDek(offer, "llm-read", dek) }, vault.ApprovalKey(offer.LeaseId));
         Assert.That(result!.Accepted, Is.EqualTo(new[] { "llm-read" }));
         using var allowed = state.Authorize($"Bearer {token}", "llm", Get("/v1/models")).Allowed;
         Assert.That(allowed!.TakeSecret(), Is.EqualTo("Bearer sk-read-2"));

@@ -59,9 +59,9 @@ public class DecoyTests
 
         Assert.That(read.Values, Is.EqualTo(set.Values));
         Assert.That(read.Placed, Is.EqualTo(set.Placed));
-        Assert.That(DecoySet.Parse(set.ToJson().Replace("\"v\": 1", "\"v\": 2")), Is.Null);
+        Assert.That(DecoySet.Parse(set.ToJson().Replace("\"v\": 1", "\"v\": 2", StringComparison.Ordinal)), Is.Null);
         Assert.That(DecoySet.Parse("{"), Is.Null);
-        Assert.That(DecoySet.Parse(set.ToJson().Replace($"{set.HttpPort}", "99999")), Is.Null);
+        Assert.That(DecoySet.Parse(set.ToJson().Replace($"{set.HttpPort}", "99999", StringComparison.Ordinal)), Is.Null);
         Assert.That(DecoySet.Parse(null), Is.Null);
     }
 
@@ -73,7 +73,7 @@ public class DecoyTests
         var kind = $"\"kind\": {(int)DecoyKind.PasswordsFile}";
         Assert.That(json, Does.Contain(kind));
 
-        var read = DecoySet.Parse(json.Replace(kind, "\"kind\": 99"))!;
+        var read = DecoySet.Parse(json.Replace(kind, "\"kind\": 99", StringComparison.Ordinal))!;
 
         Assert.That(read.Placed, Is.Empty);
         Assert.That(DecoyPlan.Files(read), Is.Empty);
@@ -225,7 +225,7 @@ public class DecoyTests
             await tcp.ConnectAsync(IPAddress.Loopback, set.HttpPort);
             var stream = tcp.GetStream();
             await stream.WriteAsync(Encoding.Latin1.GetBytes("GET /x\nforged\u001b[2J HTTP/1.1\r\n\r\n"));
-            await stream.ReadAsync(new byte[1024]);
+            await stream.ReadAtLeastAsync(new byte[1024], 1, throwOnEndOfStream: false);
             return 0;
         });
 
@@ -273,6 +273,7 @@ public class DecoyTests
 
     [Test]
     [Platform("Win")]
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
     public async Task The_owner_of_a_loopback_connection_is_this_process()
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);

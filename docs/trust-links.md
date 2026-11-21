@@ -1,7 +1,7 @@
 # Trust-chain links that add a key
 
-Status: **design, not built**. Tracks issue #41. This page designs how the trust chain stops
-accepting a new key that only the DPAPI device key vouches for.
+Status: **phases 1 and 2 built**; the flows of phase 3 are not. Tracks issue #41. This page
+designs how the trust chain stops accepting a new key that only the DPAPI device key vouches for.
 
 ## The problem
 
@@ -88,8 +88,13 @@ For `AddDevice`, `AddUser`, `AddBroker`, `SetPolicy` and `BindHello`:
 - an authorizer whose device has no Hello key yet fails with `PresenceRequired`, unless the link is
   a `BindHello` for that device signed by a paper key.
 
-`RevokeDevice` and `RemoveUser` keep today's rule. Genesis must name the device's Hello key, and its
+`RevokeDevice` and `RemoveUser` keep today's rule. Genesis names the device's Hello key, and its
 paper-key countersignature anchors it.
+
+**As built, a genesis without a Hello key is still accepted**, so chains made before this rule keep
+working: refusing it would stop every existing solo broker. Its device then authorizes nothing that
+needs presence until a `BindHello` names its key, which needs the paper key. A program with only the
+device key gains nothing from such a genesis. `tir solo init` always writes the Hello key.
 
 ### Who builds links
 
@@ -107,7 +112,7 @@ paper-key countersignature anchors it.
   - a Hello signature by another device's Hello key, or over another link, fails;
   - a new device that didn't countersign with its Hello key fails;
   - `BindHello` without the paper key fails, and with it succeeds once;
-  - a genesis without a Hello key is refused;
+  - a genesis without a Hello key is accepted, but its device can't authorize until bound;
   - revocation still needs only device keys;
   - a link signed with the `tiresias/v1/presence` prefix instead of the link prefix doesn't verify.
 - `BrokerTrust` and the broker's `POST /trust/chain`: a chain extended without presence is refused
@@ -128,9 +133,12 @@ paper-key countersignature anchors it.
 
 ## Phases
 
-1. Core: `Hello` on `DeviceRef` and `LinkSignature`, the prefix, `BindHello`, the verifier's rule and
-   `PresenceRequired`. The broker and the Keyring both refuse links without presence from this
-   release on, since no flow builds them yet.
-2. `tir solo init` writes the Hello key into genesis; `tir trust bind-hello` for existing chains;
-   `tir doctor` warns about devices without a bound Hello key.
+1. **Built.** Core: `Hello` on `DeviceRef` and `LinkSignature`, the prefix, `BindHello`, the
+   verifier's rule and `PresenceRequired`. The broker and the Keyring both refuse links without
+   presence, since no flow builds them yet. The `hello` fields are written only when set, so links
+   made before keep their bytes and hashes; an older verifier drops them and fails closed.
+2. **Built.** `tir solo init` and the app's first run write the Hello key into genesis (one more
+   Hello prompt); `tir trust bind-hello` for existing chains (with the app running, in solo mode);
+   `tir doctor` warns when this device's Hello key isn't in the solo chain. A remote broker's chain
+   isn't fetched by the doctor.
 3. The Add a device and Move to a broker flows, built on this rule.

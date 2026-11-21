@@ -18,9 +18,11 @@ public sealed record LeaseOffer(string LeaseId, byte[] LeaseKey, DateTimeOffset 
 
     /// <summary>
     /// <see cref="Crypto.SealedBox"/> context a DEK is sealed under for this lease, so a sealed DEK
-    /// opens only for this lease and only as this secret.
+    /// opens only for this lease, only as this secret, and only together with this approval key
+    /// (<see cref="Access.ApprovalKey"/>): DEKs copied from a seal can't vouch for another key.
     /// </summary>
-    public static string DekContext(string leaseId, string secretSlug) => $"lease\n{leaseId}\n{secretSlug}";
+    public static string DekContext(string leaseId, string secretSlug, ReadOnlySpan<byte> approvalKey) =>
+        $"lease\n{leaseId}\n{secretSlug}\n{Convert.ToBase64String(approvalKey)}";
 
     byte[] SignedBytes() =>
         Encoding.UTF8.GetBytes($"tiresias/v1/lease-offer\n{LeaseId}\n{Convert.ToBase64String(LeaseKey)}\n{HardCapAt.ToUnixTimeSeconds()}");

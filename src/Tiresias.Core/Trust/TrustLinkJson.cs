@@ -10,7 +10,9 @@ namespace Tiresias.Trust;
 /// </summary>
 /// <remarks>
 /// Parsing ignores unknown fields; that is safe because nothing is ever verified or hashed from
-/// the received bytes, only from this writer's re-serialization.
+/// the received bytes, only from this writer's re-serialization. The optional <c>hello</c> fields
+/// are written only when set, so links made before them keep their bytes and hashes; a verifier
+/// that predates them drops them and so fails closed on a chain that uses them.
 /// </remarks>
 public static class TrustLinkJson
 {
@@ -90,6 +92,10 @@ public static class TrustLinkJson
             case SetPolicy p:
                 WritePolicy(w, p.Policy);
                 break;
+            case BindHello h:
+                w.WriteString("deviceId", h.DeviceId);
+                w.WriteBase64String("hello", h.Hello);
+                break;
         }
         w.WriteEndObject();
         if (withSignatures)
@@ -100,6 +106,8 @@ public static class TrustLinkJson
                 w.WriteStartObject();
                 w.WriteString("device", s.DeviceId);
                 w.WriteBase64String("sig", s.Signature);
+                if (s.Hello is not null)
+                    w.WriteBase64String("hello", s.Hello);
                 w.WriteEndObject();
             }
             w.WriteEndArray();
@@ -118,6 +126,8 @@ public static class TrustLinkJson
         w.WriteString("id", device.Id);
         w.WriteBase64String("key", device.PublicKey);
         w.WriteBoolean("paper", device.Paper);
+        if (device.Hello is not null)
+            w.WriteBase64String("hello", device.Hello);
         w.WriteEndObject();
     }
 
@@ -138,6 +148,7 @@ public static class TrustLinkJson
         RemoveUser => "remove-user",
         AddBroker => "add-broker",
         SetPolicy => "set-policy",
+        BindHello => "bind-hello",
         _ => throw new ArgumentOutOfRangeException(nameof(body)),
     };
 
@@ -153,10 +164,11 @@ public static class TrustLinkJson
             "remove-user" => new RemoveUser(Str(b, "user")),
             "add-broker" => new AddBroker(Str(b, "broker"), b.GetProperty("key").GetBytesFromBase64()),
             "set-policy" => new SetPolicy(Policy(b)),
+            "bind-hello" => new BindHello(Str(b, "deviceId"), b.GetProperty("hello").GetBytesFromBase64()),
             var kind => throw new FormatException($"Unknown link kind '{kind}'."),
         };
         var sigs = e.GetProperty("sigs").EnumerateArray()
-            .Select(s => new LinkSignature(Str(s, "device"), s.GetProperty("sig").GetBytesFromBase64()))
+            .Select(s => new LinkSignature(Str(s, "device"), s.GetProperty("sig").GetBytesFromBase64(), OptionalBytes(s, "hello")))
             .ToArray();
         return new(e.GetProperty("seq").GetInt64(), Str(e, "prev"), DateTimeOffset.FromUnixTimeSeconds(e.GetProperty("time").GetInt64()), body, sigs);
     }
@@ -169,8 +181,11 @@ public static class TrustLinkJson
         var d = e.GetProperty(name);
         if (d.ValueKind == JsonValueKind.Null)
             return null;
-        return new(Str(d, "id"), d.GetProperty("key").GetBytesFromBase64(), d.GetProperty("paper").GetBoolean());
+        return new(Str(d, "id"), d.GetProperty("key").GetBytesFromBase64(), d.GetProperty("paper").GetBoolean(), OptionalBytes(d, "hello"));
     }
+
+    static byte[]? OptionalBytes(JsonElement e, string name) =>
+        e.TryGetProperty(name, out var value) && value.ValueKind != JsonValueKind.Null ? value.GetBytesFromBase64() : null;
 
     static TrustPolicy Policy(JsonElement e) => new(e.GetProperty("policy").GetProperty("adminThreshold").GetInt32());
 }

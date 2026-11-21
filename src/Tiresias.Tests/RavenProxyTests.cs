@@ -143,9 +143,9 @@ public class RavenProxyTests
         var offer = new LeaseOffer(offerJson.GetProperty("leaseId").GetString()!,
             Convert.FromBase64String(offerJson.GetProperty("leaseKey").GetString()!),
             DateTimeOffset.FromUnixTimeSeconds(offerJson.GetProperty("hardCapAt").GetInt64()));
-        await client.SendAsync(Signed("/lease/seal", new { offer.LeaseId, deks = vault.SealTo(offer) }));
+        await client.SendAsync(Signed("/lease/seal", vault.SealBody(offer)));
         var mint = await client.SendAsync(Signed("/placeholder",
-            new { consumer = "claude:test", serviceSlug = "ravendb", purpose = "testing", duration = "01:00:00" }));
+            vault.MintApproval(new("claude:test", null, "ravendb", null, "testing", TimeSpan.FromHours(1)))));
         return (await mint.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("token").GetString()!;
     }
 
@@ -289,7 +289,7 @@ public class RavenProxyTests
 
         await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "done", CancellationToken.None);
         Assert.That(socket.CloseStatus, Is.EqualTo(WebSocketCloseStatus.NormalClosure), "the node's close comes back");
-        Assert.That(SpinWait.SpinUntil(() => Audit().Contains("closed: 10 bytes up, 10 bytes down"), TimeSpan.FromSeconds(5)), Is.True, Audit());
+        Assert.That(SpinWait.SpinUntil(() => Audit().Contains("closed: 10 bytes up, 10 bytes down", StringComparison.Ordinal), TimeSpan.FromSeconds(5)), Is.True, Audit());
         Assert.That(Audit(), Does.Contain("\"WEBSOCKET\""));
     }
 
@@ -311,7 +311,7 @@ public class RavenProxyTests
         {
         }
         Assert.That(timeout.IsCancellationRequested, Is.False, "the socket ended before the timeout");
-        Assert.That(SpinWait.SpinUntil(() => Audit().Contains("lease-ended"), TimeSpan.FromSeconds(5)), Is.True, Audit());
+        Assert.That(SpinWait.SpinUntil(() => Audit().Contains("lease-ended", StringComparison.Ordinal), TimeSpan.FromSeconds(5)), Is.True, Audit());
     }
 
     sealed record SeenRequest(string Uri, string? Authorization, string? AcceptEncoding);

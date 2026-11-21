@@ -31,15 +31,15 @@ sealed class GitHubInstallationTokens(IHttpClientFactory clients) : IGitHubInsta
 }
 
 /// <summary>
-/// <c>POST /token/{service}</c>, device-signed: an installation token for a GitHub App service.
+/// <c>POST /token/{service}</c>, device-signed and carrying the user's approval: an installation token for a GitHub App service.
 /// The app's private key signs a JWT here and is zeroed; only the token, scoped to the installation
 /// and dead within the hour, goes back to the device.
 /// </summary>
 sealed class TokenEndpoint(BrokerState state, IGitHubInstallationTokens github, TimeProvider time)
 {
-    public async Task<IResult> HandleAsync(HttpContext context, string service)
+    public async Task<IResult> HandleAsync(HttpContext context, string service, Tiresias.Access.SignedApproval? approval)
     {
-        var (allowed, refusal) = state.AuthorizeToken(service, (string)context.Items[DeviceSignatureMiddleware.DeviceItem]!);
+        var (allowed, refusal) = state.AuthorizeToken(service, (string)context.Items[DeviceSignatureMiddleware.DeviceItem]!, approval);
         if (refusal is not null)
             return Results.Json(new { refusal.Reason, refusal.ElevationNeeded }, statusCode: refusal.Status);
 

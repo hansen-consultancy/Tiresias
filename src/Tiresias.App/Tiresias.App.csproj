@@ -48,6 +48,11 @@
     <ProjectReference Include="..\Tiresias.Core\Tiresias.Core.csproj" />
   </ItemGroup>
 
+  <!-- Demo mode's scenarios (Demo.cs) ship with Debug builds only. -->
+  <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+    <None Update="Demo\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup>
     <Resource Include="..\..\assets\export\tiresias.ico" Link="Assets\tiresias.ico" />
     <!-- The About window shows this version's section. -->

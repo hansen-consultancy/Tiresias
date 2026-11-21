@@ -103,7 +103,7 @@ public static class BrokerHost
 
         app.MapPost("/lease/seal", (LeaseSealRequest body, BrokerState state) =>
         {
-            var (result, refusal) = state.Seal(body.LeaseId, body.Deks);
+            var (result, refusal) = state.Seal(body.LeaseId, body.Deks, body.ApprovalKey);
             return refusal is null ? Results.Ok(result) : Refused(refusal);
         });
 
@@ -116,7 +116,7 @@ public static class BrokerHost
             return Results.NoContent();
         });
 
-        app.MapPost("/placeholder", (AccessRequest body, BrokerState state) =>
+        app.MapPost("/placeholder", (SignedApproval? body, BrokerState state) =>
         {
             var (minted, refusal) = state.Mint(body);
             return refusal is null ? Results.Ok(minted) : Refused(refusal);
@@ -128,12 +128,13 @@ public static class BrokerHost
             return Results.NoContent();
         });
 
-        app.MapPost("/token/{service}", (HttpContext context, string service, TokenEndpoint endpoint) => endpoint.HandleAsync(context, service));
+        app.MapPost("/token/{service}", (HttpContext context, string service, SignedApproval? body, TokenEndpoint endpoint) =>
+            endpoint.HandleAsync(context, service, body));
         app.MapGet("/clearance/{service}", (HttpContext context, string service, ClearanceEndpoint endpoint) => endpoint.HandleAsync(context, service));
 
-        app.MapPost("/elevate", (ElevateRequest body, BrokerState state) =>
+        app.MapPost("/elevate", (SignedApproval? body, BrokerState state) =>
         {
-            var (expiresAt, refusal) = state.Elevate(body.Service, body.Grant, TimeSpan.FromMinutes(body.Minutes));
+            var (expiresAt, refusal) = state.Elevate(body);
             return refusal is null ? Results.Ok(new { expiresAt }) : Refused(refusal);
         });
 
@@ -174,10 +175,9 @@ public static class BrokerHost
 
 sealed record LeaseBeginResponse(string LeaseId, string LeaseKey, long HardCapAt, string Signature);
 
-sealed record LeaseSealRequest(string LeaseId, Dictionary<string, byte[]> Deks);
+/// <param name="ApprovalKey">The lease's approval key (raw Ed25519 public key), bound into each DEK's context.</param>
+sealed record LeaseSealRequest(string LeaseId, Dictionary<string, byte[]> Deks, byte[]? ApprovalKey);
 
 sealed record LeaseRef(string LeaseId);
 
 sealed record PlaceholderRef(string Token);
-
-sealed record ElevateRequest(string Service, string Grant, int Minutes);

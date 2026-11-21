@@ -37,7 +37,7 @@ public class AiGuideTests
     public void Every_flag_it_names_exists(string text)
     {
         foreach (Match flag in Regex.Matches(text, @"(?<![\w-])--[a-z][a-z-]*"))
-            Assert.That(CliUsage.Text, Does.Contain(flag.Value), $"{flag.Value} is not in the usage.");
+            Assert.That(CliUsage.Text.Contains(flag.Value, StringComparison.Ordinal), Is.True, $"{flag.Value} is not in the usage.");
     }
 
     [Test]
@@ -86,7 +86,7 @@ public class AiGuideTests
     {
         var result = AiGuide.Install("# Mine\r\nline\r\n");
         Assert.That(result, Is.EqualTo("# Mine\r\nline\r\n\r\n" + Block.ReplaceLineEndings("\r\n") + "\r\n"));
-        Assert.That(result.Replace("\r\n", ""), Does.Not.Contain("\n"));
+        Assert.That(result.Replace("\r\n", "", StringComparison.Ordinal), Does.Not.Contain("\n"));
     }
 
     [Test]

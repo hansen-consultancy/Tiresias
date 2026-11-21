@@ -61,7 +61,8 @@ public partial class StatusWindow : Window
     /// <summary>Places one decoy at its default place, once the user agreed in the ask-first window.</summary>
     void OnPlaceDecoy(object sender, RoutedEventArgs e)
     {
-        if (((FrameworkElement)sender).DataContext is not DecoyLink link)
+        // A Hyperlink is a FrameworkContentElement, not a FrameworkElement.
+        if (((FrameworkContentElement)sender).DataContext is not DecoyLink link)
             return;
         var where = DecoyStore.DefaultPath(link.Kind);
         var what = link.Kind switch
