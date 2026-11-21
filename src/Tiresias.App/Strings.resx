@@ -1277,7 +1277,7 @@ Store them in clear?</value>
 • It can stop a program that used one until you say otherwise.</value>
   </data>
   <data name="FirstRun_AdminTier_Note" xml:space="preserve">
-    <value>This version sets up the service; what it does arrives in the next updates. Not now changes nothing, and About offers it again any time.</value>
+    <value>This version holds the decoys and listens for them from boot; the rest arrives in the next updates. Not now changes nothing, and About offers it again any time.</value>
   </data>
   <data name="FirstRun_Primary_AdminTier" xml:space="preserve">
     <value>Set up...</value>
@@ -2281,6 +2281,12 @@ Store them in clear?</value>
   <data name="Decoys_RemoveLeft" xml:space="preserve">
     <value>Couldn't remove: {0}</value>
     <comment>{0}: paths or variable names</comment>
+  </data>
+  <data name="Decoys_Held" xml:space="preserve">
+    <value>Held by the admin tier, which listens from boot; its place isn't shown here</value>
+  </data>
+  <data name="Decoys_StillHeld" xml:space="preserve">
+    <value>The admin tier still holds the decoys, so nothing was removed. Giving them back takes the administrator prompt.</value>
   </data>
   <data name="Decoys_RemoveKept" xml:space="preserve">
     <value>Kept {0}: changed since Tiresias placed it, so it is yours now.</value>
