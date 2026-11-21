@@ -463,7 +463,7 @@ public partial class App : Application
             return new(true, Approved: false);
         // tir revokes these placeholders when the command exits.
         var delivery = await EnvironmentDelivery.DeliverAsync(sealedNow, variables, PlaceholderMinter.Endpoint,
-            (placeholder, _) => PlaceholderMinter.MintAsync(placeholder, $"run:{program}", caller), ct);
+            (placeholder, _) => PlaceholderMinter.MintAsync(hello, placeholder, $"run:{program}", caller), ct);
         return new(true, Note(delivery), Approved: true, Variables: delivery.Variables);
     }
 
@@ -520,7 +520,7 @@ public partial class App : Application
         var observed = $"{shell.Program} ({shell.ProcessId})";
         var delivery = await EnvironmentDelivery.DeliverAsync(sealedNow, given, PlaceholderMinter.Endpoint,
             (placeholder, _) => shellPlaceholders.GetAsync(shell, placeholder,
-                () => PlaceholderMinter.MintAsync(placeholder, $"terminal:{System.IO.Path.GetFileNameWithoutExtension(shell.Program)}", observed)), ct);
+                () => PlaceholderMinter.MintAsync(hello, placeholder, $"terminal:{System.IO.Path.GetFileNameWithoutExtension(shell.Program)}", observed)), ct);
         return new(true, string.Join(Environment.NewLine, new[] { note, Note(delivery) }.OfType<string>()) is { Length: > 0 } text ? text : null,
             Approved: true, Variables: delivery.Variables);
     }

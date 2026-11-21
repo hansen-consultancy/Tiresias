@@ -23,8 +23,10 @@ public sealed class SignatureDerivedWrapper(string id, Func<byte[], byte[]> sign
 
     static readonly AeadAlgorithm Aead = AeadAlgorithm.XChaCha20Poly1305;
     static readonly byte[] Info = "tiresias/v1/signature-wrap-key"u8.ToArray();
+    static readonly byte[] ApprovalInfo = "tiresias/v1/approval-root"u8.ToArray();
 
     Key? key;
+    byte[]? approvalRoot;
 
     public string Id { get; } = id;
 
@@ -42,10 +44,23 @@ public sealed class SignatureDerivedWrapper(string id, Func<byte[], byte[]> sign
         return Aead.Decrypt(DerivedKey(), wrapped[..Aead.NonceSize], Aad(context), wrapped[Aead.NonceSize..], dek) ? dek : null;
     }
 
+    /// <summary>
+    /// The lease's approval key (<see cref="Access.ApprovalKey"/>), from the same signature as the wrap
+    /// key: no extra gesture when the wrap key is already derived, one when it isn't.
+    /// </summary>
+    public Key ApprovalKey(string leaseId)
+    {
+        DerivedKey();
+        return Access.ApprovalKey.Derive(approvalRoot!, leaseId);
+    }
+
     public void Dispose()
     {
         key?.Dispose();
         key = null;
+        if (approvalRoot is not null)
+            Array.Clear(approvalRoot);
+        approvalRoot = null;
     }
 
     Key DerivedKey()
@@ -56,6 +71,7 @@ public sealed class SignatureDerivedWrapper(string id, Func<byte[], byte[]> sign
         var raw = HKDF.DeriveKey(HashAlgorithmName.SHA256, signature, Aead.KeySize, salt: [], info: Info);
         try
         {
+            approvalRoot = HKDF.DeriveKey(HashAlgorithmName.SHA256, signature, 32, salt: [], info: ApprovalInfo);
             return key = Key.Import(Aead, raw, KeyBlobFormat.RawSymmetricKey);
         }
         finally

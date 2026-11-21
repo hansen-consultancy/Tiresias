@@ -1,5 +1,4 @@
 using System.Runtime.InteropServices;
-using System.Text;
 using Tiresias.Vault;
 using Windows.Foundation;
 using Windows.Security.Credentials;
@@ -64,16 +63,8 @@ public sealed partial class HelloKeyWrapper : IKeyWrapper, IDisposable
     }
 #endif
 
-    /// <summary>A fresh Hello prompt that proves the user is present, for step-up actions such as elevation.</summary>
-    public static void ConfirmPresence(string purpose)
-    {
-#if DEBUG
-        if (DemoMode.On)
-            return;
-#endif
-        var challenge = Encoding.UTF8.GetBytes($"tiresias/v1/presence\n{purpose}\n{Guid.NewGuid():N}");
-        Array.Clear(Sign(OpenCredential(create: false), challenge));
-    }
+    /// <summary>The lease's approval key; no extra prompt once this wrapper has derived its wrap key.</summary>
+    public NSec.Cryptography.Key ApprovalKey(string leaseId) => inner.ApprovalKey(leaseId);
 
     public byte[] Wrap(ReadOnlySpan<byte> dek, string context) => inner.Wrap(dek, context);
 

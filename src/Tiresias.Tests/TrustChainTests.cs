@@ -430,9 +430,15 @@ public class BrokerTrustChainTests
     [Test]
     public async Task Revoking_the_device_that_opened_the_lease_ends_it_and_its_placeholders()
     {
-        Assert.That((await client.SendAsync(Signed(laptop.DeviceId, laptop.Key, "/lease/begin"))).StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var begin = await client.SendAsync(Signed(laptop.DeviceId, laptop.Key, "/lease/begin"));
+        Assert.That(begin.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var offerJson = await begin.Content.ReadFromJsonAsync<JsonElement>();
+        var offer = new LeaseOffer(offerJson.GetProperty("leaseId").GetString()!,
+            Convert.FromBase64String(offerJson.GetProperty("leaseKey").GetString()!),
+            DateTimeOffset.FromUnixTimeSeconds(offerJson.GetProperty("hardCapAt").GetInt64()));
+        await client.SendAsync(Signed(laptop.DeviceId, laptop.Key, "/lease/seal", JsonSerializer.SerializeToUtf8Bytes(vault.SealBody(offer), JsonSerializerOptions.Web)));
         var mint = await client.SendAsync(Signed(laptop.DeviceId, laptop.Key, "/placeholder", JsonSerializer.SerializeToUtf8Bytes(
-            new { consumer = "claude:test", serviceSlug = "llm", purpose = "testing", duration = "01:00:00" }, JsonSerializerOptions.Web)));
+            vault.MintApproval(new("claude:test", null, "llm", null, "testing", TimeSpan.FromHours(1))), JsonSerializerOptions.Web)));
         var token = (await mint.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("token").GetString()!;
 
         using var desktopKey = Key.Create(SignatureAlgorithm.Ed25519);
