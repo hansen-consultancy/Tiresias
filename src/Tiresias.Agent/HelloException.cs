@@ -18,4 +18,11 @@ public enum HelloProblem
 public sealed class HelloException(HelloProblem problem, string message, Exception? inner = null) : InvalidOperationException(message, inner)
 {
     public HelloProblem Problem { get; } = problem;
+
+    public string? PromptRefusal => Problem switch
+    {
+        HelloProblem.Cancelled => "Windows Hello prompt was cancelled.",
+        HelloProblem.Expired => "Windows Hello prompt expired.",
+        _ => null,
+    };
 }
