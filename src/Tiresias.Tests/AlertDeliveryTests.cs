@@ -265,6 +265,15 @@ public class HttpAlertTransportTests
     }
 
     [Test]
+    public async Task A_plain_http_url_off_loopback_is_never_sent()
+    {
+        var (result, handler) = await Deliver(FakeHandler.Always(HttpStatusCode.OK), Sink with { Url = new("http://hooks.example.com/t") });
+
+        Assert.That(handler.Requests, Is.Empty);
+        Assert.That(result.Status, Is.EqualTo(DeliveryStatus.Stop));
+    }
+
+    [Test]
     public void A_sink_prints_as_its_id_only() =>
         Assert.That($"{Sink} {new AlertsConfig("workstation", new byte[32], [Sink])}", Does.Not.Contain("CANARY").And.Not.Contain("example.com"));
 }
@@ -285,6 +294,25 @@ public class AlertDeliveryTests
     {
         Assert.That(DeliveryPolicy.NextAttempt(new(DeliveryStatus.Retry, 429, TimeSpan.FromMinutes(10)), 1, T0), Is.EqualTo(T0.AddMinutes(10)));
         Assert.That(DeliveryPolicy.NextAttempt(new(DeliveryStatus.Retry, 429, TimeSpan.Zero), 3, T0), Is.EqualTo(T0.AddMinutes(2)));
+        Assert.That(DeliveryPolicy.NextAttempt(new(DeliveryStatus.Retry, 429, TimeSpan.FromSeconds(3_000_000)), 1, T0), Is.EqualTo(T0.AddHours(24)));
+    }
+
+    [Test]
+    public async Task A_huge_retry_after_holds_its_sink_and_the_others_still_go()
+    {
+        var time = new SteppedTime(T0);
+        var handler = new FakeHandler((request, _) => request.RequestUri!.AbsolutePath == "/a"
+            ? new HttpResponseMessage(HttpStatusCode.TooManyRequests) { Headers = { RetryAfter = new(TimeSpan.FromSeconds(3_000_000)) } }
+            : new HttpResponseMessage(HttpStatusCode.OK));
+        await using var sender = new AlertSender(new HttpAlertTransport(handler, time), time, _ => { });
+        sender.Configure([Sink with { Id = "a", Url = new("https://hooks.example.com/a") }, Sink with { Id = "b", Url = new("https://hooks.example.com/b") }]);
+        sender.Start();
+        sender.Enqueue(new("a", Payload(1)));
+        await Until(() => handler.Requests.Count == 1 && time.Pending == 1);
+
+        sender.Enqueue(new("b", Payload(2)));
+        await Until(() => handler.Requests.Count == 2);
+        Assert.That(handler.Requests.Last().Url.AbsolutePath, Is.EqualTo("/b"));
     }
 
     [Test]

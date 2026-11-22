@@ -104,6 +104,7 @@ public static class FindingView
         UninstallApp => (FixAction.OpenInstalledList, "Finding_FixInstalledList"),
         ReviewAlerts => (FixAction.OpenAlerts, "Finding_FixAlerts"),
         ReachGuide => (FixAction.OpenGuide, "Finding_FixReachGuide"),
+        InjectAtRunTime => (FixAction.CopyCommand, "Finding_FixCopy"),
         _ => null,
     };
 

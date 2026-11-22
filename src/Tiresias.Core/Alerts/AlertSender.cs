@@ -16,12 +16,14 @@ public static class DeliveryPolicy
     /// <summary>
     /// The next attempt after a <see cref="DeliveryStatus.Retry"/>: no sooner than the receiver's
     /// <c>Retry-After</c>, and no sooner than the backoff, so a receiver answering <c>Retry-After: 0</c>
-    /// can't make it spin.
+    /// can't make it spin. Never later than <see cref="GiveUpAfter"/>: the item expires by then anyway, and a
+    /// receiver answering <c>Retry-After: 3000000</c> must not put the worker to sleep past what it can wait.
     /// </summary>
     public static DateTimeOffset NextAttempt(DeliveryResult result, int failures, DateTimeOffset now)
     {
         var backoff = Backoff(failures);
-        return now + (result.RetryAfter is { } wait && wait > backoff ? wait : backoff);
+        var wait = result.RetryAfter is { } asked && asked > backoff ? asked : backoff;
+        return now + (wait < GiveUpAfter ? wait : GiveUpAfter);
     }
 
     public static bool Expired(DateTimeOffset queuedAt, DateTimeOffset now) => now - queuedAt >= GiveUpAfter;

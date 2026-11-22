@@ -139,6 +139,12 @@ public interface IDoctorProbe
     IReadOnlyList<Alerts.FailingSink> FailingAlertSinks => [];
     /// <summary>What the user's account can open of their containers, WSL and VMs (docs/containers-and-vms.md). No contents.</summary>
     ReachFacts Reach => ReachFacts.None;
+
+    /// <summary>The devcontainer files in the project folders, with the names in them and their env files; empty unless asked for. Never a value.</summary>
+    IEnumerable<DevcontainerFile> Devcontainers() => [];
+
+    /// <summary>What VS Code's Dev Containers forwards into containers; <c>null</c> when it isn't installed.</summary>
+    DevcontainerForwarding? DevcontainerForwarding => null;
 }
 
 /// <summary>How many decoys are placed, and whether something listens on their endpoints (checked without connecting, which would be a hit).</summary>
@@ -227,6 +233,7 @@ public static partial class Doctor
         }
         checks.AddRange(CliSignIns(probe.CliConfigs, probe.GitHubAppService));
         checks.AddRange(Reach(probe.Reach));
+        checks.AddRange(Devcontainers(probe.Devcontainers(), probe.DevcontainerForwarding));
         var (uses, runs, installed, now) = (probe.CredentialUses().ToArray(), probe.ProgramRuns().ToArray(), probe.UninstallEntries().ToArray(), DateTimeOffset.UtcNow);
         checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), uses, otherBlocks, now, runs));
         checks.AddRange(UninstallEntries(installed));

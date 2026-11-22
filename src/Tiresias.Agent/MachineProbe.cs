@@ -141,6 +141,10 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public IEnumerable<DoctorFile> GitConfigs() => Found.Repositories.Select(Read).Where(f => f.Text is not null);
 
+    public IEnumerable<DevcontainerFile> Devcontainers() => Found.Devcontainers.Select(DevcontainerProbe.Read).OfType<DevcontainerFile>();
+
+    public DevcontainerForwarding? DevcontainerForwarding => DevcontainerProbe.Forwarding();
+
     public DoctorGitCredentials? GitCredentials
     {
         get
@@ -243,12 +247,12 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public sealed record ScanStats(TimeSpan Elapsed, int Folders, int Files);
 
-    sealed record FoundFiles(List<string> Projects, List<string> Configs, List<string> Keys, List<string> Pems, List<string> Tools, List<string> Repositories, ScanStats Stats);
+    sealed record FoundFiles(List<string> Projects, List<string> Configs, List<string> Keys, List<string> Pems, List<string> Tools, List<string> Repositories, List<string> Devcontainers, ScanStats Stats);
 
     FoundFiles? found;
     FoundFiles Found => found ??= Walk();
 
-    static readonly string[] Patterns = ["*.csproj", "appsettings*.json", "*.pfx", "*.p12", "*.pem", "*.key", "nuget.config", ".npmrc"];
+    static readonly string[] Patterns = ["*.csproj", "appsettings*.json", "*.pfx", "*.p12", "*.pem", "*.key", "nuget.config", ".npmrc", "devcontainer.json", ".devcontainer.json"];
 
     /// <summary>
     /// One walk of the project roots for every file a check reads. Build output, packages and git
@@ -258,7 +262,7 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     FoundFiles Walk()
     {
         var clock = System.Diagnostics.Stopwatch.StartNew();
-        List<string> projects = [], configs = [], keys = [], pems = [], tools = [], repositories = [];
+        List<string> projects = [], configs = [], keys = [], pems = [], tools = [], repositories = [], devcontainers = [];
         var folders = roots.Length;
         // Not Hidden: Git for Windows hides .git. ReparsePoint: a junction can't loop the walk.
         var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = FileAttributes.ReparsePoint | FileAttributes.System };
@@ -288,11 +292,13 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
                     keys.Add(path);
                 else if (Matches("nuget.config", name) || Matches(".npmrc", name))
                     tools.Add(path);
+                else if (Matches("devcontainer.json", name) || Matches(".devcontainer.json", name))
+                    devcontainers.Add(path);
                 else
                     pems.Add(path);
             }
         }
-        return new(projects, configs, keys, pems, tools, repositories, new(clock.Elapsed, folders, projects.Count + configs.Count + keys.Count + pems.Count + tools.Count));
+        return new(projects, configs, keys, pems, tools, repositories, devcontainers, new(clock.Elapsed, folders, projects.Count + configs.Count + keys.Count + pems.Count + tools.Count + devcontainers.Count));
     }
 
     static bool Wanted(string name) => Patterns.Any(p => Matches(p, name));

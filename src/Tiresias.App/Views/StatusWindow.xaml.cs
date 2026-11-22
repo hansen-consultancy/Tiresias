@@ -336,6 +336,9 @@ public partial class StatusWindow : Window
             case RunThroughExec exec:
                 model.CopyFix(exec.Instruction);
                 break;
+            case InjectAtRunTime inject:
+                model.CopyFix(inject.Commands);
+                break;
             case ReachGuide:
                 Desktop.Open(FindingView.ReachGuideUrl(AppBuild.Repository));
                 break;
