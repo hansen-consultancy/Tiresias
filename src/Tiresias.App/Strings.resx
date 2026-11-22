@@ -161,7 +161,7 @@
     <value>Give a NuGet feed's token to {0}?</value>
   </data>
   <data name="Consent_NuGet_ListLabel" xml:space="preserve">
-    <value>For {0}:</value>
+    <value>For {0} as {1}:</value>
   </data>
   <data name="Consent_NuGet_Note" xml:space="preserve">
     <value>The program uses it to download packages from this feed. Allowing it hands over the value; it is never shown here.</value>
@@ -176,7 +176,7 @@
     <value>For commands in {1} ({0}):</value>
   </data>
   <data name="Consent_Shell_Note" xml:space="preserve">
-    <value>This terminal, and everything run from it, keeps them until it closes or Tiresias locks. You're asked again only for names a folder adds.</value>
+    <value>Commands started from this terminal inherit these variables. Tiresias asks again when a variable is added or its folder or delivery settings change. Locking Tiresias clears this approval.</value>
   </data>
   <data name="Env_AddHeading" xml:space="preserve">
     <value>Add a sealed variable</value>
@@ -248,7 +248,7 @@
     <value>Move to Tiresias</value>
   </data>
   <data name="Env_NuGetImportBody" xml:space="preserve">
-    <value>Seals the tokens for {0} and takes their credentials out of {1}. NuGet then asks Tiresias, and you allow each program once.</value>
+    <value>Seals the tokens for {0} and takes their credentials out of {1}. You approve a program for the exact feed URL, username and variable.</value>
   </data>
   <data name="Env_NuGetImported" xml:space="preserve">
     <value>Moved {0} to Tiresias. NuGet asks for the token from now on.</value>
@@ -281,7 +281,7 @@
     <value>left as is: {0}</value>
   </data>
   <data name="Env_NuGetSummary" xml:space="preserve">
-    <value>NuGet asks Tiresias for {0} feed(s), and you allow each program once. Needs the .NET 9.0.200 SDK or later.</value>
+    <value>NuGet asks Tiresias for {0} feed(s). Each approval covers a program, the exact feed URL, a username and a variable. Needs the .NET 9.0.200 SDK or later.</value>
   </data>
   <data name="Env_PlaceholderAdd" xml:space="preserve">
     <value>Use a placeholder</value>

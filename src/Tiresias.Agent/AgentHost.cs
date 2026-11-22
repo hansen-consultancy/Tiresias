@@ -91,7 +91,7 @@ public sealed class AgentHost : IAsyncDisposable
     public void RecordNuGet(NuGetOutcome outcome, string program, int processId, string source, string variable) =>
         activity.Append(NuGetActivity.Record(outcome, program, processId, source, variable));
 
-    public void RecordPolicyRefusal(string consumer, string service, string program, string? peer, string reason) =>
+    public void RecordPolicyRefusal(string consumer, string service, string? program, string? peer, string reason) =>
         activity.Append(new(AuditKind.Deny, Consumer: consumer, Service: service, Process: program,
             Reason: string.Equals(program, peer, StringComparison.OrdinalIgnoreCase) ? reason : $"{reason} Pipe client: {peer ?? "unidentified"}."));
 

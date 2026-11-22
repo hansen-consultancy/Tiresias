@@ -70,6 +70,7 @@
   <!-- Likewise tir's usage and agent guide, plain text checked against each other. -->
   <ItemGroup>
     <Compile Include="..\Tiresias.Keyring\Text\*.cs" Link="KeyringText\%(Filename)%(Extension)" />
+    <Compile Include="..\Tiresias.Keyring\StandaloneEnvironmentConsent.cs" Link="Keyring\StandaloneEnvironmentConsent.cs" />
   </ItemGroup>
 
   <ItemGroup>

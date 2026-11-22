@@ -85,7 +85,7 @@ public class ReleasePolicyTests
             return Task.FromResult(ConsentAnswer.AllowForSession);
         }
         Task<(NuGetOutcome Outcome, string? PolicyRefusal)> Ask(ReleasePolicy before, ReleasePolicy final) =>
-            consent.DecideAsync("dotnet", "TOKEN", before, Allow, () => Task.FromResult(final));
+            consent.DecideAsync("dotnet", new("https://packages.example/v3", "TOKEN", "reader"), before, Allow, () => Task.FromResult(final), () => { });
 
         Assert.That((await Ask(Before, Blocked)).PolicyRefusal, Is.EqualTo(Blocked.Refusal));
         Assert.That((await Ask(Before, Before)).Outcome, Is.EqualTo(NuGetOutcome.AllowedForSession));
