@@ -250,6 +250,8 @@ public class AlertLcdHubTests
         var result = await center.SendTestAsync("desk", CancellationToken.None);
 
         Assert.That(result!.Status, Is.EqualTo(DeliveryStatus.Delivered));
+        // Written to the pipe is delivered; the fake hub may still be reading it.
+        await Until(() => hub.Statuses.Count == 1);
         var status = hub.Statuses.Single();
         Assert.That((status.Text, status.Level), Is.EqualTo(("Test alert ×1", LcdHubLevel.Info)));
         Assert.That(status.LifetimeMs, Is.InRange(50_000u, 60_000u));

@@ -77,6 +77,9 @@ public static class AlertSources
         return new(kind, new AlertSubject(Findings: [.. shown.Select(c => c.Name).Distinct().Order(StringComparer.Ordinal)]), at);
     }
 
+    /// <summary><c>alerts.failing</c> about <paramref name="sink"/>, for the other sinks: its id only, which a public sink doesn't get.</summary>
+    public static AlertEvent AlertsFailing(FailingSink sink, DateTimeOffset at) => new(AlertKind.AlertsFailing, new AlertSubject(Sink: sink.Id), at);
+
     /// <summary>The secret name after <paramref name="prefix"/>, up to the <c>;</c> that ends it.</summary>
     static string? Slug(string reason, string prefix)
     {

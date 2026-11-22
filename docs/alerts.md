@@ -1,6 +1,6 @@
 # Out-of-band alerts
 
-Status: **phase 5 built**, and from phase 7 signed webhooks, the heartbeat and the LcdHub alert frame: webhook, ntfy and LcdHub end to end, with every event in the table wired but the failing-sink alert (phase 6). Tracks issue #101. This page designs how Tiresias tells you about a
+Status: **phases 1 to 6 built**, and from phase 7 signed webhooks, the heartbeat and the LcdHub alert frame: webhook, ntfy and LcdHub end to end, every event in the table wired, failing sinks reported. Tracks issue #101. This page designs how Tiresias tells you about a
 serious event when you aren't looking at the app: a push to your phone through
 [ntfy](https://ntfy.sh), a line on a [LcdHub](https://github.com/stevehansen/LcdHub) screen beside
 the machine, or a JSON POST to a webhook of your choice.
@@ -357,7 +357,8 @@ leaving.
      the admin tier) are cards on **About**, so **Alerts** is one too. Adding opens a dialog, kept out
      of screen capture.
    - **Sink ids are the user's**: 1 to 32 of `a-z`, `0-9`, `-`, such as `siem`. Logs and (phase 6)
-     findings name them; they never leave the machine.
+     findings name them; they never leave the machine, except as a trusted sink's `detail.what` in
+     `alerts.failing` (phase 6).
    - **The form takes one header.** `alerts.json` holds any number; a second one waits for a need.
    - **Narrowing in `app.json`** is `SinkNarrowing`: muted, a raised threshold (a lower one is
      ignored), removed. The card mutes and removes; a mute also drops what waits for that sink, so unmuting replays nothing; a raised threshold has no control yet. A removal
@@ -468,7 +469,29 @@ leaving.
    - The canary runs every source's event, built from inputs with a value and a placeholder token
      beside the names, through the planner into the webhook's, ntfy's and a fake LcdHub's captured
      bytes, public and trusted.
-6. **Failing sinks.** The finding on Home, `alerts.failing`, D-alerts-silenced updated.
+6. **Failing sinks. Done.** `SinkHealth` (pure), tracked per sink by `AlertSender`; `AlertCenter`
+   raises `alerts.failing` and keeps `Failing`, which Home's doctor run (`Doctor.FailingAlerts`) turns
+   into a finding with an **Open Alerts** button. D-alerts-silenced updated. What it settled or changed:
+   - **Failing** is a stop (a non-429/503 4xx, a 3xx, a sink that fails its rules), at once, or no
+     delivery for 15 minutes since the first failed attempt, checked on the minute tick. A delivery
+     clears it, and so does a test alert that gets through, a changed URL or header, or removing the
+     sink. A **muted** sink is no finding: muting takes it out of the sender, backlog and all. LcdHub never counts, as phase 4 said.
+   - **`alerts.failing` ignores the other sinks' thresholds**, as `alerts.suppressed` does: ntfy and
+     webhook default to `high`, so with the threshold applied the warning would reach only LcdHub.
+     Mutes still apply. One per sink each time it starts failing, deduped by the planner as usual.
+   - **The planner skips the sink an event is about** (`AlertSubject.Sink`), so the rule is pure and
+     tested there. A trusted sink gets the id as `detail.what`; a public sink gets the event alone; the
+     ntfy body and LcdHub line never show it. `Sink` is hashed into `key` only when set, so every
+     other subject's key is unchanged.
+   - **The finding** is one per sink, `Fail`, of kind "alert sinks that aren't delivering", its
+     dismissal bound to stopped or failing, so a stop after a dismissed failure shows again. It names
+     the sink by id only. `tir doctor` never shows it: the CLI sends no alerts. Home rechecks, and the
+     tray badge updates, when the failing set changes.
+   - The state lives in memory: after the app restarts, a sink counts as failing again only once it
+     fails again.
+   - The canary runs a failing webhook and ntfy sink with canary URL, header and token beside a public
+     and a trusted webhook and ntfy: none of them appears in another sink's request, the log or the
+     finding; the id only in a trusted webhook's `detail`.
 7. **Later. Done.** Signed webhooks and the heartbeat (*Heartbeat*, *Signed webhooks* above), and
    the LcdHub alert frame for `critical` (*LcdHub alert frame*), in two PRs. What it settled or changed:
    - **Signing is Standard Webhooks**, not a scheme of Tiresias's own: the HMAC-SHA-256 over

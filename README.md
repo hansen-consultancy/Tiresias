@@ -121,6 +121,11 @@ or changed without your approval, and an unapproved broker request; and new find
 checks turn up that Home hasn't shown. A program asking while you're at the PC doesn't: you are at
 the dialog (see [docs/alerts.md](docs/alerts.md)).
 
+When alerts stop arriving somewhere, because the receiver refused them or nothing has gone through
+for 15 minutes, Home shows "alerts to `phone` aren't arriving" with a button to the Alerts card, and
+your other alerts get an "Alerts to a sink are failing" (naming the one failing only if trusted). The
+finding goes once that sink delivers again (a test alert counts), or when you fix or remove it.
+
 ## AI coding agents
 
 `tir ai --install` writes a few lines into `~/.claude/CLAUDE.md` (`--install <file>`: your agent's

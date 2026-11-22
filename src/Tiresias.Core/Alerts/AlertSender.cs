@@ -33,7 +33,7 @@ public static class DeliveryPolicy
 /// Sends the planner's deliveries: an in-memory queue per sink, drained in order by one worker
 /// (docs/alerts.md, <i>Delivery</i>). A failed attempt waits per <see cref="DeliveryPolicy"/>; a
 /// <see cref="DeliveryStatus.Stop"/> stops the sink until its target changes or a test gets through.
-/// Holds only redacted payloads, never written to disk. Logs the sink id, status code and exception
+/// Tracks each sink's <see cref="SinkFailure"/> for <see cref="SinkHealth"/>. Holds only redacted payloads, never written to disk. Logs the sink id, status code and exception
 /// type, never the URL, a header or the body.
 /// </summary>
 public sealed class AlertSender : IAsyncDisposable
@@ -45,6 +45,7 @@ public sealed class AlertSender : IAsyncDisposable
         public AlertSink Definition = definition;
         public readonly LinkedList<Pending> Items = new();
         public bool Stopped;
+        public SinkFailure? Failure;
     }
 
     readonly HttpAlertTransport transport;
@@ -62,6 +63,9 @@ public sealed class AlertSender : IAsyncDisposable
         this.time = time;
         this.log = log;
     }
+
+    /// <summary>Raised, outside any lock, when a sink stops or delivers after failing; the 15-minute mark is the caller's to check.</summary>
+    public event Action? HealthChanged;
 
     public void Start() => running ??= Task.Run(() => RunAsync(stop.Token));
 
@@ -120,18 +124,29 @@ public sealed class AlertSender : IAsyncDisposable
             return queues.TryGetValue(sinkId, out var queue) && queue.Stopped;
     }
 
-    /// <summary>A test alert got through: whatever stopped the sink is fixed, so what waited goes now.</summary>
+    /// <summary>
+    /// A test alert got through: whatever stopped the sink or failed it is fixed, so what waited goes
+    /// now and the sink no longer counts as failing.
+    /// </summary>
     public void Resume(string sinkId)
     {
         lock (gate)
         {
-            if (queues.TryGetValue(sinkId, out var queue) && queue.Stopped)
-            {
-                Restart(queue);
-                log($"alerts: sink {sinkId} resumed");
-                Wake();
-            }
+            if (!queues.TryGetValue(sinkId, out var queue) || (!queue.Stopped && queue.Failure is null))
+                return;
+            Restart(queue);
+            log($"alerts: sink {sinkId} resumed");
+            Wake();
         }
+        HealthChanged?.Invoke();
+    }
+
+    /// <summary>The sinks failing now, per <see cref="SinkHealth.IsFailing"/>.</summary>
+    public IReadOnlyList<FailingSink> Failing()
+    {
+        var now = time.GetUtcNow();
+        lock (gate)
+            return [.. queues.Where(q => SinkHealth.IsFailing(q.Value.Failure, now)).Select(q => new FailingSink(q.Key, q.Value.Failure!.Stopped)).OrderBy(f => f.Id, StringComparer.Ordinal)];
     }
 
     /// <summary>How many deliveries wait for <paramref name="sinkId"/>.</summary>
@@ -144,6 +159,7 @@ public sealed class AlertSender : IAsyncDisposable
     void Restart(SinkQueue queue)
     {
         queue.Stopped = false;
+        queue.Failure = null;
         if (queue.Items.First is { } head)
             head.Value = head.Value with { Failures = 0, NotBefore = time.GetUtcNow() };
     }
@@ -194,8 +210,11 @@ public sealed class AlertSender : IAsyncDisposable
             if (due is not null)
             {
                 var result = await transport.DeliverAsync(item!.Payload, definition!, ct);
+                bool changed;
                 lock (gate)
-                    Apply(due, item, definition!, result);
+                    changed = Apply(due, item, definition!, result);
+                if (changed)
+                    HealthChanged?.Invoke();
                 continue;
             }
 
@@ -212,10 +231,13 @@ public sealed class AlertSender : IAsyncDisposable
     }
 
     /// <summary>Applies one attempt's result, unless the sink was removed or retargeted meanwhile.</summary>
-    void Apply(SinkQueue queue, Pending item, AlertSink definition, DeliveryResult result)
+    /// <returns>Whether the sink stopped, or delivered after failing.</returns>
+    bool Apply(SinkQueue queue, Pending item, AlertSink definition, DeliveryResult result)
     {
         if (!queues.TryGetValue(definition.Id, out var current) || current != queue || queue.Items.First is not { } head || head.Value != item)
-            return;
+            return false;
+        var before = queue.Failure;
+        queue.Failure = SinkHealth.After(before, result.Status, time.GetUtcNow());
         switch (result.Status)
         {
             case DeliveryStatus.Delivered:
@@ -235,6 +257,7 @@ public sealed class AlertSender : IAsyncDisposable
                 log($"alerts: sink {definition.Id} failed: {result}, attempt {failures}");
                 break;
         }
+        return before is not null && queue.Failure is null || before?.Stopped != true && queue.Failure?.Stopped == true;
     }
 
     public async ValueTask DisposeAsync()
