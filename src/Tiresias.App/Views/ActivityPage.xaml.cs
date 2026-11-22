@@ -23,11 +23,26 @@ public partial class ActivityPage : UserControl
 
     void OnIncidents(object sender, RoutedEventArgs e) =>
         new ServiceIncidentsWindow { Owner = Window.GetWindow(this) }.ShowDialog();
+
+    void OnCopyDetails(object sender, RoutedEventArgs e)
+    {
+        SelectedDetails.SelectAll();
+        SelectedDetails.Copy();
+    }
 }
 
 public sealed record Choice<T>(string Label, T Value);
 
-public sealed record ActivityRow(string Time, string Source, string What, string Service, string Who, string Detail);
+public sealed record ActivityRow(ActivityEntry Entry, string Time, string Source, string What, string Service, string Who, string Detail)
+{
+    public string FullText => string.Join(Environment.NewLine,
+        $"{Text.Get("Activity_ColTime")}: {Entry.Time.ToLocalTime().ToString("G", CultureInfo.CurrentCulture)}",
+        $"{Text.Get("Activity_Source")}: {Source}",
+        $"{Text.Get("Activity_ColWhat")}: {What}",
+        $"{Text.Get("Activity_ColService")}: {Service}",
+        $"{Text.Get("Activity_ColWho")}: {Who}",
+        $"{Text.Get("Activity_ColDetail")}: {Detail}");
+}
 
 public sealed partial class ActivityViewModel : ObservableObject
 {
@@ -56,6 +71,12 @@ public sealed partial class ActivityViewModel : ObservableObject
     ];
 
     public ObservableCollection<ActivityRow> Rows { get; } = [];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DetailsVisibility))]
+    public partial ActivityRow? Selected { get; set; }
+
+    public Visibility DetailsVisibility => Selected is null ? Visibility.Collapsed : Visibility.Visible;
 
     [ObservableProperty]
     public partial string Search { get; set; } = "";
@@ -96,15 +117,18 @@ public sealed partial class ActivityViewModel : ObservableObject
     void Apply()
     {
         var shown = ActivityQuery.Filter(history.Entries, new(Search, Outcome, Source, Period), DateTimeOffset.Now);
+        var selected = Selected?.Entry;
         Rows.Clear();
         foreach (var e in shown)
             Rows.Add(new(
+                e,
                 e.Time.ToLocalTime().ToString("g", CultureInfo.CurrentCulture),
                 Sources.First(s => s.Value == e.Source).Label,
                 Text.Of(ActivityQuery.Describe(e.Kind)),
                 e.Service ?? "",
                 e.Process ?? e.Consumer ?? "",
                 string.Join("  ", new[] { e.Method, e.Path, e.Status?.ToString(CultureInfo.InvariantCulture), e.Reason }.Where(s => !string.IsNullOrEmpty(s)))));
+        Selected = selected is null ? null : Rows.FirstOrDefault(r => r.Entry == selected);
         IsEmpty = shown.Count == 0;
         var notice = history.ServiceJournal switch
         {

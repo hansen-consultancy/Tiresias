@@ -115,7 +115,7 @@ public static partial class Doctor
     public const string YourAccount = "your account";
 }
 
-public enum ReachTopic { DockerEngine, HyperV }
+public enum ReachTopic { DockerEngine, HyperV, DevcontainerForwarding }
 
 /// <summary>
 /// Steps outside Tiresias to close a path into the user's containers or VMs. Tiresias runs none:
@@ -132,6 +132,8 @@ public sealed record ReachGuide(ReachTopic Topic, bool DirectGrant = false) : Do
         ReachTopic.DockerEngine => DirectGrant
             ? "quit Docker Desktop when you don't use it: its pipe closes with it. The pipe names your account itself, so leaving docker-users doesn't close it"
             : "quit Docker Desktop when you don't use it: its pipe closes with it. If you don't use Docker, leave the group as an administrator: Remove-LocalGroupMember -Group docker-users -Member \"$env:USERDOMAIN\\$env:USERNAME\"",
+        ReachTopic.DevcontainerForwarding => "if your containers don't need them, add to VS Code's user settings: "
+            + "\"dev.containers.gitCredentialHelperConfigLocation\": \"none\", \"dev.containers.dockerCredentialHelper\": false",
         _ => "if you don't manage VMs, leave the group as an administrator: Remove-LocalGroupMember -SID S-1-5-32-578 -Member \"$env:USERDOMAIN\\$env:USERNAME\". "
             + "Inside each guest, turn on BitLocker with a virtual TPM so its disk and checkpoints are ciphertext to the host",
     };
