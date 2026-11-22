@@ -189,8 +189,8 @@ shows over rotation, pinned apps and video until the producer withdraws it.
   the status item still goes.
 - **Panels.** The link now reads the hub's Panels message (type 2) instead of skipping it, and draws
   the frame at each panel's size. A new panel list means the hub forgot every frame, so the frame is
-  drawn again. A panel announced empty or with more pixels than a message holds counts as a broken
-  hub, which the link drops and reconnects to. It is sent to hidden panels too, as LcdHub asks of alerts. Style and visibility stay
+  drawn again. A panel announced empty or with more pixels than a message holds, more than 16
+  panels, or more pixels in all than four full messages counts as a broken hub, which the link drops and reconnects to. It is sent to hidden panels too, as LcdHub asks of alerts. Style and visibility stay
   skipped: the frame has its own colours.
 - **How long, and how it goes.** It shows the latest `critical` event's item, and lasts as long as
   that item: 24 hours from the last occurrence, sent as the frame's lifetime so the hub drops it by

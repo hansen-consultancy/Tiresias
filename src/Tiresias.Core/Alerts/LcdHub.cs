@@ -91,6 +91,9 @@ internal static class LcdHubWire
     const byte FrameAlert = 1, FrameLifetime = 4;
     const int MaxMessageBytes = 16 << 20;
     const int MaxPanelPixels = (MaxMessageBytes - 1024) / 4;
+    // A hub has a handful of panels; these bound what one redraw allocates and writes.
+    const int MaxPanels = 16;
+    const long MaxTotalPixels = 4L * MaxPanelPixels;
 
     public static byte[] Hello(string name)
     {
@@ -130,13 +133,17 @@ internal static class LcdHubWire
     }
 
     /// <summary>A Panels body: u16 count, then per panel its id, u16 width and u16 height.</summary>
-    /// <exception cref="IOException">Truncated, or a panel no frame could be sent to: empty, or more pixels than a message holds.</exception>
+    /// <exception cref="IOException">Truncated, or panels no frame could be sent to: one empty or with more pixels than a
+    /// message holds, more than 16 panels, or more pixels in all than four full messages.</exception>
     public static IReadOnlyList<LcdHubPanel> Panels(ReadOnlySpan<byte> body)
     {
         try
         {
             var count = BinaryPrimitives.ReadUInt16LittleEndian(body);
+            if (count > MaxPanels)
+                throw new IOException("too many panels");
             var at = 2;
+            var total = 0L;
             var panels = new List<LcdHubPanel>(count);
             for (var i = 0; i < count; i++)
             {
@@ -146,7 +153,7 @@ internal static class LcdHubWire
                 var width = BinaryPrimitives.ReadUInt16LittleEndian(body[at..]);
                 var height = BinaryPrimitives.ReadUInt16LittleEndian(body[(at + 2)..]);
                 // A lying hub is treated as gone, like a bad length: its sizes are untrusted input (I-101).
-                if (width == 0 || height == 0 || (long)width * height > MaxPanelPixels)
+                if (width == 0 || height == 0 || (long)width * height > MaxPanelPixels || (total += (long)width * height) > MaxTotalPixels)
                     throw new IOException("impossible panel size");
                 panels.Add(new(id, width, height));
                 at += 4;
