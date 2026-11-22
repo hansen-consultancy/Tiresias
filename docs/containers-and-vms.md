@@ -1,6 +1,6 @@
 # Containers, WSL and VMs: what your account can reach
 
-Status: **design, not built**. Tracks issue #113. This page designs a doctor check, **Reachable
+Status: **phases 1 and 2 built** (account facts: engine pipes, WSL disks, Hyper-V; devcontainer files and forwarding); the rest is design. Tracks issue #113. This page designs a doctor check, **Reachable
 from your account**, that tells you which secrets a normal program running as you could read inside
 your containers, WSL distributions and Hyper-V VMs. It extends the [attack surface](attack-surface.md)
 work (#34) and follows the rules of [more checks](more-checks.md#rules-every-check-keeps).
@@ -67,7 +67,7 @@ All read-only. The left column runs on every doctor run; the right only after op
 | Environment | Account facts (default) | Contents (opt-in) |
 |---|---|---|
 | Docker engine | Which engine pipes exist (`\\.\pipe\docker_engine`, `dockerDesktopLinuxEngine`, `dockerDesktopWindowsEngine`), and whether each one's DACL grants your token, by `AccessCheck` on its security descriptor (read with `READ_CONTROL` only, no connection) | `GET /_ping`, then `/containers/json?all=1`, `/containers/{id}/json`, `/images/json` and `/images/{id}/json`, each with a 10-second timeout. Env names, mount sources, the `devcontainer.local_folder` label. Nothing that writes, execs or pulls |
-| Devcontainers | none | `devcontainer.json`, `.devcontainer/devcontainer.json` and `.devcontainer/*/devcontainer.json` under the project folders (`--projects`, or the secrets editor's folders), the `.env` and Compose files they name, and VS Code's user `settings.json` for the three forwarding settings. Folders from running containers' `devcontainer.local_folder` labels are added |
+| Devcontainers | none | `.devcontainer.json`, `.devcontainer/devcontainer.json` and `.devcontainer/*/devcontainer.json` under the project folders (`--projects`, or the secrets editor's folders), the `.env` and Compose files they name, and VS Code's user `settings.json` for the three forwarding settings. Folders from running containers' `devcontainer.local_folder` labels are added |
 | WSL | Distributions from `HKCU\Software\Microsoft\Windows\CurrentVersion\Lxss` (name, version, `BasePath`), and whether each `ext4.vhdx` is owned by or readable for you (security descriptor only) | For **running** distributions only (`wsl.exe --list --running --quiet`, which starts nothing): known credential paths under each home in `\\wsl.localhost\<distro>\home\*` and `\root`, by name and existence. `docker-desktop*` distributions are skipped: the engine row covers them |
 | Hyper-V | Whether `S-1-5-32-578` is in your token and enabled, and whether Administrators is deny-only | Members only: VM names and their disk, checkpoint and saved-state paths from WMI (`root\virtualization\v2`, read-only queries). Everyone: the DACLs of disk files under the default folders (`%PUBLIC%\Documents\Hyper-V\Virtual Hard Disks`, `%ProgramData%\Microsoft\Windows\Hyper-V`) and the VM paths found, by `AccessCheck` |
 
@@ -171,10 +171,10 @@ Windows-containers engine (host administrator) first, then the Linux engine, the
 **`tir doctor`** prints the account facts as checks, like every other check:
 
 ```text
-WARN  docker engine: open to every program you run while Docker Desktop runs (docker-users)
-ok    hyper-v: not a member of Hyper-V Administrators
-WARN  wsl disks: 2 distributions' disks are files you own: Ubuntu, Debian
-ok    containers: not looked inside; run tir doctor --reach
+WARN  docker engine: docker_engine is open to docker-users and your account, so every program you run can, while Docker runs, read every container's environment, …
+      fix: quit Docker Desktop when you don't use it: its pipe closes with it. …
+ok    hyper-v: not in Hyper-V Administrators: no program you run can open a VM
+ok    wsl disks: 2 distributions' disks are files you own: Ubuntu, Debian. …
 ```
 
 **`tir doctor --reach`** adds the contents, one block per environment, names only:
@@ -293,10 +293,23 @@ Each slice ships alone, with its tests and its line in `CHANGELOG.md`.
 
 1. **Account facts.** Pipe DACLs, Hyper-V membership (enabled vs deny-only), the WSL distribution
    list and disk ownership; the three checks in `tir doctor` and on Home. No contents, no opt-in
-   needed.
+   needed. **Built**: `ReachProbe` reads each security descriptor with `READ_CONTROL` and the pure
+   `ReachAccess` decides who it grants (a deny wins; an owner can read a disk); Hyper-V counts as
+   installed when the `vmms` service exists. Docker Desktop keeps `dockerDesktopWindowsEngine` open
+   in Linux mode too, so the finding says that pipe is administrator *when Windows containers are
+   on*. **How to close it** opens this page's *Findings*.
 2. **`NameScan` and devcontainer files.** The pure scanner with the canary tests; `devcontainer.json`
    and its `.env`/Compose files under the project folders; VS Code's forwarding settings;
-   `InjectAtRunTime`. Still no engine.
+   `InjectAtRunTime`. Still no engine. **Built**, with these differences: devcontainer files are
+   read with the project walk (`--projects`, or the secrets editor's folders) like `appsettings`,
+   not behind the opt-in, since they are the user's own files in folders they pointed at. Read are
+   `containerEnv`, `remoteEnv`, `runArgs`' `-e`/`--env` and the `--env-file` files (looked for
+   against the workspace, then the file's folder); Compose files are not read yet. A URL value is
+   reported only with a password in it (`DATABASE_URL (password in URL)`), not for a user name
+   alone. Forwarding reads the two VS Code settings when the Dev Containers extension is installed;
+   the host `ssh-agent` is left to phase 4. **Copy command** copies the `tir env set` and
+   `tir run -- code .` lines; VS Code must be quit first, or `code` hands the folder to the running
+   window, which never sees the values.
 3. **Docker engine contents, opt-in.** `tir doctor --reach`, the app's card and setting, containers,
    images and mounts, the `devcontainer.local_folder` link to phase 2's folders.
 4. **WSL contents.** Running distributions only; known credential files and `.env` names; the

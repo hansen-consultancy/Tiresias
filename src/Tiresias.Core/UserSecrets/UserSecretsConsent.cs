@@ -31,27 +31,27 @@ public sealed record UserSecretsConsentRequest(string? Executable, string UserSe
 /// </summary>
 public sealed class ConsentMemory
 {
-    readonly Dictionary<(string Executable, string Id, string ReferenceScope), DateTimeOffset> allowed = [];
+    readonly Dictionary<(string Executable, string Id, string ReferenceScope), (DateTimeOffset Until, ReleaseScope Scope)> allowed = [];
     readonly Lock gate = new();
 
-    public void Remember(string? executable, string userSecretsId, DateTimeOffset until, string referenceScope = "")
+    public void Remember(string? executable, string userSecretsId, DateTimeOffset until, string referenceScope = "", ReleaseScope scope = default)
     {
         if (executable is null)
             return;
         lock (gate)
-            allowed[(Key(executable), userSecretsId, referenceScope)] = until;
+            allowed[(Key(executable), userSecretsId, referenceScope)] = (until, scope);
     }
 
-    public bool IsAllowed(string? executable, string userSecretsId, DateTimeOffset now, string referenceScope = "")
+    public bool IsAllowed(string? executable, string userSecretsId, DateTimeOffset now, string referenceScope = "", ReleaseScope scope = default)
     {
         if (executable is null)
             return false;
         lock (gate)
         {
-            if (!allowed.TryGetValue((Key(executable), userSecretsId, referenceScope), out var until))
+            if (!allowed.TryGetValue((Key(executable), userSecretsId, referenceScope), out var remembered))
                 return false;
-            if (until > now)
-                return true;
+            if (remembered.Until > now)
+                return remembered.Scope == scope;
             allowed.Remove((Key(executable), userSecretsId, referenceScope));
             return false;
         }

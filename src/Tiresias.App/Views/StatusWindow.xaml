@@ -279,6 +279,7 @@
         <Border Style="{StaticResource Card}" Visibility="{Binding GuardVisibility}">
           <StackPanel>
             <TextBlock x:Name="BlockedTitle" Text="{l:S Status_BlockedTitle}" Style="{StaticResource SubtitleText}" />
+            <TextBlock Text="{Binding GuardMessage}" Style="{StaticResource CaptionText}" />
             <TextBlock Text="{l:S Status_LockedDown}" Style="{StaticResource CaptionText}" Visibility="{Binding LockedDownVisibility}" Margin="0,0,0,4" />
             <ItemsControl ItemsSource="{Binding Blocked}" Focusable="False" AutomationProperties.LabeledBy="{Binding ElementName=BlockedTitle}">
               <ItemsControl.ItemTemplate>
@@ -330,6 +331,9 @@
               </ItemsControl>
               <TextBlock Visibility="{Binding DecoysRemovableVisibility}">
                 <Hyperlink Click="OnRemoveDecoys"><Run Text="{l:S Decoys_Remove}" /></Hyperlink>
+              </TextBlock>
+              <TextBlock Margin="12,0,0,0" Visibility="{Binding DecoysEnrollVisibility}">
+                <Hyperlink Click="OnEnrollDecoys"><Run Text="{l:S Decoys_Enroll}" /></Hyperlink>
               </TextBlock>
             </WrapPanel>
             <TextBox Text="{Binding DecoyMessage, Mode=OneWay}" Style="{StaticResource SelectableText}" TextWrapping="Wrap"

@@ -23,8 +23,8 @@ static class Home
         Read(() => VaultEditor.Load().Services.Count, "vault services"),
         Read(() => UserSecretsFiles.All().Any(f => f.Kind == SecretsFileKind.Sealed), "sealed user secrets"),
         Read(() => ProjectIndexStore.Load().Folders.Count > 0, "project folders"),
-        Read(() => EnvironmentStore.IsSealed, "sealed variables"),
-        Read(() => HasRecord(AgentHost.ActivityPath) || HasRecord(SoloBroker.AuditPath), "activity log"),
+        Read(() => EnvironmentStore.Exists, "sealed variables"),
+        Read(ActivityLog.HasHistory, "activity log"),
         [.. fixes],
         [.. Opened]));
 
@@ -34,7 +34,7 @@ static class Home
     /// </summary>
     public static NavCounts Counts()
     {
-        var today = Read(() => ActivityQuery.Today(ActivityLog.ReadAll(), DateTimeOffset.Now), "activity today");
+        var today = ActivityLog.ReadAll().Today(DateTimeOffset.Now);
         return new(
             Read(() => UserSecretsFiles.All().Count, "user secrets folders"),
             Read(() => VaultEditor.Load().Services.Count, "vault services"),
@@ -42,8 +42,6 @@ static class Home
             today?.Records,
             today?.Approvals);
     }
-
-    static bool HasRecord(string path) => new FileInfo(path) is { Exists: true, Length: > 0 };
 
     static T? Read<T>(Func<T> read, string what) where T : struct
     {

@@ -47,6 +47,8 @@ public sealed record DecoySet(int HttpPort, int SqlPort, DecoyValues Values, IRe
     public const int Version = 1;
 
     public const string FileName = "decoys.json";
+    public const int MinPort = 20000;
+    public const int MaxPort = 39999;
 
     public string HttpUrl => $"http://127.0.0.1:{HttpPort}";
 
@@ -73,7 +75,7 @@ public sealed record DecoySet(int HttpPort, int SqlPort, DecoyValues Values, IRe
     {
         for (var attempt = 0; attempt < 100; attempt++)
         {
-            var port = RandomNumberGenerator.GetInt32(20000, 40000);
+            var port = RandomNumberGenerator.GetInt32(MinPort, MaxPort + 1);
             if (port != except && free(port))
                 return port;
         }
