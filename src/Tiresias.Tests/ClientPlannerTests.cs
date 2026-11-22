@@ -110,6 +110,7 @@ public class DoctorTests
         public IReadOnlyList<string> ExposedVariables { get; set; } = [];
         public bool Solo { get; set; }
         public bool? HelloBound { get; set; }
+        public BrokerServiceState BrokerService { get; set; }
         public DoctorVault? Vault { get; set; } = new(2, [], []);
         public int? BrokerStatus { get; set; } = 401;
         public bool Forwarder { get; set; } = true;
@@ -120,8 +121,9 @@ public class DoctorTests
         public DoctorDecoys? Decoys { get; set; }
         public List<string> Blocked { get; } = [];
         public List<DecoyUseRecord> Uses { get; } = [];
+        public bool IncidentsUnavailable { get; set; }
         public IEnumerable<string> BlockedPrograms() => Blocked;
-        public IEnumerable<DecoyUseRecord> DecoyUses() => Uses;
+        public IEnumerable<DecoyUseRecord> DecoyUses() => IncidentsUnavailable ? throw new IOException() : Uses;
 
         public Task<int?> BrokerStatusAsync() => Task.FromResult(BrokerStatus);
         public Task<bool> ForwarderListeningAsync() => Task.FromResult(Forwarder);
@@ -139,6 +141,14 @@ public class DoctorTests
             return Task.FromResult<DoctorBrokerAnswer?>(new(200, System.Text.Encoding.UTF8.GetBytes("""{"clearance":"Operator","databases":{}}""")));
         }
         public AdminTierFacts? AdminTier { get; set; }
+    }
+
+    [Test]
+    public async Task An_unavailable_incident_history_is_reported_alongside_the_other_checks()
+    {
+        var checks = await Doctor.RunAsync(new FakeProbe { IncidentsUnavailable = true });
+        Assert.That(checks.Any(c => c.Name == "decoy incidents and program blocks" && c.Status == DoctorStatus.Warn), Is.True);
+        Assert.That(checks.Any(c => c.Name == Doctor.VariablesCheck), Is.True);
     }
 
     static AdminStatusResult Answer(string version) => new(version, AdminWire.ProtocolVersion, new());
@@ -173,6 +183,18 @@ public class DoctorTests
         Assert.That(listening.Status, Is.EqualTo(DoctorStatus.Ok));
         Assert.That(deaf.Status, Is.EqualTo(DoctorStatus.Warn));
         Assert.That(deaf.Detail, Does.Contain("goes unseen"));
+    }
+
+    [Test]
+    public async Task Decoys_held_by_the_admin_tier_count_it_as_the_listener()
+    {
+        var held = (await Doctor.RunAsync(new FakeProbe { Decoys = new(2, true, Held: true) })).Single(c => c.Name == "decoys");
+        var portTaken = (await Doctor.RunAsync(new FakeProbe { Decoys = new(2, false, Held: true) })).Single(c => c.Name == "decoys");
+
+        Assert.That(held.Status, Is.EqualTo(DoctorStatus.Ok));
+        Assert.That(held.Detail, Does.Contain("admin tier").And.Not.Contain("tir agent"));
+        Assert.That(portTaken.Status, Is.EqualTo(DoctorStatus.Warn));
+        Assert.That(portTaken.Detail, Does.Contain("admin tier").And.Not.Contain("start the app"));
     }
 
     [Test]
@@ -249,6 +271,14 @@ public class DoctorTests
         Assert.That(unbound.Detail, Does.Contain("tir trust bind-hello"));
         Assert.That((await Check(new FakeProbe { HelloBound = true }, "trust chain")).Status, Is.EqualTo(DoctorStatus.Ok));
         Assert.That((await Doctor.RunAsync(new FakeProbe())).Select(c => c.Name), Does.Not.Contain("trust chain"), "no chain to read");
+    }
+
+    [Test]
+    public async Task The_broker_process_line_follows_the_service()
+    {
+        Assert.That((await Check(new FakeProbe { Solo = true, BrokerService = BrokerServiceState.Running }, "broker process")).Status, Is.EqualTo(DoctorStatus.Ok));
+        Assert.That((await Check(new FakeProbe { Solo = true, BrokerService = BrokerServiceState.Stopped }, "broker process")).Status, Is.EqualTo(DoctorStatus.Fail));
+        Assert.That((await Check(new FakeProbe { Solo = true }, "broker process")).Detail, Does.Contain("tir solo service install"));
     }
 
     [Test]

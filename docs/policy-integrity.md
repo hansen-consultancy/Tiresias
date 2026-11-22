@@ -1,8 +1,8 @@
 # Policy integrity
 
 Status: **phases 1 to 3 built** (binding, broker checks, approval, migration), and the rollback
-high-water mark within a lease; keeping it across locks and restarts waits for the Windows service
-(see *Phases*). Tracks issue #24. This page designs how the broker refuses a
+high-water mark within a lease, kept across locks and restarts when the solo broker runs as the
+Windows service (see *Phases*). Tracks issue #24. This page designs how the broker refuses a
 service policy the user didn't approve: upstreams, grant rules and which secret each grant uses.
 
 ## The problem
@@ -130,8 +130,9 @@ README's setup step 5 becomes `tir service add`/`edit`.
 Restoring an older `vault.json` restores an older, once-approved policy, which still opens. The
 broker keeps the highest version it has seen per secret for the lease and refuses lower ones, so a
 rollback mid-lease fails. Across restarts that needs storage the user's account can't write: the
-Windows service's own profile. Until the service exists, a rollback to a previously approved
-policy before unlock is an honest limit, written as such.
+Windows service's own folder ([broker-service.md](broker-service.md)), which keeps the marks and
+refuses an older vault with or without a lease. A broker inside the app keeps them for the lease
+only, so there a rollback to a previously approved policy before unlock is an honest limit.
 
 ### Migration
 
@@ -173,5 +174,6 @@ vault from the admin's machine as today, after `tir vault migrate` there.
 4. **Built within a lease.** The broker keeps each secret's highest version from the lease's start
    and refuses a reload that goes below it (`VaultReload.RolledBack`, audited
    `secret-rolled-back`), keeping the newer vault. A secret removed and added again in the same
-   lease starts at version 1 and is refused until the next unlock. Persisting the mark across locks
-   and restarts, in storage the user's account can't write, comes with the Windows service.
+   lease starts at version 1 and is refused until the next unlock. The Windows service persists
+   the marks in its own folder (`Broker:HighWaterPath`), so there they hold across locks and
+   restarts; a secret below its mark at start is left out, audited, until a newer one is saved.

@@ -14,10 +14,10 @@ static unsafe partial class AdminService
         public AdminServiceFacts Facts => new(Exists, Running);
     }
 
-    public static State Query()
+    public static State Query(string serviceName = AdminWire.ServiceName)
     {
         using var scm = Manager(ScManagerConnect);
-        var service = OpenServiceW(scm.Handle, AdminWire.ServiceName, ServiceQueryStatus);
+        var service = OpenServiceW(scm.Handle, serviceName, ServiceQueryStatus);
         if (service == IntPtr.Zero)
             return Marshal.GetLastPInvokeError() == ErrorServiceDoesNotExist ? new(false, false, 0) : throw new Win32Exception();
         try

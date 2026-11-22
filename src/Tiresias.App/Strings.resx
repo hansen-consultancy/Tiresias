@@ -786,6 +786,12 @@ Switch to this copy, {2}, from {3}? The other copy quits first, ending its lease
   <data name="Status_BlockedTitle" xml:space="preserve">
     <value>Blocked programs</value>
   </data>
+  <data name="Status_BlocksUnavailable" xml:space="preserve">
+    <value>The admin tier's blocked programs are unavailable.</value>
+  </data>
+  <data name="Status_UnblockIncomplete" xml:space="preserve">
+    <value>The program remains blocked. Unblocking requires administrator approval.</value>
+  </data>
   <data name="Status_LockedDown" xml:space="preserve">
     <value>Locked after "This wasn't me": every request is refused until you unlock here.</value>
   </data>
@@ -1029,10 +1035,22 @@ Switch to this copy, {2}, from {3}? The other copy quits first, ending its lease
     <value>All sources</value>
   </data>
   <data name="Activity_SourceUserSecrets" xml:space="preserve">
-    <value>App (user secrets, environment, NuGet)</value>
+    <value>App (unlock, user secrets, environment, NuGet)</value>
   </data>
   <data name="Activity_SourceBroker" xml:space="preserve">
     <value>Broker</value>
+  </data>
+  <data name="Activity_SourceLegacyBroker" xml:space="preserve">
+    <value>Previous app broker</value>
+  </data>
+  <data name="Activity_ServiceUnavailable" xml:space="preserve">
+    <value>Broker service activity is unavailable.</value>
+  </data>
+  <data name="Activity_ServiceStopped" xml:space="preserve">
+    <value>The broker service is stopped. Its activity is unavailable.</value>
+  </data>
+  <data name="Activity_ServiceInvalid" xml:space="preserve">
+    <value>The broker service journal could not be verified.</value>
   </data>
   <data name="Activity_PeriodToday" xml:space="preserve">
     <value>Today</value>
@@ -1286,7 +1304,7 @@ Store them in clear?</value>
 • It can stop a program that used one until you say otherwise.</value>
   </data>
   <data name="FirstRun_AdminTier_Note" xml:space="preserve">
-    <value>This version sets up the service; what it does arrives in the next updates. Not now changes nothing, and About offers it again any time.</value>
+    <value>This version holds the decoys and listens for them from boot; the rest arrives in the next updates. Not now changes nothing, and About offers it again any time.</value>
   </data>
   <data name="FirstRun_Primary_AdminTier" xml:space="preserve">
     <value>Set up...</value>
@@ -2050,6 +2068,35 @@ Store them in clear?</value>
   <data name="Finding_FixAlerts" xml:space="preserve">
     <value>Open Alerts</value>
   </data>
+  <data name="Notify_AdminIncidents" xml:space="preserve">
+    <value>Decoy activity is awaiting review. Open Service incidents in Activity.</value>
+  </data>
+  <data name="AdminIncidents_Title" xml:space="preserve">
+    <value>Service incidents</value>
+  </data>
+  <data name="AdminIncidents_Review" xml:space="preserve">
+    <value>Mark displayed incidents reviewed (administrator)</value>
+  </data>
+  <data name="AdminIncidents_Reviewed" xml:space="preserve">
+    <value>Reviewed</value>
+  </data>
+  <data name="AdminIncidents_ConfirmReview" xml:space="preserve">
+    <value>Mark {0} service incidents through {1} reviewed for the signed-in user? Their history will remain available in Activity.</value>
+  </data>
+  <data name="AdminIncidents_ConfirmUnblock" xml:space="preserve">
+    <value>Unblock this program for the signed-in user and allow it to request credentials again?
+
+{0}</value>
+  </data>
+  <data name="AdminIncidents_ReviewIncomplete" xml:space="preserve">
+    <value>Review was not confirmed. Refresh to check the recorded status.</value>
+  </data>
+  <data name="AdminIncidents_Unavailable" xml:space="preserve">
+    <value>The admin service incident history is unavailable.</value>
+  </data>
+  <data name="AdminIncidents_Count" xml:space="preserve">
+    <value>{0} incidents recorded, {1} awaiting review.</value>
+  </data>
   <data name="Notify_Decoy_Title" xml:space="preserve">
     <value>A program used a decoy credential</value>
   </data>
@@ -2432,6 +2479,24 @@ Store them in clear?</value>
   <data name="Decoys_RemoveLeft" xml:space="preserve">
     <value>Couldn't remove: {0}</value>
     <comment>{0}: paths or variable names</comment>
+  </data>
+  <data name="Decoys_Held" xml:space="preserve">
+    <value>Placement verified. The service is listening for use.</value>
+  </data>
+  <data name="Decoys_PendingListener" xml:space="preserve">
+    <value>Placement verified. The service is waiting for the listener ports.</value>
+  </data>
+  <data name="Decoys_Enroll" xml:space="preserve">
+    <value>Verify placements and enable service monitoring (UAC)</value>
+  </data>
+  <data name="Decoys_EnrollmentIncomplete" xml:space="preserve">
+    <value>Service enrollment was not completed. Existing local placements are kept.</value>
+  </data>
+  <data name="Decoys_VerifyLegacy" xml:space="preserve">
+    <value>Update the admin tier and verify the previous registration to enable service monitoring.</value>
+  </data>
+  <data name="Decoys_StillHeld" xml:space="preserve">
+    <value>The admin tier still holds the decoys, so nothing was removed. Giving them back takes the administrator prompt.</value>
   </data>
   <data name="Decoys_RemoveKept" xml:space="preserve">
     <value>Kept {0}: changed since Tiresias placed it, so it is yours now.</value>

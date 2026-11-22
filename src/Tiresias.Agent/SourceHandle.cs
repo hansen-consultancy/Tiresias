@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
+using System.Text;
 using Microsoft.Win32.SafeHandles;
+using Tiresias.AdminTier;
 
 namespace Tiresias.Agent;
 
@@ -32,10 +34,11 @@ sealed unsafe partial class SourceHandle : IDisposable
         FinalPath = new string(buffer, 0, (int)length);
     }
 
-    public static SourceHandle Open(string path, bool directory)
+    public static SourceHandle Open(string path, bool directory, bool allowDelete = false)
     {
         var flags = FileFlagOpenReparsePoint | (directory ? FileFlagBackupSemantics : 0);
-        var handle = CreateFileW(path, directory ? FileReadAttributes : GenericRead, FileShareRead, IntPtr.Zero, OpenExisting, flags, IntPtr.Zero);
+        var access = (directory ? FileReadAttributes : GenericRead) | (allowDelete ? 0x00010000u : 0u);
+        var handle = CreateFileW(path, access, FileShareRead, IntPtr.Zero, OpenExisting, flags, IntPtr.Zero);
         if (handle.IsInvalid)
             throw new Win32Exception();
         try
@@ -50,6 +53,27 @@ sealed unsafe partial class SourceHandle : IDisposable
     }
 
     public void Dispose() => Handle.Dispose();
+
+    /// <summary>Reads a bounded regular file at its expected final path while retaining the handle for the handoff.</summary>
+    public string? ReadText(string path, int limit)
+    {
+        if ((Attributes & (FileAttributes.ReparsePoint | FileAttributes.Directory)) != 0 || Links != 1 ||
+            !AdminHandBack.IsWhereAsked(path, FinalPath))
+            return null;
+        var size = RandomAccess.GetLength(Handle);
+        if (size > limit)
+            return null;
+        var bytes = new byte[checked((int)size)];
+        var offset = 0;
+        while (offset < bytes.Length)
+        {
+            var read = RandomAccess.Read(Handle, bytes.AsSpan(offset), offset);
+            if (read == 0)
+                return null;
+            offset += read;
+        }
+        return Encoding.UTF8.GetString(bytes);
+    }
 
     const uint GenericRead = 0x80000000;
     const uint FileReadAttributes = 0x0080;
