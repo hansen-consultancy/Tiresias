@@ -21,7 +21,8 @@ public partial class AlertSinkWindow : Window
     public AlertSinkWindow(bool ntfy)
     {
         InitializeComponent();
-        Desktop.ExcludeFromCapture(this);
+        // Real input even in a demo: someone trying the flow may paste their real URL, topic or token.
+        Desktop.ExcludeFromCapture(this, evenInDemo: true);
         this.ntfy = ntfy;
         Title = Heading.Text = Text.Get(ntfy ? "Alerts_NtfyWindowTitle" : "Alerts_WindowTitle");
         Intro.Text = Text.Get(ntfy ? "Alerts_NtfyWindowIntro" : "Alerts_WindowIntro");
