@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Tiresias.AdminTier;
@@ -109,6 +109,8 @@ public class DoctorTests
         public bool RecoveryKeySet { get; set; } = true;
         public IReadOnlyList<string> ExposedVariables { get; set; } = [];
         public bool Solo { get; set; }
+        public bool? HelloBound { get; set; }
+        public BrokerServiceState BrokerService { get; set; }
         public DoctorVault? Vault { get; set; } = new(2, [], []);
         public int? BrokerStatus { get; set; } = 401;
         public bool Forwarder { get; set; } = true;
@@ -119,8 +121,9 @@ public class DoctorTests
         public DoctorDecoys? Decoys { get; set; }
         public List<string> Blocked { get; } = [];
         public List<DecoyUseRecord> Uses { get; } = [];
+        public bool IncidentsUnavailable { get; set; }
         public IEnumerable<string> BlockedPrograms() => Blocked;
-        public IEnumerable<DecoyUseRecord> DecoyUses() => Uses;
+        public IEnumerable<DecoyUseRecord> DecoyUses() => IncidentsUnavailable ? throw new IOException() : Uses;
 
         public Task<int?> BrokerStatusAsync() => Task.FromResult(BrokerStatus);
         public Task<bool> ForwarderListeningAsync() => Task.FromResult(Forwarder);
@@ -128,7 +131,24 @@ public class DoctorTests
         public IEnumerable<DoctorFile> Projects() => ProjectFiles;
         public IEnumerable<DoctorFile> ConfigFiles() => Config;
         public IEnumerable<string> KeyFiles() => Keys;
+        public List<DoctorRavenCertificate> Raven { get; } = [];
+        public List<string> ClearanceAsked { get; } = [];
+        public IEnumerable<DoctorRavenCertificate> RavenCertificates() => Raven;
+
+        public Task<DoctorBrokerAnswer?> RavenClearanceAsync(string service)
+        {
+            ClearanceAsked.Add(service);
+            return Task.FromResult<DoctorBrokerAnswer?>(new(200, System.Text.Encoding.UTF8.GetBytes("""{"clearance":"Operator","databases":{}}""")));
+        }
         public AdminTierFacts? AdminTier { get; set; }
+    }
+
+    [Test]
+    public async Task An_unavailable_incident_history_is_reported_alongside_the_other_checks()
+    {
+        var checks = await Doctor.RunAsync(new FakeProbe { IncidentsUnavailable = true });
+        Assert.That(checks.Any(c => c.Name == "decoy incidents and program blocks" && c.Status == DoctorStatus.Warn), Is.True);
+        Assert.That(checks.Any(c => c.Name == Doctor.VariablesCheck), Is.True);
     }
 
     static AdminStatusResult Answer(string version) => new(version, AdminWire.ProtocolVersion, new());
@@ -207,6 +227,22 @@ public class DoctorTests
     }
 
     [Test]
+    public async Task RavenDB_clearance_is_asked_through_a_broker_that_answers()
+    {
+        var probe = new FakeProbe { Raven = { new("orders", null, null, null) } };
+        Assert.That((await Check(probe, "RavenDB clearance")).Status, Is.EqualTo(DoctorStatus.Warn));
+        Assert.That(probe.ClearanceAsked, Is.EqualTo(new[] { "orders" }));
+    }
+
+    [Test]
+    public async Task RavenDB_clearance_is_skipped_without_waiting_on_a_broker_that_doesnt()
+    {
+        var probe = new FakeProbe { BrokerStatus = null, Raven = { new("orders", null, null, null) } };
+        Assert.That((await Check(probe, "RavenDB clearance")).Detail, Does.StartWith("skipped"));
+        Assert.That(probe.ClearanceAsked, Is.Empty);
+    }
+
+    [Test]
     public async Task Secret_looking_environment_variables_are_a_warning_naming_them()
     {
         var check = (await Doctor.RunAsync(new FakeProbe { ExposedVariables = ["OPENAI_API_KEY", "HF_TOKEN"] }))
@@ -225,6 +261,24 @@ public class DoctorTests
         Assert.That(warnings, Has.Some.Contains("fixed IP"));
         Assert.That(warnings, Has.Some.Contains("same machine").And.Some.Contains("admin"));
         Assert.That(warnings, Has.Some.StartsWith("Broker runs inside the app"));
+    }
+
+    [Test]
+    public async Task A_device_whose_hello_key_isnt_in_the_chain_is_told_to_bind_it()
+    {
+        var unbound = await Check(new FakeProbe { HelloBound = false }, "trust chain");
+        Assert.That(unbound.Status, Is.EqualTo(DoctorStatus.Warn));
+        Assert.That(unbound.Detail, Does.Contain("tir trust bind-hello"));
+        Assert.That((await Check(new FakeProbe { HelloBound = true }, "trust chain")).Status, Is.EqualTo(DoctorStatus.Ok));
+        Assert.That((await Doctor.RunAsync(new FakeProbe())).Select(c => c.Name), Does.Not.Contain("trust chain"), "no chain to read");
+    }
+
+    [Test]
+    public async Task The_broker_process_line_follows_the_service()
+    {
+        Assert.That((await Check(new FakeProbe { Solo = true, BrokerService = BrokerServiceState.Running }, "broker process")).Status, Is.EqualTo(DoctorStatus.Ok));
+        Assert.That((await Check(new FakeProbe { Solo = true, BrokerService = BrokerServiceState.Stopped }, "broker process")).Status, Is.EqualTo(DoctorStatus.Fail));
+        Assert.That((await Check(new FakeProbe { Solo = true }, "broker process")).Detail, Does.Contain("tir solo service install"));
     }
 
     [Test]

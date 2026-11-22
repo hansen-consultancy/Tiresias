@@ -28,9 +28,14 @@ public sealed record MintedPlaceholder(string Token, DateTimeOffset ExpiresAt);
 /// Leased secrets bound to their policy whose policy the new vault changes without a re-seal. When
 /// there are any, the new vault was refused and the previous one kept.
 /// </param>
-public sealed record VaultReload(IReadOnlyList<string> Unleased, IReadOnlyList<string> Unapproved)
+/// <param name="RolledBack">
+/// Secrets whose version in the new vault is lower than one this lease already saw: an older
+/// <c>vault.json</c> restored, with its once-approved policy. When there are any, the new vault was
+/// refused and the previous one kept.
+/// </param>
+public sealed record VaultReload(IReadOnlyList<string> Unleased, IReadOnlyList<string> Unapproved, IReadOnlyList<string>? RolledBack = null)
 {
-    public bool Refused => Unapproved.Count > 0;
+    public bool Refused => Unapproved.Count > 0 || RolledBack is { Count: > 0 };
 }
 
 /// <summary>
@@ -68,16 +73,43 @@ public sealed class BrokerState : IDisposable
     Lease? lease;
     Key? leaseKey;
     string? leaseDevice;
+    PublicKey? approvalKey;
+    readonly Dictionary<string, DateTimeOffset> usedNonces = [];
 
-    public BrokerState(VaultDocument vault, LeaseTerms terms, AuditLog audit, Key identity, TimeProvider time)
+    /// <summary>
+    /// The highest version of each secret this lease has seen, or, with <see cref="marks"/>, this
+    /// broker ever authenticated. A vault that goes below it is a rollback to an older, once-approved
+    /// policy (docs/policy-integrity.md, *Rollback*).
+    /// </summary>
+    Dictionary<string, int> highWater = [];
+
+    readonly HighWaterMarks? marks;
+
+    /// <param name="marks">Keeps the marks across restarts and locks; without it they last one lease.</param>
+    public BrokerState(VaultDocument vault, LeaseTerms terms, AuditLog audit, Key identity, TimeProvider time, HighWaterMarks? marks = null)
     {
-        this.vault = vault;
         this.terms = terms;
         this.audit = audit;
         this.identity = identity;
         this.time = time;
+        this.marks = marks;
         placeholders = new(time);
+        if (marks is not null)
+        {
+            foreach (var (slug, version) in marks.Load())
+                highWater[slug] = version;
+            var below = RolledBack(vault);
+            foreach (var slug in below)
+                audit.Append(new(AuditKind.Deny, Reason: $"secret-rolled-back: {slug}; left out until a newer version is saved"));
+            vault = vault with { Secrets = [.. vault.Secrets.Where(s => !below.Contains(s.Slug))] };
+        }
+        this.vault = vault;
     }
+
+    string[] RolledBack(VaultDocument next) => next.Secrets
+        .Where(s => highWater.TryGetValue(s.Slug, out var seen) && s.Version < seen)
+        .Select(s => s.Slug)
+        .ToArray();
 
     /// <summary>
     /// Raised with the lease id after a lease ended, for whatever holds per-lease resources outside
@@ -100,6 +132,8 @@ public sealed class BrokerState : IDisposable
 
             var id = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8));
             lease = Lease.Begin(id, now, terms);
+            if (marks is null)
+                RaiseHighWater(vault.Secrets);
             leaseKey = Key.Create(KeyAgreementAlgorithm.X25519);
             leaseDevice = device;
             audit.Append(new(AuditKind.LeaseBegin, id, device));
@@ -111,36 +145,69 @@ public sealed class BrokerState : IDisposable
     }
 
     /// <summary>
-    /// Accepts DEKs sealed to the lease key. Each must open under its lease/slug context and must
-    /// actually open its vault secret, so garbage is refused here rather than at the first request.
+    /// Accepts DEKs sealed to the lease key. Each must open under its lease/slug/approval-key context
+    /// and must actually open its vault secret, so garbage is refused here rather than at the first
+    /// request. The first seal that delivers such a DEK registers <paramref name="approvalKey"/> as
+    /// the lease's: only whoever opens the vault can name the key that approves operations.
     /// </summary>
-    public (SealResult? Result, Refusal? Refusal) Seal(string leaseId, IReadOnlyDictionary<string, byte[]> sealedDeks)
+    /// <param name="approvalKey">The raw Ed25519 public key of <see cref="ApprovalKey"/> for this lease.</param>
+    /// <param name="revisionSignature">For a broker keeping durable marks, the enrolled revision key's signature on this batch.</param>
+    public (SealResult? Result, Refusal? Refusal) Seal(string leaseId, IReadOnlyDictionary<string, byte[]> sealedDeks, byte[]? approvalKey,
+        byte[]? revisionSignature = null)
     {
         lock (gate)
         {
             if (Check(leaseId) is { } refusal)
                 return (null, refusal);
-
-            var accepted = new List<string>();
-            var rejected = new List<string>();
-            foreach (var (slug, box) in sealedDeks)
+            if (approvalKey is not { Length: 32 })
+                return (null, new(400, "approval-key-required"));
+            if (marks is not null && !LeaseSeal.Verify(marks.RevisionKey, leaseId, approvalKey, sealedDeks, revisionSignature))
             {
-                var secret = vault.FindSecret(slug);
-                var dek = secret is null ? null : SealedBox.Open(leaseKey!, box, LeaseOffer.DekContext(leaseId, slug));
-                if (dek is null || !Opens(secret!, dek, vault))
-                {
-                    if (dek is not null)
-                        Array.Clear(dek);
-                    rejected.Add(slug);
-                    continue;
-                }
-
-                if (deks.Remove(slug, out var old))
-                    Array.Clear(old);
-                deks[slug] = dek;
-                accepted.Add(slug);
+                audit.Append(new(AuditKind.Deny, leaseId, leaseDevice, Reason: "revision-signature-invalid"));
+                return (null, new(401, "revision-signature-invalid"));
             }
-            return (new(accepted.ToArray(), rejected.ToArray()), null);
+            if (this.approvalKey is { } registered && !registered.Export(KeyBlobFormat.RawPublicKey).AsSpan().SequenceEqual(approvalKey))
+            {
+                audit.Append(new(AuditKind.Deny, leaseId, leaseDevice, Reason: "approval-key-mismatch"));
+                return (null, new(409, "approval-key-mismatch"));
+            }
+
+            var accepted = new Dictionary<string, byte[]>();
+            var rejected = new List<string>();
+            try
+            {
+                foreach (var (slug, box) in sealedDeks)
+                {
+                    var secret = vault.FindSecret(slug);
+                    var dek = secret is null ? null : SealedBox.Open(leaseKey!, box, LeaseOffer.DekContext(leaseId, slug, approvalKey));
+                    if (dek is null || !Opens(secret!, dek, vault))
+                    {
+                        if (dek is not null)
+                            Array.Clear(dek);
+                        rejected.Add(slug);
+                        continue;
+                    }
+                    accepted.Add(slug, dek);
+                }
+                if (marks is not null)
+                    RaiseHighWater(accepted.Keys.Select(slug => vault.FindSecret(slug)!));
+                if (accepted.Count > 0)
+                    this.approvalKey ??= PublicKey.Import(SignatureAlgorithm.Ed25519, approvalKey, KeyBlobFormat.RawPublicKey);
+                foreach (var (slug, dek) in accepted)
+                {
+                    if (deks.Remove(slug, out var old))
+                        Array.Clear(old);
+                    deks[slug] = dek;
+                }
+                var result = new SealResult(accepted.Keys.ToArray(), rejected.ToArray());
+                accepted.Clear(); // The live lease owns these keys now.
+                return (result, null);
+            }
+            finally
+            {
+                foreach (var dek in accepted.Values)
+                    Array.Clear(dek);
+            }
         }
     }
 
@@ -156,12 +223,28 @@ public sealed class BrokerState : IDisposable
     /// seals the new one. A secret bound to its policy that is unchanged on disk but no longer opens
     /// means its policy changed without approval: the whole vault is refused and the previous one
     /// kept. A service whose policy changed loses its placeholders and elevations, which were
-    /// approved for the old one.
+    /// approved for the old one. A secret below its high-water mark refuses the whole vault when
+    /// the current one serves it, and is left out when it is already out.
     /// </summary>
     public VaultReload ReplaceVault(VaultDocument next)
     {
         lock (gate)
         {
+            // Going below a version this broker serves now is a rollback: the whole vault is refused. A secret already
+            // left out (at startup, below its persisted mark) stays out as the constructor has it, so an older copy that
+            // is still on disk does not block every unrelated change.
+            var currentLease = CurrentLease(time.GetUtcNow());
+            var below = currentLease is null && marks is null ? [] : RolledBack(next);
+            var rolledBack = below.Where(slug => vault.FindSecret(slug) is not null).ToArray();
+            if (rolledBack.Length > 0)
+            {
+                foreach (var slug in rolledBack)
+                    audit.Append(new(AuditKind.Deny, lease?.Id, Reason: $"secret-rolled-back: {slug}; vault reload refused"));
+                return new([], [], rolledBack);
+            }
+            if (below.Length > 0)
+                next = next with { Secrets = [.. next.Secrets.Where(s => !below.Contains(s.Slug))] };
+
             var unapproved = deks
                 .Where(d => vault.FindSecret(d.Key) is { PolicyHash: not null } current
                     && next.FindSecret(d.Key) is { } incoming
@@ -177,17 +260,41 @@ public sealed class BrokerState : IDisposable
                 return new([], unapproved);
             }
 
-            foreach (var (slug, dek) in deks.ToArray())
+            var authenticated = new List<SealedSecret>();
+            var dropped = new List<string>();
+            foreach (var (slug, dek) in deks)
             {
                 if (next.FindSecret(slug) is { } secret && Opens(secret, dek, next))
-                    continue;
-                Array.Clear(dek);
+                    authenticated.Add(secret);
+                else
+                    dropped.Add(slug);
+            }
+            if (marks is not null)
+                RaiseHighWater(authenticated);
+            else if (currentLease is not null)
+                RaiseHighWater(next.Secrets);
+            foreach (var slug in dropped)
+            {
+                Array.Clear(deks[slug]);
                 deks.Remove(slug);
             }
             RetireChangedServices(next);
             vault = next;
-            return new(CurrentLease(time.GetUtcNow()) is null ? [] : next.Secrets.Where(s => !deks.ContainsKey(s.Slug)).Select(s => s.Slug).ToArray(), []);
+            return new(currentLease is null ? [] : next.Secrets.Where(s => !deks.ContainsKey(s.Slug)).Select(s => s.Slug).ToArray(), []);
         }
+    }
+
+    /// <summary>Persist an advance before making its revision available to the lease. Call under <see cref="gate"/>.</summary>
+    void RaiseHighWater(IEnumerable<SealedSecret> secrets)
+    {
+        Dictionary<string, int>? raised = null;
+        foreach (var secret in secrets)
+            if (!(raised ?? highWater).TryGetValue(secret.Slug, out var seen) || secret.Version > seen)
+                (raised ??= new(highWater))[secret.Slug] = secret.Version;
+        if (raised is null)
+            return;
+        marks?.Save(raised);
+        highWater = raised;
     }
 
     /// <summary>Ends the placeholders and elevations of every service whose policy differs in <paramref name="next"/>. Call under <see cref="gate"/>.</summary>
@@ -242,13 +349,18 @@ public sealed class BrokerState : IDisposable
             CurrentLease(time.GetUtcNow());
     }
 
-    public (MintedPlaceholder? Minted, Refusal? Refusal) Mint(AccessRequest request)
+    /// <summary>Mints the placeholder <paramref name="signed"/> approves, exactly as approved.</summary>
+    public (MintedPlaceholder? Minted, Refusal? Refusal) Mint(SignedApproval? signed)
     {
         lock (gate)
         {
             var now = time.GetUtcNow();
             if (CurrentLease(now) is not { } current)
                 return (null, new(503, "no-lease"));
+            var (approval, denied) = Approved(signed, Approval.MintOp, current, now, new(AuditKind.Deny, current.Id, Method: "MINT"));
+            if (approval is null)
+                return (null, denied);
+            var request = approval.ToAccessRequest();
             if (vault.FindService(request.ServiceSlug) is not { } service)
                 return (null, new(404, "unknown-service"));
             var problems = Consent.Validate(request, service);
@@ -278,19 +390,46 @@ public sealed class BrokerState : IDisposable
     /// Opens a GitHub App service's secret for <c>/token</c>, on behalf of a signed device. Uses the
     /// service's least privileged grant; one that needs elevation is refused unless elevated.
     /// </summary>
-    public (AllowedRequest? Allowed, Refusal? Refusal) AuthorizeToken(string serviceSlug, string device)
+    public (AllowedRequest? Allowed, Refusal? Refusal) AuthorizeToken(string serviceSlug, string device, SignedApproval? signed) =>
+        AuthorizeDeviceUse(serviceSlug, device, "TOKEN", AuditKind.Token,
+            s => s.Upstream.Host.Equals(GitHub.GitHubAppSecret.ApiHost, StringComparison.OrdinalIgnoreCase), "not-a-token-service", needsApproval: true, signed);
+
+    /// <summary>
+    /// Lets a device ask RavenDB who a service's certificate is (<c>/clearance</c>), with that
+    /// certificate. Only for a service the RavenDB setup saved, whose one grant is the certificate;
+    /// not through the grant's rule: the answer is metadata about the certificate, never data, so it
+    /// needs no signed approval (docs/step-up.md).
+    /// </summary>
+    public (AllowedRequest? Allowed, Refusal? Refusal) AuthorizeClearance(string serviceSlug, string device) =>
+        AuthorizeDeviceUse(serviceSlug, device, "CLEARANCE", AuditKind.Allow, s => RavenSetupPlanner.Recognize(s) is not null, "not-a-raven-service");
+
+    /// <summary>
+    /// A device using a service's first grant itself, outside any placeholder: <c>/token</c> and
+    /// <c>/clearance</c>. With <paramref name="needsApproval"/>, only with a signed token approval for this service.
+    /// </summary>
+    (AllowedRequest? Allowed, Refusal? Refusal) AuthorizeDeviceUse(string serviceSlug, string device, string method, AuditKind kind, Func<Service, bool> fits, string misfit,
+        bool needsApproval = false, SignedApproval? signed = null)
     {
-        var record = new AuditRecord(AuditKind.Deny, Consumer: device, Service: serviceSlug, Method: "TOKEN");
+        var record = new AuditRecord(AuditKind.Deny, Consumer: device, Service: serviceSlug, Method: method);
         lock (gate)
         {
             var now = time.GetUtcNow();
             if (CurrentLease(now) is not { } current)
                 return (null, Refuse(record, 503, "no-lease"));
             record = record with { LeaseId = current.Id };
+            if (needsApproval)
+            {
+                var (approval, denied) = Approved(signed, Approval.TokenOp, current, now, record);
+                if (approval is null)
+                    return (null, denied);
+                if (approval.Service != serviceSlug)
+                    return (null, Refuse(record, 401, "approval-invalid"));
+                record = record with { Consumer = approval.Consumer, Reason = approval.Purpose };
+            }
             if (vault.FindService(serviceSlug) is not { } service)
                 return (null, Refuse(record, 404, "unknown-service"));
-            if (!service.Upstream.Host.Equals(GitHub.GitHubAppSecret.ApiHost, StringComparison.OrdinalIgnoreCase) || service.Grants.Count == 0)
-                return (null, Refuse(record, 400, "not-a-token-service"));
+            if (!fits(service) || service.Grants.Count == 0)
+                return (null, Refuse(record, 400, misfit));
             var grant = service.Grants[0];
             record = record with { Grant = grant.Name };
             if (grant.RequiresElevation && !current.ActiveElevations(serviceSlug, now).Contains(grant.Name))
@@ -300,18 +439,22 @@ public sealed class BrokerState : IDisposable
                 return (null, Refuse(record, 503, "secret-not-leased"));
             if (Open(secret, dek, vault) is not { } value)
                 return (null, !PolicyBinding.Allows(vault, secret) ? Refuse(record, 403, "policy-not-approved") : Refuse(record, 500, "secret-unreadable"));
-            return (new AllowedRequest(audit, record with { Kind = AuditKind.Token }, service, grant, value, current.HardCapAt), null);
+            return (new AllowedRequest(audit, record with { Kind = kind }, service, grant, value, current.HardCapAt), null);
         }
     }
 
-    /// <summary>Records an elevation the Keyring approved (after its own Hello prompt). Never outlives the lease.</summary>
-    public (DateTimeOffset? ExpiresAt, Refusal? Refusal) Elevate(string serviceSlug, string grantName, TimeSpan duration)
+    /// <summary>Records the elevation <paramref name="signed"/> approves, for the approved duration. Never outlives the lease.</summary>
+    public (DateTimeOffset? ExpiresAt, Refusal? Refusal) Elevate(SignedApproval? signed)
     {
         lock (gate)
         {
             var now = time.GetUtcNow();
             if (CurrentLease(now) is not { } current)
                 return (null, new(503, "no-lease"));
+            var (approval, denied) = Approved(signed, Approval.ElevateOp, current, now, new(AuditKind.Deny, current.Id, leaseDevice, Method: "ELEVATE"));
+            if (approval is null)
+                return (null, denied);
+            var (serviceSlug, grantName, duration) = (approval.Service, approval.Grant ?? "", TimeSpan.FromSeconds(approval.Seconds));
             var grant = vault.FindService(serviceSlug)?.Grants.FirstOrDefault(g => g.Name == grantName);
             if (grant is not { RequiresElevation: true })
                 return (null, new(400, "not-elevatable"));
@@ -469,6 +612,29 @@ public sealed class BrokerState : IDisposable
         return ((current, placeholder, service), null);
     }
 
+    /// <summary>
+    /// The approval <paramref name="signed"/> carries, when the user gave it for this lease and this
+    /// operation: it verifies under the lease's approval key, is fresh, and wasn't used before.
+    /// Otherwise a 401, audited. Call under <see cref="gate"/>.
+    /// </summary>
+    (Approval? Approval, Refusal? Refusal) Approved(SignedApproval? signed, string op, Lease current, DateTimeOffset now, AuditRecord record)
+    {
+        if (signed is not { Approval: not null, Signature: not null })
+            return (null, Refuse(record, 401, "approval-required"));
+        if (approvalKey is null || signed.Verify(approvalKey) is not { } approval
+            || approval.Op != op || approval.LeaseId != current.Id)
+            return (null, Refuse(record, 401, "approval-invalid"));
+        record = record with { Service = approval.Service, Consumer = approval.Consumer };
+        var age = now - DateTimeOffset.FromUnixTimeSeconds(approval.IssuedAt);
+        if (age > RequestSignature.MaxAge || age < -RequestSignature.MaxSkewAhead)
+            return (null, Refuse(record, 401, "approval-stale"));
+        foreach (var stale in usedNonces.Where(n => n.Value <= now).Select(n => n.Key).ToArray())
+            usedNonces.Remove(stale);
+        if (!usedNonces.TryAdd(approval.Nonce, now + RequestSignature.MaxAge + RequestSignature.MaxSkewAhead))
+            return (null, Refuse(record, 401, "approval-replayed"));
+        return (approval, null);
+    }
+
     Refusal Refuse(AuditRecord record, int status, string reason, string? elevationNeeded = null)
     {
         audit.Append(record with { Status = status, Reason = elevationNeeded is null ? reason : $"{reason}: {elevationNeeded}" });
@@ -520,6 +686,10 @@ public sealed class BrokerState : IDisposable
         deks.Clear();
         leaseKey?.Dispose();
         leaseKey = null;
+        approvalKey = null;
+        usedNonces.Clear();
+        if (marks is null)
+            highWater.Clear();
         placeholders.RevokeLease(id);
         audit.Append(new(AuditKind.LeaseEnd, id, leaseDevice, Reason: reason));
         lease = null;

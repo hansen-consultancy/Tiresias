@@ -182,19 +182,6 @@ public class AdminAuditTests
         Assert.That(AdminAuditState.Parse(json), Is.EqualTo(AdminAuditState.Initial));
 
     [Test]
-    public void A_routine_read_crosses_the_wire_as_the_app_reads_it()
-    {
-        var hit = new DecoyHit(DecoyUse.Read, Decoy, 4242, @"C:\Windows\explorer.exe", DateTimeOffset.UnixEpoch);
-        var (queue, added) = AdminEventQueue.Empty.Add(hit, [], "File Explorer");
-
-        var back = AdminReply.Ok(new AdminEvents([added])).ResultAs<AdminEvents>()!.Events.Single();
-
-        Assert.That(back.Routine, Is.EqualTo("File Explorer"));
-        Assert.That(back.Hit, Is.EqualTo(hit));
-        Assert.That(AdminEventQueue.Parse(queue.ToJson()).Pending.Single().Routine, Is.EqualTo("File Explorer"), "and a restart");
-    }
-
-    [Test]
     public void Auditing_is_in_the_held_sets_status()
     {
         var set = DecoySet.Mint(_ => true).With(new(DecoyKind.Project, @"C:\Users\alice\source\billing-api-old", DateTimeOffset.UnixEpoch));

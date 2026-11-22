@@ -11,18 +11,6 @@ public sealed record BrokerPin(Uri Url, string IdentityKey);
 public sealed record KeyringSettings(string DeviceId, string VaultPath, string? RecoveryPublicKey);
 
 /// <summary>
-/// One broker this Keyring is enrolled with: a tenant (personal, customer), each with its own pinned
-/// identity, vault and trust chain. <see cref="GenesisHash"/> is the trust chain's pinned genesis,
-/// when the tenant runs one. <see cref="Solo"/>: the broker is this workstation's own, hosted by the
-/// agent on loopback (see <see cref="SoloBroker"/>).
-/// </summary>
-public sealed record TenantConfig(string Name, Uri Url, string IdentityKey, string VaultPath, string? GenesisHash = null, bool Solo = false);
-
-/// <summary>The lease <c>tir unlock</c> opened, so <c>tir agent</c>, <c>tir status</c> and <c>tir lock</c> can find it.</summary>
-/// <param name="LeaseKey">The lease's public X25519 key (base64) from the verified offer, so a secret added later can be sealed to the same lease. Absent in a lease file written before it was kept.</param>
-public sealed record OpenLease(string LeaseId, DateTimeOffset HardCapAt, string? LeaseKey = null);
-
-/// <summary>
 /// Everything the Keyring keeps on disk, under <c>%LOCALAPPDATA%\Tiresias</c>. None of it is a
 /// secret value: the device key is DPAPI-protected to the user's account, the rest is public or a pin.
 /// Per-tenant state (pin, vault path, lease, trust-chain head) follows the tenant picked by
@@ -34,7 +22,7 @@ public static class KeyringStore
     static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
     static readonly byte[] DeviceKeyEntropy = "tiresias/v1/device-key"u8.ToArray();
 
-    public static string Directory { get; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Tiresias");
+    public static string Directory => Path.Combine(UserMachine.Folder(Environment.SpecialFolder.LocalApplicationData), "Tiresias");
 
     public const string DefaultTenant = "default";
 

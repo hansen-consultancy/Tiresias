@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSec.Cryptography;
@@ -17,11 +18,10 @@ using Tiresias.Vault;
 namespace Tiresias.Agent;
 
 /// <summary>
-/// Solo mode's broker: the same broker code as a hosted one, run inside the agent on loopback. It
-/// identifies the calling process from the loopback connection, so no forwarder is needed. The
-/// design's target is a Windows service under its own virtual account (processes running as the
-/// user then can't read its memory); until that is built, the broker shares the agent's process
-/// and <c>tir doctor</c> says so.
+/// Solo mode's broker: the same broker code as a hosted one, on loopback. It identifies the calling
+/// process from the loopback connection, so no forwarder is needed. It runs inside the agent unless
+/// the Windows service is installed (<see cref="BrokerService"/>, docs/broker-service.md), which
+/// hosts this same class under its own account; <c>tir doctor</c> says which.
 /// </summary>
 /// <remarks>
 /// The vault can change while the broker runs (<c>tir service add</c>, <c>tir vault add</c>, the
@@ -60,23 +60,14 @@ public sealed class SoloBroker : IAsyncDisposable
 
     /// <summary>Starts the broker for the solo tenant, creating an empty vault when there is none yet.</summary>
     /// <exception cref="IOException">Port 7780 is taken by another program.</exception>
-    public async Task StartAsync()
+    public Task StartAsync()
     {
         if (app is not null)
-            return;
+            return Task.CompletedTask;
         var tenant = KeyringStore.Tenant is { Solo: true } t ? t : throw new InvalidOperationException("Solo mode isn't set up on this device.");
         if (!File.Exists(tenant.VaultPath))
             VaultFile.Save(tenant.VaultPath, new VaultDocument([], []));
-        vaultStamp = File.GetLastWriteTimeUtc(tenant.VaultPath);
-
-        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
-        {
-            Args = [],
-            // An empty folder of its own, so no appsettings.json from wherever tir was started is read.
-            ContentRootPath = Directory,
-            EnvironmentName = "Production",
-        });
-        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        return StartAsync(tenant.VaultPath, Directory, new Dictionary<string, string?>
         {
             ["Broker:VaultPath"] = tenant.VaultPath,
             ["Broker:AuditPath"] = AuditPath,
@@ -86,14 +77,35 @@ public sealed class SoloBroker : IAsyncDisposable
             ["Broker:TimeZone"] = TimeZoneInfo.Local.Id,
             ["Broker:IdentifyLoopbackCaller"] = "true",
         });
+    }
+
+    /// <param name="contentRoot">An empty folder of its own, so no appsettings.json from wherever tir was started is read.</param>
+    /// <param name="windowsService">Run under the service manager (<see cref="BrokerService"/>).</param>
+    /// <param name="journalReaderSid">The installing account recorded in the service's protected configuration.</param>
+    internal async Task StartAsync(string vaultPath, string contentRoot, Dictionary<string, string?> settings, bool windowsService = false, string? journalReaderSid = null)
+    {
+        vaultStamp = File.GetLastWriteTimeUtc(vaultPath);
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            Args = [],
+            ContentRootPath = contentRoot,
+            EnvironmentName = "Production",
+        });
+        builder.Configuration.AddInMemoryCollection(settings);
         builder.WebHost.UseUrls(Url.GetLeftPart(UriPartial.Authority));
         builder.Logging.ClearProviders();
+        if (windowsService)
+        {
+            builder.Host.UseWindowsService(o => o.ServiceName = BrokerServiceLayout.Name);
+            if (journalReaderSid is not null)
+                builder.Services.AddHostedService(sp => new BrokerJournal(sp.GetRequiredService<Tiresias.Audit.AuditLog>(), journalReaderSid));
+        }
 
         var built = BrokerHost.Build(builder);
         var state = built.Services.GetRequiredService<BrokerState>();
         built.Use(async (context, next) =>
         {
-            await KeepVaultCurrentAsync(state, tenant.VaultPath, context.Request.Path);
+            await KeepVaultCurrentAsync(state, vaultPath, context.Request.Path);
             await next(context);
         });
         try
@@ -107,6 +119,9 @@ public sealed class SoloBroker : IAsyncDisposable
         }
         app = built;
     }
+
+    /// <summary>Waits until the host is told to stop, as the service manager does.</summary>
+    internal Task WaitForShutdownAsync() => app?.WaitForShutdownAsync() ?? Task.CompletedTask;
 
     public async Task StopAsync()
     {
@@ -162,6 +177,11 @@ public sealed class SoloBroker : IAsyncDisposable
             }
             vaultStamp = stamp;
             var reload = state.ReplaceVault(vault);
+            if (reload.RolledBack is { Count: > 0 } rolledBack)
+            {
+                Log?.Invoke($"The vault holds older versions of {string.Join(", ", rolledBack)} than this lease already saw, as when an older copy is restored. The solo broker keeps the vault it had; undo the change in {vaultPath}.");
+                return;
+            }
             if (reload.Refused)
             {
                 Log?.Invoke($"The vault changed the services of {string.Join(", ", reload.Unapproved)} without your approval. The solo broker keeps the services it had; undo the change in {vaultPath}.");
@@ -173,16 +193,18 @@ public sealed class SoloBroker : IAsyncDisposable
     }
 
     /// <summary>The broker identity's public key (base64), creating the identity on first use. The Keyring pins it.</summary>
-    public static string IdentityPublicKey()
+    public static string IdentityPublicKey() => IdentityPublicKey(IdentityKeyPath);
+
+    internal static string IdentityPublicKey(string identityKeyPath)
     {
-        System.IO.Directory.CreateDirectory(Directory);
-        using var key = BrokerIdentity.LoadOrCreate(IdentityKeyStore.ForPlatform(IdentityKeyPath, NullLogger.Instance), NullLogger.Instance);
+        System.IO.Directory.CreateDirectory(Path.GetDirectoryName(identityKeyPath)!);
+        using var key = BrokerIdentity.LoadOrCreate(IdentityKeyStore.ForPlatform(identityKeyPath, NullLogger.Instance), NullLogger.Instance);
         return Convert.ToBase64String(key.PublicKey.Export(KeyBlobFormat.RawPublicKey));
     }
 
     /// <summary>
-    /// Sets up solo mode: a trust chain whose genesis this device and the paper key sign, the broker
-    /// identity, and the Keyring enrolled with that broker. <paramref name="recoveryKey"/> is the
+    /// Sets up solo mode: a trust chain whose genesis this device (device key and Hello key, one Hello
+    /// prompt) and the paper key sign, the broker identity, and the Keyring enrolled with that broker. <paramref name="recoveryKey"/> is the
     /// paper key's raw bytes, which must match the recovery key already stored.
     /// </summary>
     /// <exception cref="InvalidOperationException">Already enrolled, no recovery key yet, or the key typed isn't it.</exception>
@@ -201,7 +223,7 @@ public sealed class SoloBroker : IAsyncDisposable
         System.IO.Directory.CreateDirectory(Directory);
         using var deviceKey = KeyringStore.LoadOrCreateDeviceKey();
         using var paperKey = PaperKey.SigningKey(recoveryKey);
-        var genesis = TrustChain.Start("solo", "owner", new Signer(settings.DeviceId, deviceKey), new Signer("paper", paperKey),
+        var genesis = TrustChain.Start("solo", "owner", new Signer(settings.DeviceId, deviceKey, HelloKeyWrapper.LinkKey(create: true)), new Signer("paper", paperKey),
             new TrustPolicy(), DateTimeOffset.UtcNow);
         File.WriteAllBytes(TrustChainPath, TrustLinkJson.WriteChain([genesis]));
         File.Delete(TrustChainPath + ".head");

@@ -23,7 +23,7 @@ static partial class SurfaceProbe
 
     public static IEnumerable<InstalledExtension> Extensions()
     {
-        var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var profile = UserMachine.Folder(Environment.SpecialFolder.UserProfile);
         return Hosts.SelectMany(h => Doctor.Extensions(h.Host, ReadOrNull(Path.Combine(profile, h.Folder, "extensions", "extensions.json"))));
     }
 
@@ -34,10 +34,10 @@ static partial class SurfaceProbe
     {
         var tray = TrayPrograms();
         List<StartupEntry> entries = [];
-        foreach (var (hive, where) in new[] { (Registry.CurrentUser, StartupEntry.RunKey), (Registry.LocalMachine, StartupEntry.MachineRunKey) })
+        foreach (var (hive, where) in new[] { (UserMachine.CurrentUser, StartupEntry.RunKey), (UserMachine.LocalMachine, StartupEntry.MachineRunKey) })
         {
-            using var key = hive.OpenSubKey(RunKey);
-            using var approved = hive.OpenSubKey(DisableStartup.ApprovedKey + "Run");
+            using var key = hive?.OpenSubKey(RunKey);
+            using var approved = hive?.OpenSubKey(DisableStartup.ApprovedKey + "Run");
             if (key is null)
                 continue;
             foreach (var name in key.GetValueNames())
@@ -45,8 +45,8 @@ static partial class SurfaceProbe
                     && key.GetValue(name) is string command && Doctor.ExecutableIn(Environment.ExpandEnvironmentVariables(command)) is { } path)
                     entries.Add(Entry(name, where, path, name, tray));
         }
-        var folder = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
-        using var approvedFiles = Registry.CurrentUser.OpenSubKey(DisableStartup.ApprovedKey + "StartupFolder");
+        var folder = UserMachine.Folder(Environment.SpecialFolder.Startup);
+        using var approvedFiles = UserMachine.CurrentUser.OpenSubKey(DisableStartup.ApprovedKey + "StartupFolder");
         if (Directory.Exists(folder))
             foreach (var file in Directory.EnumerateFiles(folder))
             {
@@ -68,7 +68,7 @@ static partial class SurfaceProbe
     static HashSet<string> TrayPrograms()
     {
         HashSet<string> paths = new(StringComparer.OrdinalIgnoreCase);
-        using var icons = Registry.CurrentUser.OpenSubKey(@"Control Panel\NotifyIconSettings");
+        using var icons = UserMachine.CurrentUser.OpenSubKey(@"Control Panel\NotifyIconSettings");
         if (icons is null)
             return paths;
         foreach (var name in icons.GetSubKeyNames())
@@ -83,7 +83,7 @@ static partial class SurfaceProbe
     /// <summary>A path that may start with a known folder's id, as the shell records them; <c>null</c> when the id isn't one this reads.</summary>
     static string? ResolveKnownFolder(string path)
     {
-        if (!path.StartsWith('{') || path.IndexOf('}') is not (> 0 and var close))
+        if (!path.StartsWith('{', StringComparison.Ordinal) || path.IndexOf('}', StringComparison.Ordinal) is not (> 0 and var close))
             return path;
         return Guid.TryParse(path[..(close + 1)], out var id) && KnownFolder(id) is { } folder ? folder.TrimEnd('\\') + path[(close + 1)..] : null;
     }
@@ -104,7 +104,7 @@ static partial class SurfaceProbe
     public static IEnumerable<ProgramRun> ProgramRuns()
     {
         const string executables = @"Software\Microsoft\Windows\CurrentVersion\Explorer\UserAssist\{CEBFF5CD-ACE2-4F4F-9178-9926F41749EA}\Count";
-        using var key = Registry.CurrentUser.OpenSubKey(executables);
+        using var key = UserMachine.CurrentUser.OpenSubKey(executables);
         if (key is null)
             return [];
         return Doctor.UserAssistRuns([.. key.GetValueNames().Select(n => (n, key.GetValue(n) as byte[]))], KnownFolder);
@@ -151,9 +151,9 @@ static partial class SurfaceProbe
 
     /// <summary>
     /// The uninstall entries a person would see in Settings, machine (64- and 32-bit) and user, each
-    /// with whether the uninstaller its command names and its folder exist. Windows components,
-    /// updates and Windows Installer entries are left out: the first two aren't apps, and the last
-    /// names <c>msiexec</c>, which says nothing about the program's own files.
+    /// with whether the uninstaller its command names and its folder exist. Windows components and
+    /// updates are left out: they aren't apps. A Windows Installer entry names <c>msiexec</c>, which
+    /// says nothing about the program's own files, so its uninstaller is <c>null</c>.
     /// </summary>
     public static IEnumerable<UninstallEntry> UninstallEntries()
     {
@@ -169,15 +169,16 @@ static partial class SurfaceProbe
             (RegistryHive.LocalMachine, RegistryView.Registry32, @"HKLM\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"),
         })
         {
-            using var root = RegistryKey.OpenBaseKey(hive, view);
-            using var uninstall = root.OpenSubKey(UninstallKey);
+            using var root = DemoMode.On ? null : RegistryKey.OpenBaseKey(hive, view);
+            var top = root ?? (hive == RegistryHive.CurrentUser ? UserMachine.CurrentUser : null);
+            using var uninstall = top?.OpenSubKey(UninstallKey);
             if (uninstall is null)
                 continue;
             foreach (var name in uninstall.GetSubKeyNames())
             {
                 using var key = uninstall.OpenSubKey(name);
                 if (key?.GetValue("DisplayName") is not string { Length: > 0 } display
-                    || key.GetValue("SystemComponent") is 1 || key.GetValue("ParentKeyName") is not null || key.GetValue("WindowsInstaller") is 1
+                    || key.GetValue("SystemComponent") is 1 || key.GetValue("ParentKeyName") is not null
                     || key.GetValue("UninstallString") is not string command)
                     continue;
                 command = Environment.ExpandEnvironmentVariables(command).Trim();
@@ -189,7 +190,9 @@ static partial class SurfaceProbe
                 var own = folder is not null && !SameOrUnder(folder, windows) ? folder : null;
                 entries.Add(new($@"{prefix}\{name}", display, key.GetValue("DisplayVersion") as string, uninstaller,
                     uninstaller is not null && File.Exists(uninstaller), folder is not null && Directory.Exists(folder), command,
-                    own, own is not null && (unseen.Any(p => SameOrUnder(p, own)) || HasDriver(own))));
+                    own, own is not null && (unseen.Any(p => SameOrUnder(p, own)) || HasDriver(own)),
+                    key.GetValue("DisplayIcon") is string { Length: > 0 } icon ? Environment.ExpandEnvironmentVariables(icon) : null,
+                    key.GetValue("Publisher") as string is { Length: > 0 } publisher ? publisher.Trim() : null));
             }
         }
         return entries;
@@ -228,13 +231,22 @@ static partial class SurfaceProbe
         return paths;
     }
 
-    public static IEnumerable<DecoyUseRecord> DecoyUses() => Doctor.DecoyUses(Lines(AgentHost.ActivityPath));
+    public static IEnumerable<DecoyUseRecord> DecoyUses()
+    {
+        var service = AdminIncidents.History() ?? throw new IOException("The admin service incident history is unavailable.");
+        return Doctor.DecoyUses(Lines(AgentHost.ActivityPath)).Concat(service.Events.Where(e => e.Routine is null).Select(e =>
+            new DecoyUseRecord(e.Hit.Program, new DecoyTouch(e.Hit, e.Parents).What, e.Hit.At, e.Frozen)));
+    }
 
     public static IEnumerable<CredentialUse> CredentialUses() =>
         Doctor.CredentialUses(Lines(AgentHost.ActivityPath).Concat(Lines(SoloBroker.AuditPath)));
 
-    public static IEnumerable<string> BlockedPrograms() =>
-        Doctor.BlockedPaths(ReadOrNull(Path.Combine(KeyringStore.Directory, "blocklist.json"))).Where(File.Exists);
+    public static IEnumerable<string> BlockedPrograms()
+    {
+        var service = AdminProgramBlocks.ListAsync().GetAwaiter().GetResult();
+        var local = Doctor.BlockedPaths(ReadOrNull(Path.Combine(KeyringStore.Directory, "blocklist.json")));
+        return (service ?? []).Select(p => p.Path).Concat(local).Distinct(StringComparer.OrdinalIgnoreCase).Where(File.Exists);
+    }
 
     static string? ReadOrNull(string path)
     {
@@ -295,6 +307,31 @@ static partial class SurfaceProbe
     /// count as unchecked rather than unsigned; so do Store apps, signed as a package and started
     /// through an alias the check can't open.
     /// </summary>
+    /// <summary>
+    /// Whether a local file's embedded signature is valid (offline, as <see cref="IsSigned"/>) and the
+    /// name of who signed it. The name comes from the signer's certificate and is shown only next to
+    /// the verdict: an invalid signature can name anyone.
+    /// </summary>
+    public static (bool? Valid, string? Signer) Signature(string path)
+    {
+        if (!Path.IsPathFullyQualified(path) || path.StartsWith(@"\\", StringComparison.Ordinal) || !File.Exists(path))
+            return (null, null);
+        var valid = IsSigned(path);
+        try
+        {
+            // Reads the embedded signer certificate only; whether to believe it is WinVerifyTrust's call above.
+#pragma warning disable SYSLIB0057
+            using var certificate = new System.Security.Cryptography.X509Certificates.X509Certificate2(
+                System.Security.Cryptography.X509Certificates.X509Certificate.CreateFromSignedFile(path));
+#pragma warning restore SYSLIB0057
+            return (valid, certificate.GetNameInfo(System.Security.Cryptography.X509Certificates.X509NameType.SimpleName, forIssuer: false));
+        }
+        catch (System.Security.Cryptography.CryptographicException)
+        {
+            return (valid, null);
+        }
+    }
+
     static unsafe bool? IsSigned(string path)
     {
         var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);

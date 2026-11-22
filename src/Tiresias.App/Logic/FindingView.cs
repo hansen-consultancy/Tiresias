@@ -33,8 +33,8 @@ public enum FixAction
     Thaw,
     /// <summary>The Services page's add form, its address filled in.</summary>
     AddService,
-    /// <summary>Settings, Apps, Installed apps, where the user uninstalls a program.</summary>
-    OpenInstalledApps,
+    /// <summary>The Installed page: the whole list, unused programs first.</summary>
+    OpenInstalledList,
 }
 
 /// <summary>
@@ -100,9 +100,18 @@ public static class FindingView
         ThawProgram => (FixAction.Thaw, "Finding_FixThaw"),
         RunThroughExec { Setup: not null } => (FixAction.AddService, "Finding_FixGitHubApp"),
         RunThroughExec => (FixAction.CopyCommand, "Finding_FixCopy"),
-        UninstallApp => (FixAction.OpenInstalledApps, "Finding_FixInstalledApps"),
+        UninstallApp => (FixAction.OpenInstalledList, "Finding_FixInstalledList"),
         _ => null,
     };
+
+    /// <summary>
+    /// A row's button: a finding's own, or for a group the one its members share when it opens a
+    /// list rather than acting on one of them, so unused programs are one line with one button.
+    /// </summary>
+    public static (FixAction Action, string Label)? GroupButton(IReadOnlyList<DoctorCheck> group) =>
+        group.Count == 1 ? Button(group[0].Fix)
+        : group.Select(c => Button(c.Fix)).Distinct().ToArray() is [{ Action: FixAction.OpenInstalledList } shared] ? shared
+        : null;
 
     /// <summary>Where the delivery sits and where the fix takes it, as <c>E5/C3 → E2/C1</c>.</summary>
     public static string Moves(DoctorCheck check) => check switch

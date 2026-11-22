@@ -15,6 +15,7 @@ namespace Tiresias.Admin;
 /// minute per program and file, with the processes that started it and whether its opener is a
 /// routine one.
 /// </summary>
+[System.Runtime.Versioning.SupportedOSPlatform("windows")]
 sealed class ReadAudit : IDisposable
 {
     /// <summary>Events that aren't reads of a held file move the record id forward; saving it this often is enough.</summary>

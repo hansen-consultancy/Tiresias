@@ -151,7 +151,9 @@ read keeps the thread list's file name. Each open:
 open files they find. A routine opener is recorded but raises nothing: Windows Search
 (`SearchProtocolHost`, `SearchIndexer`, `SearchFilterHost`) and Explorer (`explorer`, `prevhost`)
 under `%WINDIR%`, Defender (`MsMpEng`, `MpDefenderCoreService`) under `%ProgramFiles%` or
-`%ProgramData%\Microsoft\Windows Defender`, OneDrive's machine-wide install under `%ProgramFiles%`,
+`%ProgramData%\Microsoft\Windows Defender`, Defender for Endpoint's sensor (`MsSense`) under
+`%ProgramFiles%` or `%ProgramData%\Microsoft\Windows Defender Advanced Threat Protection`,
+OneDrive's machine-wide install under `%ProgramFiles%`,
 and Tiresias's own `tir` and app (removing decoys reads them). A per-user OneDrive runs from a folder
 any program can write to, so its opens are findings: keep decoys out of synced folders. Both the
 file name and the folder must match; an opener whose path couldn't be read is not routine. Checking
@@ -183,7 +185,7 @@ then blocks, notifies, records and raises the finding as for a use it saw itself
 take the set back through a UAC prompt, then remove the decoys as always. While a set is held, no
 other is placed beside it. **Step 3**: the service puts an audit rule on each held decoy file and
 reads every read of one from the Security log, including reads while the app or the service was
-stopped; each comes to the app as a read the tripwire saw (recorded, notified, never blocked).
+stopped; each is a service incident, never blocking, and one by a routine opener raises nothing.
 **Step 4**: a use by a process the service can name freezes it, with what it started, and blocks
 its program's network until the user thaws it from Home (a UAC prompt); **This wasn't me** asks the
 service to do the same.

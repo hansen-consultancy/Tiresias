@@ -1,6 +1,5 @@
 using System.Net;
 using System.Text.Json;
-using NSec.Cryptography;
 using Tiresias.Client;
 using Tiresias.Crypto;
 using Tiresias.Transport;
@@ -25,34 +24,35 @@ public static class LeaseControl
     /// </summary>
     public static async Task<UnlockResult> UnlockAsync(HelloKeyWrapper hello, IReadOnlyList<string>? slugs = null)
     {
-        var broker = KeyringStore.RequireBroker();
+        var (tenant, service) = BrokerService.RequireRecipient(KeyringStore.Tenant ?? throw new InvalidOperationException("Not enrolled with a broker."));
+        var broker = new BrokerPin(tenant.Url, tenant.IdentityKey);
         var settings = KeyringStore.Settings;
-        var vault = VaultFile.Load(settings.VaultPath);
+        var vault = VaultFile.Load(tenant.VaultPath);
         slugs ??= vault.Secrets.Where(s => s.WrappedDeks.ContainsKey("hello")).Select(s => s.Slug).ToArray();
-        var secrets = slugs.Select(s => vault.FindSecret(s) ?? throw new InvalidOperationException($"No secret '{s}' in {settings.VaultPath}.")).ToArray();
+        var secrets = slugs.Select(s => vault.FindSecret(s) ?? throw new InvalidOperationException($"No secret '{s}' in {tenant.VaultPath}.")).ToArray();
 
         var notes = new List<string>();
         using var client = BrokerClient.For(broker);
-        if (await CheckTrustChainAsync(client, broker, settings) is { } untrusted)
+        if (await CheckTrustChainAsync(client, tenant, settings.DeviceId) is { } untrusted)
             return Failed($"{untrusted} Nothing was sealed.");
         var begin = await client.PostAsync("/lease/begin");
         if (!begin.Ok || begin.Body is not { } body)
             return Failed($"Lease not opened: {begin.Describe()}");
 
-        var offer = new LeaseOffer(
+        var lease = new OpenLease(
             body.GetProperty("leaseId").GetString()!,
-            Convert.FromBase64String(body.GetProperty("leaseKey").GetString()!),
-            DateTimeOffset.FromUnixTimeSeconds(body.GetProperty("hardCapAt").GetInt64()));
-        var identity = PublicKey.Import(SignatureAlgorithm.Ed25519, Convert.FromBase64String(broker.IdentityKey), KeyBlobFormat.RawPublicKey);
-        if (!offer.Verify(identity, Convert.FromBase64String(body.GetProperty("signature").GetString()!)))
-            return Failed("The lease offer is not signed by the pinned broker identity. Nothing was sealed.");
+            DateTimeOffset.FromUnixTimeSeconds(body.GetProperty("hardCapAt").GetInt64()),
+            body.GetProperty("leaseKey").GetString(), body.GetProperty("signature").GetString());
+        if (lease.Verify(broker.IdentityKey, DateTimeOffset.UtcNow) is not { } offer)
+            return Failed("The lease offer is expired or not signed by the pinned broker identity. Nothing was sealed.");
 
-        var sealedDeks = SealDeks(secrets, hello, offer.LeaseId, offer.LeaseKey, notes);
-        var seal = await client.PostAsync("/lease/seal", new { offer.LeaseId, deks = sealedDeks });
+        var approvalKey = ApprovalPublicKey(hello, offer.LeaseId);
+        var sealedDeks = SealDeks(secrets, hello, offer.LeaseId, offer.LeaseKey, approvalKey, notes);
+        var seal = await PostSealAsync(client, hello, service, offer.LeaseId, sealedDeks, approvalKey);
         if (!seal.Ok || seal.Body is not { } result)
             return Failed($"DEKs not accepted: {seal.Describe()}");
 
-        KeyringStore.Lease = new(offer.LeaseId, offer.HardCapAt, Convert.ToBase64String(offer.LeaseKey));
+        KeyringStore.Lease = lease;
         return new(true, $"Lease {offer.LeaseId} open until {offer.HardCapAt.ToLocalTime():HH:mm}.",
             Strings(result.GetProperty("accepted")), Strings(result.GetProperty("rejected")), notes);
 
@@ -66,18 +66,20 @@ public static class LeaseControl
     /// <returns>What happened, for the agent's log; <c>null</c> when nothing needed sealing.</returns>
     public static async Task<string?> SealIntoOpenLeaseAsync(HelloKeyWrapper hello, IReadOnlyList<string> slugs)
     {
-        if (KeyringStore.Lease is not { } lease || KeyringStore.Broker is not { } broker)
+        if (KeyringStore.Lease is not { } lease || KeyringStore.Tenant is not { } selected)
             return null;
-        if (lease.LeaseKey is null)
-            return $"New secrets ({string.Join(", ", slugs)}) can't join lease {lease.LeaseId}, which was opened by an older version. Lock and unlock to use them.";
-        var vault = VaultFile.Load(KeyringStore.Settings.VaultPath);
+        var (tenant, service) = BrokerService.RequireRecipient(selected);
+        if (lease.Verify(tenant.IdentityKey, DateTimeOffset.UtcNow) is not { } offer)
+            return "The saved lease offer could not be verified. Lock and unlock to add secrets.";
+        var vault = VaultFile.Load(tenant.VaultPath);
         var secrets = slugs.Select(vault.FindSecret).OfType<SealedSecret>().Where(s => s.WrappedDeks.ContainsKey("hello")).ToArray();
         if (secrets.Length == 0)
             return null;
         var notes = new List<string>();
-        var sealedDeks = SealDeks(secrets, hello, lease.LeaseId, Convert.FromBase64String(lease.LeaseKey), notes);
-        using var client = BrokerClient.For(broker);
-        var seal = await client.PostAsync("/lease/seal", new { lease.LeaseId, deks = sealedDeks });
+        var approvalKey = ApprovalPublicKey(hello, lease.LeaseId);
+        var sealedDeks = SealDeks(secrets, hello, lease.LeaseId, offer.LeaseKey, approvalKey, notes);
+        using var client = BrokerClient.For(new(tenant.Url, tenant.IdentityKey));
+        var seal = await PostSealAsync(client, hello, service, lease.LeaseId, sealedDeks, approvalKey);
         if (!seal.Ok || seal.Body is not { } result)
             return $"Couldn't add {string.Join(", ", sealedDeks.Keys)} to lease {lease.LeaseId}: {seal.Describe()}";
         var accepted = Strings(result.GetProperty("accepted"));
@@ -90,8 +92,21 @@ public static class LeaseControl
         return string.Join(" ", [.. lines, .. notes]);
     }
 
-    /// <summary>Each secret's DEK, unwrapped with Hello and sealed to the lease key; a secret Hello can't open gets a note instead.</summary>
-    static Dictionary<string, byte[]> SealDeks(IEnumerable<SealedSecret> secrets, HelloKeyWrapper hello, string leaseId, byte[] leaseKey, List<string> notes)
+    static Task<BrokerResponse> PostSealAsync(BrokerClient client, HelloKeyWrapper hello, bool service, string leaseId, Dictionary<string, byte[]> deks, byte[] approvalKey)
+    {
+        using var revision = service ? hello.RevisionKey() : null;
+        var revisionSignature = revision is null ? null : LeaseSeal.Sign(revision, leaseId, approvalKey, deks);
+        return client.PostAsync("/lease/seal", new { leaseId, deks, approvalKey, revisionSignature });
+    }
+
+    /// <summary>The public half of the lease's approval key, which the seal registers with the broker.</summary>
+    static byte[] ApprovalPublicKey(HelloKeyWrapper hello, string leaseId)
+    {
+        using var key = hello.ApprovalKey(leaseId);
+        return Access.ApprovalKey.Public(key);
+    }
+
+    static Dictionary<string, byte[]> SealDeks(IEnumerable<SealedSecret> secrets, HelloKeyWrapper hello, string leaseId, byte[] leaseKey, byte[] approvalKey, List<string> notes)
     {
         var sealedDeks = new Dictionary<string, byte[]>();
         foreach (var secret in secrets)
@@ -104,7 +119,7 @@ public static class LeaseControl
             }
             try
             {
-                sealedDeks[secret.Slug] = SealedBox.Seal(leaseKey, dek, LeaseOffer.DekContext(leaseId, secret.Slug));
+                sealedDeks[secret.Slug] = SealedBox.Seal(leaseKey, dek, LeaseOffer.DekContext(leaseId, secret.Slug, approvalKey));
             }
             finally
             {
@@ -143,15 +158,15 @@ public static class LeaseControl
     /// verify per <see cref="BrokerTrust"/>, and remembers the head it accepts so the next unlock
     /// catches a rollback. Returns the reason to refuse, or null.
     /// </summary>
-    static async Task<string?> CheckTrustChainAsync(BrokerClient client, BrokerPin broker, KeyringSettings settings)
+    static async Task<string?> CheckTrustChainAsync(BrokerClient client, TenantConfig tenant, string deviceId)
     {
-        if (KeyringStore.Tenant?.GenesisHash is not { } genesis)
+        if (tenant.GenesisHash is not { } genesis)
             return null;
         var (status, body) = await client.GetAsync("/trust/chain");
         if (status != HttpStatusCode.OK)
             return $"This tenant pins a trust chain but the broker served none ({(int)status}).";
         var result = BrokerTrust.Evaluate(TrustLinkJson.ParseChain(body), genesis, KeyringStore.ChainHead,
-            Convert.FromBase64String(broker.IdentityKey), settings.DeviceId);
+            Convert.FromBase64String(tenant.IdentityKey), deviceId);
         if (!result.Trusted)
             return result.Error;
         KeyringStore.ChainHead = result.Head;

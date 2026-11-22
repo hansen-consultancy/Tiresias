@@ -1,9 +1,10 @@
 using System.Runtime.InteropServices;
-using System.Text;
 using Tiresias.Vault;
 using Windows.Foundation;
 using Windows.Security.Credentials;
 using Windows.Security.Cryptography;
+using Windows.Security.Cryptography.Core;
+using Tiresias.Trust;
 
 namespace Tiresias.Agent;
 
@@ -27,6 +28,9 @@ public sealed partial class HelloKeyWrapper : IKeyWrapper, IDisposable
 {
     /// <summary>Whether the Tiresias Hello credential exists. Asks Windows without a prompt.</summary>
     public static bool Exists() =>
+#if DEBUG
+        DemoMode.On ? DemoMode.HelloExists :
+#endif
         KeyCredentialManager.IsSupportedAsync().AsTask().GetAwaiter().GetResult()
         && KeyCredentialManager.OpenAsync(CredentialName).AsTask().GetAwaiter().GetResult().Status == KeyCredentialStatus.Success;
 
@@ -34,19 +38,48 @@ public sealed partial class HelloKeyWrapper : IKeyWrapper, IDisposable
 
     readonly SignatureDerivedWrapper inner;
 
-    HelloKeyWrapper(KeyCredential credential) =>
-        inner = new SignatureDerivedWrapper("hello", challenge => Sign(credential, challenge));
+    HelloKeyWrapper(Func<byte[], byte[]> sign) =>
+        inner = new SignatureDerivedWrapper("hello", sign);
 
     public string Id => inner.Id;
 
     /// <param name="create">Create the credential when it doesn't exist yet. Only when sealing: a new credential can't open what an old one wrapped.</param>
-    public static HelloKeyWrapper Open(bool create) => new(OpenCredential(create));
-
-    /// <summary>A fresh Hello prompt that proves the user is present, for step-up actions such as elevation.</summary>
-    public static void ConfirmPresence(string purpose)
+    public static HelloKeyWrapper Open(bool create)
     {
-        var challenge = Encoding.UTF8.GetBytes($"tiresias/v1/presence\n{purpose}\n{Guid.NewGuid():N}");
-        Array.Clear(Sign(OpenCredential(create: false), challenge));
+#if DEBUG
+        if (DemoMode.On)
+            return OpenDemo(create);
+#endif
+        var credential = OpenCredential(create);
+        return new(challenge => Sign(credential, challenge));
+    }
+
+#if DEBUG
+    /// <summary>Demo mode's stand-in: a fixed key that "signs" without a prompt, so the real credential is never opened or created.</summary>
+    static HelloKeyWrapper OpenDemo(bool create)
+    {
+        if (!DemoMode.HelloExists && !create)
+            throw new HelloException(HelloProblem.CredentialMissing, $"No Windows Hello credential '{CredentialName}' on this machine. Re-wrap the vault from the recovery key.");
+        DemoMode.HelloExists = true;
+        return new(challenge => System.Security.Cryptography.HMACSHA256.HashData(DemoMode.HelloKey, challenge));
+    }
+#endif
+
+    /// <summary>The lease's approval key; no extra prompt once this wrapper has derived its wrap key.</summary>
+    public NSec.Cryptography.Key ApprovalKey(string leaseId) => inner.ApprovalKey(leaseId);
+
+    /// <summary>The vault revision signer enrolled with this user's broker service.</summary>
+    public NSec.Cryptography.Key RevisionKey() => inner.RevisionKey();
+
+    /// <summary>
+    /// The same credential as a trust-chain link key (docs/trust-links.md): its public key, and a
+    /// signer that shows a Hello prompt for every link it signs.
+    /// </summary>
+    public static HelloKey LinkKey(bool create)
+    {
+        var credential = OpenCredential(create);
+        CryptographicBuffer.CopyToByteArray(credential.RetrievePublicKey(CryptographicPublicKeyBlobType.X509SubjectPublicKeyInfo), out var spki);
+        return new(spki, data => Sign(credential, data));
     }
 
     public byte[] Wrap(ReadOnlySpan<byte> dek, string context) => inner.Wrap(dek, context);
@@ -149,24 +182,4 @@ public sealed partial class HelloKeyWrapper : IKeyWrapper, IDisposable
         KeyCredentialStatus.UserPrefersPassword => HelloProblem.Cancelled,
         _ => HelloProblem.Unavailable,
     };
-}
-
-public enum HelloProblem
-{
-    /// <summary>No PIN, face or fingerprint is set up for this Windows account.</summary>
-    NotSetUp,
-    /// <summary>The user closed the Hello prompt.</summary>
-    Cancelled,
-    /// <summary>The prompt was answered too late, typically after waiting unseen behind other windows.</summary>
-    Expired,
-    /// <summary>The Tiresias credential is gone (Hello reset, new PC): the recovery key re-wraps.</summary>
-    CredentialMissing,
-    /// <summary>Anything else Windows reported, e.g. the TPM is busy or locked out.</summary>
-    Unavailable,
-}
-
-/// <summary>Windows Hello failed for a reason the caller may explain differently; still an <see cref="InvalidOperationException"/>.</summary>
-public sealed class HelloException(HelloProblem problem, string message, Exception? inner = null) : InvalidOperationException(message, inner)
-{
-    public HelloProblem Problem { get; } = problem;
 }

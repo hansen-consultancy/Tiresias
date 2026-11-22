@@ -18,10 +18,14 @@ static partial class Desktop
 
     /// <summary>
     /// Keeps a window out of screenshots, screen recordings and screen sharing (it shows as black),
-    /// for windows that can show a secret value or the recovery key.
+    /// for windows that can show a secret value or the recovery key. Not in demo mode, whose values are
+    /// made up, unless the window takes real input there too (a recovery key, a server's real login).
     /// </summary>
-    public static void ExcludeFromCapture(Window window) =>
-        window.SourceInitialized += (_, _) => SetWindowDisplayAffinity(new WindowInteropHelper(window).Handle, WdaExcludeFromCapture);
+    public static void ExcludeFromCapture(Window window, bool evenInDemo = false)
+    {
+        if (!DemoMode.On || evenInDemo)
+            window.SourceInitialized += (_, _) => SetWindowDisplayAffinity(new WindowInteropHelper(window).Handle, WdaExcludeFromCapture);
+    }
 
     /// <summary>Whether the taskbar is light, which picks the tray icon that stays visible on it.</summary>
     public static bool TaskbarIsLight()
@@ -65,6 +69,9 @@ static partial class Desktop
     {
         if (!Tiresias.Client.RemoveExtension.IsSafeId(remove.Id))
             return false;
+        // The host's CLI would remove it from the real machine.
+        if (DemoMode.On)
+            return true;
         var start = new ProcessStartInfo("cmd.exe") { UseShellExecute = false, CreateNoWindow = true };
         foreach (var argument in new[] { "/d", "/c", remove.Host.Cli, "--uninstall-extension", remove.Id })
             start.ArgumentList.Add(argument);
@@ -97,7 +104,7 @@ static partial class Desktop
         byte[] value = [3, 0, 0, 0, .. BitConverter.GetBytes(DateTime.UtcNow.ToFileTimeUtc())];
         try
         {
-            using var key = Registry.CurrentUser.CreateSubKey(Tiresias.Client.DisableStartup.ApprovedKey + kind);
+            using var key = UserMachine.CurrentUser.CreateSubKey(Tiresias.Client.DisableStartup.ApprovedKey + kind);
             key.SetValue(startup.Item, value, RegistryValueKind.Binary);
             return true;
         }
@@ -119,6 +126,14 @@ static partial class Desktop
             return null;
         var folder = Path.Combine(KeyringStore.Directory, "removed-entries");
         var backup = Path.Combine(folder, $"{DateTime.Now:yyyyMMdd-HHmmss} {remove.BackupName}");
+        if (DemoMode.On)
+        {
+            // reg.exe would export the real key; the made-up one has nothing worth putting back.
+            Directory.CreateDirectory(folder);
+            File.WriteAllText(backup, "Windows Registry Editor Version 5.00\r\n\r\n; demo mode: made-up entry\r\n");
+            UserMachine.CurrentUser.DeleteSubKeyTree(remove.Subkey, throwOnMissingSubKey: false);
+            return backup;
+        }
         var start = new ProcessStartInfo("reg.exe") { UseShellExecute = false, CreateNoWindow = true };
         foreach (var argument in new[] { "export", remove.Key, backup, "/y" })
             start.ArgumentList.Add(argument);
@@ -134,7 +149,7 @@ static partial class Desktop
                 if (process.ExitCode != 0 || !File.Exists(backup))
                     return null;
             }
-            Registry.CurrentUser.DeleteSubKeyTree(remove.Subkey, throwOnMissingSubKey: false);
+            UserMachine.CurrentUser.DeleteSubKeyTree(remove.Subkey, throwOnMissingSubKey: false);
             return backup;
         }
         catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException or OperationCanceledException
@@ -167,6 +182,22 @@ static partial class Desktop
     /// <returns>Whether it went; one open in another program stays where it is.</returns>
     public static unsafe bool Recycle(string directory)
     {
+        // The demo's files would land in the real Recycle Bin; anything outside its made-up machine stays.
+        if (DemoMode.On)
+        {
+#if DEBUG
+            if (!DemoScenario.Inside(DemoMode.Profile!, directory))
+            {
+                AppLog.Info("demo mode: left a path outside the made-up machine where it is");
+                return false;
+            }
+#endif
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+            else
+                File.Delete(directory);
+            return true;
+        }
         const uint Delete = 3;
         const ushort AllowUndo = 0x40, NoConfirmation = 0x10, Silent = 0x4, NoErrorUi = 0x400;
         // The shell takes a list of paths ended by an empty one.
@@ -193,6 +224,40 @@ static partial class Desktop
 
     [LibraryImport("shell32.dll", EntryPoint = "SHFileOperationW")]
     private static unsafe partial int SHFileOperation(ShellFileOperation* operation);
+
+    /// <summary>
+    /// The small icon at <paramref name="index"/> in a program, library or <c>.ico</c> file, frozen so
+    /// any thread can build it; <c>null</c> when there is none. The file is read as data, never run.
+    /// </summary>
+    public static System.Windows.Media.ImageSource? SmallIcon(string path, int index)
+    {
+        if (!File.Exists(path))
+            return null;
+        var small = new nint[1];
+        if (ExtractIconEx(path, index, null, small, 1) == 0 || small[0] == 0)
+            return null;
+        try
+        {
+            var image = Imaging.CreateBitmapSourceFromHIcon(small[0], Int32Rect.Empty, System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
+            image.Freeze();
+            return image;
+        }
+        catch (Exception e) when (e is COMException or ArgumentException)
+        {
+            return null;
+        }
+        finally
+        {
+            DestroyIcon(small[0]);
+        }
+    }
+
+    [LibraryImport("shell32.dll", EntryPoint = "ExtractIconExW", StringMarshalling = StringMarshalling.Utf16)]
+    private static partial uint ExtractIconEx(string file, int index, nint[]? large, nint[]? small, uint icons);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool DestroyIcon(nint icon);
 
     [LibraryImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

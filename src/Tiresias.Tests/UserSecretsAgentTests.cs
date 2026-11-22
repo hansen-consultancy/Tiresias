@@ -173,6 +173,7 @@ public class UserSecretsServiceTests
         public Queue<ConsentAnswer> Answers { get; } = new();
         public List<UserSecretsConsentRequest> Shown { get; } = [];
         public TaskCompletionSource? Hold { get; set; }
+        public TaskCompletionSource? Entered { get; set; }
 
         /// <summary>The screen went away unanswered (the session locked), as the app reports it.</summary>
         public bool Vanish { get; set; }
@@ -193,6 +194,7 @@ public class UserSecretsServiceTests
         public async Task<ConsentAnswer> AskAsync(UserSecretsConsentRequest request, CancellationToken ct)
         {
             Shown.Add(request);
+            Entered?.TrySetResult();
             if (Vanish)
                 throw new OperationCanceledException();
             if (Hold is { } hold)
@@ -223,6 +225,54 @@ public class UserSecretsServiceTests
     string FilePath => Path.Combine(folder, SecretsFile.FileName);
 
     Task<AgentReply> Load(string? caller = Exe) => service.HandleAsync(new(AgentRequest.LoadUserSecrets, Id, folder), caller, CancellationToken.None);
+
+    [Test]
+    public async Task A_block_refuses_a_remembered_release_and_clearing_it_requires_fresh_consent()
+    {
+        var policy = new ReleasePolicy(new ReleaseScope(0));
+        using var audit = new AuditLog(Path.Combine(root, "activity.jsonl"), time);
+        service.Dispose();
+        service = new(root, keys, screen, time, audit, checkProgram: (_, _) => Task.FromResult(policy));
+        File.WriteAllText(FilePath, """{ "key": "test-value" }""");
+        await Load();
+        screen.Answers.Enqueue(ConsentAnswer.AllowForSession);
+        Assert.That((await Load()).Status, Is.EqualTo(AgentStatus.Ok));
+
+        policy = new(new ReleaseScope(1), "Blocked by policy.");
+        var blocked = await Load();
+        Assert.That(blocked.Status, Is.EqualTo(AgentStatus.Denied));
+        Assert.That(blocked.Json, Is.Null);
+        Assert.That(blocked.Message, Is.EqualTo(policy.Refusal));
+        Assert.That(File.ReadLines(Path.Combine(root, "activity.jsonl")).Last(), Does.Contain("Blocked by policy.").And.Not.Contain("test-value"));
+        Assert.That(screen.Shown, Has.Count.EqualTo(1));
+
+        policy = new(new ReleaseScope(1));
+        screen.Answers.Enqueue(ConsentAnswer.Deny);
+        Assert.That((await Load()).Status, Is.EqualTo(AgentStatus.Denied));
+        Assert.That(screen.Shown, Has.Count.EqualTo(2));
+    }
+
+    [Test]
+    public async Task A_block_while_consent_is_open_prevents_the_user_secrets_reply()
+    {
+        var policy = new ReleasePolicy(new ReleaseScope(0));
+        service.Dispose();
+        service = new(root, keys, screen, time, checkProgram: (_, _) => Task.FromResult(policy));
+        File.WriteAllText(FilePath, """{ "key": "test-value" }""");
+        await Load();
+        screen.Answers.Enqueue(ConsentAnswer.AllowForSession);
+        screen.Hold = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var asked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        screen.Entered = asked;
+        var pending = Load();
+        await asked.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        policy = new(new ReleaseScope(1), "Blocked while asking.");
+        screen.Hold.SetResult();
+        var reply = await pending;
+        Assert.That(reply.Status, Is.EqualTo(AgentStatus.Denied));
+        Assert.That(reply.Message, Is.EqualTo(policy.Refusal));
+        Assert.That(reply.Json, Is.Null);
+    }
 
     [Test]
     public async Task First_load_seals_the_plaintext_file_without_a_prompt()

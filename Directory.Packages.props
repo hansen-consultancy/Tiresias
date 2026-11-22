@@ -22,5 +22,6 @@
     <PackageVersion Include="System.Diagnostics.EventLog" Version="11.0.0" />
     <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="11.0.0" />
     <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="11.0.0" />
+    <PackageVersion Include="System.ServiceProcess.ServiceController" Version="11.0.0" />
   </ItemGroup>
 </Project>

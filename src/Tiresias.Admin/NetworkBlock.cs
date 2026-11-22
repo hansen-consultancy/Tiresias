@@ -10,6 +10,7 @@ namespace Tiresias.Admin;
 /// restart of the service or the machine until lifted by id. Linked into the agent, whose elevated
 /// removal lifts them with the service stopped.
 /// </summary>
+[System.Runtime.Versioning.SupportedOSPlatform("windows")]
 static unsafe partial class NetworkBlock
 {
     static readonly Guid Provider = new("6f1c0e2a-5b7d-4e8f-9a3c-2d4b6e8f0a1c");

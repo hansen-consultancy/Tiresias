@@ -71,8 +71,9 @@ co-signed by a key derived from the paper recovery key. Encryption at rest, Hell
 leases, placeholders, consent and audit all work, offline too. What you give up: requests leave
 from your own connection (no fixed IP to allow-list), and the secrets stay on the same machine
 as your agents, with no protection from code running as admin. `tir doctor` lists these every
-time. The broker shares the agent's process for now; running it as a Windows service under its
-own account is planned (see [docs/desktop-app.md](docs/desktop-app.md#solo-mode)).
+time. The broker shares the agent's process unless you run `tir solo service install` as
+administrator, which moves it into a Windows service under its own account
+(see [docs/broker-service.md](docs/broker-service.md)).
 
 Services are added with one command, for example
 `tir service add httpbin --upstream https://httpbin.org --allow '^/headers$'`, which asks for the
@@ -92,7 +93,8 @@ See [docs/ai-agents.md](docs/ai-agents.md).
 ## Trust model in one paragraph
 
 Devices are enrolled into a per-tenant **trust chain**: hash-linked, signed links rooted in a
-genesis hash you pin at setup, so a server relaying the chain cannot add a device. A **paper
+genesis hash you pin at setup, so a server relaying the chain cannot add a device, and every link
+that adds trust needs a Windows Hello signature, so a program running as you cannot either. A **paper
 recovery key** can repair the chain if every device is lost. Brokers verify the chain themselves,
 and so does the Keyring before it hands the broker any key. A control plane (an optional HTTP
 service) only relays chains, approves known locations and collects audit summaries. It is never

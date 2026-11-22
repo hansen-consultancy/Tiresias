@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -9,18 +11,30 @@ namespace Tiresias.AdminTier;
 /// <summary>What <c>decoys.status</c> answers: the kinds placed (one per decoy) and how many files, never a place, port or value.</summary>
 /// <param name="Listening">The service has the set's ports bound now.</param>
 /// <param name="Auditing">Every held file carries the audit rule and the policy logs it, so each read is named.</param>
-public sealed record AdminDecoysStatus(bool Held, bool Listening, IReadOnlyList<DecoyKind> Kinds, int Files, bool Auditing = false);
+public sealed record AdminDecoysStatus(bool Held, bool Listening, IReadOnlyList<DecoyKind> Kinds, int Files, bool NeedsVerification = false,
+    bool Verified = false, bool Auditing = false)
+{
+    /// <summary>Older services report a held set without any placement confirmation.</summary>
+    public AdminDecoysStatus ConfirmedStatus() => Held && !Verified ? new(false, false, [], 0, NeedsVerification: true) : this;
+}
 
 /// <summary>What <c>decoys.release</c> answers: the set, handed back, and the user it is whose (the session's, for an over-the-shoulder caller).</summary>
-public sealed record AdminDecoysRelease(string UserSid, DecoySet? Set);
+public sealed record AdminDecoysRelease(string UserSid, DecoySet? Set, string? Receipt = null);
 
-/// <summary>A decoy used or a decoy file read, queued for its user until the app acknowledges it: <see cref="DecoyHit"/> and the processes that started the program, nearest first.</summary>
+/// <summary>A service-recorded decoy use or decoy file read, and the processes that started its program, nearest first.</summary>
 /// <param name="Routine">A read by a routine opener (<see cref="DecoyReads.RoutineOpener"/>): recorded, raising nothing.</param>
 /// <param name="Frozen">The service froze the program for this use and blocked its network, until <c>thaw</c>.</param>
 public sealed record AdminEvent(long Id, DecoyHit Hit, IReadOnlyList<string> Parents, string? Routine = null, bool Frozen = false);
 
-/// <summary>What <c>events.wait</c> answers: the caller's events not yet acknowledged, oldest first.</summary>
-public sealed record AdminEvents(IReadOnlyList<AdminEvent> Events);
+/// <summary>One page, oldest first. The protected review position advances only on explicit review.</summary>
+public sealed record AdminEvents(IReadOnlyList<AdminEvent> Events, long ReviewedThrough = 0, long LastId = 0);
+
+/// <summary>The most recent matching incident is retained even after the program is unblocked.</summary>
+public sealed record AdminBlockStatus(bool Blocked, long Generation);
+
+public sealed record AdminBlockedProgram(string Path, string? Sha256, DateTimeOffset Since);
+
+public sealed partial record AdminBlocks(IReadOnlyList<AdminBlockedProgram> Programs, string? NextAfter = null);
 
 /// <summary>
 /// The arguments of the decoy ops and <c>events.wait</c>, as <see cref="AdminCallerPolicy"/> checks
@@ -32,18 +46,14 @@ public static partial class AdminArgs
     public const int MaxFiles = 16;
     public const int MaxPath = 1024;
     public const int MaxValue = 512;
-    public const int MaxAck = 256;
     public const int MaxWaitSeconds = Protocol.AdminWire.MaxWaitSeconds;
 
-    /// <summary>Ports a decoy may name: none of the well-known ones.</summary>
-    public const int MinPort = 1024;
-
     /// <summary><c>decoys.adopt</c>'s arguments for a set: its fields (not the values it derives) and the paths of its files.</summary>
-    public static JsonObject Adopt(DecoySet set) => new()
+    public static JsonObject Adopt(DecoySet set, string ownerSid) => new()
     {
+        ["owner"] = ownerSid,
         ["set"] = Protocol.AdminWire.ToNode(new WireSet(set.HttpPort, set.SqlPort, set.Values, [.. set.Placed])),
-        ["files"] = Protocol.AdminWire.ToNode(set.Placed
-            .SelectMany(p => DecoyPlan.Steps(set, p.Kind, p.Where, _ => false)).OfType<WriteDecoyFile>().Select(f => f.Path).ToArray()),
+        ["files"] = Protocol.AdminWire.ToNode(AdminHeldDecoys.FilesFor(set)),
     };
 
     sealed record WireSet(int HttpPort, int SqlPort, DecoyValues Values, PlacedDecoy[] Placed);
@@ -55,7 +65,8 @@ public static partial class AdminArgs
     {
         if (node is not JsonObject set || !Exactly(set, "httpPort", "sqlPort", "values", "placed"))
             return false;
-        if (!Int(set["httpPort"], MinPort, 65535, out var http) || !Int(set["sqlPort"], MinPort, 65535, out var sql) || http == sql)
+        if (!Int(set["httpPort"], DecoySet.MinPort, DecoySet.MaxPort, out var http) ||
+            !Int(set["sqlPort"], DecoySet.MinPort, DecoySet.MaxPort, out var sql) || http == sql)
             return false;
         if (set["values"] is not JsonObject values || !Exactly(values, "sqlUser", "sqlPassword", "adminToken", "apiKey")
             || values.Any(v => !Text(v.Value, MaxValue)))
@@ -74,19 +85,29 @@ public static partial class AdminArgs
     public static bool Files(JsonNode? node) =>
         node is JsonArray files && files.Count <= MaxFiles && files.All(f => Text(f, MaxPath) && FullPath((string)f!));
 
-    /// <summary><c>events.wait</c>'s <c>ack</c>: ids of events the app has handled.</summary>
-    public static bool Ack(JsonNode? node) =>
-        node is JsonArray ids && ids.Count <= MaxAck && ids.All(id => Long(id, out var value) && value > 0);
+    public static bool Cursor(JsonNode? node) => Long(node, out var id) && id >= 0;
+
+    public static bool Program(JsonNode? node) => Text(node, MaxPath) && ImagePath((string)node!);
+
+    // These names are only compared with recorded images. The service never opens a request's path.
+    internal static bool ImagePath(string? path) => path is { Length: > 2 } &&
+        ((char.IsAsciiLetter(path[0]) && path[1] == ':' && path[2] == '\\') || path.StartsWith(@"\\", StringComparison.Ordinal));
+
+    public static bool Digest(JsonNode? node) => node is JsonValue value && value.TryGetValue<string>(out var text)
+        && text.Length == 64 && text.All(char.IsAsciiHexDigit);
 
     /// <summary><c>events.wait</c>'s <c>wait</c>: seconds to wait for an event when none is queued.</summary>
     public static bool Wait(JsonNode? node) => Int(node, 0, MaxWaitSeconds, out _);
 
     /// <summary>A drive-rooted Windows path, without a <c>..</c> segment: the decoys are the user's files, never a device or a share.</summary>
     public static bool FullPath(string path) =>
-        DrivePath().IsMatch(path) && !path.Split('\\').Any(segment => segment is ".." or ".");
+        DrivePath().IsMatch(path) && !path.Contains('/', StringComparison.Ordinal) && path.Split('\\').Skip(1).All(segment =>
+            segment.Length > 0 && segment[^1] is not ('.' or ' ') && !DeviceName().IsMatch(segment));
 
     /// <summary>A local, domain or Entra ID user's SID: the only thing the service names a file after.</summary>
     public static bool UserSid(string? sid) => sid is not null && SidPattern().IsMatch(sid);
+
+    public static bool Owner(JsonNode? node) => node is JsonValue v && v.TryGetValue<string>(out var sid) && UserSid(sid);
 
     static bool Exactly(JsonObject node, params string[] names) =>
         node.Count == names.Length && names.All(node.ContainsKey);
@@ -109,6 +130,9 @@ public static partial class AdminArgs
     [GeneratedRegex(@"^[A-Za-z]:\\[^<>""|?*:]*$")]
     private static partial Regex DrivePath();
 
+    [GeneratedRegex(@"^(CON|NUL|PRN|AUX|COM[1-9]|LPT[1-9])(?:\.|$)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex DeviceName();
+
     [GeneratedRegex(@"^S-1-(5-21|12-1)(-[0-9]{1,10}){4}$", RegexOptions.IgnoreCase)]
     private static partial Regex SidPattern();
 }
@@ -117,15 +141,38 @@ public static partial class AdminArgs
 /// A user's decoys as the service holds them, in its state folder (<c>decoys\&lt;sid&gt;.json</c>):
 /// the set and the paths of its files. A damaged file, or one from a newer service, reads as none.
 /// </summary>
-public sealed record AdminHeldDecoys(DecoySet Set, IReadOnlyList<string> Files)
+public sealed record AdminHeldDecoys(DecoySet Set, IReadOnlyList<string> Files, bool Verified = true)
 {
-    public const int Version = 1;
+    public const int Version = 2;
 
-    public AdminDecoysStatus Status(bool listening, bool auditing = false) => new(true, listening, [.. Set.Placed.Select(p => p.Kind)], Files.Count, auditing);
+    public string ReleaseReceipt() => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(ToJson())));
+
+    public AdminDecoysStatus Status(bool listening, bool auditing = false) => Verified
+        ? new(true, listening, [.. Set.Placed.Select(p => p.Kind)], Files.Count, Verified: true, Auditing: auditing)
+        : new(false, false, [], 0, NeedsVerification: true);
+
+    public bool MatchesManifest()
+    {
+        if (Set.HttpPort is < DecoySet.MinPort or > DecoySet.MaxPort || Set.SqlPort is < DecoySet.MinPort or > DecoySet.MaxPort ||
+            Set.HttpPort == Set.SqlPort || Set.Placed.Count is 0 or > AdminArgs.MaxPlaced || Set.Placed.Any(p =>
+            p.Kind == DecoyKind.Variables ? p.Where != "user environment" : !AdminArgs.FullPath(p.Where)))
+            return false;
+        var expected = FilesFor(Set);
+        return expected.Count == Files.Count && expected.Count <= AdminArgs.MaxFiles &&
+            expected.All(AdminArgs.FullPath) && expected.Distinct(StringComparer.OrdinalIgnoreCase).Count() == expected.Count &&
+            expected.ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(Files) &&
+            Set.Placed.Count(p => p.Kind == DecoyKind.Variables) <= 1;
+    }
+
+    public static IReadOnlyList<string> FilesFor(DecoySet set) =>
+        [.. DecoyPlan.Files(set).Select(path => path.Replace('/', '\\'))];
+
+    public bool IsPlaced(Func<DecoyStep, bool> matches) => MatchesManifest() &&
+        Set.Placed.SelectMany(p => DecoyPlan.Steps(Set, p.Kind, p.Where, _ => false)).All(matches);
 
     public string ToJson() => new JsonObject
     {
-        ["v"] = Version,
+        ["v"] = Verified ? Version : 1,
         ["set"] = JsonNode.Parse(Set.ToJson()),
         ["files"] = new JsonArray([.. Files.Select(f => (JsonNode)f)]),
     }.ToJsonString();
@@ -134,11 +181,12 @@ public sealed record AdminHeldDecoys(DecoySet Set, IReadOnlyList<string> Files)
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(json) || JsonNode.Parse(json) is not JsonObject file || file["v"]?.GetValue<int>() != Version)
+            if (string.IsNullOrWhiteSpace(json) || JsonNode.Parse(json) is not JsonObject file || file["v"]?.GetValue<int>() is not (1 or Version))
                 return null;
             if (DecoySet.Parse(file["set"]?.ToJsonString()) is not { Placed.Count: > 0 } set || file["files"] is not JsonArray files)
                 return null;
-            return new(set, [.. files.Select(f => f?.GetValue<string>()).OfType<string>()]);
+            var held = new AdminHeldDecoys(set, [.. files.Select(f => f?.GetValue<string>()).OfType<string>()], file["v"]!.GetValue<int>() == Version);
+            return held.Verified && !held.MatchesManifest() ? null : held;
         }
         catch (Exception e) when (e is JsonException or InvalidOperationException or FormatException)
         {
@@ -147,53 +195,6 @@ public sealed record AdminHeldDecoys(DecoySet Set, IReadOnlyList<string> Files)
     }
 }
 
-/// <summary>
-/// One user's queue of decoy uses, kept by the service until the app acknowledges each by id, so a
-/// use while the app is closed (or the machine restarts) is still told. Bounded: past
-/// <see cref="Capacity"/> the oldest go. Immutable.
-/// </summary>
-public sealed record AdminEventQueue(long NextId, IReadOnlyList<AdminEvent> Pending)
-{
-    public const int Version = 1;
-    public const int Capacity = 100;
-
-    public static readonly AdminEventQueue Empty = new(1, []);
-
-    public (AdminEventQueue Queue, AdminEvent Added) Add(DecoyHit hit, IReadOnlyList<string> parents, string? routine = null, bool frozen = false)
-    {
-        var added = new AdminEvent(NextId, hit, parents, routine, frozen);
-        return (new(NextId + 1, [.. Pending.Append(added).TakeLast(Capacity)]), added);
-    }
-
-    public AdminEventQueue Ack(IEnumerable<long> ids)
-    {
-        var done = ids.ToHashSet();
-        return this with { Pending = [.. Pending.Where(e => !done.Contains(e.Id))] };
-    }
-
-    static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
-
-    public string ToJson() => JsonSerializer.Serialize(new File(Version, NextId, [.. Pending]), Json);
-
-    /// <returns><see cref="Empty"/> for no file, a damaged one, or one from a newer service.</returns>
-    public static AdminEventQueue Parse(string? json)
-    {
-        if (string.IsNullOrWhiteSpace(json))
-            return Empty;
-        try
-        {
-            return JsonSerializer.Deserialize<File>(json, Json) is { V: Version, NextId: > 0 } file
-                ? new(file.NextId, [.. (file.Pending ?? []).Where(e => e is { Hit: not null } && e.Id < file.NextId)])
-                : Empty;
-        }
-        catch (JsonException)
-        {
-            return Empty;
-        }
-    }
-
-    sealed record File(int V, long NextId, AdminEvent[]? Pending);
-}
 
 /// <summary>
 /// Where an elevated process hands a held set back: <c>decoys.json</c> in the user's keyring folder,

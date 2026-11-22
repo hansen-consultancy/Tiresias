@@ -39,12 +39,13 @@ public class BrokerStateTests
         identity.Dispose();
         vault.Dispose();
         File.Delete(auditPath);
+        File.Delete(auditPath + ".marks");
     }
 
     LeaseOffer OpenLease()
     {
         var (offer, _) = state.BeginLease("laptop");
-        var (result, refusal) = state.Seal(offer.LeaseId, vault.SealTo(offer));
+        var (result, refusal) = state.Seal(offer.LeaseId, vault.SealTo(offer), vault.ApprovalKey(offer.LeaseId));
         Assert.That(refusal, Is.Null);
         Assert.That(result!.Rejected, Is.Empty);
         return offer;
@@ -52,7 +53,7 @@ public class BrokerStateTests
 
     string Mint(string? ceiling = null)
     {
-        var (minted, refusal) = state.Mint(new AccessRequest("claude:test", null, "llm", ceiling, "testing", TimeSpan.FromHours(1)));
+        var (minted, refusal) = state.Mint(vault.MintApproval(new AccessRequest("claude:test", null, "llm", ceiling, "testing", TimeSpan.FromHours(1)), time.GetUtcNow()));
         Assert.That(refusal, Is.Null);
         return minted!.Token;
     }
@@ -128,7 +129,7 @@ public class BrokerStateTests
 
         Assert.That(state.Authorize($"Bearer {token}", "llm", delete).Refusal, Is.EqualTo(new Refusal(403, "elevation-required", "admin")));
 
-        var (expires, refusal) = state.Elevate("llm", "admin", TimeSpan.FromMinutes(15));
+        var (expires, refusal) = state.Elevate(vault.ElevateApproval("llm", "admin", TimeSpan.FromMinutes(15), time.GetUtcNow()));
         Assert.That(refusal, Is.Null);
         Assert.That(expires, Is.EqualTo(T0.AddMinutes(15)));
         using var allowed = state.Authorize($"Bearer {token}", "llm", delete).Allowed;
@@ -139,7 +140,7 @@ public class BrokerStateTests
     public void Only_elevation_grants_can_be_elevated()
     {
         OpenLease();
-        Assert.That(state.Elevate("llm", "read", TimeSpan.FromMinutes(5)).Refusal?.Reason, Is.EqualTo("not-elevatable"));
+        Assert.That(state.Elevate(vault.ElevateApproval("llm", "read", TimeSpan.FromMinutes(5), time.GetUtcNow())).Refusal?.Reason, Is.EqualTo("not-elevatable"));
     }
 
     [Test]
@@ -165,7 +166,7 @@ public class BrokerStateTests
         var stale = vault.SealTo(first);
         var (second, _) = state.BeginLease("laptop");
 
-        var (result, _) = state.Seal(second.LeaseId, new Dictionary<string, byte[]>(stale) { ["nope"] = [1, 2, 3] });
+        var (result, _) = state.Seal(second.LeaseId, new Dictionary<string, byte[]>(stale) { ["nope"] = [1, 2, 3] }, vault.ApprovalKey(second.LeaseId));
         Assert.That(result!.Accepted, Is.Empty);
         Assert.That(result.Rejected, Is.EquivalentTo(new[] { "llm-read", "llm-write", "llm-admin", "nope" }));
     }
@@ -174,14 +175,14 @@ public class BrokerStateTests
     public void Sealing_to_a_lease_that_is_not_current_is_a_conflict()
     {
         OpenLease();
-        Assert.That(state.Seal("other", new Dictionary<string, byte[]>()).Refusal?.Status, Is.EqualTo(409));
+        Assert.That(state.Seal("other", new Dictionary<string, byte[]>(), vault.ApprovalKey("other")).Refusal?.Status, Is.EqualTo(409));
     }
 
     [Test]
     public void An_invalid_access_request_is_refused_with_its_problems()
     {
         OpenLease();
-        var (_, refusal) = state.Mint(new AccessRequest("claude:test", null, "llm", null, "", TimeSpan.FromHours(1)));
+        var (_, refusal) = state.Mint(vault.MintApproval(new AccessRequest("claude:test", null, "llm", null, "", TimeSpan.FromHours(1)), time.GetUtcNow()));
         Assert.That(refusal!.Status, Is.EqualTo(400));
         Assert.That(refusal.Problems, Has.Some.Contains("purpose"));
     }
@@ -267,6 +268,156 @@ public class BrokerStateTests
     }
 
     [Test]
+    public void Restoring_an_older_vault_mid_lease_is_refused_and_the_newer_one_kept()
+    {
+        OpenLease();
+        var token = Mint();
+        var newer = SecretEnvelope.Seal("llm-read", 2, "Bearer sk-read-2"u8, [vault.Tpm], PolicyBinding.Hash(vault.Document, "llm-read"));
+        state.ReplaceVault(vault.Document with { Secrets = [.. vault.Document.Secrets.Where(s => s.Slug != "llm-read"), newer] });
+
+        var reload = state.ReplaceVault(vault.Document);
+
+        Assert.That(reload.Refused, Is.True);
+        Assert.That(reload.RolledBack, Is.EqualTo(new[] { "llm-read" }));
+        Assert.That(AuditLines(), Has.Exactly(1).Contains("secret-rolled-back: llm-read"));
+        Assert.That(state.Authorize($"Bearer {token}", "llm", Get("/v1/models")).Refusal?.Reason, Is.EqualTo("secret-not-leased"),
+            "still the newer vault, waiting for its DEK");
+    }
+
+    [Test]
+    public void A_new_lease_starts_its_own_high_water_mark()
+    {
+        OpenLease();
+        var newer = SecretEnvelope.Seal("llm-read", 2, "Bearer sk-read-2"u8, [vault.Tpm], PolicyBinding.Hash(vault.Document, "llm-read"));
+        state.ReplaceVault(vault.Document with { Secrets = [.. vault.Document.Secrets.Where(s => s.Slug != "llm-read"), newer] });
+        state.End();
+
+        Assert.That(state.ReplaceVault(vault.Document).Refused, Is.False, "without a lease there is nothing to compare with");
+    }
+
+    [Test]
+    public void Persisted_marks_refuse_an_older_vault_without_a_lease_and_after_a_restart()
+    {
+        using var signingKey = Key.Create(SignatureAlgorithm.Ed25519);
+        var marks = new HighWaterMarks(auditPath + ".marks", signingKey.PublicKey);
+        var newer = SecretEnvelope.Seal("llm-read", 2, "Bearer sk-read-2"u8, [vault.Tpm], PolicyBinding.Hash(vault.Document, "llm-read"));
+        var newerVault = vault.Document with { Secrets = [.. vault.Document.Secrets.Where(s => s.Slug != "llm-read"), newer] };
+
+        using (var first = StartWithMarks(vault.Document, marks))
+        {
+            Assert.That(first.ReplaceVault(newerVault).Refused, Is.False);
+            var offer = first.BeginLease("laptop").Offer;
+            var approval = vault.ApprovalKey(offer.LeaseId);
+            var boxes = new Dictionary<string, byte[]> { [newer.Slug] = vault.SealDek(offer, newer.Slug, SecretEnvelope.UnwrapDek(newer, vault.Tpm)!) };
+            Assert.That(first.Seal(offer.LeaseId, boxes, approval, LeaseSeal.Sign(signingKey, offer.LeaseId, approval, boxes)).Result!.Accepted,
+                Is.EqualTo(new[] { newer.Slug }));
+            first.End();
+            Assert.That(first.ReplaceVault(vault.Document).RolledBack, Is.EqualTo(new[] { newer.Slug }));
+        }
+
+        using var restarted = StartWithMarks(vault.Document, marks);
+        Assert.That(AuditLines(), Has.Some.Contains("secret-rolled-back: llm-read; left out"));
+        var next = restarted.BeginLease("laptop").Offer;
+        var keys = vault.SealTo(next);
+        var nextApproval = vault.ApprovalKey(next.LeaseId);
+        var sealedResult = restarted.Seal(next.LeaseId, keys, nextApproval, LeaseSeal.Sign(signingKey, next.LeaseId, nextApproval, keys)).Result!;
+        Assert.That(sealedResult.Rejected, Is.EqualTo(new[] { newer.Slug }));
+        Assert.That(restarted.ReplaceVault(newerVault).Refused, Is.False, "the authenticated revision can be restored");
+    }
+
+    [Test]
+    public void Only_a_new_revision_store_starts_empty()
+    {
+        using var signingKey = Key.Create(SignatureAlgorithm.Ed25519);
+        var path = auditPath + ".marks";
+        var marks = new HighWaterMarks(path, signingKey.PublicKey);
+        Assert.That(marks.Load(), Is.Empty);
+        File.WriteAllText(path, "null");
+        Assert.That(() => marks.Load(), Throws.TypeOf<InvalidDataException>());
+    }
+
+    BrokerState StartWithMarks(VaultDocument document, HighWaterMarks marks) => new(document,
+        LeaseTerms.Workday(TimeZoneInfo.FindSystemTimeZoneById("Europe/Brussels")), new AuditLog(auditPath, time),
+        Key.Create(SignatureAlgorithm.Ed25519), time, marks);
+
+    [Test]
+    public void Startup_and_reload_leave_each_revision_pending_until_its_signed_data_key_opens_it()
+    {
+        using var signingKey = Key.Create(SignatureAlgorithm.Ed25519);
+        var marks = new HighWaterMarks(auditPath + ".marks", signingKey.PublicKey);
+        var pending = SecretEnvelope.Seal("llm-read", 2, "updated"u8, [vault.Tpm], PolicyBinding.Hash(vault.Document, "llm-read"));
+        var candidate = vault.Document with { Secrets = [.. vault.Document.Secrets.Where(s => s.Slug != pending.Slug), pending] };
+        using (var first = StartWithMarks(candidate, marks))
+        {
+            var lease = first.BeginLease("laptop").Offer;
+            var boxes = vault.SealTo(lease);
+            var approval = vault.ApprovalKey(lease.LeaseId);
+            var signature = LeaseSeal.Sign(signingKey, lease.LeaseId, approval, boxes);
+            Assert.That(first.Seal(lease.LeaseId, boxes, approval).Refusal?.Status, Is.EqualTo(401));
+            Assert.That(first.LeasedDeks(), Is.Empty);
+            Assert.That(marks.Load(), Is.Empty);
+            Assert.That(first.Seal(lease.LeaseId, boxes, approval, signature).Result!.Rejected, Is.EqualTo(new[] { pending.Slug }));
+            Assert.That(marks.Load().Keys, Is.EquivalentTo(new[] { "llm-write", "llm-admin" }));
+            Assert.That(first.ReplaceVault(vault.Document).Refused, Is.False);
+            Assert.That(first.Seal(lease.LeaseId, boxes, approval, signature).Result!.Rejected, Is.Empty);
+            first.End();
+            Assert.That(first.ReplaceVault(candidate).Refused, Is.False);
+            Assert.That(marks.Load()[pending.Slug], Is.EqualTo(1), "a reload while locked is still pending");
+        }
+        using var restarted = StartWithMarks(candidate, marks);
+        Assert.That(restarted.ReplaceVault(vault.Document).Refused, Is.False);
+        Assert.That(marks.Load()[pending.Slug], Is.EqualTo(1));
+    }
+
+    [Test]
+    public void A_revision_authenticated_by_a_retained_data_key_advances_the_durable_mark()
+    {
+        using var signingKey = Key.Create(SignatureAlgorithm.Ed25519);
+        var marks = new HighWaterMarks(auditPath + ".marks", signingKey.PublicKey);
+        using var broker = StartWithMarks(vault.Document, marks);
+        var offer = broker.BeginLease("laptop").Offer;
+        var boxes = vault.SealTo(offer);
+        var approval = vault.ApprovalKey(offer.LeaseId);
+        Assert.That(broker.Seal(offer.LeaseId, boxes, approval, LeaseSeal.Sign(signingKey, offer.LeaseId, approval, boxes)).Result!.Rejected, Is.Empty);
+        var read = vault.Document.FindSecret("llm-read")!;
+        var newer = SecretEnvelope.Rebind(read, SecretEnvelope.UnwrapDek(read, vault.Tpm)!, PolicyBinding.Hash(vault.Document, read.Slug), [vault.Tpm])!;
+        var updated = vault.Document with { Secrets = [.. vault.Document.Secrets.Where(s => s.Slug != read.Slug), newer] };
+        Assert.That(broker.ReplaceVault(updated).Unleased, Is.Empty);
+        Assert.That(marks.Load()[read.Slug], Is.EqualTo(newer.Version));
+    }
+
+    [Test]
+    public void A_revision_signature_binds_the_lease_approval_key_and_complete_key_batch()
+    {
+        using var key = Key.Create(SignatureAlgorithm.Ed25519);
+        using var other = Key.Create(SignatureAlgorithm.Ed25519);
+        var boxes = new Dictionary<string, byte[]> { ["b"] = [2], ["a"] = [1] };
+        var signature = LeaseSeal.Sign(key, "lease", [3], boxes);
+        Assert.That(LeaseSeal.Verify(key.PublicKey, "lease", [3], new Dictionary<string, byte[]> { ["a"] = [1], ["b"] = [2] }, signature), Is.True);
+        Assert.That(LeaseSeal.Verify(other.PublicKey, "lease", [3], boxes, signature), Is.False);
+        Assert.That(LeaseSeal.Verify(key.PublicKey, "next", [3], boxes, signature), Is.False);
+        Assert.That(LeaseSeal.Verify(key.PublicKey, "lease", [4], boxes, signature), Is.False);
+        boxes["a"] = [5];
+        Assert.That(LeaseSeal.Verify(key.PublicKey, "lease", [3], boxes, signature), Is.False);
+    }
+
+    [Test]
+    public void A_secret_left_out_below_its_mark_does_not_block_reloading_the_rest()
+    {
+        using var signingKey = Key.Create(SignatureAlgorithm.Ed25519);
+        var marks = new HighWaterMarks(auditPath + ".marks", signingKey.PublicKey);
+        marks.Save(new Dictionary<string, int> { ["llm-read"] = 2 });
+        using var restarted = StartWithMarks(vault.Document, marks);
+        var edited = vault.Document with { Services = [.. vault.Document.Services, new Service("httpbin", new Uri("https://httpbin.example/"), [])] };
+        Assert.That(restarted.ReplaceVault(edited).Refused, Is.False, "the unrelated change loads");
+        var offer = restarted.BeginLease("laptop").Offer;
+        var boxes = vault.SealTo(offer);
+        var approval = vault.ApprovalKey(offer.LeaseId);
+        var result = restarted.Seal(offer.LeaseId, boxes, approval, LeaseSeal.Sign(signingKey, offer.LeaseId, approval, boxes)).Result!;
+        Assert.That(result.Rejected, Is.EqualTo(new[] { "llm-read" }), "the older secret stays out");
+    }
+
+    [Test]
     public void A_re_sealed_secret_loses_its_old_dek_until_the_new_one_is_sealed()
     {
         var offer = OpenLease();
@@ -279,7 +430,7 @@ public class BrokerStateTests
 
         var dek = SecretEnvelope.UnwrapDek(resealed, vault.Tpm)!;
         var (result, _) = state.Seal(offer.LeaseId, new Dictionary<string, byte[]>
-            { ["llm-read"] = SealedBox.Seal(offer.LeaseKey, dek, LeaseOffer.DekContext(offer.LeaseId, "llm-read")) });
+            { ["llm-read"] = vault.SealDek(offer, "llm-read", dek) }, vault.ApprovalKey(offer.LeaseId));
         Assert.That(result!.Accepted, Is.EqualTo(new[] { "llm-read" }));
         using var allowed = state.Authorize($"Bearer {token}", "llm", Get("/v1/models")).Allowed;
         Assert.That(allowed!.TakeSecret(), Is.EqualTo("Bearer sk-read-2"));

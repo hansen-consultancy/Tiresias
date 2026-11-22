@@ -1,10 +1,8 @@
 using System.ComponentModel;
 using System.IO.Pipes;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Text.Json.Nodes;
-using Microsoft.Win32.SafeHandles;
 using Tiresias.AdminTier;
 using Tiresias.Protocol;
 
@@ -15,7 +13,7 @@ namespace Tiresias.Agent;
 /// process the Service Control Manager runs as <c>TiresiasAdmin</c>: a program that took the pipe's
 /// name first is not the service, and is never told or believed anything.
 /// </summary>
-public static partial class AdminClient
+public static class AdminClient
 {
     static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(2);
     static readonly TimeSpan ReplyTimeout = TimeSpan.FromSeconds(5);
@@ -25,24 +23,28 @@ public static partial class AdminClient
         (typeof(AdminClient).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0").Split('+', 2)[0];
 
     /// <summary>Whether the service exists, from the Service Control Manager alone: no pipe, no wait.</summary>
-    public static bool Installed
+    public static bool Installed => ServiceInstalled() == true;
+
+    /// <summary>Null when the Service Control Manager cannot confirm the service's presence or absence.</summary>
+    public static bool? ServiceInstalled()
     {
-        get
+        if (DemoMode.On)
+            return false;
+        try
         {
-            try
-            {
-                return AdminService.Query().Exists;
-            }
-            catch (Win32Exception)
-            {
-                return false;
-            }
+            return AdminService.Query().Exists;
+        }
+        catch (Exception e) when (e is Win32Exception or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            return null;
         }
     }
 
     /// <summary>The admin tier as it is now, read without a prompt. Never throws: a tier that can't be read reads as not answering.</summary>
     public static async Task<AdminTierFacts> FactsAsync()
     {
+        if (DemoMode.On)
+            return new(false, false, null, AppVersion);
         AdminService.State service;
         try
         {
@@ -75,7 +77,7 @@ public static partial class AdminClient
     /// One request to the running service; <c>null</c> when it isn't installed or running, can't be
     /// reached, or the pipe isn't the service's. <paramref name="reply"/> bounds the wait for the answer.
     /// </summary>
-    public static async Task<AdminReply?> SendAsync(string op, JsonObject? args = null, TimeSpan? reply = null, CancellationToken ct = default)
+    public static async Task<AdminReply?> SendAsync(string op, System.Text.Json.Nodes.JsonObject? args = null, TimeSpan? reply = null, CancellationToken ct = default)
     {
         AdminService.State service;
         try
@@ -101,19 +103,17 @@ public static partial class AdminClient
         try
         {
             await pipe.ConnectAsync(ConnectTimeout, timeout.Token);
-            if (!GetNamedPipeServerProcessId(pipe.SafePipeHandle, out var server) || server != serviceProcessId)
+            if (!ServicePipeIdentity.Matches(pipe, serviceProcessId))
                 return null;
+            if (AdminService.Query().ProcessId != serviceProcessId)
+                throw new IOException("The admin service restarted while connecting.");
             await AdminWire.WriteAsync(pipe, request, timeout.Token);
             return await AdminWire.ReadAsync<AdminReply>(pipe, timeout.Token);
         }
-        catch (Exception e) when (e is IOException or TimeoutException or OperationCanceledException or UnauthorizedAccessException
+        catch (Exception e) when (e is IOException or TimeoutException or OperationCanceledException or UnauthorizedAccessException or Win32Exception
             or InvalidDataException or System.Text.Json.JsonException)
         {
             return null;
         }
     }
-
-    [LibraryImport("kernel32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool GetNamedPipeServerProcessId(SafePipeHandle pipe, out uint serverProcessId);
 }

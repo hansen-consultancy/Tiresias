@@ -23,8 +23,10 @@ public sealed class SignatureDerivedWrapper(string id, Func<byte[], byte[]> sign
 
     static readonly AeadAlgorithm Aead = AeadAlgorithm.XChaCha20Poly1305;
     static readonly byte[] Info = "tiresias/v1/signature-wrap-key"u8.ToArray();
+    static readonly byte[] ApprovalInfo = "tiresias/v1/approval-root"u8.ToArray();
 
     Key? key;
+    byte[]? approvalRoot;
 
     public string Id { get; } = id;
 
@@ -42,10 +44,39 @@ public sealed class SignatureDerivedWrapper(string id, Func<byte[], byte[]> sign
         return Aead.Decrypt(DerivedKey(), wrapped[..Aead.NonceSize], Aad(context), wrapped[Aead.NonceSize..], dek) ? dek : null;
     }
 
+    /// <summary>
+    /// The lease's approval key (<see cref="Access.ApprovalKey"/>), from the same signature as the wrap
+    /// key: no extra gesture when the wrap key is already derived, one when it isn't.
+    /// </summary>
+    public Key ApprovalKey(string leaseId)
+    {
+        DerivedKey();
+        return Access.ApprovalKey.Derive(approvalRoot!, leaseId);
+    }
+
+    /// <summary>The service enrolls the public half once and verifies subsequent vault revisions with it.</summary>
+    public Key RevisionKey()
+    {
+        DerivedKey();
+        Span<byte> seed = stackalloc byte[32];
+        try
+        {
+            HKDF.DeriveKey(HashAlgorithmName.SHA256, approvalRoot!, seed, salt: [], info: "tiresias/v1/vault-revision-key"u8);
+            return Key.Import(SignatureAlgorithm.Ed25519, seed, KeyBlobFormat.RawPrivateKey);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(seed);
+        }
+    }
+
     public void Dispose()
     {
         key?.Dispose();
         key = null;
+        if (approvalRoot is not null)
+            Array.Clear(approvalRoot);
+        approvalRoot = null;
     }
 
     Key DerivedKey()
@@ -56,6 +87,7 @@ public sealed class SignatureDerivedWrapper(string id, Func<byte[], byte[]> sign
         var raw = HKDF.DeriveKey(HashAlgorithmName.SHA256, signature, Aead.KeySize, salt: [], info: Info);
         try
         {
+            approvalRoot = HKDF.DeriveKey(HashAlgorithmName.SHA256, signature, 32, salt: [], info: ApprovalInfo);
             return key = Key.Import(Aead, raw, KeyBlobFormat.RawSymmetricKey);
         }
         finally

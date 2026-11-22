@@ -11,6 +11,7 @@ namespace Tiresias.Admin;
 /// (<see cref="NetworkBlock"/>), kept in <c>frozen.json</c> so a restart can still thaw them. While
 /// that file can't be read the service freezes nothing, rather than lose track of a freeze.
 /// </summary>
+[System.Runtime.Versioning.SupportedOSPlatform("windows")]
 sealed class Freezer(string stateFolder, ILogger logger)
 {
     readonly string path = Path.Combine(stateFolder, "frozen.json");
@@ -168,6 +169,7 @@ sealed class Freezer(string stateFolder, ILogger logger)
 }
 
 /// <summary>A user's profile folder, from the machine's profile list.</summary>
+[System.Runtime.Versioning.SupportedOSPlatform("windows")]
 static class UserProfile
 {
     public static string? Folder(string sid)

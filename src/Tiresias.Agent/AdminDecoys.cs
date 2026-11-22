@@ -20,42 +20,25 @@ namespace Tiresias.Agent;
 /// </summary>
 public static partial class AdminDecoys
 {
-    /// <summary>Places a decoy as <see cref="DecoyStore.Place"/> does, then hands the set to the admin tier when it runs.</summary>
+    /// <summary>Places a decoy locally. Passing the set to the service requires a separate enrollment.</summary>
     /// <exception cref="InvalidOperationException">Something is already at that place, or the admin tier holds this user's decoys.</exception>
     public static PlacedDecoy Place(DecoyKind kind, string? where)
     {
-        if (DecoyStore.Current is null && Status() is { Held: true })
+        if (AdminClient.Installed && Status() is { Held: true })
             throw new InvalidOperationException("The admin tier holds your decoys, so no other set can be placed beside them. Remove them first (tir decoys remove), then place again.");
-        var placed = DecoyStore.Place(kind, where);
-        Adopt();
-        return placed;
+        return DecoyStore.Place(kind, where);
     }
 
     /// <summary>
     /// Hands <c>decoys.json</c>'s set to the admin tier and deletes the file, when the tier runs. Kept
     /// as it is when the tier isn't there or refuses: the agent then listens, as without it.
     /// </summary>
-    /// <returns>Whether the admin tier holds the set now.</returns>
-    public static bool Adopt()
-    {
-        if (DecoyStore.Current is not { Placed.Count: > 0 } set)
-            return false;
-        if (Send(AdminOps.DecoysAdopt, AdminArgs.Adopt(set)) is not { Status: AdminStatus.Ok })
-            return false;
-        File.Delete(DecoyStore.FilePath);
-        return true;
-    }
+    /// <returns>The elevated setup result.</returns>
+    public static AdminSetupResult Adopt() => DecoyEnrollment.Run((sid, set) =>
+        Send(AdminOps.DecoysAdopt, AdminArgs.Adopt(set, sid))?.ResultAs<AdminDecoysStatus>() is { Held: true, Verified: true });
 
     /// <summary>The held set's kinds and file count; <c>null</c> when the admin tier doesn't answer.</summary>
-    public static AdminDecoysStatus? Status() => Send(AdminOps.DecoysStatus)?.ResultAs<AdminDecoysStatus>();
-
-    /// <summary>The decoy uses queued for this user, after acknowledging <paramref name="ack"/>; <c>null</c> when the admin tier doesn't answer.</summary>
-    public static async Task<IReadOnlyList<AdminEvent>?> WaitAsync(IReadOnlyList<long> ack, CancellationToken ct)
-    {
-        var args = new JsonObject { ["ack"] = AdminWire.ToNode(ack.ToArray()), ["wait"] = AdminWire.MaxWaitSeconds };
-        var reply = await AdminClient.SendAsync(AdminOps.EventsWait, args, TimeSpan.FromSeconds(AdminWire.MaxWaitSeconds + 10), ct);
-        return reply?.ResultAs<AdminEvents>()?.Events;
-    }
+    public static AdminDecoysStatus? Status() => Send(AdminOps.DecoysStatus)?.ResultAs<AdminDecoysStatus>()?.ConfirmedStatus();
 
     /// <summary>
     /// For the app's <i>This wasn't me</i>: asks the admin tier to freeze the process and block its
@@ -65,7 +48,7 @@ public static partial class AdminDecoys
     public static async Task<AdminFreezeResult?> FreezeAsync(int processId) =>
         (await AdminClient.SendAsync(AdminOps.Freeze, new JsonObject { ["pid"] = processId }))?.ResultAs<AdminFreezeResult>();
 
-    /// <summary>Run elevated (<c>Tiresias.exe --admin-tier thaw &lt;program&gt;</c>): thaws the session user's freezes of the program and unblocks its network.</summary>
+    /// <summary>Run elevated (<c>Tiresias.exe --admin-tier unblock-program &lt;program&gt;</c>, before the unblock): thaws the session user's freezes of the program and lifts its network block.</summary>
     public static AdminSetupResult Thaw(string program) =>
         Send(AdminOps.Thaw, new JsonObject { ["program"] = program }) is { Status: AdminStatus.Ok } ? AdminSetupResult.Done : AdminSetupResult.Failed;
 
@@ -76,7 +59,7 @@ public static partial class AdminDecoys
     /// <summary>
     /// Run elevated (<c>tir decoys release</c>,<c>Tiresias.exe --admin-tier release-decoys</c>):
     /// takes the session user's set back from the admin tier and writes it to that user's
-    /// <c>decoys.json</c>. When it can't be written, the set is handed to the admin tier again.
+    /// <c>decoys.json</c>. The service keeps its original registration until the local file is durable.
     /// </summary>
     public static AdminSetupResult Release()
     {
@@ -84,10 +67,16 @@ public static partial class AdminDecoys
             return AdminSetupResult.Failed;
         if (released.Set is not { } set)
             return AdminSetupResult.Done;
-        if (HandBack(released.UserSid, set))
-            return AdminSetupResult.Done;
-        Send(AdminOps.DecoysAdopt, AdminArgs.Adopt(set));
-        return AdminSetupResult.Failed;
+        if (released.Receipt is not { } receipt)
+            return AdminSetupResult.Failed;
+        return DecoyEnrollment.WithDesktop((token, sid, path) =>
+        {
+            if (sid != released.UserSid)
+                return AdminSetupResult.Failed;
+            using var file = WindowsIdentity.RunImpersonated(token, () => OpenHandBack(path, set));
+            return file is not null && Send(AdminOps.DecoysReleaseCommit, new() { ["receipt"] = receipt }) is { Status: AdminStatus.Ok }
+                ? AdminSetupResult.Done : AdminSetupResult.Failed;
+        });
     }
 
     /// <summary>
@@ -105,10 +94,13 @@ public static partial class AdminDecoys
         foreach (var file in Directory.Exists(folder) ? Directory.EnumerateFiles(folder, "*.json") : [])
         {
             var sid = Path.GetFileNameWithoutExtension(file);
-            if (AdminArgs.UserSid(sid) && AdminHeldDecoys.Parse(File.ReadAllText(file)) is { } held && HandBack(sid, held.Set))
+            var held = AdminArgs.UserSid(sid) ? AdminHeldDecoys.Parse(File.ReadAllText(file)) : null;
+            using var restored = held is not null && KeyringFolder(sid) is { } keyring
+                ? OpenHandBack(Path.Combine(keyring, DecoySet.FileName), held.Set) : null;
+            if (restored is not null)
             {
                 if (privileged)
-                    foreach (var path in held.Files)
+                    foreach (var path in held!.Files)
                         AuditRules.Remove(path);
                 File.Delete(file);
             }
@@ -137,32 +129,60 @@ public static partial class AdminDecoys
         }
     }
 
-    /// <summary>Writes the set to the user's <c>decoys.json</c>, only as a new file at exactly that path (<see cref="AdminHandBack"/>).</summary>
-    static bool HandBack(string sid, DecoySet set)
+    /// <summary>Holds the exact durable file until its service receipt commits. A retry accepts the identical file.</summary>
+    static IDisposable? OpenHandBack(string path, DecoySet set)
     {
-        if (KeyringFolder(sid) is not { } folder || !Directory.Exists(folder))
-            return false;
-        var path = Path.Combine(folder, DecoySet.FileName);
-        using var file = CreateFileW(path, GenericWrite | Delete, 0, IntPtr.Zero, CreateNew, FileFlagOpenReparsePoint, IntPtr.Zero);
+        var json = set.ToJson();
+        var file = CreateFileW(path, GenericWrite | Delete, 0, IntPtr.Zero, CreateNew, FileFlagOpenReparsePoint, IntPtr.Zero);
         if (file.IsInvalid)
-            return false;
-        if (FinalPath(file) is not { } final || !AdminHandBack.IsWhereAsked(path, final))
         {
-            // Not where it was asked for: a link on the way. Ours to take back, since it was just made.
+            var exists = Marshal.GetLastPInvokeError() is 80 or 183;
+            file.Dispose();
+            if (!exists)
+                return null;
+            var existing = SourceHandle.Open(path, directory: false);
+            try
+            {
+                if (existing.ReadText(path, Encoding.UTF8.GetByteCount(json)) == json)
+                    return existing;
+            }
+            catch
+            {
+                existing.Dispose();
+                throw;
+            }
+            existing.Dispose();
+            return null;
+        }
+        var stream = new FileStream(file, FileAccess.Write);
+        try
+        {
+            if (FinalPath(file) is { } final && AdminHandBack.IsWhereAsked(path, final))
+            {
+                stream.Write(Encoding.UTF8.GetBytes(json));
+                stream.Flush(flushToDisk: true);
+                return stream;
+            }
+        }
+        catch
+        {
+            DiscardNew();
+            throw;
+        }
+        DiscardNew();
+        return null;
+
+        void DiscardNew()
+        {
             var delete = new FileDispositionInfo { DeleteFile = 1 };
             SetFileInformationByHandle(file, FileDispositionInfoClass, ref delete, (uint)Marshal.SizeOf<FileDispositionInfo>());
-            return false;
+            stream.Dispose();
         }
-        using var stream = new FileStream(file, FileAccess.Write);
-        stream.Write(Encoding.UTF8.GetBytes(set.ToJson()));
-        return true;
     }
 
-    /// <summary>The keyring folder of the user with this SID: this process's own, or the one in their profile.</summary>
+    /// <summary>The default keyring location for an offline user during service removal.</summary>
     static string? KeyringFolder(string sid)
     {
-        if (string.Equals(WindowsIdentity.GetCurrent().User?.Value, sid, StringComparison.OrdinalIgnoreCase))
-            return KeyringStore.Directory;
         using var key = Registry.LocalMachine.OpenSubKey($@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\{sid}");
         return key?.GetValue("ProfileImagePath") is string profile ? AdminHandBack.KeyringFolder(Environment.ExpandEnvironmentVariables(profile)) : null;
     }

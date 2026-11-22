@@ -154,18 +154,6 @@ public class AdminFreezeTests
     }
 
     [Test]
-    public void A_frozen_use_travels_on_the_event()
-    {
-        var hit = new DecoyHit(DecoyUse.AdminToken, "127.0.0.1:8080", 10, Evil, DateTimeOffset.UnixEpoch);
-        var (queue, added) = AdminEventQueue.Empty.Add(hit, [], frozen: true);
-
-        Assert.That(added.Frozen, Is.True);
-        Assert.That(AdminEventQueue.Parse(queue.ToJson()).Pending.Single().Frozen, Is.True);
-        var wire = AdminWire.FromNode<AdminEvents>(AdminWire.ToNode(new AdminEvents(queue.Pending)));
-        Assert.That(wire!.Events.Single().Frozen, Is.True);
-    }
-
-    [Test]
     public void The_status_counts_the_callers_freezes() =>
         Assert.That(AdminWire.FromNode<AdminFeatures>(AdminWire.ToNode(new AdminFeatures(Frozen: 2)))!.Frozen, Is.EqualTo(2));
 

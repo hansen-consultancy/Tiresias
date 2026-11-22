@@ -50,36 +50,40 @@ public partial class StatusWindow : Window
     /// <summary>A decoy use is a new finding: run the checks again.</summary>
     void OnDecoyTouched(DecoyTouch _) => Dispatcher.BeginInvoke(model.Refresh);
 
-    /// <summary>A program the admin tier froze is thawed first (a UAC prompt); declined or failed, it stays blocked.</summary>
     async void OnUnblock(object sender, RoutedEventArgs e)
     {
-        if (((FrameworkElement)sender).DataContext is not BlockedRow row)
-            return;
-        if ((await AdminClient.FactsAsync()).Status?.Features.Frozen > 0 && !await ThawAsync(row.Path))
-            return;
-        AppLog.Info($"unblocked {row.Path}");
-        App.Current.Guard.Unblock(row.Path);
+        if (((FrameworkElement)sender).DataContext is BlockedRow row)
+            await UnblockAsync(row.Path);
     }
 
-    /// <summary>The decoy use was the user's: thaw the program (a UAC prompt), then unblock it; declined or failed, it stays both.</summary>
-    async Task ThawAndUnblockAsync(string program)
+    /// <summary>With the admin tier, one UAC prompt thaws a program it froze, lifts its network block and unblocks it.</summary>
+    async Task UnblockAsync(string program)
     {
-        if (await ThawAsync(program))
+        try
         {
-            AppLog.Info($"thawed and unblocked {program}: the decoy use was the user's");
+            if (await AdminProgramBlocks.ListAsync() is not null &&
+                (await AdminTierElevation.RunAsync("unblock-program", program) != AdminSetupResult.Done ||
+                (await AdminProgramBlocks.ListAsync())?.Any(p => string.Equals(p.Path, program, StringComparison.OrdinalIgnoreCase)) != false))
+            {
+                model.GuardMessage = Text.Get("Status_UnblockIncomplete");
+                return;
+            }
             App.Current.Guard.Unblock(program);
+            AppLog.Info($"unblocked {program}");
+            model.Refresh();
         }
-        model.Refresh();
+        catch (IOException e)
+        {
+            AppLog.Error(e, "unblocking program");
+            model.GuardMessage = Text.Get("Status_BlocksUnavailable");
+        }
     }
-
-    /// <summary>Has the admin tier thaw the user's freezes of the program and unblock its network, behind a UAC prompt.</summary>
-    static async Task<bool> ThawAsync(string program) =>
-        await AdminTierElevation.RunAsync("thaw", program) == AdminSetupResult.Done;
 
     /// <summary>Places one decoy at its default place, once the user agreed in the ask-first window.</summary>
     void OnPlaceDecoy(object sender, RoutedEventArgs e)
     {
-        if (((FrameworkElement)sender).DataContext is not DecoyLink link)
+        // A Hyperlink is a FrameworkContentElement, not a FrameworkElement.
+        if (((FrameworkContentElement)sender).DataContext is not DecoyLink link)
             return;
         var where = DecoyStore.DefaultPath(link.Kind);
         var what = link.Kind switch
@@ -109,7 +113,7 @@ public partial class StatusWindow : Window
         if (!AskWindow.Confirm(this, Text.Get("Decoys_RemoveHeading"), Text.Get("Decoys_RemoveBody"), Text.Get("Decoys_RemoveAction")))
             return;
         // Held by the admin tier: getting the set back takes the UAC prompt; then it is removed as always.
-        if (DecoyStore.Current is null && await Task.Run(AdminDecoys.Status) is { Held: true }
+        if (DecoyStore.Current is null && await Task.Run(AdminDecoys.Status) is ({ Held: true } or { NeedsVerification: true })
             && (await AdminTierElevation.RunAsync("release-decoys") is not AdminSetupResult.Done || DecoyStore.Current is null))
         {
             model.ShowDecoys(Text.Get("Decoys_StillHeld"));
@@ -122,6 +126,13 @@ public partial class StatusWindow : Window
             kept.Count == 0 ? "" : Text.Format("Decoys_RemoveKept", string.Join(", ", kept)),
             left.Count == 0 ? "" : Text.Format("Decoys_RemoveLeft", string.Join(", ", left)),
         }.Where(m => m.Length > 0)));
+        model.Refresh();
+    }
+
+    async void OnEnrollDecoys(object sender, RoutedEventArgs e)
+    {
+        var result = await AdminTierElevation.RunAsync("adopt-decoys");
+        model.ShowDecoys(result == AdminSetupResult.Done ? "" : Text.Get("Decoys_EnrollmentIncomplete"));
         model.Refresh();
     }
 
@@ -172,6 +183,7 @@ public partial class StatusWindow : Window
             ServicesPage => NavServices,
             EnvironmentPage => NavEnvironment,
             ActivityPage => NavActivity,
+            InstalledPage => NavInstalled,
             AboutPage => NavAbout,
             _ => NavHome,
         };
@@ -196,6 +208,7 @@ public partial class StatusWindow : Window
             "Services" => Navigate<ServicesPage>(),
             "Environment" => ShowEnvironment(),
             "Activity" => Navigate<ActivityPage>(),
+            "Installed" => Navigate<InstalledPage>(),
             "About" => Navigate<AboutPage>(),
             _ => null,
         };
@@ -305,15 +318,13 @@ public partial class StatusWindow : Window
                 model.CopyFix(fix.Instruction);
                 break;
             case UninstallApp:
-                Desktop.Open("ms-settings:appsfeatures");
-                break;
-            case ThawProgram { Path: var program }:
-                _ = ThawAndUnblockAsync(program);
+                Navigate<InstalledPage>();
                 break;
             case UnblockProgram { Path: var program }:
-                AppLog.Info($"unblocked {program}: the decoy use was the user's");
-                App.Current.Guard.Unblock(program);
-                model.Refresh();
+                _ = UnblockAsync(program);
+                break;
+            case ThawProgram { Path: var frozen }:
+                _ = UnblockAsync(frozen);
                 break;
             case RunThroughExec { Setup: { } setup }:
                 Navigate<ServicesPage>()?.Add(setup.Upstream);
@@ -493,11 +504,17 @@ public sealed partial class FindingRow(IReadOnlyList<DoctorCheck> checks) : Obse
 
     public string? MovesMeaning => PositionText.Meaning(Check.Now, Check.Better) is { Length: > 0 } meaning ? meaning : null;
 
-    public string Glyph => Check.Status == DoctorStatus.Fail ? "\uEA39" : "\uE7BA";
+    /// <summary>Failure, warning, or for hygiene (status ok) a plain information mark.</summary>
+    public string Glyph => Check.Status switch { DoctorStatus.Fail => "\uEA39", DoctorStatus.Warn => "\uE7BA", _ => "\uE946" };
 
-    public Brush? Brush => Application.Current.TryFindResource(Check.Status == DoctorStatus.Fail ? "SystemFillColorCriticalBrush" : "SystemFillColorCautionBrush") as Brush;
+    public Brush? Brush => Application.Current.TryFindResource(Check.Status switch
+    {
+        DoctorStatus.Fail => "SystemFillColorCriticalBrush",
+        DoctorStatus.Warn => "SystemFillColorCautionBrush",
+        _ => "TextFillColorSecondaryBrush",
+    }) as Brush;
 
-    public string FixLabel { get; } = checks.Count == 1 && FindingView.Button(checks[0].Fix) is { } button ? Text.Get(button.Label) : "";
+    public string FixLabel { get; } = FindingView.GroupButton(checks) is { } button ? Text.Get(button.Label) : "";
 
     public Visibility FixVisibility => FixLabel.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
 
@@ -566,14 +583,35 @@ public sealed partial class StatusViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(GuardVisibility))]
     public partial Visibility LockedDownVisibility { get; set; } = Visibility.Collapsed;
 
-    public Visibility GuardVisibility => LockedDownVisibility == Visibility.Visible || Blocked.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(GuardVisibility))]
+    public partial string GuardMessage { get; set; } = "";
+
+    public Visibility GuardVisibility => LockedDownVisibility == Visibility.Visible || Blocked.Count > 0 || GuardMessage.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+    int guardRead;
 
     /// <summary>The lockdown and the blocklist as they are now.</summary>
-    public void ShowGuard()
+    public async void ShowGuard()
     {
+        int read = ++guardRead;
+        IReadOnlyList<AdminBlockedProgram> service = [];
+        string message = "";
+        try
+        {
+            service = await AdminProgramBlocks.ListAsync() ?? [];
+        }
+        catch (IOException e)
+        {
+            AppLog.Error(e, "reading blocked programs");
+            message = Text.Get("Status_BlocksUnavailable");
+        }
+        if (read != guardRead)
+            return;
+        GuardMessage = message;
         var list = App.Current.Guard.Current;
         Blocked.Clear();
-        foreach (var program in list.Programs.OrderByDescending(p => p.Since))
+        var programs = service.Select(p => new BlockedProgram(p.Path, p.Sha256, p.Since)).Concat(list.Programs);
+        foreach (var program in programs.DistinctBy(p => p.Path, StringComparer.OrdinalIgnoreCase).OrderByDescending(p => p.Since))
             Blocked.Add(new(program.Path, Text.Format("Status_BlockedSince", program.Since.ToLocalTime())));
         LockedDownVisibility = list.LockedDown ? Visibility.Visible : Visibility.Collapsed;
         OnPropertyChanged(nameof(GuardVisibility));
@@ -585,6 +623,9 @@ public sealed partial class StatusViewModel : ObservableObject
 
     [ObservableProperty]
     public partial Visibility DecoysRemovableVisibility { get; set; } = Visibility.Collapsed;
+
+    [ObservableProperty]
+    public partial Visibility DecoysEnrollVisibility { get; set; } = Visibility.Collapsed;
 
     /// <summary>Why the last place or remove fell short; empty when it didn't.</summary>
     [ObservableProperty]
@@ -605,17 +646,18 @@ public sealed partial class StatusViewModel : ObservableObject
         {
             set = null;
         }
-        var card = DecoyCard.Of(set, set is null && AdminClient.Installed ? AdminDecoys.Status() : null);
+        var card = DecoyCard.Of(set, AdminClient.Installed ? AdminDecoys.Status() : null);
         Decoys.Clear();
         foreach (var placed in card.Placed)
             Decoys.Add(new(Text.Get(DecoyCard.Keys(placed.Kind).Name), placed.Where, Text.Format("Decoys_Since", placed.Placed.ToLocalTime())));
         foreach (var kind in card.Held)
-            Decoys.Add(new(Text.Get(DecoyCard.Keys(kind).Name), Text.Get("Decoys_Held"), ""));
+            Decoys.Add(new(Text.Get(DecoyCard.Keys(kind).Name), Text.Get(card.Listening ? "Decoys_Held" : "Decoys_PendingListener"), ""));
         DecoyLinks.Clear();
         foreach (var kind in card.Placeable)
             DecoyLinks.Add(new(kind, Text.Get(DecoyCard.Keys(kind).Place)));
         DecoysRemovableVisibility = card.Removable ? Visibility.Visible : Visibility.Collapsed;
-        DecoyMessage = message;
+        DecoysEnrollVisibility = card.CanEnroll ? Visibility.Visible : Visibility.Collapsed;
+        DecoyMessage = message.Length == 0 && card.NeedsVerification ? Text.Get("Decoys_VerifyLegacy") : message;
     }
 
     [ObservableProperty]

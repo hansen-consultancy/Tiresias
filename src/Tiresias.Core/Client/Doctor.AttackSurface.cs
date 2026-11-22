@@ -162,7 +162,7 @@ public static partial class Doctor
             if (data is not { Length: >= 68 })
                 continue;
             var path = Rot13(name);
-            if (path.StartsWith('{') && path.IndexOf('}') is > 0 and var close)
+            if (path.StartsWith('{', StringComparison.Ordinal) && path.IndexOf('}', StringComparison.Ordinal) is > 0 and var close)
             {
                 if (!Guid.TryParse(path[..(close + 1)], out var folder) || knownFolder(folder) is not { } resolved)
                     continue;

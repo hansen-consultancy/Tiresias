@@ -55,7 +55,14 @@ public static class VaultFile
                 JsonSerializer.Serialize(stream, dto, Json);
                 stream.Flush(flushToDisk: true);
             }
-            File.Move(temp, full, overwrite: true);
+            try
+            {
+                File.Move(temp, full, overwrite: !OperatingSystem.IsWindows());
+            }
+            catch (IOException) when (OperatingSystem.IsWindows() && File.Exists(full))
+            {
+                File.Replace(temp, full, null); // Preserve the vault's explicit service read permission across saves.
+            }
         }
         finally
         {

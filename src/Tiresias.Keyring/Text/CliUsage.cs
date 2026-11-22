@@ -1,4 +1,4 @@
-namespace Tiresias.Keyring;
+﻿namespace Tiresias.Keyring;
 
 /// <summary>What <c>tir</c> prints on a usage error: the command list that <see cref="AiGuide"/> is checked against.</summary>
 static class CliUsage
@@ -16,6 +16,12 @@ static class CliUsage
         tir solo init
             Solo mode: the broker runs inside the Tiresias app on this PC, no server needed. Creates
             the recovery key if there is none (or asks for it) and a one-device trust chain.
+        tir solo service install | uninstall
+            As administrator: runs the solo broker as the Tiresias Windows service, under its own
+            account, so programs running as you can't read its memory. Quit the app first.
+        tir trust bind-hello
+            Names this PC's Windows Hello key in the trust chain, for a chain made before Tiresias
+            asked for it: one Hello prompt and the recovery key, once. Solo mode needs the app running.
         tir vault add <slug> [--from-stdin]
         tir vault migrate     bind secrets saved before Tiresias checked service settings (one Hello prompt)
         tir service add <slug> --upstream <https-url> [--secret <slug>] [--method GET]... [--allow <regex>]...
@@ -93,6 +99,7 @@ static class CliUsage
         tir decoys place <passwords|project|variables> [<path>]
         tir decoys list
         tir decoys remove
+        tir decoys adopt
             Decoy credentials that open nothing and point to a port only Tiresias listens on, so a
             program that finds and uses one is named in the activity log (and blocked by the app).
             passwords: a passwords.txt (Documents by default); project: a new folder with an

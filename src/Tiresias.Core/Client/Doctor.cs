@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Tiresias.AdminTier;
@@ -51,8 +51,14 @@ public interface IDoctorProbe
     /// <summary>Enrolled with the broker this device hosts itself (solo mode) rather than a remote one.</summary>
     bool Solo => false;
 
+    /// <summary>Solo mode: whether the broker runs as the Windows service rather than inside the app.</summary>
+    BrokerServiceState BrokerService => BrokerServiceState.NotInstalled;
+
     /// <summary><c>null</c> when the vault file is missing.</summary>
     DoctorVault? Vault { get; }
+
+    /// <summary>Whether the trust chain names this device's Windows Hello key (docs/trust-links.md); <c>null</c> when there is no chain to read.</summary>
+    bool? HelloBound => null;
 
     /// <summary>The HTTP status of an unsigned call to the broker (401 means up), or <c>null</c> when unreachable.</summary>
     Task<int?> BrokerStatusAsync();
@@ -89,6 +95,9 @@ public interface IDoctorProbe
 
     /// <summary>The vault's RavenDB services with their certificates as recorded at setup. Never the certificate.</summary>
     IEnumerable<DoctorRavenCertificate> RavenCertificates() => [];
+
+    /// <summary>The broker's answer to <c>/clearance</c> for the service; <c>null</c> when it didn't answer. Never prompts.</summary>
+    Task<DoctorBrokerAnswer?> RavenClearanceAsync(string service) => Task.FromResult<DoctorBrokerAnswer?>(null);
 
     /// <summary>The sealed environment's deliveries, by name; <c>null</c> while locked. See <see cref="Doctor.KeysAsValues"/>.</summary>
     DoctorEnvironment? SealedEnvironment => null;
@@ -152,11 +161,20 @@ public static partial class Doctor
             Vault(probe.Vault),
         };
 
+        if (probe.HelloBound is { } bound)
+            checks.Add(bound
+                ? new("trust chain", DoctorStatus.Ok, "this device's Windows Hello key signs the links that add trust")
+                : new("trust chain", DoctorStatus.Warn, "this device's Windows Hello key isn't in the trust chain yet, so it can't add a device or change trust: run tir trust bind-hello"));
         if (probe.Solo)
+        {
             checks.AddRange(SoloTradeOffs);
+            checks.Add(BrokerProcess(probe.BrokerService));
+        }
+        var brokerStatus = probe.Enrolled ? await probe.BrokerStatusAsync() : null;
         if (probe.Enrolled)
-            checks.Add(await probe.BrokerStatusAsync() switch
+            checks.Add(brokerStatus switch
             {
+                null when probe.Solo && probe.BrokerService != BrokerServiceState.NotInstalled => new("broker reachable", DoctorStatus.Fail, "no answer: the broker runs as the Tiresias service; start it in Windows Services"),
                 null when probe.Solo => new("broker reachable", DoctorStatus.Fail, "no answer: the broker runs inside the Tiresias app; start the app (or tir agent)"),
                 null => new("broker reachable", DoctorStatus.Fail, "no answer (NetBird down, or the broker stopped)"),
                 401 => new("broker reachable", DoctorStatus.Ok, "answers and refuses unsigned calls"),
@@ -185,17 +203,37 @@ public static partial class Doctor
         checks.AddRange(ConfigChecks(probe.UserSecretsFiles(), probe.ConfigFiles(), probe.KeyFiles()));
         checks.AddRange(GitTokens(probe.GitConfigs(), probe.GitCredentials));
         checks.AddRange(PublishingKeys(probe.ToolFiles(), probe.UserVariableNames));
-        checks.AddRange(RavenExpiry(probe.RavenCertificates(), DateTimeOffset.UtcNow));
+        var ravenCertificates = probe.RavenCertificates().ToArray();
+        checks.AddRange(RavenExpiry(ravenCertificates, DateTimeOffset.UtcNow));
+        var clearances = new List<(DoctorRavenCertificate, DoctorBrokerAnswer?)>();
+        foreach (var certificate in ravenCertificates)
+            clearances.Add((certificate, brokerStatus is null ? null : await probe.RavenClearanceAsync(certificate.Service)));
+        checks.AddRange(RavenClearance(clearances));
         checks.AddRange(KeysAsValues(probe.SealedEnvironment));
         // A program blocked for using a decoy is that finding, not "This wasn't me"'s.
-        var decoyUses = probe.DecoyUses().ToArray();
-        var blocked = probe.BlockedPrograms().ToArray();
         var (startup, installed) = (probe.StartupEntries().ToArray(), probe.UninstallEntries().ToArray());
+        DecoyUseRecord[]? decoyUses = null;
+        string[] blocked = [], otherBlocks = [];
+        try
+        {
+            decoyUses = [.. probe.DecoyUses()];
+            blocked = [.. probe.BlockedPrograms()];
+        }
+        catch (IOException)
+        {
+            decoyUses = null;
+        }
         var runs = probe.ProgramRuns(RunsAsked(startup, installed, blocked)).ToArray();
-        checks.AddRange(Decoys(decoyUses, blocked, DateTimeOffset.UtcNow, runs));
+        if (decoyUses is null)
+            checks.Add(new("decoy incidents and program blocks", DoctorStatus.Warn, "The admin service could not supply its incident history and block list."));
+        else
+        {
+            checks.AddRange(Decoys(decoyUses, blocked, DateTimeOffset.UtcNow, runs));
+            otherBlocks = [.. blocked.Where(b => !decoyUses.Any(u => !u.IsRead && SamePath(u.Program, b)))];
+        }
         checks.AddRange(CliSignIns(probe.CliConfigs, probe.GitHubAppService));
         var (uses, now) = (probe.CredentialUses().ToArray(), DateTimeOffset.UtcNow);
-        checks.AddRange(AttackSurface(probe.Extensions(), startup, uses, blocked.Where(b => !decoyUses.Any(u => !u.IsRead && SamePath(u.Program, b))), now, runs));
+        checks.AddRange(AttackSurface(probe.Extensions(), startup, uses, otherBlocks, now, runs));
         checks.AddRange(UninstallEntries(installed));
         checks.AddRange(UnusedApplications(installed, runs, uses, now));
         return checks;
@@ -210,8 +248,15 @@ public static partial class Doctor
         new("mode", DoctorStatus.Ok, "Solo: the broker runs on this device; encryption, leases, placeholders, consent and audit all apply"),
         new("egress", DoctorStatus.Warn, "Solo: requests leave from your own connection, so there is no fixed IP for upstreams to allow-list"),
         new("isolation", DoctorStatus.Warn, "Solo: secrets live on the same machine as your agents and are not protected from code running as admin"),
-        new("broker process", DoctorStatus.Warn, "Broker runs inside the app: install the service for process isolation (not built yet)"),
     ];
+
+    /// <summary>Where solo mode's broker runs (docs/broker-service.md).</summary>
+    static DoctorCheck BrokerProcess(BrokerServiceState service) => service switch
+    {
+        BrokerServiceState.Running => new("broker process", DoctorStatus.Ok, "Broker runs as the Tiresias service, out of reach of programs running as you"),
+        BrokerServiceState.Stopped => new("broker process", DoctorStatus.Fail, "The Tiresias service is installed but stopped: start it in Windows Services, or run tir solo service install again"),
+        _ => new("broker process", DoctorStatus.Warn, "Broker runs inside the app: install the service for process isolation (tir solo service install, as administrator)"),
+    };
 
     public const string AdminTierCheck = "admin tier";
 

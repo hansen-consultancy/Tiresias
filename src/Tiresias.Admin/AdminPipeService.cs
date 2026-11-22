@@ -21,6 +21,14 @@ sealed class AdminPipeService(ILogger<AdminPipeService> logger) : BackgroundServ
     /// <summary>A client that connects and then says nothing is dropped after this.</summary>
     static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(10);
 
+    /// <summary>
+    /// Connections served at once. An <c>events.wait</c> holds one for up to 30 s, so without a cap a
+    /// local program could pile them up until the service runs out of handles; past it, callers wait.
+    /// </summary>
+    const int MaxConnections = 32;
+
+    readonly SemaphoreSlim slots = new(MaxConnections);
+
     static readonly string Version =
         (typeof(AdminPipeService).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.0.0")
         .Split('+', 2)[0];
@@ -52,6 +60,7 @@ sealed class AdminPipeService(ILogger<AdminPipeService> logger) : BackgroundServ
             {
                 try
                 {
+                    await slots.WaitAsync(stop);
                     await listening.WaitForConnectionAsync(stop);
                 }
                 catch (OperationCanceledException)
@@ -62,7 +71,7 @@ sealed class AdminPipeService(ILogger<AdminPipeService> logger) : BackgroundServ
                 var connectedUtc = DateTime.UtcNow;
                 listening = Create(first: false);
                 running.RemoveAll(t => t.IsCompleted);
-                running.Add(ServeAsync(connected, connectedUtc, stop));
+                running.Add(ServeThenFreeAsync(connected, connectedUtc, stop));
             }
         }
         finally
@@ -94,6 +103,18 @@ sealed class AdminPipeService(ILogger<AdminPipeService> logger) : BackgroundServ
             PipeTransmissionMode.Byte, options, 0, 0, security);
     }
 
+    async Task ServeThenFreeAsync(NamedPipeServerStream pipe, DateTime connectedUtc, CancellationToken stop)
+    {
+        try
+        {
+            await ServeAsync(pipe, connectedUtc, stop);
+        }
+        finally
+        {
+            slots.Release();
+        }
+    }
+
     async Task ServeAsync(NamedPipeServerStream pipe, DateTime connectedUtc, CancellationToken stop)
     {
         await using (pipe)
@@ -107,9 +128,27 @@ sealed class AdminPipeService(ILogger<AdminPipeService> logger) : BackgroundServ
                     read.CancelAfter(RequestTimeout);
                     request = await AdminWire.ReadAsync<AdminRequest>(pipe, read.Token);
                 }
-                var reply = await AnswerAsync(request, client, stop);
-                Record(request.Op, client, reply.Status, reply.Message);
-                await AdminWire.WriteAsync(pipe, reply, stop);
+                var decision = client.Caller is { } caller
+                    ? AdminCallerPolicy.Decide(request, caller)
+                    : AdminDecision.Refuse($"the caller can't be named: {client.Problem}");
+                AdminReply reply;
+                try
+                {
+                    if (decision.ActingFor is { } user)
+                    {
+                        if (AdminCallerPolicy.NeedsElevation(request.Op))
+                            log!.Append(Action(request.Op, client, "requested", null, user));
+                        reply = await AnswerAsync(request, user, stop);
+                    }
+                    else
+                        reply = AdminReply.Refused(decision.Reason!);
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or System.Text.Json.JsonException)
+                {
+                    reply = new(AdminStatus.Error, Message: "The protected service state could not be read or written.");
+                }
+                Record(request.Op, client, reply.Status, reply.Message, decision.ActingFor);
+                await AdminWire.WriteReplyAsync(pipe, reply, RequestTimeout, stop);
             }
             catch (Exception e) when (e is IOException or InvalidDataException or System.Text.Json.JsonException or OperationCanceledException or EndOfStreamException)
             {
@@ -119,15 +158,8 @@ sealed class AdminPipeService(ILogger<AdminPipeService> logger) : BackgroundServ
         }
     }
 
-    async Task<AdminReply> AnswerAsync(AdminRequest request, PipeClientInfo client, CancellationToken stop)
+    async Task<AdminReply> AnswerAsync(AdminRequest request, string user, CancellationToken stop)
     {
-        if (client.Caller is not { } caller)
-            return AdminReply.Refused($"the caller can't be named: {client.Problem}");
-        var decision = AdminCallerPolicy.Decide(request, caller);
-        if (!decision.Allowed)
-            return AdminReply.Refused(decision.Reason!);
-        // Every action is the acting user's: the caller's own, or its session's user for an elevated caller.
-        var user = decision.ActingFor!;
         var args = request.Args ?? [];
         switch (request.Op)
         {
@@ -145,11 +177,23 @@ sealed class AdminPipeService(ILogger<AdminPipeService> logger) : BackgroundServ
                     ? AdminReply.Refused(refused)
                     : AdminReply.Ok(decoys.Status(user));
             case AdminOps.DecoysRelease:
-                return AdminReply.Ok(new AdminDecoysRelease(user, await decoys!.ReleaseAsync(user)));
+                return AdminReply.Ok(decoys!.PrepareRelease(user));
+            case AdminOps.DecoysReleaseCommit:
+                return await decoys!.CommitReleaseAsync(user, args["receipt"]!.GetValue<string>())
+                    ? AdminReply.Ok(new { }) : AdminReply.Refused("the registered decoys changed during handback");
             case AdminOps.EventsWait:
-                var ack = AdminWire.FromNode<long[]>(args["ack"]) ?? [];
                 var wait = TimeSpan.FromSeconds(args["wait"]!.GetValue<int>());
-                return AdminReply.Ok(new AdminEvents(await decoys!.WaitAsync(user, ack, wait, stop)));
+                return AdminReply.Ok(await decoys!.WaitAsync(user, args["after"]!.GetValue<long>(), wait, stop));
+            case AdminOps.EventsHistory:
+                return AdminReply.Ok(decoys!.History(user, args["after"]!.GetValue<long>()));
+            case AdminOps.EventsReview:
+                return AdminReply.Ok(decoys!.Review(user, args["through"]!.GetValue<long>()));
+            case AdminOps.BlocksCheck:
+                return AdminReply.Ok(decoys!.Check(user, (string?)args["program"], (string?)args["sha256"]));
+            case AdminOps.BlocksList:
+                return AdminReply.Ok(decoys!.Blocks(user, (string?)args["after"]));
+            case AdminOps.BlocksUnblock:
+                return AdminReply.Ok(decoys!.Unblock(user, (string)args["program"]!));
             case AdminOps.Freeze:
                 var (froze, notFrozen) = freezer!.Freeze(user, args["pid"]!.GetValue<int>());
                 return froze is not null ? AdminReply.Ok(froze) : AdminReply.Refused(notFrozen!);
@@ -181,13 +225,15 @@ sealed class AdminPipeService(ILogger<AdminPipeService> logger) : BackgroundServ
         }
     }
 
-    void Record(string? op, PipeClientInfo client, AdminStatus result, string? reason)
+    static AdminAction Action(string? op, PipeClientInfo client, string result, string? reason, string? actingFor) =>
+        AdminAction.Of(DateTimeOffset.Now, op, client.Caller, client.Pid, client.Image, result, reason, actingFor);
+
+    void Record(string? op, PipeClientInfo client, AdminStatus result, string? reason, string? actingFor = null)
     {
-        var line = AdminAction.Of(DateTimeOffset.Now, op, client.Caller, client.Pid, client.Image, result.ToString().ToLowerInvariant(),
-            result == AdminStatus.Ok ? null : reason ?? client.Problem).ToLine();
+        var action = Action(op, client, result.ToString().ToLowerInvariant(), result == AdminStatus.Ok ? null : reason ?? client.Problem, actingFor);
         try
         {
-            log!.Append(line);
+            log!.Append(action);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {

@@ -70,7 +70,7 @@ public class BrokerHostTests
         return message;
     }
 
-    async Task<string> OpenLeaseAndMint(string? ceiling = null)
+    async Task<string> OpenLeaseAndMint(string? ceiling = null, Key? enrolledSigner = null)
     {
         var begin = await client.SendAsync(Signed("/lease/begin"));
         Assert.That(begin.StatusCode, Is.EqualTo(HttpStatusCode.OK));
@@ -85,11 +85,11 @@ public class BrokerHostTests
         using (var identity = Key.Import(SignatureAlgorithm.Ed25519, raw, KeyBlobFormat.RawPrivateKey))
             Assert.That(offer.Verify(identity.PublicKey, Convert.FromBase64String(offerJson.GetProperty("signature").GetString()!)), Is.True);
 
-        var seal = await client.SendAsync(Signed("/lease/seal", new { offer.LeaseId, deks = vault.SealTo(offer) }));
+        var seal = await client.SendAsync(Signed("/lease/seal", vault.SealBody(offer, enrolledSigner)));
         Assert.That(seal.StatusCode, Is.EqualTo(HttpStatusCode.OK));
 
         var mint = await client.SendAsync(Signed("/placeholder",
-            new { consumer = "claude:test", serviceSlug = "llm", ceiling, purpose = "testing", duration = "01:00:00" }));
+            vault.MintApproval(new("claude:test", null, "llm", ceiling, "testing", TimeSpan.FromHours(1)))));
         Assert.That(mint.StatusCode, Is.EqualTo(HttpStatusCode.OK), await mint.Content.ReadAsStringAsync());
         return (await mint.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("token").GetString()!;
     }
@@ -101,6 +101,26 @@ public class BrokerHostTests
         message.Headers.Add("X-Tiresias-Device", "laptop");
         message.Headers.Add("X-Trace", "t-1");
         return message;
+    }
+
+    [Test]
+    public async Task A_service_lease_records_the_revisions_accepted_over_HTTP()
+    {
+        using var signer = Key.Create(SignatureAlgorithm.Ed25519);
+        var marksPath = Path.Combine(dir, "marks.json");
+        parent = factory;
+        client.Dispose();
+        factory = parent.WithWebHostBuilder(b =>
+        {
+            b.UseSetting("Broker:HighWaterPath", marksPath);
+            b.UseSetting("Broker:RevisionPublicKey", Convert.ToBase64String(signer.PublicKey.Export(KeyBlobFormat.RawPublicKey)));
+        });
+        client = factory.CreateClient();
+
+        await OpenLeaseAndMint(enrolledSigner: signer);
+
+        var marks = new HighWaterMarks(marksPath, signer.PublicKey).Load();
+        Assert.That(marks, Is.EquivalentTo(vault.Document.Secrets.ToDictionary(s => s.Slug, s => s.Version)));
     }
 
     [Test]
@@ -221,7 +241,7 @@ public class BrokerHostTests
         Assert.That(denied.StatusCode, Is.EqualTo(HttpStatusCode.Forbidden));
         Assert.That((await denied.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("elevationNeeded").GetString(), Is.EqualTo("admin"));
 
-        var elevate = await client.SendAsync(Signed("/elevate", new { service = "llm", grant = "admin", minutes = 5 }));
+        var elevate = await client.SendAsync(Signed("/elevate", vault.ElevateApproval("llm", "admin", TimeSpan.FromMinutes(5))));
         Assert.That(elevate.StatusCode, Is.EqualTo(HttpStatusCode.OK));
 
         var allowed = await client.SendAsync(Svc(HttpMethod.Delete, "/svc/llm/v1/models/x", token));

@@ -29,6 +29,8 @@ static partial class TcpConnectionOwner
     static unsafe int? OwningPid(bool ipv6, int clientPort, int serverPort)
     {
         // Row layouts: MIB_TCPROW_OWNER_PID (6 DWORDs) and MIB_TCP6ROW_OWNER_PID (56 bytes).
+        // MIB_TCP6ROW_OWNER_PID: local address[16], local scope id, local port (20), remote address[16],
+        // remote scope id, remote port (44), state, pid (52): 56 bytes. MIB_TCPROW_OWNER_PID: 24 bytes.
         var (family, rowSize, localPortAt, remotePortAt, pidAt) = ipv6 ? (AfInet6, 56, 20, 44, 52) : (AfInet, 24, 8, 16, 20);
         var size = 0;
         for (var attempt = 0; attempt < 4; attempt++)

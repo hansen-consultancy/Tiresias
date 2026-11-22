@@ -15,6 +15,7 @@ namespace Tiresias.Admin;
 /// service keeps and an elevated administrator has. Linked into the agent too, so the tier's removal
 /// can undo it with the service stopped.
 /// </summary>
+[System.Runtime.Versioning.SupportedOSPlatform("windows")]
 static unsafe partial class AuditRules
 {
     static readonly SecurityIdentifier Everyone = new(WellKnownSidType.WorldSid, null);

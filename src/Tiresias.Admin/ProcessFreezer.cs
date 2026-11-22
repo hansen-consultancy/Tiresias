@@ -18,6 +18,7 @@ namespace Tiresias.Admin;
 /// Manager still ends a frozen process. Linked into the agent, whose elevated removal thaws with the
 /// service stopped.
 /// </summary>
+[System.Runtime.Versioning.SupportedOSPlatform("windows")]
 static partial class ProcessFreezer
 {
     /// <summary>Every running process, with what <see cref="AdminFreeze"/> judges it by.</summary>

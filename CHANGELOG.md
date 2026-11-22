@@ -10,20 +10,33 @@ its section below.
 
 ### Added
 
+- `tir solo service install` (as administrator) runs solo mode's broker as a Windows service under
+  its own account, so programs running as you can't read its memory or rewrite the files it
+  trusts, and an older `vault.json` restored while locked is refused. `tir solo service uninstall`
+  moves it back into the app.
+- `Tiresias.Core` and `Tiresias.Protocol` carry the groundwork for out-of-band alerts: the
+  `tiresias.alert/v1` payload and the planner that decides, per sink, what to send, with dedupe,
+  rate limits and redaction. Nothing sends alerts yet.
+- Home and `tir doctor` list programs you haven't opened in 90 days. A program that works without
+  being opened (a tray icon, a service, a driver, something that starts at log-on, a command on
+  `PATH`) is never counted, nor one that used a credential. On Home they are one line, last, that
+  doesn't light the tray badge.
+- A new **Installed** page lists every installed program with when you last opened it (or why
+  that's unknown) and its icon, unused ones first, with a search box. Select one to see its version, who it is
+  installed for, the credentials it used in the last 90 days, its folder, its publisher and who
+  signed it (checked on your PC), and **Search online...** to look it up in your browser. **Open Installed apps
+  in Settings** is where you uninstall it.
+- Admin tier: every read of a decoy file is named, from Windows' own file auditing, with the
+  program that read it and what started it; reads by routine openers such as Windows Search are
+  kept in the incident history and raise nothing.
 - Admin tier: it now tells Tiresias when your programs last ran, from Windows' records only an
   administrator can read (the Background Activity Moderator and Prefetch), for the programs the
   doctor looks at and only for you. Unused applications are found more reliably, and a decoy
   finding says when Windows last saw the program run.
-
 - Admin tier: a program that uses a decoy credential is now frozen, together with what it started,
   and cut off the network until you decide. Home's finding offers **Thaw and unblock (that was me)**
-  behind an admin prompt; dismissing it keeps the program frozen. **This wasn't me** freezes the
-  program too. Removing the admin tier thaws everything and lifts every network block first.
-
-- Home and `tir doctor` list programs you haven't opened in 90 days, with **Open Installed apps**
-  to uninstall them. A program that works without being opened (a tray icon, a service, a driver,
-  something that starts at log-on, a command on `PATH`) is never counted, nor one that used a
-  credential. These lines sort last and don't light the tray badge.
+  behind an admin prompt, as does unblocking it from the blocked programs list; dismissing it keeps
+  the program frozen. **This wasn't me** freezes the program too. Removing the admin tier thaws everything and lifts every network block first.
 - `tir doctor --surface` also lists what is installed: each editor's extensions with the
   credentials that editor used through Tiresias in the last 90 days, global `dotnet`, `npm`, `pipx`
   and `cargo` tools, and what starts at log-on with its signature and when you last opened it.
@@ -56,6 +69,9 @@ its section below.
   a token.
 - The app checks for findings in the background, a minute after it starts and every four hours.
   New ones put a dot on the tray icon and "(*n* new)" on **Status...** until you open Home.
+- Home and `tir doctor` ask RavenDB, through the broker, what each RavenDB service's certificate may
+  do, and warn when it can change the server (Cluster Admin, Operator), reaches more than one
+  database, or is Admin on its database. **Edit...** on the service swaps in a narrower one.
 - An optional admin tier: with one Windows admin prompt, the app sets up a small Tiresias service
   that runs from Program Files. First run offers it once (**Not now** changes nothing); About shows
   whether it runs and offers **Set up**, **Update** or **Remove**, and `tir doctor` reports it.
@@ -68,6 +84,17 @@ its section below.
 
 ### Changed
 
+- Trust-chain links that add a device, user or broker, or change the admin threshold, now need a
+  Windows Hello signature from each device that signs them and each device they add. Setting up
+  solo mode asks for Windows Hello once more, to put this PC's Hello key in the chain. A chain made
+  earlier keeps working; `tir trust bind-hello` (with the recovery key) adds the key to it, and
+  `tir doctor` says when that is needed.
+- While unlocked, the broker refuses a `vault.json` holding older versions of secrets than it
+  already saw, as when an older copy is restored, and keeps the newer one.
+- The broker now checks that you approved each placeholder, elevation and GitHub App token itself,
+  instead of trusting any program that can sign as this PC. Approvals are signed with a key only
+  the unlocked app or a Windows Hello prompt can derive; prompts are unchanged. Update `tir` and
+  the app together: an older `tir` gets `approval-required`.
 - The secrets editor hides user-secrets folders that hold no keys behind a line, "*N* empty
   folders", with **Move *N* empty to Recycle Bin**. Folders holding only settings (flags, numbers,
   plain URLs) say "(settings only)" and are listed after those holding secrets. Saving an empty file
@@ -81,6 +108,8 @@ its section below.
 - An app loading its user secrets through `Tiresias.Extensions.Configuration` now lets the
   consent dialog and Windows Hello prompt come to the front, as `tir` already did, instead of
   opening behind the IDE.
+- Microsoft Defender for Endpoint's sensor opening a decoy file during a scan is recorded as a
+  routine open, like Defender's own, instead of raising a warning on Home.
 
 ## [0.2.1] - 2026-11-20
 

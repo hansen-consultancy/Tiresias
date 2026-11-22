@@ -9,6 +9,6 @@ public static partial class Doctor
     /// though not a backslash last, where it would escape bash's closing quote.
     /// </summary>
     internal static bool Pastable(string value, bool path = false) =>
-        value.Length > 0 && !value.EndsWith('\\')
-        && value.All(c => char.IsAsciiLetterOrDigit(c) || "/:._@+-".Contains(c) || (path && c is '\\' or ' '));
+        value.Length > 0 && !value.EndsWith('\\', StringComparison.Ordinal)
+        && value.All(c => char.IsAsciiLetterOrDigit(c) || "/:._@+-".Contains(c, StringComparison.Ordinal) || (path && c is '\\' or ' '));
 }

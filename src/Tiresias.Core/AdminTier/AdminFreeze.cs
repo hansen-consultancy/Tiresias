@@ -189,7 +189,4 @@ public static partial class AdminArgs
 {
     /// <summary><c>freeze</c>'s <c>pid</c>: a process id, never the idle or system process.</summary>
     public static bool Pid(JsonNode? node) => Int(node, 8, int.MaxValue, out _);
-
-    /// <summary><c>thaw</c>'s <c>program</c>: the frozen program's full image path.</summary>
-    public static bool Program(JsonNode? node) => Text(node, MaxPath) && FullPath((string)node!);
 }

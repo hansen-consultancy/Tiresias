@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -354,7 +354,8 @@ public sealed partial class FirstRunViewModel : ObservableObject
 
     async Task SetUpSoloAsync()
     {
-        SoloBroker.Setup(recoveryKey!);
+        // Signing genesis shows a Hello prompt: keep the window responsive meanwhile.
+        await Task.Run(() => SoloBroker.Setup(recoveryKey!));
         Forget();
         // Starts the in-app broker and opens the first lease; already unlocked, so no second Hello prompt.
         await App.Current.UnlockAsync(interactive: true);

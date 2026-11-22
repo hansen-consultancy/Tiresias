@@ -1,7 +1,8 @@
-using System.Net;
+﻿using System.Net;
 using System.Security.Cryptography;
 using Tiresias.Client;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using Tiresias.Audit;
 using Tiresias.Broker;
@@ -27,7 +28,7 @@ public class TrustChainTests
     public void SetUp()
     {
         laptop = NewSigner("alice-laptop");
-        paper = NewSigner("alice-paper");
+        paper = NewSigner("alice-paper", hello: false);
         chain = [TrustChain.Start("personal", "alice", laptop, paper, new(), T0)];
         genesisHash = TrustChain.Hash(chain[0]);
     }
@@ -40,11 +41,11 @@ public class TrustChainTests
         keys.Clear();
     }
 
-    Signer NewSigner(string id)
+    Signer NewSigner(string id, bool hello = true)
     {
         var key = Key.Create(SignatureAlgorithm.Ed25519);
         keys.Add(key);
-        return new(id, key);
+        return new(id, key, hello ? TestHello.For(id) : null);
     }
 
     void Add(LinkBody body, params Signer[] signers) => chain.Add(TrustChain.Append(chain, body, T0, signers));
@@ -298,6 +299,118 @@ public class TrustChainTests
     [Test]
     public void Malformed_json_is_not_a_chain() =>
         Assert.That(TrustLinkJson.ParseChain("[{\"seq\":0}]"u8), Is.Null);
+
+    // Presence (docs/trust-links.md): links that add trust need Hello signatures.
+
+    static Signer WithoutHello(Signer signer) => signer with { Hello = null };
+
+    [Test]
+    public void Genesis_anchors_the_first_devices_hello_key() =>
+        Assert.That(Valid().Devices["alice-laptop"].Hello, Is.EqualTo(laptop.Hello!.PublicKey));
+
+    [Test]
+    public void An_add_device_its_authorizer_signed_without_hello_needs_presence()
+    {
+        var desktop = NewSigner("alice-desktop");
+        Add(new AddDevice("alice", desktop.Describe()), WithoutHello(laptop), desktop);
+        AssertFails(TrustFailureKind.PresenceRequired, 1);
+    }
+
+    [Test]
+    public void A_new_device_without_a_hello_key_or_signature_needs_presence()
+    {
+        var bare = NewSigner("alice-desktop", hello: false);
+        Add(new AddDevice("alice", bare.Describe()), laptop, bare);
+        AssertFails(TrustFailureKind.PresenceRequired, 1);
+
+        chain.RemoveAt(1);
+        var desktop = NewSigner("alice-desktop");
+        Add(new AddDevice("alice", desktop.Describe()), laptop, WithoutHello(desktop));
+        AssertFails(TrustFailureKind.PresenceRequired, 1);
+    }
+
+    [Test]
+    public void Every_link_that_adds_trust_needs_presence()
+    {
+        var anna = NewSigner("anna-phone");
+        LinkBody[] bodies =
+        [
+            new AddUser("anna", false, anna.Describe()),
+            new AddBroker("vps-broker", RandomNumberGenerator.GetBytes(32)),
+            new SetPolicy(new()),
+        ];
+        foreach (var body in bodies)
+        {
+            Signer[] countersigners = body is AddUser ? [anna] : [];
+            Add(body, [WithoutHello(laptop), .. countersigners]);
+            AssertFails(TrustFailureKind.PresenceRequired, 1);
+            chain.RemoveAt(1);
+        }
+    }
+
+    [Test]
+    public void A_hello_signature_by_another_key_or_over_other_bytes_does_not_verify()
+    {
+        var desktop = NewSigner("alice-desktop");
+        var inner = laptop.Hello!;
+        HelloKey[] forged =
+        [
+            TestHello.For("someone-else") with { PublicKey = inner.PublicKey },
+            inner with { Sign = data => inner.Sign([.. data, 0]) },
+            inner with { Sign = data => inner.Sign([.. "tiresias/v1/presence\n"u8, .. data["tiresias/v1/link\n".Length..]]) },
+        ];
+        foreach (var hello in forged)
+        {
+            Add(new AddDevice("alice", desktop.Describe()), laptop with { Hello = hello }, desktop);
+            AssertFails(TrustFailureKind.BadSignature, 1);
+            chain.RemoveAt(1);
+        }
+    }
+
+    [Test]
+    public void Revocation_needs_only_device_keys()
+    {
+        var desktop = NewSigner("alice-desktop");
+        Add(new AddDevice("alice", desktop.Describe()), laptop, desktop);
+        Add(new RevokeDevice("alice-desktop"), WithoutHello(laptop));
+        Assert.That(Valid().Devices.Keys, Does.Not.Contain("alice-desktop"));
+    }
+
+    [Test]
+    public void A_device_from_before_hello_binds_its_key_once_with_the_paper_key()
+    {
+        var old = WithoutHello(laptop);
+        chain = [TrustChain.Start("personal", "alice", old, paper, new(), T0)];
+        genesisHash = TrustChain.Hash(chain[0]);
+        Assert.That(Encoding.UTF8.GetString(TrustLinkJson.Write(chain[0], withSignatures: true)), Does.Not.Contain("hello"),
+            "a link without Hello keys keeps the bytes it had before them");
+        Assert.That(Valid().Devices["alice-laptop"].Hello, Is.Null);
+
+        var desktop = NewSigner("alice-desktop");
+        Add(new AddDevice("alice", desktop.Describe()), old, desktop);
+        AssertFails(TrustFailureKind.PresenceRequired, 1);
+        chain.RemoveAt(1);
+
+        var bind = new BindHello("alice-laptop", laptop.Hello!.PublicKey);
+        Add(bind, laptop);
+        AssertFails(TrustFailureKind.UnauthorizedSigner, 1);
+        chain.RemoveAt(1);
+
+        Add(bind, laptop, paper);
+        var state = Valid();
+        Assert.That(state.Devices["alice-laptop"].Hello, Is.EqualTo(laptop.Hello.PublicKey));
+        Assert.That(state.BreakGlassUses, Is.EqualTo(new[] { new BreakGlassUse(1, "alice-paper", "alice") }));
+
+        Add(new AddDevice("alice", desktop.Describe()), laptop, desktop);
+        Assert.That(Valid().Devices.Keys, Does.Contain("alice-desktop"));
+
+        Add(new BindHello("alice-desktop", TestHello.For("other").PublicKey), desktop, paper);
+        AssertFails(TrustFailureKind.InvalidLink, 3);
+        chain.RemoveAt(3);
+
+        var parsed = TrustLinkJson.ParseChain(TrustLinkJson.WriteChain(chain))!;
+        Assert.That(parsed.Select(TrustChain.Hash), Is.EqualTo(chain.Select(TrustChain.Hash)));
+    }
 }
 
 /// <summary>The broker with a trust chain configured: the chain, not the static device list, decides who may sign.</summary>
@@ -322,7 +435,7 @@ public class BrokerTrustChainTests
         chainPath = Path.Combine(dir, "chain.json");
         vault = TestVault.Create();
         VaultFile.Save(Path.Combine(dir, "vault.json"), vault.Document);
-        laptop = new("alice-laptop", Key.Create(SignatureAlgorithm.Ed25519));
+        laptop = TestHello.Device("alice-laptop", Key.Create(SignatureAlgorithm.Ed25519));
         paper = new("alice-paper", Key.Create(SignatureAlgorithm.Ed25519));
         configured = Key.Create(SignatureAlgorithm.Ed25519);
         chain = [TrustChain.Start("personal", "alice", laptop, paper, new(), T0)];
@@ -383,7 +496,7 @@ public class BrokerTrustChainTests
     public async Task A_longer_chain_enrols_its_new_device_and_is_audited()
     {
         using var desktopKey = Key.Create(SignatureAlgorithm.Ed25519);
-        var desktop = new Signer("alice-desktop", desktopKey);
+        var desktop = TestHello.Device("alice-desktop", desktopKey);
         chain.Add(TrustChain.Append(chain, new AddDevice("alice", desktop.Describe()), T0, laptop, desktop));
 
         var response = await PostChain(chain);
@@ -393,6 +506,20 @@ public class BrokerTrustChainTests
         Assert.That((await client.SendAsync(Signed(desktop.DeviceId, desktopKey, "/lease/end"))).StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
         Assert.That(File.ReadAllText(Path.Combine(dir, "audit.jsonl")), Does.Contain("\"kind\":\"TrustLink\"").And.Contain("seq 1 add-device"));
         Assert.That(AuditLog.Verify(Path.Combine(dir, "audit.jsonl")), Is.Null);
+    }
+
+    [Test]
+    public async Task A_chain_extended_without_presence_is_refused_and_the_head_stays()
+    {
+        using var desktopKey = Key.Create(SignatureAlgorithm.Ed25519);
+        var desktop = TestHello.Device("alice-desktop", desktopKey);
+        chain.Add(TrustChain.Append(chain, new AddDevice("alice", desktop.Describe()), T0, laptop with { Hello = null }, desktop));
+
+        var response = await PostChain(chain);
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Conflict));
+        Assert.That((await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("reason").GetString(), Is.EqualTo("PresenceRequired"));
+        Assert.That((await client.SendAsync(Signed(desktop.DeviceId, desktopKey, "/lease/end"))).StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
     }
 
     [Test]
@@ -416,7 +543,7 @@ public class BrokerTrustChainTests
     public async Task A_shorter_chain_is_refused_as_a_rollback_and_audited()
     {
         using var desktopKey = Key.Create(SignatureAlgorithm.Ed25519);
-        var desktop = new Signer("alice-desktop", desktopKey);
+        var desktop = TestHello.Device("alice-desktop", desktopKey);
         chain.Add(TrustChain.Append(chain, new AddDevice("alice", desktop.Describe()), T0, laptop, desktop));
         Assert.That((await PostChain(chain)).StatusCode, Is.EqualTo(HttpStatusCode.OK));
 
@@ -430,13 +557,19 @@ public class BrokerTrustChainTests
     [Test]
     public async Task Revoking_the_device_that_opened_the_lease_ends_it_and_its_placeholders()
     {
-        Assert.That((await client.SendAsync(Signed(laptop.DeviceId, laptop.Key, "/lease/begin"))).StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var begin = await client.SendAsync(Signed(laptop.DeviceId, laptop.Key, "/lease/begin"));
+        Assert.That(begin.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var offerJson = await begin.Content.ReadFromJsonAsync<JsonElement>();
+        var offer = new LeaseOffer(offerJson.GetProperty("leaseId").GetString()!,
+            Convert.FromBase64String(offerJson.GetProperty("leaseKey").GetString()!),
+            DateTimeOffset.FromUnixTimeSeconds(offerJson.GetProperty("hardCapAt").GetInt64()));
+        await client.SendAsync(Signed(laptop.DeviceId, laptop.Key, "/lease/seal", JsonSerializer.SerializeToUtf8Bytes(vault.SealBody(offer), JsonSerializerOptions.Web)));
         var mint = await client.SendAsync(Signed(laptop.DeviceId, laptop.Key, "/placeholder", JsonSerializer.SerializeToUtf8Bytes(
-            new { consumer = "claude:test", serviceSlug = "llm", purpose = "testing", duration = "01:00:00" }, JsonSerializerOptions.Web)));
+            vault.MintApproval(new("claude:test", null, "llm", null, "testing", TimeSpan.FromHours(1))), JsonSerializerOptions.Web)));
         var token = (await mint.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("token").GetString()!;
 
         using var desktopKey = Key.Create(SignatureAlgorithm.Ed25519);
-        var desktop = new Signer("alice-desktop", desktopKey);
+        var desktop = TestHello.Device("alice-desktop", desktopKey);
         chain.Add(TrustChain.Append(chain, new AddDevice("alice", desktop.Describe()), T0, laptop, desktop));
         chain.Add(TrustChain.Append(chain, new RevokeDevice(laptop.DeviceId), T0, desktop));
         Assert.That((await PostChain(chain)).StatusCode, Is.EqualTo(HttpStatusCode.OK));
@@ -453,7 +586,7 @@ public class BrokerTrustChainTests
     public async Task A_rolled_back_chain_file_stops_the_broker_on_restart()
     {
         using var desktopKey = Key.Create(SignatureAlgorithm.Ed25519);
-        var desktop = new Signer("alice-desktop", desktopKey);
+        var desktop = TestHello.Device("alice-desktop", desktopKey);
         chain.Add(TrustChain.Append(chain, new AddDevice("alice", desktop.Describe()), T0, laptop, desktop));
         Assert.That((await PostChain(chain)).StatusCode, Is.EqualTo(HttpStatusCode.OK));
 
@@ -478,9 +611,9 @@ public class BrokerTrustTests
     [SetUp]
     public void SetUp()
     {
-        laptop = new("alice-laptop", Key.Create(SignatureAlgorithm.Ed25519));
+        laptop = TestHello.Device("alice-laptop", Key.Create(SignatureAlgorithm.Ed25519));
         paper = new("alice-paper", Key.Create(SignatureAlgorithm.Ed25519));
-        desktop = new("alice-desktop", Key.Create(SignatureAlgorithm.Ed25519));
+        desktop = TestHello.Device("alice-desktop", Key.Create(SignatureAlgorithm.Ed25519));
         brokerKey = RandomNumberGenerator.GetBytes(32);
         chain = [TrustChain.Start("personal", "alice", laptop, paper, new(), T0)];
         genesis = TrustChain.Hash(chain[0]);

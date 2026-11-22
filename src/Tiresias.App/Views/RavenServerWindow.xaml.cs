@@ -27,7 +27,7 @@ public partial class RavenServerWindow : Window
     public RavenServerWindow(RavenSetupInput? existing = null)
     {
         InitializeComponent();
-        Desktop.ExcludeFromCapture(this);
+        Desktop.ExcludeFromCapture(this, evenInDemo: true);
         if (existing is not null)
             model.Edit(existing);
         DataContext = model;
