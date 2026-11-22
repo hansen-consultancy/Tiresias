@@ -73,7 +73,8 @@ public sealed class AlertCenter : IAsyncDisposable
             config = current;
             setup = current?.Setup(narrowing);
             opened = true;
-            Sender.Configure(current?.Live(narrowing) ?? []);
+            // A muted sink leaves the sender, and what waits for it (a backlog held while it failed) goes with it.
+            Sender.Configure(current?.Live(narrowing).Where(s => narrowing?.GetValueOrDefault(s.Id)?.Muted != true) ?? []);
             while (waiting.TryDequeue(out var e))
                 Plan(e);
         }

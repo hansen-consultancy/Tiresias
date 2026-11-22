@@ -446,6 +446,28 @@ public class AlertCenterTests
     }
 
     [Test]
+    public async Task Muting_drops_what_waits_for_the_sink_and_unmuting_replays_none_of_it()
+    {
+        var handler = new FakeHandler((_, n) => new HttpResponseMessage(n == 1 ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.OK));
+        var time = new SteppedTime(T0);
+        await using var center = new AlertCenter(new WebhookTransport(handler, time), time, _ => { });
+        center.Sender.Start();
+        var config = new AlertsConfig("workstation", InstallKey, [Sink("a", AlertRedaction.Public)]);
+        center.Use(config, null);
+        center.Raise(new(AlertKind.DecoyUsed, new(Program: "C:\\x.exe"), T0));
+        await Until(() => handler.Requests.Count == 1 && time.Pending == 1);
+
+        center.Use(config, new Dictionary<string, SinkNarrowing> { ["a"] = new(Muted: true) });
+        time.Advance(TimeSpan.FromHours(1));
+        await Task.Delay(50);
+        center.Use(config, null);
+        time.Advance(TimeSpan.FromHours(1));
+        await Task.Delay(50);
+
+        Assert.That(handler.Requests, Has.Count.EqualTo(1));
+    }
+
+    [Test]
     public async Task A_test_alert_goes_to_one_sink_every_time_it_is_asked()
     {
         var handler = FakeHandler.Always(HttpStatusCode.OK);

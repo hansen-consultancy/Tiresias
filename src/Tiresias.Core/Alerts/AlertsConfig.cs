@@ -67,7 +67,7 @@ public sealed record AlertsConfig
     public AlertsConfig Purged(IReadOnlyDictionary<string, SinkNarrowing>? narrowing) =>
         new(Machine, InstallKey, [.. Sinks.Where(s => narrowing?.GetValueOrDefault(s.Id)?.Removed != true)]);
 
-    /// <summary>The sinks still delivering: not removed. Muted ones stay, so their queue keeps what is already in it.</summary>
+    /// <summary>The sinks not removed, muted ones included.</summary>
     public IReadOnlyList<WebhookSink> Live(IReadOnlyDictionary<string, SinkNarrowing>? narrowing) => Purged(narrowing).Sinks;
 
     /// <summary>What the planner works from: the sealed sinks, narrowed.</summary>
