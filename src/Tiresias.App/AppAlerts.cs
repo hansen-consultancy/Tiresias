@@ -18,7 +18,7 @@ internal sealed class AppAlerts : IAsyncDisposable
     public AppAlerts()
     {
         // A demo's webhooks and ntfy topics are made up: nothing leaves the machine, and every post "gets through".
-        // A demo runs beside the installed app, so it leaves the real LcdHub to that app.
+        // It runs beside the installed app, so it leaves the real LcdHub to that app.
         var transport = DemoMode.On ? new HttpAlertTransport(new DemoHandler(), TimeProvider.System) : new HttpAlertTransport();
         Center = new AlertCenter(transport, TimeProvider.System, AppLog.Info,
             DemoMode.On ? null : new LcdHubLink(TimeProvider.System, AppLog.Info));
