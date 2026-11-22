@@ -89,12 +89,19 @@ public static class SecretsFile
     /// Splits a sealed file into the envelope's blob and any plain keys written beside it since,
     /// which the agent merges in and seals.
     /// </summary>
-    public static (byte[] Sealed, JsonObject? PlainAdditions) Read(string json)
+    public static (byte[] Sealed, JsonObject? PlainAdditions) Read(string json) => Read(json, allowAdditions: true);
+
+    /// <summary>Reads the envelope alone, as written by <see cref="Write"/>. Policy files must reject plaintext additions.</summary>
+    public static byte[] ReadSealedOnly(string json) => Read(json, allowAdditions: false).Sealed;
+
+    static (byte[] Sealed, JsonObject? PlainAdditions) Read(string json, bool allowAdditions)
     {
         var root = JsonNode.Parse(json, documentOptions: new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true })?.AsObject()
             ?? throw new InvalidDataException("secrets.json is not a JSON object.");
         var envelope = root[EnvelopeProperty]?.AsObject()
             ?? throw new InvalidDataException("secrets.json has no sealed envelope.");
+        if (!allowAdditions && (root.Count != 1 || envelope.Count != 2))
+            throw new InvalidDataException("Unexpected data alongside the sealed envelope.");
         if ((int?)envelope["v"] != 1)
             throw new InvalidDataException($"Unsupported sealed secrets version '{envelope["v"]}'.");
         var blob = Convert.FromBase64String((string?)envelope["sealed"] ?? throw new InvalidDataException("Sealed envelope is empty."));

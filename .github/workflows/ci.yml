@@ -35,6 +35,9 @@ jobs:
       - name: Test
         # A hung test fails after 5 minutes and is named in the log, instead of holding the runner.
         run: dotnet test src/Tiresias.Tests/Tiresias.Tests.csproj -c Release --blame-hang-timeout 5m --blame-hang-dump-type none
+      - name: Test desktop UI
+        if: runner.os == 'Windows'
+        run: dotnet test src/Tiresias.App.Tests/Tiresias.App.Tests.csproj -c Release --no-build
       - name: Pack
         if: runner.os == 'Windows'
         run: dotnet pack Tiresias.slnx -c Release -o artifacts
