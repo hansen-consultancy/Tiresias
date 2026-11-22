@@ -101,6 +101,7 @@ public static class FindingView
         RunThroughExec => (FixAction.CopyCommand, "Finding_FixCopy"),
         UninstallApp => (FixAction.OpenInstalledList, "Finding_FixInstalledList"),
         ReachGuide => (FixAction.OpenGuide, "Finding_FixReachGuide"),
+        InjectAtRunTime => (FixAction.CopyCommand, "Finding_FixCopy"),
         _ => null,
     };
 
