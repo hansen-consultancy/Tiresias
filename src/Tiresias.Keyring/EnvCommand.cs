@@ -466,11 +466,17 @@ static class EnvCommand
             static (arguments, items) => Tiresias.App.StandaloneConsentDialog.AskEnvironmentAsync(arguments, items),
             () => snapshot.DeliverAsync(variables, endpoint,
                 (placeholder, _) => PlaceholderMinter.MintAsync(hello, placeholder, $"run:{program}", null), PlaceholderMinter.RevokeAsync, CancellationToken.None),
-            allowed => activity.Append(AgentHost.EnvironmentRecord(allowed, program, terms, "tir run (Windows Hello)")));
+            Record);
         if (delivery is null)
             return Denied;
         foreach (var problem in delivery.Problems)
             Console.Error.WriteLine(problem);
         return delivery.Variables;
+
+        void Record(bool allowed, string? refusal)
+        {
+            var entry = AgentHost.EnvironmentRecord(allowed, program, terms, "tir run (Windows Hello)");
+            activity.Append(refusal is null ? entry : entry with { Reason = $"{refusal} {entry.Reason}" });
+        }
     }
 }

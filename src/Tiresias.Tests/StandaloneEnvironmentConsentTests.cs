@@ -31,7 +31,11 @@ public class StandaloneEnvironmentConsentTests
                 events.Add("mint");
                 return Task.FromResult(new MintedPlaceholder("fixture-placeholder"));
             }, _ => Task.CompletedTask, CancellationToken.None),
-            approved => events.Add(approved ? "allow" : "deny"));
+            (approved, refusal) =>
+            {
+                Assert.That(refusal, Is.Null);
+                events.Add(approved ? "allow" : "deny");
+            });
 
         Assert.That(events, Is.EqualTo(new[] { "prompt" }));
         Assert.That(request.IsCompleted, Is.False);
@@ -59,7 +63,7 @@ public class StandaloneEnvironmentConsentTests
         Assert.ThrowsAsync<EnvironmentIntegrityException>(() => StandaloneEnvironmentConsent.RequestAsync(["tool.exe"], terms,
             (_, _) => { current = false; return Task.FromResult(true); },
             () => snapshot.DeliverAsync(variables, Endpoint, (_, _) => throw new AssertionException("Unexpected mint."),
-                _ => Task.CompletedTask, CancellationToken.None), decisions.Add));
+                _ => Task.CompletedTask, CancellationToken.None), (allowed, _) => decisions.Add(allowed)));
 
         Assert.That(decisions, Is.Empty);
     }
@@ -68,14 +72,14 @@ public class StandaloneEnvironmentConsentTests
     [TestCase(true)]
     public void An_unavailable_dialog_records_a_denial_before_any_release(bool asynchronousFailure)
     {
-        var decisions = new List<bool>();
+        var decisions = new List<(bool Allowed, string? Refusal)>();
         var failure = new FileNotFoundException("Private fixture detail.");
         var error = Assert.ThrowsAsync<InvalidOperationException>(() => StandaloneEnvironmentConsent.RequestAsync(["tool.exe"], ["TOKEN (global, raw value)"],
             (_, _) => asynchronousFailure ? Task.FromException<bool>(failure) : throw failure,
-            () => throw new AssertionException("Unexpected delivery."), decisions.Add));
+            () => throw new AssertionException("Unexpected delivery."), (allowed, refusal) => decisions.Add((allowed, refusal))));
 
         Assert.That(error!.Message, Is.EqualTo("The Tiresias consent dialog was unavailable. The command was stopped."));
-        Assert.That(decisions, Is.EqualTo(new[] { false }));
+        Assert.That(decisions, Is.EqualTo(new[] { (false, "The Tiresias consent dialog was unavailable.") }));
     }
 
     [Test]
@@ -88,7 +92,7 @@ public class StandaloneEnvironmentConsentTests
         var delivery = await StandaloneEnvironmentConsent.RequestAsync(["tool.exe"], terms,
             (_, _) => throw new AssertionException("Unexpected prompt."),
             () => snapshot.DeliverAsync(variables, Endpoint, (_, _) => throw new AssertionException("Unexpected mint."),
-                _ => Task.CompletedTask, CancellationToken.None), decisions.Add);
+                _ => Task.CompletedTask, CancellationToken.None), (allowed, _) => decisions.Add(allowed));
 
         Assert.That(delivery!.Variables, Is.Empty);
         Assert.That(decisions, Is.EqualTo(new[] { true }));
