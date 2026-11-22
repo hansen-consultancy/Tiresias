@@ -358,7 +358,7 @@ public partial class App : Application
         });
         guard!.Block(asker.Image, sha);
         var blocked = asker.Image is { } image && guard.Current.Programs.Any(p => string.Equals(p.Path, image, StringComparison.OrdinalIgnoreCase));
-        var frozen = process is not null && await AdminDecoys.FreezeAsync(process.ProcessId) is { Processes: > 0 };
+        var frozen = process is not null && await AdminDecoys.FreezeAsync(process.ProcessId) is { Processes: > 0 } or { NetworkBlocked: true };
         if (frozen)
             AppLog.Info($"this wasn't me: the admin tier froze {process!.Program} ({process.ProcessId})");
         host!.RecordIncident(asked, process is null ? asker.Image : $"{process.Program} ({process.ProcessId})", chain, blocked, frozen);
