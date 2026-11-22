@@ -27,7 +27,7 @@ public sealed record PrefetchFile(string Executable, IReadOnlyList<string> Files
     /// </summary>
     public string? ProgramPath => Files.FirstOrDefault(f =>
     {
-        var name = f[(f.LastIndexOf('\\') + 1)..];
+        var name = f[(f.LastIndexOf(@"\", StringComparison.Ordinal) + 1)..];
         return Executable.Length >= 29 ? name.StartsWith(Executable, StringComparison.OrdinalIgnoreCase) : name.Equals(Executable, StringComparison.OrdinalIgnoreCase);
     });
 }
@@ -99,14 +99,14 @@ public static class AdminLastRun
         if (path.StartsWith(@"\VOLUME{", StringComparison.OrdinalIgnoreCase))
         {
             var close = path.IndexOf('}', StringComparison.Ordinal);
-            var dash = close > 0 ? path.LastIndexOf('-', close) : -1;
+            var dash = close > 0 ? path.LastIndexOf("-", close, StringComparison.Ordinal) : -1;
             if (dash < 0 || close + 1 >= path.Length || path[close + 1] != '\\')
                 return null;
             return devices.TryGetValue("VOLUME:" + path[(dash + 1)..close].ToUpperInvariant(), out var drive) ? drive + path[(close + 1)..] : null;
         }
         // \Device\HarddiskVolume3\...: the device is the first two segments.
-        var second = path.Length > 1 ? path.IndexOf('\\', path.IndexOf('\\', 1) + 1) : -1;
-        if (!path.StartsWith('\\') || second < 0)
+        var second = path.Length > 1 ? path.IndexOf(@"\", path.IndexOf(@"\", 1, StringComparison.Ordinal) + 1, StringComparison.Ordinal) : -1;
+        if (!path.StartsWith(@"\", StringComparison.Ordinal) || second < 0)
             return null;
         return devices.TryGetValue(path[..second], out var letter) ? letter + path[second..] : null;
     }

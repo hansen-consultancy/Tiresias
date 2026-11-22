@@ -332,6 +332,9 @@ public partial class StatusWindow : Window
             case RunThroughExec exec:
                 model.CopyFix(exec.Instruction);
                 break;
+            case ReachGuide:
+                Desktop.Open(FindingView.ReachGuideUrl(AppBuild.Repository));
+                break;
         }
     }
 
