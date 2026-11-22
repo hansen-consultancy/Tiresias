@@ -367,7 +367,7 @@ leaving.
    - **Failing** is a stop (a non-429/503 4xx, a 3xx, a sink that fails its rules), at once, or no
      delivery for 15 minutes since the first failed attempt, checked on the minute tick. A delivery
      clears it, and so does a test alert that gets through, a changed URL or header, or removing the
-     sink. A **muted** sink is no finding (its queue stays). LcdHub never counts, as phase 4 said.
+     sink. A **muted** sink is no finding: muting takes it out of the sender, backlog and all. LcdHub never counts, as phase 4 said.
    - **`alerts.failing` ignores the other sinks' thresholds**, as `alerts.suppressed` does: ntfy and
      webhook default to `high`, so with the threshold applied the warning would reach only LcdHub.
      Mutes still apply. One per sink each time it starts failing, deduped by the planner as usual.
