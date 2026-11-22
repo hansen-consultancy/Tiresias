@@ -33,6 +33,7 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public bool Enrolled => KeyringStore.Broker is not null;
     public bool Solo => KeyringStore.Tenant is { Solo: true };
+    public BrokerServiceState BrokerService => Solo ? Agent.BrokerService.State() : BrokerServiceState.NotInstalled;
     public bool HasDeviceKey => KeyringStore.HasDeviceKey;
     public bool RecoveryKeySet => KeyringStore.Settings.RecoveryPublicKey is not null;
 
@@ -110,15 +111,23 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
         [.. EnvironmentStore.UserVariables().Where(v => v.LooksSecret && !IsDecoyVariable(v.Name)).Select(v => v.Name)];
 
     /// <summary>The decoy variables, while placed: a decoy is not a secret to seal.</summary>
-    static bool IsDecoyVariable(string name) =>
-        DecoyStore.Current is { } set && set.Placed.Any(p => p.Kind == DecoyKind.Variables) && DecoyPlan.VariableNames.Contains(name, StringComparer.OrdinalIgnoreCase);
+    bool IsDecoyVariable(string name) =>
+        DecoyPlan.VariableNames.Contains(name, StringComparer.OrdinalIgnoreCase)
+        && (DecoyStore.Current is { } set ? set.Placed.Any(p => p.Kind == DecoyKind.Variables) : HeldDecoys?.Kinds.Contains(DecoyKind.Variables) == true);
+
+    /// <summary>The set the admin tier holds, asked once per doctor run: <c>decoys.json</c> is gone then.</summary>
+    AdminDecoysStatus? HeldDecoys => heldDecoys ??= AdminClient.Installed ? AdminDecoys.Status() : null;
+
+    AdminDecoysStatus? heldDecoys;
 
     public DoctorDecoys? Decoys => DecoyStore.Current is { Placed.Count: > 0 } set
         ? new(set.Placed.Count, IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners().Any(e => e.Port == set.HttpPort))
-        : null;
+        : HeldDecoys is { Held: true } held ? new(held.Kinds.Count, held.Listening, Held: true) : null;
 
     // On the thread pool: the app runs the doctor from its UI thread, and this waits on a pipe.
     public AdminTierFacts? AdminTier => Task.Run(AdminClient.FactsAsync).GetAwaiter().GetResult() is { Installed: true } tier ? tier : null;
+
+    public ReachFacts Reach => ReachProbe.Read();
 
     public IEnumerable<DoctorFile> Projects() => Found.Projects.Select(Read);
 
@@ -131,6 +140,10 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     public IEnumerable<string> KeyFiles() => Found.Keys.Concat(Found.Pems.Where(HoldsPemPrivateKey));
 
     public IEnumerable<DoctorFile> GitConfigs() => Found.Repositories.Select(Read).Where(f => f.Text is not null);
+
+    public IEnumerable<DevcontainerFile> Devcontainers() => Found.Devcontainers.Select(DevcontainerProbe.Read).OfType<DevcontainerFile>();
+
+    public DevcontainerForwarding? DevcontainerForwarding => DevcontainerProbe.Forwarding();
 
     public DoctorGitCredentials? GitCredentials
     {
@@ -231,12 +244,12 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public sealed record ScanStats(TimeSpan Elapsed, int Folders, int Files);
 
-    sealed record FoundFiles(List<string> Projects, List<string> Configs, List<string> Keys, List<string> Pems, List<string> Tools, List<string> Repositories, ScanStats Stats);
+    sealed record FoundFiles(List<string> Projects, List<string> Configs, List<string> Keys, List<string> Pems, List<string> Tools, List<string> Repositories, List<string> Devcontainers, ScanStats Stats);
 
     FoundFiles? found;
     FoundFiles Found => found ??= Walk();
 
-    static readonly string[] Patterns = ["*.csproj", "appsettings*.json", "*.pfx", "*.p12", "*.pem", "*.key", "nuget.config", ".npmrc"];
+    static readonly string[] Patterns = ["*.csproj", "appsettings*.json", "*.pfx", "*.p12", "*.pem", "*.key", "nuget.config", ".npmrc", "devcontainer.json", ".devcontainer.json"];
 
     /// <summary>
     /// One walk of the project roots for every file a check reads. Build output, packages and git
@@ -246,7 +259,7 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     FoundFiles Walk()
     {
         var clock = System.Diagnostics.Stopwatch.StartNew();
-        List<string> projects = [], configs = [], keys = [], pems = [], tools = [], repositories = [];
+        List<string> projects = [], configs = [], keys = [], pems = [], tools = [], repositories = [], devcontainers = [];
         var folders = roots.Length;
         // Not Hidden: Git for Windows hides .git. ReparsePoint: a junction can't loop the walk.
         var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = FileAttributes.ReparsePoint | FileAttributes.System };
@@ -276,11 +289,13 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
                     keys.Add(path);
                 else if (Matches("nuget.config", name) || Matches(".npmrc", name))
                     tools.Add(path);
+                else if (Matches("devcontainer.json", name) || Matches(".devcontainer.json", name))
+                    devcontainers.Add(path);
                 else
                     pems.Add(path);
             }
         }
-        return new(projects, configs, keys, pems, tools, repositories, new(clock.Elapsed, folders, projects.Count + configs.Count + keys.Count + pems.Count + tools.Count));
+        return new(projects, configs, keys, pems, tools, repositories, devcontainers, new(clock.Elapsed, folders, projects.Count + configs.Count + keys.Count + pems.Count + tools.Count + devcontainers.Count));
     }
 
     static bool Wanted(string name) => Patterns.Any(p => Matches(p, name));

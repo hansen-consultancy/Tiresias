@@ -155,6 +155,7 @@ public sealed record NuGetImportStep(string File, NuGetConfigCredential Credenti
     bool ProtectFirst = false, bool SealClearText = false, string? Skip = null)
 {
     public bool Acts => Skip is null;
+    public string? DisplayUrl => NuGetSource.ParseUrl(Credential.Source)?.AbsoluteUri;
 }
 
 public static class NuGetImport
@@ -177,8 +178,8 @@ public static class NuGetImport
 
             if (c.Source is null)
                 return Skip("its source is defined in another config file; run this where that one applies");
-            if (!Uri.TryCreate(c.Source, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
-                return Skip("not an https source");
+            if (NuGetSource.ParseUrl(c.Source) is null)
+                return Skip(NuGetSource.UrlRequirement);
             switch (c.Kind)
             {
                 case NuGetPasswordKind.Encrypted:

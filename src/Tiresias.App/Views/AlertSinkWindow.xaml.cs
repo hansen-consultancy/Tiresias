@@ -28,7 +28,8 @@ public partial class AlertSinkWindow : Window
     public AlertSinkWindow(SinkForm form)
     {
         InitializeComponent();
-        Desktop.ExcludeFromCapture(this);
+        // Real input even in a demo: someone trying the flow may paste their real URL, topic or token.
+        Desktop.ExcludeFromCapture(this, evenInDemo: true);
         this.form = form;
         Title = Heading.Text = Text.Get(form switch { SinkForm.Ntfy => "Alerts_NtfyWindowTitle", SinkForm.LcdHub => "Alerts_LcdHubWindowTitle", _ => "Alerts_WindowTitle" });
         Intro.Text = Text.Get(form switch { SinkForm.Ntfy => "Alerts_NtfyWindowIntro", SinkForm.LcdHub => "Alerts_LcdHubWindowIntro", _ => "Alerts_WindowIntro" });

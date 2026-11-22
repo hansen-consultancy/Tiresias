@@ -11,8 +11,11 @@ public enum AdminInstallStep
     /// <summary>Set an existing service's binary, account, start type, privileges and failure actions again.</summary>
     ConfigureService,
     StartService,
+    /// <summary>Give each user's held decoy set back to that user's agent, read from the state folder once the service has stopped.</summary>
+    HandBackDecoys,
     DeleteService,
     DeleteFiles,
+    /// <summary>Only when every held set went back: one that didn't stays there, and an install picks it up again.</summary>
     DeleteStateFolder,
 }
 
@@ -23,7 +26,7 @@ public enum AdminSetupResult
     Failed = 1,
     /// <summary>This copy of the app has no <c>admin\</c> folder to install from: a development build.</summary>
     FilesMissing = 2,
-    /// <summary>Neither <c>install</c> nor <c>remove</c>.</summary>
+    /// <summary>Not <c>install</c>, <c>remove</c> or <c>release-decoys</c>.</summary>
     Usage = 3,
     /// <summary>The service was set up but stopped again at once: its state folder or pipe name isn't its own.</summary>
     DidNotStart = 4,
@@ -52,6 +55,8 @@ public static class AdminInstallPlan
     public static IReadOnlyList<AdminInstallStep> Remove(AdminServiceFacts service) =>
     [
         .. service.Running ? [AdminInstallStep.StopService] : Array.Empty<AdminInstallStep>(),
+        // Stopped first, so nothing listens on a set or changes it while it goes back.
+        AdminInstallStep.HandBackDecoys,
         .. service.Exists ? [AdminInstallStep.DeleteService] : Array.Empty<AdminInstallStep>(),
         AdminInstallStep.DeleteFiles,
         AdminInstallStep.DeleteStateFolder,

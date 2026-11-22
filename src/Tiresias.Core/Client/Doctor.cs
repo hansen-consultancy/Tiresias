@@ -51,6 +51,9 @@ public interface IDoctorProbe
     /// <summary>Enrolled with the broker this device hosts itself (solo mode) rather than a remote one.</summary>
     bool Solo => false;
 
+    /// <summary>Solo mode: whether the broker runs as the Windows service rather than inside the app.</summary>
+    BrokerServiceState BrokerService => BrokerServiceState.NotInstalled;
+
     /// <summary><c>null</c> when the vault file is missing.</summary>
     DoctorVault? Vault { get; }
 
@@ -131,10 +134,20 @@ public interface IDoctorProbe
 
     /// <summary>The optional admin tier (docs/admin-tier.md); <c>null</c> when it isn't installed.</summary>
     AdminTierFacts? AdminTier => null;
+
+    /// <summary>What the user's account can open of their containers, WSL and VMs (docs/containers-and-vms.md). No contents.</summary>
+    ReachFacts Reach => ReachFacts.None;
+
+    /// <summary>The devcontainer files in the project folders, with the names in them and their env files; empty unless asked for. Never a value.</summary>
+    IEnumerable<DevcontainerFile> Devcontainers() => [];
+
+    /// <summary>What VS Code's Dev Containers forwards into containers; <c>null</c> when it isn't installed.</summary>
+    DevcontainerForwarding? DevcontainerForwarding => null;
 }
 
 /// <summary>How many decoys are placed, and whether something listens on their endpoints (checked without connecting, which would be a hit).</summary>
-public sealed record DoctorDecoys(int Placed, bool Listening);
+/// <param name="Held">The admin tier holds the set and is the one listening (docs/admin-tier.md), so the agent needn't run.</param>
+public sealed record DoctorDecoys(int Placed, bool Listening, bool Held = false);
 
 /// <summary>
 /// The <c>tir doctor</c> checklist: turns probe facts into ok / warn / fail lines. A failure is
@@ -158,11 +171,15 @@ public static partial class Doctor
                 ? new("trust chain", DoctorStatus.Ok, "this device's Windows Hello key signs the links that add trust")
                 : new("trust chain", DoctorStatus.Warn, "this device's Windows Hello key isn't in the trust chain yet, so it can't add a device or change trust: run tir trust bind-hello"));
         if (probe.Solo)
+        {
             checks.AddRange(SoloTradeOffs);
+            checks.Add(BrokerProcess(probe.BrokerService));
+        }
         var brokerStatus = probe.Enrolled ? await probe.BrokerStatusAsync() : null;
         if (probe.Enrolled)
             checks.Add(brokerStatus switch
             {
+                null when probe.Solo && probe.BrokerService != BrokerServiceState.NotInstalled => new("broker reachable", DoctorStatus.Fail, "no answer: the broker runs as the Tiresias service; start it in Windows Services"),
                 null when probe.Solo => new("broker reachable", DoctorStatus.Fail, "no answer: the broker runs inside the Tiresias app; start the app (or tir agent)"),
                 null => new("broker reachable", DoctorStatus.Fail, "no answer (NetBird down, or the broker stopped)"),
                 401 => new("broker reachable", DoctorStatus.Ok, "answers and refuses unsigned calls"),
@@ -176,9 +193,7 @@ public static partial class Doctor
                 : new("forwarder", DoctorStatus.Warn, "not running: placeholders work only against the broker directly"));
 
         if (probe.Decoys is { Placed: > 0 } decoys)
-            checks.Add(decoys.Listening
-                ? new("decoys", DoctorStatus.Ok, $"{decoys.Placed} placed; a program that uses one is named")
-                : new("decoys", DoctorStatus.Warn, $"{decoys.Placed} placed, but nothing listens on their endpoints, so a use goes unseen: start the app or tir agent"));
+            checks.Add(DecoysLine(decoys));
         if (probe.AdminTier is { Installed: true } adminTier)
             checks.Add(AdminTierLine(adminTier));
         checks.AddRange(probe.UserSecretsFiles().Select(UserSecretsFile).OfType<DoctorCheck>());
@@ -201,12 +216,23 @@ public static partial class Doctor
         checks.AddRange(RavenClearance(clearances));
         checks.AddRange(KeysAsValues(probe.SealedEnvironment));
         // A program blocked for using a decoy is that finding, not "This wasn't me"'s.
-        var decoyUses = probe.DecoyUses().ToArray();
-        var blocked = probe.BlockedPrograms().ToArray();
-        checks.AddRange(Decoys(decoyUses, blocked, DateTimeOffset.UtcNow));
+        string[] otherBlocks = [];
+        try
+        {
+            var decoyUses = probe.DecoyUses().ToArray();
+            var blocked = probe.BlockedPrograms().ToArray();
+            checks.AddRange(Decoys(decoyUses, blocked, DateTimeOffset.UtcNow));
+            otherBlocks = [.. blocked.Where(b => !decoyUses.Any(u => !u.IsRead && SamePath(u.Program, b)))];
+        }
+        catch (IOException)
+        {
+            checks.Add(new("decoy incidents and program blocks", DoctorStatus.Warn, "The admin service could not supply its incident history and block list."));
+        }
         checks.AddRange(CliSignIns(probe.CliConfigs, probe.GitHubAppService));
+        checks.AddRange(Reach(probe.Reach));
+        checks.AddRange(Devcontainers(probe.Devcontainers(), probe.DevcontainerForwarding));
         var (uses, runs, installed, now) = (probe.CredentialUses().ToArray(), probe.ProgramRuns().ToArray(), probe.UninstallEntries().ToArray(), DateTimeOffset.UtcNow);
-        checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), uses, blocked.Where(b => !decoyUses.Any(u => !u.IsRead && SamePath(u.Program, b))), now, runs));
+        checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), uses, otherBlocks, now, runs));
         checks.AddRange(UninstallEntries(installed));
         checks.AddRange(UnusedApplications(installed, runs, uses, now));
         return checks;
@@ -221,10 +247,26 @@ public static partial class Doctor
         new("mode", DoctorStatus.Ok, "Solo: the broker runs on this device; encryption, leases, placeholders, consent and audit all apply"),
         new("egress", DoctorStatus.Warn, "Solo: requests leave from your own connection, so there is no fixed IP for upstreams to allow-list"),
         new("isolation", DoctorStatus.Warn, "Solo: secrets live on the same machine as your agents and are not protected from code running as admin"),
-        new("broker process", DoctorStatus.Warn, "Broker runs inside the app: install the service for process isolation (not built yet)"),
     ];
 
+    /// <summary>Where solo mode's broker runs (docs/broker-service.md).</summary>
+    static DoctorCheck BrokerProcess(BrokerServiceState service) => service switch
+    {
+        BrokerServiceState.Running => new("broker process", DoctorStatus.Ok, "Broker runs as the Tiresias service, out of reach of programs running as you"),
+        BrokerServiceState.Stopped => new("broker process", DoctorStatus.Fail, "The Tiresias service is installed but stopped: start it in Windows Services, or run tir solo service install again"),
+        _ => new("broker process", DoctorStatus.Warn, "Broker runs inside the app: install the service for process isolation (tir solo service install, as administrator)"),
+    };
+
     public const string AdminTierCheck = "admin tier";
+
+    /// <summary>Whether a use of a placed decoy is seen: the agent listens, or the admin tier holding the set does.</summary>
+    static DoctorCheck DecoysLine(DoctorDecoys decoys) => (decoys.Listening, decoys.Held) switch
+    {
+        (true, false) => new("decoys", DoctorStatus.Ok, $"{decoys.Placed} placed; a program that uses one is named"),
+        (true, true) => new("decoys", DoctorStatus.Ok, $"{decoys.Placed} placed, held by the admin tier, which listens from boot; a program that uses one is named"),
+        (false, false) => new("decoys", DoctorStatus.Warn, $"{decoys.Placed} placed, but nothing listens on their endpoints, so a use goes unseen: start the app or tir agent"),
+        (false, true) => new("decoys", DoctorStatus.Warn, $"{decoys.Placed} placed, held by the admin tier, but it can't listen on their endpoints (a port is taken), so a use goes unseen"),
+    };
 
     /// <summary>The admin tier, when installed: running and which version, or a failure when nothing it does happens.</summary>
     static DoctorCheck AdminTierLine(AdminTierFacts tier) => tier.State switch

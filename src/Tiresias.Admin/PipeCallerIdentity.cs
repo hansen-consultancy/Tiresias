@@ -1,9 +1,12 @@
 using System.ComponentModel;
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
+using System.Security.Cryptography;
 using System.Security.Principal;
 using Microsoft.Win32.SafeHandles;
 using Tiresias.AdminTier;
+using Tiresias.Decoys;
 
 namespace Tiresias.Admin;
 
@@ -16,6 +19,7 @@ sealed record PipeClientInfo(AdminCaller? Caller, int? Pid, string? Image, strin
 /// anything the client sends. The process must have existed before the connection was accepted:
 /// a client that connects and exits can't hand its process id to another process that took it.
 /// </summary>
+[SupportedOSPlatform("windows")]
 static partial class PipeCallerIdentity
 {
     const string ServiceGroupSid = "S-1-5-6";
@@ -91,12 +95,83 @@ static partial class PipeCallerIdentity
         }
     }
 
-    static string? Image(SafeProcessHandle process)
+    static string? Image(SafeProcessHandle process, uint flags = 0)
     {
         var buffer = new char[1024];
         var size = buffer.Length;
-        return QueryFullProcessImageNameW(process, 0, buffer, ref size) ? new string(buffer, 0, size) : null;
+        return QueryFullProcessImageNameW(process, flags, buffer, ref size) ? new string(buffer, 0, size) : null;
     }
+
+    /// <summary>Fingerprints only a live, locally attributed image on a disk volume. The path
+    /// block remains effective when the process exits or the file cannot be measured.</summary>
+    public static unsafe string? ImageDigest(DecoyHit hit)
+    {
+        if (hit.Use == DecoyUse.Read || hit.ProcessId is not > 0 || hit.Program is null || !AdminArgs.FullPath(hit.Program))
+            return null;
+        using var process = OpenProcess(ProcessQueryLimitedInformation, false, (uint)hit.ProcessId.Value);
+        if (process.IsInvalid || !GetProcessTimes(process, out var created, out _, out _, out _)
+            || DateTime.FromFileTimeUtc(created) > hit.At.UtcDateTime || !string.Equals(Image(process), hit.Program, StringComparison.OrdinalIgnoreCase)
+            || Image(process, ProcessNameNative) is not { } native)
+            return null;
+        const string prefix = @"\Device\HarddiskVolume";
+        if (!native.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            return null;
+        var end = native.IndexOf('\\', prefix.Length, StringComparison.Ordinal);
+        if (end <= prefix.Length || native.AsSpan(prefix.Length, end - prefix.Length).ContainsAnyExceptInRange('0', '9'))
+            return null;
+        // Resolve the kernel-reported volume path in one open. A reparse at any component refuses
+        // the measurement, including one inserted after process attribution.
+        fixed (char* name = native)
+        {
+            var length = checked((ushort)(native.Length * sizeof(char)));
+            var unicode = new UnicodeString { Length = length, MaximumLength = length, Buffer = name };
+            var attributes = new ObjectAttributes
+            {
+                Length = sizeof(ObjectAttributes), Name = &unicode, Attributes = ObjCaseInsensitive | ObjDontReparse,
+            };
+            var status = NtOpenFile(out var file, FileReadData | Synchronize, &attributes, out _, FileShareRead,
+                FileNonDirectory | FileSynchronousNonAlert);
+            using (file)
+            {
+                if (status < 0 || file.IsInvalid)
+                    return null;
+                try
+                {
+                    using var stream = new FileStream(file, FileAccess.Read);
+                    return Convert.ToHexString(SHA256.HashData(stream));
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+                {
+                    return null;
+                }
+            }
+        }
+    }
+
+    const uint ProcessNameNative = 1;
+    const uint ObjCaseInsensitive = 0x40, ObjDontReparse = 0x1000;
+    const uint FileReadData = 1, Synchronize = 0x100000, FileShareRead = 1;
+    const uint FileNonDirectory = 0x40, FileSynchronousNonAlert = 0x20;
+
+    [StructLayout(LayoutKind.Sequential)]
+    unsafe struct UnicodeString { public ushort Length, MaximumLength; public char* Buffer; }
+
+    [StructLayout(LayoutKind.Sequential)]
+    unsafe struct ObjectAttributes
+    {
+        public int Length;
+        public nint RootDirectory;
+        public UnicodeString* Name;
+        public uint Attributes;
+        public nint SecurityDescriptor, SecurityQos;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct IoStatus { public nint Status; public nuint Information; }
+
+    [LibraryImport("ntdll.dll")]
+    private static unsafe partial int NtOpenFile(out SafeFileHandle handle, uint access, ObjectAttributes* attributes,
+        out IoStatus io, uint share, uint options);
 
     const uint ProcessQueryLimitedInformation = 0x1000;
     const uint TokenQuery = 0x0008;

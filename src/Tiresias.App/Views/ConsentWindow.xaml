@@ -4,7 +4,7 @@
         xmlns:l="clr-namespace:Tiresias.App"
         Title="{l:S Consent_WindowTitle}"
         l:WindowFit.Size="Standard" ResizeMode="NoResize" Topmost="True" ShowInTaskbar="True"
-        Icon="pack://application:,,,/Assets/tiresias.ico">
+        Icon="pack://application:,,,/Tiresias;component/Assets/tiresias.ico">
   <Window.Resources>
     <!-- One answer: what it is, and on the line under it what it means. -->
     <Style x:Key="Choice" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
@@ -62,7 +62,7 @@
       </Button>
 
       <!-- An unexpected prompt can mean malware: deny, lock everything and block the program (docs/desktop-app.md). -->
-      <TextBlock Margin="0,6,0,0" ToolTip="{l:S Consent_NotMe_Tip}">
+      <TextBlock x:Name="ReportIncident" Margin="0,6,0,0" ToolTip="{l:S Consent_NotMe_Tip}">
         <Hyperlink Click="OnNotMe" Foreground="{DynamicResource SystemFillColorCriticalBrush}"
                    AutomationProperties.HelpText="{l:S Consent_NotMe_Tip}"><Run Text="{l:S Consent_NotMe}" /></Hyperlink>
       </TextBlock>

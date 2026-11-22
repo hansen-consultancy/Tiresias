@@ -125,7 +125,15 @@ sealed class TestVault : IDisposable
         Approve(Access.Approval.ForToken(LeaseId!, service, "exec:test", "testing", now ?? DateTimeOffset.UtcNow));
 
     /// <summary>The <c>/lease/seal</c> body for <paramref name="offer"/>.</summary>
-    public object SealBody(LeaseOffer offer) => new { offer.LeaseId, deks = SealTo(offer), approvalKey = ApprovalKey(offer.LeaseId) };
+    public object SealBody(LeaseOffer offer, Key? enrolledSigner = null)
+    {
+        var deks = SealTo(offer);
+        var approvalKey = ApprovalKey(offer.LeaseId);
+        if (enrolledSigner is null)
+            return new { offer.LeaseId, deks, approvalKey };
+        var revisionSignature = LeaseSeal.Sign(enrolledSigner, offer.LeaseId, approvalKey, deks);
+        return new { offer.LeaseId, deks, approvalKey, revisionSignature };
+    }
 
     public Dictionary<string, byte[]> SealTo(LeaseOffer offer)
     {
