@@ -1,0 +1,103 @@
+<Window x:Class="Tiresias.App.Views.AlertSinkWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:l="clr-namespace:Tiresias.App"
+        l:WindowFit.Size="Standard"
+        Icon="pack://application:,,,/Assets/tiresias.ico">
+  <Window.Resources>
+    <Style x:Key="Hint" TargetType="TextBlock" BasedOn="{StaticResource CaptionText}">
+      <Setter Property="Margin" Value="0,4,0,0" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style x:Key="Field" TargetType="StackPanel">
+      <Setter Property="Margin" Value="0,0,0,12" />
+    </Style>
+  </Window.Resources>
+  <Grid Margin="{StaticResource PagePadding}">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <StackPanel Grid.Row="0">
+      <TextBlock x:Name="Heading" Style="{StaticResource TitleText}" AutomationProperties.HeadingLevel="Level1" />
+      <TextBlock x:Name="Intro" Style="{StaticResource BodyText}" TextWrapping="Wrap" />
+    </StackPanel>
+
+    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,8,0,0" Focusable="False">
+      <StackPanel MaxWidth="620" HorizontalAlignment="Left">
+        <!-- Asked once, with the first sink: required, never filled in from the host name (docs/alerts.md, Settled). -->
+        <StackPanel x:Name="MachineField" Style="{StaticResource Field}">
+          <Label x:Name="MachineLabel" Content="{l:S Alerts_Machine}" Target="{Binding ElementName=MachineBox}" Padding="0,0,0,4" />
+          <TextBox x:Name="MachineBox" MaxLength="64" AutomationProperties.LabeledBy="{Binding ElementName=MachineLabel}" />
+          <TextBlock Text="{l:S Alerts_MachineHint}" Style="{StaticResource Hint}" />
+        </StackPanel>
+
+        <StackPanel Style="{StaticResource Field}">
+          <Label x:Name="IdLabel" Content="{l:S Alerts_Id}" Target="{Binding ElementName=IdBox}" Padding="0,0,0,4" />
+          <TextBox x:Name="IdBox" MaxLength="32" AutomationProperties.LabeledBy="{Binding ElementName=IdLabel}" />
+          <TextBlock Text="{l:S Alerts_IdHint}" Style="{StaticResource Hint}" />
+        </StackPanel>
+
+        <!-- A webhook: its URL and one header. -->
+        <StackPanel x:Name="WebhookFields">
+          <StackPanel Style="{StaticResource Field}">
+            <Label x:Name="UrlLabel" Content="{l:S Alerts_Url}" Target="{Binding ElementName=UrlBox}" Padding="0,0,0,4" />
+            <TextBox x:Name="UrlBox" AutomationProperties.LabeledBy="{Binding ElementName=UrlLabel}" />
+            <TextBlock Text="{l:S Alerts_UrlHint}" Style="{StaticResource Hint}" />
+          </StackPanel>
+
+          <StackPanel Style="{StaticResource Field}">
+            <Label x:Name="HeaderNameLabel" Content="{l:S Alerts_HeaderNameLabel}" Target="{Binding ElementName=HeaderNameBox}" Padding="0,0,0,4" />
+            <TextBox x:Name="HeaderNameBox" AutomationProperties.LabeledBy="{Binding ElementName=HeaderNameLabel}" />
+            <Label x:Name="HeaderValueLabel" Content="{l:S Alerts_HeaderValueLabel}" Target="{Binding ElementName=HeaderValueBox}" Padding="0,8,0,4" />
+            <PasswordBox x:Name="HeaderValueBox" AutomationProperties.LabeledBy="{Binding ElementName=HeaderValueLabel}" />
+            <TextBlock Text="{l:S Alerts_HeaderHint}" Style="{StaticResource Hint}" />
+          </StackPanel>
+        </StackPanel>
+
+        <!-- ntfy: server, topic and an optional token (docs/alerts.md, Sinks). -->
+        <StackPanel x:Name="NtfyFields">
+          <StackPanel Style="{StaticResource Field}">
+            <Label x:Name="ServerLabel" Content="{l:S Alerts_NtfyServer}" Target="{Binding ElementName=ServerBox}" Padding="0,0,0,4" />
+            <TextBox x:Name="ServerBox" Text="https://ntfy.sh" AutomationProperties.LabeledBy="{Binding ElementName=ServerLabel}" />
+            <TextBlock Text="{l:S Alerts_NtfyServerHint}" Style="{StaticResource Hint}" />
+          </StackPanel>
+
+          <StackPanel Style="{StaticResource Field}">
+            <Label x:Name="TopicLabel" Content="{l:S Alerts_NtfyTopic}" Target="{Binding ElementName=TopicBox}" Padding="0,0,0,4" />
+            <TextBox x:Name="TopicBox" MaxLength="64" AutomationProperties.LabeledBy="{Binding ElementName=TopicLabel}" />
+            <TextBlock Text="{l:S Alerts_NtfyTopicHint}" Style="{StaticResource Hint}" />
+          </StackPanel>
+
+          <StackPanel Style="{StaticResource Field}">
+            <Label x:Name="TokenLabel" Content="{l:S Alerts_NtfyToken}" Target="{Binding ElementName=TokenBox}" Padding="0,0,0,4" />
+            <PasswordBox x:Name="TokenBox" AutomationProperties.LabeledBy="{Binding ElementName=TokenLabel}" />
+            <TextBlock Text="{l:S Alerts_NtfyTokenHint}" Style="{StaticResource Hint}" />
+          </StackPanel>
+        </StackPanel>
+
+        <StackPanel Style="{StaticResource Field}">
+          <Label x:Name="ThresholdLabel" Content="{l:S Alerts_Threshold}" Target="{Binding ElementName=ThresholdBox}" Padding="0,0,0,4" />
+          <ComboBox x:Name="ThresholdBox" HorizontalAlignment="Left" MinWidth="220" AutomationProperties.LabeledBy="{Binding ElementName=ThresholdLabel}" />
+        </StackPanel>
+
+        <StackPanel x:Name="TrustedField" Style="{StaticResource Field}">
+          <CheckBox x:Name="TrustedBox" Content="{l:S Alerts_Trusted}" />
+          <TextBlock Text="{l:S Alerts_TrustedHint}" Style="{StaticResource Hint}" Margin="28,0,0,0" />
+        </StackPanel>
+      </StackPanel>
+    </ScrollViewer>
+
+    <TextBlock Grid.Row="2" x:Name="Message" Style="{StaticResource BodyText}" Foreground="{DynamicResource SystemFillColorCriticalBrush}"
+               Margin="0,12,0,0" TextWrapping="Wrap" AutomationProperties.LiveSetting="Assertive" />
+
+    <StackPanel Grid.Row="3" Style="{StaticResource ButtonRow}">
+      <Button x:Name="SaveButton" Style="{DynamicResource AccentButtonStyle}" MinWidth="120" Padding="12,6" Content="{l:S Alerts_Save}"
+              IsDefault="True" Click="OnSave" />
+      <Button Style="{StaticResource RowButton}" Content="{l:S Common_Cancel}" IsCancel="True" />
+    </StackPanel>
+  </Grid>
+</Window>

@@ -29,11 +29,17 @@ public partial class App : Application
     AgentHost? host;
     TrayController? tray;
     AppUpdates? updates;
+    AppAlerts? alerts;
+    /// <summary>Whether the Windows session is locked or disconnected, as the last session switch said; assumed not at start.</summary>
+    volatile bool sessionLocked;
     readonly Dictionary<Type, Window> windows = [];
     /// <summary>tir, a terminal, NuGet and the tray asking at once share one Windows Hello prompt.</summary>
     readonly SingleFlight<UnlockResult?> unlocking = new();
 
     internal AgentHost Host => host!;
+
+    /// <summary>Out-of-band alerts (docs/alerts.md): opened at unlock, kept while locked.</summary>
+    internal AppAlerts Alerts => alerts!;
 
     internal ConsentPresenter Consent => consent!;
 
@@ -76,17 +82,37 @@ public partial class App : Application
 #endif
 
         consent = new ConsentPresenter(Dispatcher);
+        // Before the agent starts: the solo broker audits a trust chain it rejects at startup.
+        alerts = new AppAlerts();
+        var alertCenter = alerts.Center;
         guard = new ProgramGuard();
         host = new AgentHost(consent, guard.CheckAsync);
         consent.Unlock = async () => (await UnlockAsync(interactive: true)).Ok;
         consent.Gate = guard.Decide;
-        consent.NotMe = (asker, asked) =>
+        consent.SessionLocked = () => sessionLocked;
+        consent.Alert = (kind, asker, names) => _ = Task.Run(() => alertCenter.Raise(
+            Tiresias.Alerts.AlertSources.Asked(kind, asker.Image, asker.ProcessId, names, ParentsOf(asker.ProcessId), DateTimeOffset.UtcNow)));
+        consent.NotMe = (asker, asked, names) =>
         {
             // Before the next waiting request is looked at: from here on everything is refused.
             guard.LockDown();
-            _ = Dispatcher.InvokeAsync(() => NotMeAsync(asker, asked)).Task.Unwrap();
+            _ = Dispatcher.InvokeAsync(() => NotMeAsync(asker, asked, names)).Task.Unwrap();
         };
         host.Log += AppLog.Info;
+        // Before the broker starts: a trust chain it rejects at startup is audited, and so alerts, then.
+        host.BrokerAudited += (record, at) =>
+        {
+            if (Tiresias.Alerts.AlertSources.Audited(record, at) is { } alert)
+                alertCenter.Raise(alert);
+        };
+        host.ServiceIncidentsReceived += incidents =>
+        {
+            // A routine opener's read is evidence only, as in AgentHost.
+            foreach (var incident in incidents.Where(i => i.Routine is null))
+                if (AlertFor(new DecoyTouch(incident.Hit, incident.Parents, null, incident.Frozen)) is { } alert)
+                    alertCenter.Raise(alert);
+            Dispatcher.BeginInvoke(() => tray?.Notify(Text.Get("Notify_Decoy_Title"), Text.Get("Notify_AdminIncidents")));
+        };
         // A demo serves nothing: no user-secrets pipe, broker or control pipe for tir, whose names the real app's use.
         if (!DemoMode.On)
         {
@@ -110,14 +136,15 @@ public partial class App : Application
         tray = new TrayController(this);
         host.StateChanged += () =>
         {
+            // The first unlock opens alerts.json; from then on alerts work while locked too.
+            if (host.Keys.Hello is { } hello)
+                _ = Task.Run(() => alerts.Unlocked(hello));
             // Locked: every terminal asks again, as it would after a restart.
             if (!host.Keys.IsUnlocked)
                 ClearEnvironmentConsent();
             Dispatcher.BeginInvoke(Refresh);
         };
         host.DecoyTouched += OnDecoyTouched;
-        host.ServiceIncidentsReceived += () => Dispatcher.BeginInvoke(() =>
-            tray?.Notify(Text.Get("Notify_Decoy_Title"), Text.Get("Notify_AdminIncidents")));
         host.UserSecrets.FirstSealed += id => Dispatcher.BeginInvoke(() =>
             tray?.Notify(Text.Get("Notify_FirstSealed_Title"), Text.Format("Notify_FirstSealed_Body", id)));
         SystemEvents.SessionSwitch += OnSessionSwitch;
@@ -340,7 +367,7 @@ public partial class App : Application
     /// find the process and what started it, block the program, have the admin tier (when installed)
     /// freeze the process and block its network, record it and show what to do next.
     /// </summary>
-    async Task NotMeAsync(Asker asker, string asked)
+    async Task NotMeAsync(Asker asker, string asked, IReadOnlyList<string>? names)
     {
         AppLog.Info($"this wasn't me: {asker.Image ?? "unknown program"} asked for {asked}");
         await LockAsync();
@@ -348,8 +375,7 @@ public partial class App : Application
         {
             var found = asker.ProcessId is { } pid ? (ProcessTree.Ancestry(pid, 0) is [var self] ? self : null)
                 : asker.Image is { } path && System.IO.Path.IsPathFullyQualified(path) ? ProcessTree.Newest(path) : null;
-            var parents = found is null ? Array.Empty<string>()
-                : [.. ProcessTree.Ancestry(found.ProcessId).Skip(1).Select(p => $"{p.Program} ({p.ProcessId})")];
+            var parents = ParentsOf(found?.ProcessId);
             return (found, parents, asker.Image is { } program ? guard!.Sha256(program) : null);
         });
         guard!.Block(asker.Image, sha);
@@ -358,9 +384,15 @@ public partial class App : Application
         if (frozen)
             AppLog.Info($"this wasn't me: the admin tier froze {process!.Program} ({process.ProcessId})");
         host!.RecordIncident(asked, process is null ? asker.Image : $"{process.Program} ({process.ProcessId})", chain, blocked, frozen);
+        alerts!.Center.Raise(Tiresias.Alerts.AlertSources.Asked(Tiresias.Alerts.AlertKind.IncidentReported,
+            process?.Program ?? asker.Image, process?.ProcessId ?? asker.ProcessId, names, chain, DateTimeOffset.UtcNow));
         IncidentView view = new(asked, asker.Image, process, chain, blocked, frozen);
         IncidentWindow.Show(view);
     }
+
+    static Tiresias.Alerts.AlertEvent? AlertFor(DecoyTouch touch) =>
+        Tiresias.Alerts.AlertSources.DecoyUsed(touch.Hit, touch.Parents, touch.What)
+            ?? Tiresias.Alerts.AlertSources.DecoyRead(touch.Hit, touch.Parents, touch.What, touch.Routine);
 
     /// <summary>
     /// A decoy credential was used (docs/decoys.md): block the program, say so, and let Home raise
@@ -370,6 +402,8 @@ public partial class App : Application
     /// </summary>
     void OnDecoyTouched(DecoyTouch touch)
     {
+        if (AlertFor(touch) is { } alert)
+            alerts?.Center.Raise(alert);
         var program = touch.Hit.Program;
         if (touch.Hit.Use == DecoyUse.Read)
         {
@@ -384,6 +418,10 @@ public partial class App : Application
                 ? Text.Format("Notify_Decoy_Unknown", touch.What)
                 : Text.Format("Notify_Decoy_Body", System.IO.Path.GetFileName(program), touch.What)));
     }
+
+    /// <summary>The processes that started <paramref name="processId"/>, nearest first, as the incident record names them.</summary>
+    static string[] ParentsOf(int? processId) =>
+        processId is { } pid ? [.. ProcessTree.Ancestry(pid).Skip(1).Select(p => $"{p.Program} ({p.ProcessId})")] : [];
 
     /// <summary>A request that came through <c>tir</c>: the program that ran it is the one asking, not <c>tir</c> itself.</summary>
     static Asker TirCaller(PipeClient caller) =>
@@ -661,6 +699,7 @@ public partial class App : Application
 
     void OnSessionSwitch(object? sender, SessionSwitchEventArgs e)
     {
+        sessionLocked = AlertTriggers.SessionLocked(sessionLocked, e.Reason.ToString());
         // The agent locks its keys itself; open consent dialogs are answered Deny here so none waits behind the lock screen.
         if (e.Reason is SessionSwitchReason.SessionLock or SessionSwitchReason.SessionLogoff or SessionSwitchReason.ConsoleDisconnect)
             consent?.DenyAll();
@@ -693,6 +732,8 @@ public partial class App : Application
         await stop.CancelAsync();
         if (host is not null)
             await host.DisposeAsync();
+        if (alerts is not null)
+            await alerts.DisposeAsync();
         consent?.Dispose();
         instance?.ReleaseMutex();
         instance?.Dispose();

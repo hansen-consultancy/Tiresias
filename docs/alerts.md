@@ -1,7 +1,6 @@
 # Out-of-band alerts
 
-Status: **phase 1 built** (the pure planner and the payload, in `Tiresias.Core` and
-`Tiresias.Protocol`); nothing sends yet. Tracks issue #101. This page designs how Tiresias tells you about a
+Status: **phase 5 built**: webhook, ntfy and LcdHub end to end, with every event in the table wired but the failing-sink alert (phase 6). Tracks issue #101. This page designs how Tiresias tells you about a
 serious event when you aren't looking at the app: a push to your phone through
 [ntfy](https://ntfy.sh), a line on a [LcdHub](https://github.com/stevehansen/LcdHub) screen beside
 the machine, or a JSON POST to a webhook of your choice.
@@ -44,7 +43,7 @@ to explain. The title a sink shows comes from this table, never from the event's
 | Event | Severity | Title | Source today |
 |---|---|---|---|
 | `decoy.used` | critical | Decoy credential used | `AgentHost.DecoyTouched` ([decoys.md](decoys.md), layer 1) |
-| `decoy.read` | critical | Decoy file read | The read tripwire (decoys.md layer 2, #97), once it lands |
+| `decoy.read` | critical | Decoy file read | The read tripwire (decoys.md layer 2, #97), for a program that isn't a routine opener |
 | `trust.rejected` | critical | Trust chain rejected | Broker audit `TrustRejected` |
 | `vault.rolled-back` | critical | Vault rolled back | Broker audit `secret-rolled-back` (#83) |
 | `trust.break-glass` | high | Paper key used | Broker audit `BreakGlass` |
@@ -275,14 +274,126 @@ leaving.
    - The canary covers the planner and the payload's JSON. The value and placeholder-token
      canaries and the per-formatter canaries come with the first source mapping and formatter
      (phases 2 to 5): `AlertSubject` has no field that can hold a value, and no formatter exists yet.
-2. **Webhook end to end.** Sealed `alerts.json`, an **Alerts** section in Settings to add a webhook
-   behind Hello (asking for the required machine label first), **Send a test alert**, the delivery worker, and `decoy.used` wired. README,
-   CHANGELOG, I-101 to `mitigated`.
-3. **ntfy.** Its formatter and the setup form (server, topic, token, a hint to use a write-only
-   token).
-4. **LcdHub.** The pipe client (wire v4 status items) and clearing items from `FindingWatch.Shown`.
-5. **The other events.** Blocklist and lockdown refusals, "This wasn't me", `consent.while-locked`,
-   broker audit events from the solo broker, `findings.new`.
+2. **Webhook end to end. Done.** Sealed `alerts.json` (`AlertsConfig`, `AlertsFile`, `AlertsStore`),
+   the transport and the delivery worker (`WebhookTransport`, `AlertSender`, `DeliveryPolicy`),
+   `AlertCenter` tying the planner to the worker, an **Alerts** card to add a webhook behind Hello
+   (asking for the required machine label first), **Send a test alert**, and `decoy.used` wired.
+   README, CHANGELOG, I-101 to `mitigated`. What it settled or changed:
+   - **Settings is About.** The app has no separate Settings page; its settings (start with Windows,
+     the admin tier) are cards on **About**, so **Alerts** is one too. Adding opens a dialog, kept out
+     of screen capture.
+   - **Sink ids are the user's**: 1 to 32 of `a-z`, `0-9`, `-`, such as `siem`. Logs and (phase 6)
+     findings name them; they never leave the machine.
+   - **The form takes one header.** `alerts.json` holds any number; a second one waits for a need.
+   - **Narrowing in `app.json`** is `SinkNarrowing`: muted, a raised threshold (a lower one is
+     ignored), removed. The card mutes and removes; a mute also drops what waits for that sink, so unmuting replays nothing; a raised threshold has no control yet. A removal
+     stops the sink at once and leaves `alerts.json` at once if unlocked, else at the next unlock,
+     since sealing needs the Hello wrapper.
+   - **`alerts.json` refuses plain keys beside its seal** instead of merging them as a
+     `secrets.json` does, and a plain (never sealed) file: anything that could add a sink goes through
+     a sealed save. A file that doesn't open turns alerts off, logged, and doesn't fail the unlock.
+     The recovery restore gives `alerts.json` back to a new Hello key with everything else sealed.
+   - **`Retry-After`** sets the earliest retry, but never sooner than the backoff, so `Retry-After: 0`
+     can't make the worker spin. A **3xx** stops the sink like a 4xx: it isn't followed, and the
+     definition is what needs fixing. A sink restarts when its URL or headers change, or when a test
+     alert gets through.
+   - **Send a test alert** goes to one sink, now, outside dedupe and rate limits (a second test after
+     fixing the receiver mustn't be deduped away), built by the planner with its redaction. One
+     attempt, no retry; the card shows the status code or the exception type.
+   - The canary now runs through the first source mapping (`AlertSources.DecoyUsed`) and the webhook
+     formatter into captured request bytes, with a value and a placeholder token beside the event.
+3. **ntfy. Done.** `NtfyFormat`, and an **Add ntfy...** form on the Alerts card (server, topic,
+   optional token, with hints to use a write-only token and a long random topic), sealed like the
+   webhook. What it settled or changed:
+   - **One HTTP transport.** `WebhookTransport` became `HttpAlertTransport`, which checks a sink and
+     hands it to its kind's formatter; `WebhookRules` became `SinkRules`. A sink is an `AlertSink`
+     record (`WebhookSink`, `NtfySink`) whose `ToString` is sealed to its kind and id, so no kind can
+     print its address or token.
+   - **The form takes the server and the topic apart** (the server prefilled with `https://ntfy.sh`);
+     `alerts.json` keeps the joined topic URL as `url`, beside `token` when there is one. A server may
+     sit under a path, but has no query or fragment. A topic follows ntfy's own rule, 1 to 64 of
+     `A-Z`, `a-z`, `0-9`, `-`, `_`; a token is 1 to 256 visible ASCII characters. Both are checked
+     again before every send.
+   - **Priority** is 2/3/4/5 as designed; 1 (min) is never used, so an alert always shows. **Tags**
+     are emoji names: `information_source`, `large_orange_diamond`, `warning`, `rotating_light`
+     for info to critical.
+   - **The body** is "Critical on desk, ×1. Open Tiresias.", in English (it leaves the machine; it
+     isn't the app's UI). A trusted sink adds the program's file name in brackets and nothing else
+     from `detail`: never the folder, which can name the user, nor the parents, names or decoy kind.
+   - **`Title` is the event table's title as is**; a test pins every title to printable ASCII, so it
+     fits a header without encoding. `Content-Type` is `text/plain; charset=utf-8`.
+   - The canary runs through the decoy mapping, the planner and the ntfy formatter into the captured
+     request line, headers and body: no name canary on a public sink, only the program's file name on
+     a trusted one, never a value, a placeholder or the folder; the token once, in `Authorization`.
+4. **LcdHub. Done.** `LcdHubLink` (the pipe client, wire v4 status items), `LcdHubFormat`, an
+   **Add LcdHub...** form on the Alerts card, and clearing from `FindingWatch.Shown`. What it settled
+   or changed:
+   - **The link stays connected while it has something to show, and only then.** LcdHub drops a
+     producer's status items when it disconnects, so a one-shot send would vanish at once. The link
+     connects when an item arrives, sends every item again after the hub restarts or starts late
+     (with what is left of its lifetime), and disconnects when nothing is left, so Tiresias isn't in
+     the hub's producer list (as `Tiresias`) while idle. It writes only Hello and Status and skips
+     whatever the hub sends.
+   - **No hub is not a failure.** LcdHub deliveries don't go through `AlertSender`'s queue and retries:
+     an item waits in the link, retried every 5 seconds, until a hub appears or its 24 hours end.
+     A screen that isn't running is normal, so phase 6 won't count it as a failing sink.
+   - **One item per event, counting up.** The key is `tiresias:<event>`, so a second subject of the
+     same event updates the line instead of adding one. The count adds every delivery since the item
+     was last cleared (a dedupe summary's `count` holds only the repeats), the level is the worst
+     seen, and each update renews the 24 hours.
+   - **Never `detail`, trusted or not.** The text is the title and count only, so the form has no
+     trusted choice: the screen faces whoever stands at the desk.
+   - **Clearing takes every Tiresias item off**, not just findings: Home showing the findings means
+     you are back at the machine, which is what the "while you were away" view waits for. Removing
+     the sink clears it too. Muting stops new items and leaves what is shown to its lifetime.
+   - **One LcdHub sink per machine**, default id `desk`, default threshold `warning`. In `alerts.json`
+     it is `{"id", "kind": "lcdhub", "threshold", "redaction"}`, with no address or credential.
+   - **Send a test alert** shows "Test alert ×1" for one minute, not 24 hours, and reports whether a
+     hub took it within 3 seconds; if none did, it still shows should one start within the minute.
+   - **Pipe squatting is not checked beyond `CurrentUserOnly`**, which already refuses a pipe served
+     by another user. The serving process could be compared to `LcdHub.exe`, but anything running as
+     you can take that name, and the hub can sit anywhere under any name, so the check would refuse
+     a real hub before it stopped a squatter. What a squatter learns is what the screen shows anyone:
+     event titles and counts (I-101, D-alerts-silenced).
+   - A demo (`--demo`) leaves the real LcdHub alone.
+   - The canary runs through the decoy mapping, the planner and the link into the bytes a fake hub
+     received, for a public and a trusted sink: no canary, no user name, no machine label.
+5. **The other events. Done.** Every source in the events table but `alerts.*` is wired, each a thin
+   mapping in `AlertSources` (Core) or `AlertTriggers` (the app's `Logic/`). What it settled or changed:
+   - **`decoy.read`** comes from the read tripwire (#97) through the same `DecoyTouched` as
+     `decoy.used`, but only for a program that isn't a routine opener (an indexer, an antivirus): the
+     same programs the app notifies of. Otherwise every scan would be a critical alert.
+   - **Consent alerts are decided at the gate**, when a request's turn comes: `Blocked` is
+     `program.blocked`, `LockedDown` is `lockdown.refused`, and a request the gate lets through while
+     the Windows session is locked is `consent.while-locked`. One request raises one alert at most. A
+     request asked with someone at the machine raises none.
+   - **"The session is locked"** means locked, logged off or disconnected (locally or over Remote
+     Desktop) since the last session switch, until it is unlocked, logged on or connected again. The
+     app assumes unlocked when it starts.
+   - **Consent and incident subjects** carry the program, its process id, the processes that started
+     it, and the secret or variable names asked for. A `tir` placeholder or `tir exec` approval
+     carries no names: its lines are `tir`'s own text, which can hold a command. The request's heading
+     and command line never go.
+   - **Broker events come from the solo broker's audit log**: as it writes it (`AuditLog.Appended`)
+     when the app hosts the broker, or from the Windows service's journal, read every 30 seconds while
+     the service runs (`AuditTail`). The journal's first read after the app starts only sets where to
+     begin, as does one that no longer extends the last (replaced, shrunk, or a chain that doesn't
+     verify): records the app didn't see written never alert late. `trust.rejected` carries the verifier's failure kind (`Fork`,
+     `Rollback`...), `trust.break-glass` nothing, `vault.rolled-back` and `vault.unapproved` the
+     secret's name (`policy-not-approved: <slug>` is the refused reload's record), `approval.invalid`
+     the service and the calling process. The record's free-text reason never goes whole. A reload
+     that refuses several secrets writes a record, and so an alert, per secret.
+   - **The admin tier's decoy incidents** (decoys the admin service holds) raise `decoy.used` as the
+     app receives them, with the program, its process chain and the decoy kind, as a decoy the app
+     holds does. After a restart, incidents not yet reviewed in Activity alert once more.
+   - **`findings.new` is one event per background check run**, naming each new finding by its title,
+     never its detail: a warning when any of them fails, info when they only warn. New means open, not
+     shown on Home (`seen-findings.json`) and not alerted on before by this run of the app; a finding
+     that goes away and comes back alerts again. After a restart, findings still unshown alert once
+     more. Home running the checks itself raises nothing: you are looking at them.
+   - The canary runs every source's event, built from inputs with a value and a placeholder token
+     beside the names, through the planner into the webhook's, ntfy's and a fake LcdHub's captured
+     bytes, public and trusted.
 6. **Failing sinks.** The finding on Home, `alerts.failing`, D-alerts-silenced updated.
 7. **Later.** An LcdHub alert frame for `critical`; heartbeat; a signed webhook payload.
 

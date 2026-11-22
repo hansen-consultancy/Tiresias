@@ -34,7 +34,7 @@ design and issue. A PR that finishes, starts or adds an item edits this page in 
       decoys from boot); steps 3-5 in review (decoy read auditing, freezing a program that used a
       decoy and blocking its network, lastrun from BAM and Prefetch)
 - [ ] Out-of-band alerts: ntfy, LcdHub and a webhook, public by default ([design](alerts.md), #101).
-      Slice 1 in review
+      The planner, the webhook and ntfy built; LcdHub and the other events in review
 - [ ] Secrets reachable in containers, WSL and VMs from the user's account
       ([design](containers-and-vms.md), #113). Phase 1 (what your account can open) built; phase 2 (devcontainer files, forwarding) in review
 - [x] `tir ai`: instructions for AI coding agents ([guide](ai-agents.md))

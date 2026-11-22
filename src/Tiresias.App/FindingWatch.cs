@@ -18,6 +18,9 @@ static class FindingWatch
     static DispatcherTimer? timer;
     static bool running;
 
+    /// <summary>The findings a background run already alerted on (<c>findings.new</c>), this run of the app only.</summary>
+    static IReadOnlySet<string> alerted = new HashSet<string>();
+
     /// <summary>How many findings Home hasn't shown yet; 0 until the first run.</summary>
     public static int NewCount { get; private set; }
 
@@ -39,7 +42,7 @@ static class FindingWatch
 
     public static void Stop() => timer?.Stop();
 
-    /// <summary>Home showed these checks' findings: they are seen, and the badge clears.</summary>
+    /// <summary>Home showed these checks' findings: they are seen, the badge clears, and so do the LcdHub's alert items.</summary>
     public static void Shown(IReadOnlyList<DoctorCheck> checks)
     {
         var open = FindingBadge.Open(checks, DismissalStore.Load());
@@ -55,6 +58,7 @@ static class FindingWatch
             AppLog.Error(e, "seen findings");
         }
         Set(0);
+        App.Current.Alerts.Center.FindingsShown();
     }
 
     /// <summary>Runs the checks off the UI thread, unless Home is running them itself.</summary>
@@ -69,7 +73,12 @@ static class FindingWatch
             var checks = await Task.Run(() => Doctor.RunAsync(probe));
             var dismissals = DismissalStore.Load();
             Home.LastFindings = FindingView.Of(checks, dismissals).Open.Count;
-            Set(FindingBadge.New(FindingBadge.Open(checks, dismissals), ReadSeen()));
+            var seen = ReadSeen();
+            Set(FindingBadge.New(FindingBadge.Open(checks, dismissals), seen));
+            var run = AlertTriggers.Findings(checks, dismissals, seen, alerted, DateTimeOffset.UtcNow);
+            alerted = run.Alerted;
+            if (run.Alert is { } alert)
+                App.Current.Alerts.Center.Raise(alert);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidDataException)
         {

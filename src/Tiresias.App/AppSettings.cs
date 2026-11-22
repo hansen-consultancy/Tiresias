@@ -1,11 +1,13 @@
 using System.Text.Json;
 using Tiresias.Agent;
+using Tiresias.Alerts;
 
 namespace Tiresias.App;
 
 /// <summary>The app's own preferences, <c>%LOCALAPPDATA%\Tiresias\app.json</c>. A missing or unreadable file means the defaults.</summary>
 /// <param name="SetupSkipped">The user finished the first-run wizard without a broker.</param>
-public sealed record AppSettings(bool SetupSkipped = false, DateTimeOffset? LastUpdateCheck = null)
+/// <param name="Alerts">Alert sinks narrowed without Windows Hello (muted, removed), by sink id; see <see cref="SinkNarrowing"/>.</param>
+public sealed record AppSettings(bool SetupSkipped = false, DateTimeOffset? LastUpdateCheck = null, IReadOnlyDictionary<string, SinkNarrowing>? Alerts = null)
 {
     static string Path => System.IO.Path.Combine(KeyringStore.Directory, "app.json");
 
