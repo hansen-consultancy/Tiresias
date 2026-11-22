@@ -1,6 +1,6 @@
 # Out-of-band alerts
 
-Status: **phases 1 to 6 built**: webhook, ntfy and LcdHub end to end, every event in the table wired, failing sinks reported. Tracks issue #101. This page designs how Tiresias tells you about a
+Status: **phases 1 to 6 built**, and from phase 7 signed webhooks and the heartbeat: webhook, ntfy and LcdHub end to end, every event in the table wired, failing sinks reported. Tracks issue #101. This page designs how Tiresias tells you about a
 serious event when you aren't looking at the app: a push to your phone through
 [ntfy](https://ntfy.sh), a line on a [LcdHub](https://github.com/stevehansen/LcdHub) screen beside
 the machine, or a JSON POST to a webhook of your choice.
@@ -58,6 +58,7 @@ to explain. The title a sink shows comes from this table, never from the event's
 | `alerts.failing` | warning | Alerts to a sink are failing | The delivery loop below, sent to the other sinks |
 | `alerts.suppressed` | warning | Alerts held back | The rate limit below: how many it held back while a bucket was empty |
 | `alerts.test` | info | Test alert | **Send a test alert** in the app |
+| `alerts.alive` | info | Tiresias is running | The heartbeat below, to the webhooks that asked for one |
 
 Broker audit events come from the broker in the app (solo mode) as it writes them. A remote
 broker's own events are the broker's business, not this page's (see *Not in scope*).
@@ -197,6 +198,55 @@ All in the planner's state, per sink:
 - The queue holds only redacted payloads. It is not written to disk in v1: alerts lost when the app
   exits are still in the activity log.
 
+### Heartbeat
+
+A sink can't tell a quiet machine from a dead app ([D-alerts-silenced](threats/D-alerts-silenced.md)).
+A webhook can ask for a heartbeat: an `alerts.alive` every N minutes, which a receiver that expects
+it (a dead man's switch, a cron monitor) turns into "nothing heard from `workstation`".
+
+- **Opt-in per webhook, off by default.** `"heartbeatMinutes": 15` on the sink in `alerts.json`,
+  5 to 60 whole minutes; the form offers off, 5, 15, 30 and 60. Turning it on sends something new,
+  so it is a sealed save, behind Hello like the rest of the definition.
+- **Webhooks only.** On ntfy a heartbeat would be a push to your phone every interval, and ntfy
+  can't notice silence; LcdHub is a screen beside the machine, which has nobody to tell.
+- **What leaves: the machine label and the time.** An ordinary `tiresias.alert/v1` with `event`
+  `alerts.alive`, `severity` `info`, `title` "Tiresias is running", `count` 1, `at` the send time
+  and a `key` fixed per install. Never `detail`, on a trusted sink too. It widens nothing: a public
+  sink already gets the label and times with every alert.
+- **The schedule.** `AlertPlanner.Tick` sends the first at once (the app ticks right after unlock)
+  and the next once the interval has passed since the last, outside threshold, dedupe and rate
+  limits. A muted or removed sink gets none; unmuting sends one at once. The app ticks every minute,
+  so beats are N to N+1 minutes apart.
+- **Delivery.** Through the sink's queue like any alert, so a sink stopped by a 4xx stops beating
+  too, which is the point. A newer heartbeat replaces one still waiting, so a receiver back from an
+  outage gets one, not a backlog.
+- **What a receiver should expect.** One beat per interval, plus up to a minute's jitter and the
+  retry backoff. Alarm after about two intervals of silence. Expect silence after a restart until
+  the first unlock (see *Settled*), and when the app or the session ends: the receiver can't tell
+  those from an attack, and shouldn't try.
+
+### Signed webhooks
+
+A webhook's own `Authorization` header says who may post. A signature also proves the body came
+from this machine and wasn't replayed.
+
+- **Scheme: [Standard Webhooks](https://www.standardwebhooks.com/)**, so a receiver checks it with an
+  off-the-shelf library instead of code written for Tiresias. Three headers on every request:
+  `webhook-id` (the payload's `id`, also the `Idempotency-Key`), `webhook-timestamp` (Unix seconds,
+  the attempt's own time) and `webhook-signature: v1,<base64 HMAC-SHA-256 over
+  "<id>.<timestamp>.<body>">`, over exactly the bytes sent.
+- **The key.** A `whsec_` secret (base64 of 24 to 64 bytes) per webhook: pasted from the receiver,
+  or made by **New secret** in the form (32 random bytes) and copied to the receiver. It is
+  `"signing"` on the sink in sealed `alerts.json`, so adding or changing it needs Hello, and it never
+  leaves the machine: only the HMAC does. The form is kept out of screen capture, like the header,
+  and a sink prints as its kind and id only, so no log line or exception can show the key.
+- **Replay.** The receiver refuses a timestamp more than 5 minutes from its own clock (the spec's
+  tolerance) and remembers `webhook-id`s inside that window. Each retry signs again with its own
+  time and the same id, so a late retry still verifies and a replayed one doesn't.
+- **Headers.** `webhook-id`, `webhook-timestamp` and `webhook-signature` are reserved, so a user
+  header can't fake or override a signature. Without a secret, none is sent.
+- **What leaves.** Nothing new: the id and a time are in the body already.
+
 ### While locked
 
 Locking ends the lease and forgets every consent, but not the sink definitions the app opened at
@@ -241,10 +291,6 @@ leaving.
 
 - **A remote broker's alerts.** A broker on a VPS sees trust and approval failures for every
   device. Alerting from there is a broker feature with its own config.
-- **Heartbeat.** A sink can't tell a quiet machine from a dead app. A periodic `alerts.alive` that
-  the receiver expects is a later addition, opt-in per sink.
-- **Signed payloads.** An HMAC signature header for the webhook. The receiver's own auth header
-  covers who may post; a signature would also prove the payload came from this machine.
 - **Other sinks** (email, Teams, Slack). Each is a formatter over the same payload; Slack and Teams
   webhooks already take a JSON POST.
 
@@ -418,6 +464,13 @@ leaving.
    - The canary runs a failing webhook and ntfy sink with canary URL, header and token beside a public
      and a trusted webhook and ntfy: none of them appears in another sink's request, the log or the
      finding; the id only in a trusted webhook's `detail`.
-7. **Later.** An LcdHub alert frame for `critical`; heartbeat; a signed webhook payload.
+7. **Later.** Signed webhooks and the heartbeat **done** (*Heartbeat*, *Signed webhooks* above);
+   an LcdHub alert frame for `critical` follows in its own PR. What it settled or changed:
+   - **Signing is Standard Webhooks**, not a scheme of Tiresias's own: the HMAC-SHA-256 over
+     timestamp and body the design sketched, with header names and a secret format receivers'
+     libraries already check. The id in the signature is the payload's.
+   - **The heartbeat is for webhooks only**, 5 to 60 minutes, off by default, and is a payload of
+     the existing schema rather than a new one, so a receiver needs no second parser.
+   - The form only adds sinks: to sign or beat on an existing webhook, remove it and add it again.
 
 Each phase merges on its own, and only phase 2 onwards is user-facing.

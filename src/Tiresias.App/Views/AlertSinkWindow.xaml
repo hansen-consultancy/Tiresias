@@ -56,6 +56,26 @@
             <PasswordBox x:Name="HeaderValueBox" AutomationProperties.LabeledBy="{Binding ElementName=HeaderValueLabel}" />
             <TextBlock Text="{l:S Alerts_HeaderHint}" Style="{StaticResource Hint}" />
           </StackPanel>
+
+          <!-- Standard Webhooks signing and the heartbeat (docs/alerts.md, Signed webhooks, Heartbeat). -->
+          <StackPanel Style="{StaticResource Field}">
+            <Label x:Name="SigningLabel" Content="{l:S Alerts_Signing}" Target="{Binding ElementName=SigningBox}" Padding="0,0,0,4" />
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBox x:Name="SigningBox" FontFamily="Consolas" AutomationProperties.LabeledBy="{Binding ElementName=SigningLabel}" />
+              <Button Grid.Column="1" Style="{StaticResource RowButton}" Margin="8,0,0,0" Content="{l:S Alerts_SigningNew}" Click="OnNewSecret" />
+            </Grid>
+            <TextBlock Text="{l:S Alerts_SigningHint}" Style="{StaticResource Hint}" />
+          </StackPanel>
+
+          <StackPanel Style="{StaticResource Field}">
+            <Label x:Name="HeartbeatLabel" Content="{l:S Alerts_Heartbeat}" Target="{Binding ElementName=HeartbeatBox}" Padding="0,0,0,4" />
+            <ComboBox x:Name="HeartbeatBox" HorizontalAlignment="Left" MinWidth="220" AutomationProperties.LabeledBy="{Binding ElementName=HeartbeatLabel}" />
+            <TextBlock Text="{l:S Alerts_HeartbeatHint}" Style="{StaticResource Hint}" />
+          </StackPanel>
         </StackPanel>
 
         <!-- ntfy: server, topic and an optional token (docs/alerts.md, Sinks). -->

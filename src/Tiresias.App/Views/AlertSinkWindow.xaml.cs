@@ -46,8 +46,13 @@ public partial class AlertSinkWindow : Window
         ThresholdBox.SelectedIndex = form == SinkForm.LcdHub ? 2 : 1;
         if (form == SinkForm.LcdHub)
             IdBox.Text = "desk";
+        HeartbeatBox.ItemsSource = AlertsCard.HeartbeatChoices.Select(m => m == 0 ? Text.Get("Alerts_HeartbeatOff") : Text.Format("Alerts_HeartbeatEvery", m)).ToArray();
+        HeartbeatBox.SelectedIndex = 0;
         Loaded += (_, _) => (needsMachine ? MachineBox : IdBox).Focus();
     }
+
+    /// <summary>A fresh secret for the receiver to copy: the window is kept out of screen capture.</summary>
+    void OnNewSecret(object sender, RoutedEventArgs e) => SigningBox.Text = WebhookSignature.NewSecret();
 
     /// <summary>The sink saved, once the dialog returns <c>true</c>.</summary>
     public string? AddedId { get; private set; }
@@ -63,7 +68,7 @@ public partial class AlertSinkWindow : Window
             SinkForm.Ntfy => AlertsCard.BuildNtfy(needsMachine, MachineBox.Text, IdBox.Text, ServerBox.Text, TopicBox.Text, TokenBox.Password, threshold, trusted, existing),
             SinkForm.LcdHub => AlertsCard.BuildLcdHub(needsMachine, MachineBox.Text, IdBox.Text, threshold, sinks),
             _ => ((AlertSink?, Phrase?))AlertsCard.Build(needsMachine, MachineBox.Text, IdBox.Text, UrlBox.Text, HeaderNameBox.Text, HeaderValueBox.Password,
-                threshold, trusted, existing),
+                threshold, trusted, existing, SigningBox.Text, AlertsCard.HeartbeatChoices[Math.Max(0, HeartbeatBox.SelectedIndex)]),
         };
         if (problem is not null)
         {
