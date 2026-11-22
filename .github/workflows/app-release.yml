@@ -75,6 +75,8 @@ jobs:
           for rid in win-x64 win-arm64; do
             dotnet publish src/Tiresias.App -c Release -r $rid --self-contained -p:Version="$v" -o publish/$rid
             dotnet publish src/Tiresias.Keyring -c Release -r $rid --self-contained -p:Version="$v" -o publish/$rid
+            dotnet publish src/Tiresias.RecoveryHelper -c Release -r $rid -p:Version="$v" -o recovery/$rid
+            cp recovery/$rid/tiresias-recovery.exe publish/$rid/
             dotnet publish src/Tiresias.NuGetPlugin -c Release -r $rid --self-contained -p:Version="$v" -o publish/$rid
             dotnet publish src/Tiresias.Admin -c Release -r $rid --self-contained -p:PublishSingleFile=true -p:Version="$v" -o publish/$rid/admin
           done
@@ -125,7 +127,7 @@ jobs:
 
       # vpk signs Tiresias.exe, tir.exe and every other unsigned binary in the package, then the
       # installer. Stop here if anything users run came out unsigned or untimestamped: check each
-      # installer and the two executables inside each full package that updates install. Artifact
+      # installer and the three executables inside each full package that updates install. Artifact
       # Signing certificates live three days, so a signature without a timestamp stops verifying
       # three days after the release.
       - name: Verify signatures
@@ -138,12 +140,24 @@ jobs:
             $into = "$env:RUNNER_TEMP/full/$($full.BaseName)"
             Copy-Item $full.FullName "$into.zip"   # Expand-Archive only takes a .zip name
             Expand-Archive "$into.zip" -DestinationPath $into -Force
-            $files += @(Get-ChildItem $into -Include Tiresias.exe, tir.exe -Recurse)
+            $clients = @(Get-ChildItem $into -Include Tiresias.exe, tir.exe, tiresias-recovery.exe -File -Recurse)
+            foreach ($name in 'Tiresias.exe', 'tir.exe', 'tiresias-recovery.exe') {
+              if (@($clients | Where-Object Name -eq $name).Count -ne 1) { throw "Expected one $name in $($full.Name)" }
+            }
+            $signers = @($clients | ForEach-Object { (Get-AuthenticodeSignature $_.FullName).SignerCertificate.Thumbprint } | Sort-Object -Unique)
+            if ($signers.Count -ne 1) { throw "The recovery helper and its clients must have the same signer in $($full.Name)" }
+            $env:TIRESIAS_SIGNED_RECOVERY_CLIENT = ($clients | Where-Object Name -eq 'tir.exe').DirectoryName
+            $results = Join-Path $env:RUNNER_TEMP "verify-$($full.BaseName)"
+            dotnet test src/Tiresias.App.Tests/Tiresias.App.Tests.csproj -c Release --filter 'FullyQualifiedName=Tiresias.App.Tests.RecoveryHelperImageTests.Signed_release_clients_verify_the_packaged_helper' --results-directory $results --logger 'trx;LogFileName=helper.trx'
+            if ($LASTEXITCODE -ne 0 -or ([xml](Get-Content -Raw (Join-Path $results 'helper.trx'))).TestRun.ResultSummary.Counters.passed -ne '1') {
+              throw "Recovery enrollment verification failed for $($full.Name)"
+            }
+            $files += $clients
           }
           $files += @(Get-ChildItem Releases -Filter *-Setup.exe)
           $bad = $files | Where-Object { $s = Get-AuthenticodeSignature $_.FullName; $s.Status -ne 'Valid' -or -not $s.TimeStamperCertificate }
-          # Two architectures: two full packages, each with two executables, and two installers.
-          if ($fulls.Count -lt 2 -or $files.Count -lt 6 -or $bad) {
+          # Two architectures: two full packages, each with three executables, and two installers.
+          if ($fulls.Count -lt 2 -or $files.Count -lt 8 -or $bad) {
             Write-Output "::error title=Unsigned or untimestamped files::$($bad.Name -join ', ')"
             exit 1
           }

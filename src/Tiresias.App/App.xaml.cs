@@ -210,22 +210,20 @@ public partial class App : Application
 
     internal static SetupFacts SetupFacts()
     {
-        var recoverySet = KeyringStore.Settings.RecoveryPublicKey is not null;
-        return new(HelloKeyWrapper.Exists(), recoverySet, KeyringStore.Broker is not null, AppSettings.Load().SetupSkipped,
-            SealedWithoutKey: !recoverySet && AnythingSealed(), AdminTierInstalled: AdminClient.Installed);
-    }
-
-    /// <summary>A damaged vault or secrets file must not stop the app starting: the status page reports it.</summary>
-    static bool AnythingSealed()
-    {
+        var facts = new SetupFacts(HelloKeyWrapper.Exists(), RecoverySet: false, KeyringStore.Broker is not null, AppSettings.Load().SetupSkipped,
+            AdminTierInstalled: AdminClient.Installed);
         try
         {
-            return RecoveryRestore.AnythingSealed();
+            if (RecoveryKey.IsEnrolled)
+                return facts with { RecoverySet = true };
+            return RecoveryKey.NeedsVerification
+                ? facts with { RecoveryNeedsVerification = true }
+                : facts with { SealedWithoutKey = RecoveryRestore.AnythingSealed() };
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidDataException)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidDataException
+            or InvalidOperationException or System.Security.Cryptography.CryptographicException)
         {
-            AppLog.Error(e, "looking for sealed secrets");
-            return false;
+            return facts with { RecoveryError = e.Message };
         }
     }
 

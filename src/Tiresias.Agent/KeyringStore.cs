@@ -7,7 +7,7 @@ namespace Tiresias.Agent;
 /// <summary>The broker this Keyring talks to, pinned at enrolment. Every lease offer must verify against <see cref="IdentityKey"/>.</summary>
 public sealed record BrokerPin(Uri Url, string IdentityKey);
 
-/// <summary>Local settings. <see cref="RecoveryPublicKey"/> is only the public half; the private half exists on paper.</summary>
+/// <summary>Local settings. <see cref="RecoveryPublicKey"/> is a legacy migration hint.</summary>
 public sealed record KeyringSettings(string DeviceId, string VaultPath, string? RecoveryPublicKey);
 
 /// <summary>
@@ -71,6 +71,8 @@ public static class KeyringStore
     static KeyringSettings StoredSettings =>
         Read<KeyringSettings>(SettingsPath) ?? new(Environment.MachineName.ToLowerInvariant(), DefaultVaultPath, null);
 
+    internal static string DeviceVaultPath => StoredSettings.VaultPath;
+
     /// <summary>The trust-chain head this Keyring last accepted from the selected tenant's broker; a broker answering with an older one is rolling back.</summary>
     public static Trust.ChainHead? ChainHead
     {
@@ -129,8 +131,17 @@ public static class KeyringStore
         return key;
     }
 
-    static T? Read<T>(string path) where T : class =>
-        File.Exists(path) ? JsonSerializer.Deserialize<T>(File.ReadAllText(path), Json) : null;
+    static T? Read<T>(string path) where T : class
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<T>(File.ReadAllText(path), Json);
+        }
+        catch (Exception e) when (e is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return null;
+        }
+    }
 
     static void Write<T>(string path, T? value) where T : class
     {

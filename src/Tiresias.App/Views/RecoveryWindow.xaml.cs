@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -22,13 +23,46 @@ public partial class RecoveryWindow : Window
     }
 
     void OnClose(object sender, RoutedEventArgs e) => Close();
+
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        base.OnClosing(e);
+        if (DataContext is RecoveryViewModel { IsWorking: true })
+            e.Cancel = true;
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        ((RecoveryViewModel)DataContext).TypedKey = "";
+        base.OnClosed(e);
+    }
 }
 
 public sealed partial class RecoveryViewModel : ObservableObject
 {
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(RestoreCommand))]
+    [NotifyPropertyChangedFor(nameof(Fingerprint))]
     public partial string TypedKey { get; set; } = "";
+
+    public string Fingerprint => FingerprintText(TypedKey);
+
+    internal static string FingerprintText(byte[] paper) => Text.Format("Recovery_CompareFingerprint", PaperKey.RecipientFingerprint(paper));
+
+    internal static string FingerprintText(string typed)
+    {
+        var paper = PaperKey.Parse(typed);
+        if (paper is null)
+            return "";
+        try
+        {
+            return FingerprintText(paper);
+        }
+        finally
+        {
+            Array.Clear(paper);
+        }
+    }
 
     [ObservableProperty]
     public partial string Message { get; set; } = "";

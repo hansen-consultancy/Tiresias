@@ -35,7 +35,8 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     public bool Solo => KeyringStore.Tenant is { Solo: true };
     public BrokerServiceState BrokerService => Solo ? Agent.BrokerService.State() : BrokerServiceState.NotInstalled;
     public bool HasDeviceKey => KeyringStore.HasDeviceKey;
-    public bool RecoveryKeySet => KeyringStore.Settings.RecoveryPublicKey is not null;
+    public bool RecoveryKeySet => RecoveryKey.IsEnrolled;
+    public bool RecoveryKeyNeedsVerification => RecoveryKey.NeedsVerification;
 
     /// <summary>Read from the solo broker's chain file; a remote broker's chain isn't fetched here.</summary>
     public bool? HelloBound

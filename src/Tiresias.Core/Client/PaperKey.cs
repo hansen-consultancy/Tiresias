@@ -11,7 +11,7 @@ namespace Tiresias.Client;
 /// wraps every DEK, and an HKDF of them with its own label is the Ed25519 paper key that co-signs
 /// genesis, so neither use can be turned into the other.
 /// </summary>
-public static class PaperKey
+public static partial class PaperKey
 {
     const string Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
     static readonly byte[] SigningInfo = "tiresias/v1/paper-signing-key"u8.ToArray();
@@ -101,6 +101,13 @@ public static class PaperKey
     {
         using var key = Key.Import(KeyAgreementAlgorithm.X25519, recoveryKey, KeyBlobFormat.RawPrivateKey);
         return CryptographicOperations.FixedTimeEquals(key.PublicKey.Export(KeyBlobFormat.RawPublicKey), publicKey);
+    }
+
+    /// <summary>The public recipient fingerprint to compare with the administrator's enrollment prompt.</summary>
+    public static string RecipientFingerprint(ReadOnlySpan<byte> paper)
+    {
+        using var key = Key.Import(KeyAgreementAlgorithm.X25519, paper, KeyBlobFormat.RawPrivateKey);
+        return PublicFingerprint(key.PublicKey.Export(KeyBlobFormat.RawPublicKey));
     }
 
     static bool Same(string expected, string typed) =>

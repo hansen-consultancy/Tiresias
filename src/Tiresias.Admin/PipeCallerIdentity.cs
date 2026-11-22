@@ -7,6 +7,7 @@ using System.Security.Principal;
 using Microsoft.Win32.SafeHandles;
 using Tiresias.AdminTier;
 using Tiresias.Decoys;
+using Tiresias.Windows;
 
 namespace Tiresias.Admin;
 
@@ -57,43 +58,11 @@ static partial class PipeCallerIdentity
         var user = identity.User?.Value ?? throw new Win32Exception("The token has no user.");
         var isService = ServiceAccounts.Contains(user) || identity.Groups?.Any(g => g.Value == ServiceGroupSid) == true;
         var session = (int)TokenInt(token, TokenSessionId);
-        return new(user, session, SessionUser(session), TokenInt(token, TokenElevation) != 0, isService);
+        return new(user, session, WindowsSessionAccount.Find(session)?.Sid, TokenInt(token, TokenElevation) != 0, isService);
     }
 
     static uint TokenInt(SafeAccessTokenHandle token, int infoClass) =>
         GetTokenInformation(token, infoClass, out var value, sizeof(uint), out _) ? value : throw new Win32Exception(Marshal.GetLastPInvokeError());
-
-    /// <summary>The SID of the user signed in to the session, or <c>null</c> when nobody is.</summary>
-    static string? SessionUser(int session)
-    {
-        var name = SessionString(session, WtsUserName);
-        if (string.IsNullOrEmpty(name))
-            return null;
-        try
-        {
-            return new NTAccount(SessionString(session, WtsDomainName) ?? "", name).Translate(typeof(SecurityIdentifier)).Value;
-        }
-        catch (SystemException)
-        {
-            // NTAccount.Translate throws IdentityNotMappedException, or a bare SystemException when a domain can't be reached.
-            // Can't be told: the caller is refused, as if nobody were signed in to its session.
-            return null;
-        }
-    }
-
-    static string? SessionString(int session, int infoClass)
-    {
-        if (!WTSQuerySessionInformationW(IntPtr.Zero, session, infoClass, out var buffer, out _))
-            return null;
-        try
-        {
-            return Marshal.PtrToStringUni(buffer);
-        }
-        finally
-        {
-            WTSFreeMemory(buffer);
-        }
-    }
 
     static string? Image(SafeProcessHandle process, uint flags = 0)
     {
@@ -178,8 +147,6 @@ static partial class PipeCallerIdentity
     const uint TokenDuplicate = 0x0002;
     const int TokenSessionId = 12;
     const int TokenElevation = 20;
-    const int WtsUserName = 5;
-    const int WtsDomainName = 7;
 
     [LibraryImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -204,10 +171,4 @@ static partial class PipeCallerIdentity
     [return: MarshalAs(UnmanagedType.Bool)]
     private static partial bool GetTokenInformation(SafeAccessTokenHandle token, int infoClass, out uint info, int length, out int returned);
 
-    [LibraryImport("wtsapi32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool WTSQuerySessionInformationW(IntPtr server, int session, int infoClass, out IntPtr buffer, out int bytes);
-
-    [LibraryImport("wtsapi32.dll")]
-    private static partial void WTSFreeMemory(IntPtr memory);
 }

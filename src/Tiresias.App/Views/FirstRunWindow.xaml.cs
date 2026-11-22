@@ -8,8 +8,6 @@ using Tiresias.Agent;
 using Tiresias.App.Logic;
 using Tiresias.Client;
 using Tiresias.Protocol;
-using Tiresias.UserSecrets;
-using Tiresias.Vault;
 
 namespace Tiresias.App.Views;
 
@@ -39,14 +37,23 @@ public partial class FirstRunWindow : Window
 
     void ShowStep()
     {
-        foreach (var panel in new Panel[] { Welcome, Hello, RecoveryShow, RecoveryConfirm, Restore, Mode, RecoveryType, AdminTierPanel, Done })
-            panel.Visibility = (FirstRunStep)panel.Tag == model.Step ? Visibility.Visible : Visibility.Collapsed;
+        var panelStep = model.Step == FirstRunStep.RecoveryMigrate ? FirstRunStep.RecoveryRestore : model.Step;
+        foreach (var panel in new Panel[] { Welcome, Hello, RecoveryCreate, RecoveryUnavailable, RecoveryShow, RecoveryConfirm, Restore, Mode, RecoveryType, AdminTierPanel, Done })
+            panel.Visibility = (FirstRunStep)panel.Tag == panelStep ? Visibility.Visible : Visibility.Collapsed;
         if (model.Step == FirstRunStep.RecoveryConfirm)
             Dispatcher.BeginInvoke(() => FirstGroup.Focus());
         else if (model.Step == FirstRunStep.RecoveryType)
             Dispatcher.BeginInvoke(() => TypedKey.Focus());
-        else if (model.Step == FirstRunStep.RecoveryRestore)
+        else if (panelStep == FirstRunStep.RecoveryRestore)
             Dispatcher.BeginInvoke(() => RestoreKey.Focus());
+    }
+
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        base.OnClosing(e);
+        // A pending enrollment or restore is still using the paper cleared by OnClosed.
+        if (model.IsWorking && model.Step != FirstRunStep.Done)
+            e.Cancel = true;
     }
 
     protected override void OnClosed(EventArgs e)
@@ -59,6 +66,8 @@ public partial class FirstRunWindow : Window
     /// <summary>On the admin tier's offer the second button is <b>Not now</b>, which moves on rather than closing.</summary>
     void OnClose(object sender, RoutedEventArgs e)
     {
+        if (model.IsWorking)
+            return;
         if (model.Step == FirstRunStep.AdminTier)
             model.NotNow();
         else
@@ -69,8 +78,7 @@ public partial class FirstRunWindow : Window
 public sealed partial class FirstRunViewModel : ObservableObject
 {
     byte[]? recoveryKey;
-    IReadOnlyList<string> words = [];
-    (int First, int Second) challenge;
+    FirstRunPaper? pendingPaper;
 
     /// <summary>The typed key was adopted, so this PC has a recovery key: a new one can no longer be made.</summary>
     [ObservableProperty]
@@ -81,14 +89,18 @@ public sealed partial class FirstRunViewModel : ObservableObject
 
     public FirstRunViewModel()
     {
-        MoveOn(FirstRunPlan.Start(App.SetupFacts()));
+        MoveFrom(App.SetupFacts(), resume: true);
         UpdateLabels();
     }
 
     public event Action? Finished;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(RestoreTitle), nameof(RestoreBody))]
     public partial FirstRunStep Step { get; set; }
+
+    public string RestoreTitle => Text.Get(Step == FirstRunStep.RecoveryMigrate ? "FirstRun_RecoveryMigrate_Title" : "FirstRun_RecoveryRestore_Title");
+    public string RestoreBody => Text.Get(Step == FirstRunStep.RecoveryMigrate ? "FirstRun_RecoveryMigrate_Body" : "FirstRun_RecoveryRestore_Body");
 
     [ObservableProperty]
     public partial string StepLabel { get; set; } = "";
@@ -136,6 +148,11 @@ public sealed partial class FirstRunViewModel : ObservableObject
     public partial string RestoreKey { get; set; } = "";
 
     [ObservableProperty]
+    public partial string Fingerprint { get; set; } = "";
+
+    partial void OnRestoreKeyChanged(string value) => Fingerprint = RecoveryViewModel.FingerprintText(value);
+
+    [ObservableProperty]
     public partial string RestoreResult { get; set; } = "";
 
     [ObservableProperty]
@@ -149,6 +166,7 @@ public sealed partial class FirstRunViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(PrimaryCommand))]
+    [NotifyCanExecuteChangedFor(nameof(NewRecoveryKeyCommand), nameof(SkipSoloCommand), nameof(ShowKeyAgainCommand))]
     public partial bool IsWorking { get; set; }
 
     SetupMode Chosen => IsBroker ? SetupMode.Broker : IsSecretsOnly ? SetupMode.SecretsOnly : SetupMode.Solo;
@@ -171,12 +189,15 @@ public sealed partial class FirstRunViewModel : ObservableObject
             switch (Step)
             {
                 case FirstRunStep.Welcome:
-                    MoveOn(FirstRunPlan.Next(Step, App.SetupFacts()));
+                    MoveFrom(App.SetupFacts());
+                    break;
+                case FirstRunStep.RecoveryUnavailable:
+                    MoveFrom(App.SetupFacts(), resume: true);
                     break;
                 case FirstRunStep.Hello:
                     await Task.Run(() => App.Current.Host.Keys.Unlock(create: true));
                     App.Current.Refresh();
-                    MoveOn(FirstRunPlan.Next(Step, App.SetupFacts()));
+                    MoveFrom(App.SetupFacts());
                     break;
                 case FirstRunStep.RecoveryShow:
                     if (!WroteItDown)
@@ -186,16 +207,23 @@ public sealed partial class FirstRunViewModel : ObservableObject
                     }
                     Step = FirstRunStep.RecoveryConfirm;
                     break;
+                case FirstRunStep.RecoveryCreate:
+                    ShowNewKey(await Task.Run(() => RecoveryKey.Create()));
+                    break;
                 case FirstRunStep.RecoveryConfirm:
-                    if (!PaperKey.Confirm(words, challenge, FirstAnswer, SecondAnswer))
+                    var first = FirstAnswer;
+                    var second = SecondAnswer;
+                    if (pendingPaper is not { } paper || !await Task.Run(() => paper.TryEnroll(first, second)))
                     {
                         Message = Text.Get("FirstRun_RecoveryConfirm_Mismatch");
                         return;
                     }
+                    pendingPaper = null;
                     KeyText = "";
-                    MoveOn(FirstRunPlan.Next(Step, App.SetupFacts()));
+                    MoveFrom(App.SetupFacts());
                     break;
                 case FirstRunStep.RecoveryRestore:
+                case FirstRunStep.RecoveryMigrate:
                     await RestoreAsync();
                     break;
                 case FirstRunStep.Mode:
@@ -223,12 +251,12 @@ public sealed partial class FirstRunViewModel : ObservableObject
                     break;
             }
         }
-        catch (InvalidOperationException e) when (Step is FirstRunStep.RecoveryType or FirstRunStep.RecoveryRestore && e is not HelloException)
+        catch (InvalidOperationException e) when (e is not HelloException && Step is (FirstRunStep.RecoveryType or FirstRunStep.RecoveryRestore
+            or FirstRunStep.RecoveryMigrate or FirstRunStep.RecoveryCreate or FirstRunStep.RecoveryConfirm))
         {
-            // The key typed is a key, but not this device's: say so in place.
             Message = e.Message;
         }
-        catch (Exception e) when (e is InvalidOperationException or IOException or UnauthorizedAccessException
+        catch (Exception e) when (e is InvalidOperationException or IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidDataException
             or System.Security.Cryptography.CryptographicException or System.Net.Http.HttpRequestException)
         {
             ProblemWindow.Show(e, $"first run, step {Step}", retry: () => PrimaryCommand.Execute(null));
@@ -239,7 +267,7 @@ public sealed partial class FirstRunViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanAct))]
     void ShowKeyAgain()
     {
         if (recoveryKey is null)
@@ -249,23 +277,26 @@ public sealed partial class FirstRunViewModel : ObservableObject
         Step = FirstRunStep.RecoveryShow;
     }
 
-    /// <summary>The key was lost before anything was sealed to it: forget its public half and make a new one.</summary>
-    [RelayCommand]
-    void ReplaceKey()
+    [RelayCommand(CanExecute = nameof(CanAct))]
+    async Task NewRecoveryKeyAsync()
     {
         if (!CanReplaceKey)
             return;
-        KeyringStore.Settings = KeyringStore.Settings with { RecoveryPublicKey = null };
-        AppLog.Info("recovery key replaced during first run (nothing was sealed to the old one)");
-        MoveOn(FirstRunStep.RecoveryShow);
-    }
-
-    /// <summary>The paper for the sealed secrets here is gone: carry on with a new key, leaving them locked until it turns up.</summary>
-    [RelayCommand]
-    void NewRecoveryKey()
-    {
-        AppLog.Info("first run: new recovery key chosen over restoring the sealed secrets here");
-        MoveOn(FirstRunStep.RecoveryShow);
+        IsWorking = true;
+        try
+        {
+            var keepImportedLocked = Step == FirstRunStep.RecoveryRestore;
+            ShowNewKey(await Task.Run(() => keepImportedLocked ? RecoveryKey.Create(keepImportedSecretsLocked: true) : RecoveryKey.ReplaceUnused()));
+        }
+        catch (Exception e) when (e is InvalidOperationException or IOException or UnauthorizedAccessException or System.Text.Json.JsonException
+            or InvalidDataException or System.Security.Cryptography.CryptographicException)
+        {
+            Message = e.Message;
+        }
+        finally
+        {
+            IsWorking = false;
+        }
     }
 
     /// <summary>The admin tier declined: nothing changes, and About offers it later.</summary>
@@ -275,7 +306,7 @@ public sealed partial class FirstRunViewModel : ObservableObject
         MoveOn(FirstRunStep.Done);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanAct))]
     void SkipSolo()
     {
         IsSecretsOnly = true;
@@ -290,6 +321,9 @@ public sealed partial class FirstRunViewModel : ObservableObject
             Array.Clear(recoveryKey);
         recoveryKey = null;
         KeyText = "";
+        pendingPaper = null;
+        TypedKey = RestoreKey = FirstAnswer = SecondAnswer = "";
+        Fingerprint = "";
     }
 
     /// <summary>
@@ -301,7 +335,7 @@ public sealed partial class FirstRunViewModel : ObservableObject
     {
         if (RestoreDone)
         {
-            MoveOn(FirstRunPlan.Next(Step, App.SetupFacts()));
+            MoveFrom(App.SetupFacts());
             return;
         }
         var paper = PaperKey.Parse(RestoreKey);
@@ -316,6 +350,11 @@ public sealed partial class FirstRunViewModel : ObservableObject
             await Task.Run(() => App.Current.Host.Keys.Unlock(create: true));
             var hello = App.Current.Host.Keys.Hello!;
             summary = await Task.Run(() => RecoveryRestore.Run(paper, hello));
+            Forget();
+            if (RecoveryKey.PublicKey is { } recipient && PaperKey.Matches(paper, Convert.FromBase64String(recipient)))
+                recoveryKey = paper;
+            else
+                Array.Clear(paper);
         }
         catch
         {
@@ -323,13 +362,16 @@ public sealed partial class FirstRunViewModel : ObservableObject
             throw;
         }
         AppLog.Info($"first run: recovery restore, {summary.Restored} restored, {summary.AlreadyOpen} already open, {summary.NotOpened.Count} not opened");
-        Forget();
-        recoveryKey = paper;
         RestoreKey = "";
         App.Current.Refresh();
+        if (!RecoveryKey.IsEnrolled)
+        {
+            RestoreResult = RecoveryViewModel.Describe(summary) + Environment.NewLine + Text.Get("FirstRun_RecoveryMigrate_StillNeeded");
+            return;
+        }
         if (summary.NotOpened.Count == 0)
         {
-            MoveOn(FirstRunPlan.Next(Step, App.SetupFacts()));
+            MoveFrom(App.SetupFacts());
             return;
         }
         RestoreResult = RecoveryViewModel.Describe(summary) + Environment.NewLine + Text.Get("FirstRun_RecoveryRestore_Later");
@@ -338,8 +380,14 @@ public sealed partial class FirstRunViewModel : ObservableObject
 
     async Task ChooseModeAsync()
     {
-        var next = FirstRunPlan.Next(FirstRunStep.Mode, App.SetupFacts(), Chosen, haveRecoveryKey: recoveryKey is not null);
-        if (Chosen != SetupMode.Solo || App.SetupFacts().Enrolled)
+        var facts = App.SetupFacts();
+        if (!facts.RecoverySet)
+        {
+            MoveFrom(facts, resume: true);
+            return;
+        }
+        var next = FirstRunPlan.Next(FirstRunStep.Mode, facts, Chosen, haveRecoveryKey: recoveryKey is not null);
+        if (Chosen != SetupMode.Solo || facts.Enrolled)
         {
             Finish(Chosen);
             return;
@@ -375,41 +423,60 @@ public sealed partial class FirstRunViewModel : ObservableObject
         MoveOn(FirstRunPlan.Finishing(App.SetupFacts()));
     }
 
-    /// <summary>Enters a step, doing what it needs on the way in (the recovery key is created as its page opens).</summary>
+    void ShowNewKey(PendingRecoveryKey candidate)
+    {
+        Forget();
+        recoveryKey = candidate.Paper;
+        pendingPaper = new FirstRunPaper(candidate.Paper, candidate.Enroll);
+        KeyText = PaperKey.Format(candidate.Paper);
+        Fingerprint = RecoveryViewModel.FingerprintText(candidate.Paper);
+        WroteItDown = false;
+        Step = FirstRunStep.RecoveryShow;
+    }
+
+    void MoveFrom(SetupFacts facts, bool resume = false)
+    {
+        MoveOn(resume ? FirstRunPlan.Start(facts) : FirstRunPlan.Next(Step, facts));
+        if (facts.RecoveryError is { } error)
+            Message = error;
+    }
+
     void MoveOn(FirstRunStep next)
     {
-        if (next == FirstRunStep.RecoveryShow)
-        {
-            Forget();
-            recoveryKey = RecoveryKey.Create();
-            words = PaperKey.Words(recoveryKey);
-            challenge = PaperKey.Challenge(words.Count);
-            KeyText = PaperKey.Format(recoveryKey);
-            WroteItDown = false;
-            FirstAnswer = SecondAnswer = "";
-        }
-        if (next == FirstRunStep.RecoveryType)
+        if (next is FirstRunStep.RecoveryType or FirstRunStep.RecoveryMigrate)
             UpdateLostKey();
+        else if (next == FirstRunStep.RecoveryRestore)
+        {
+            CanReplaceKey = true;
+            LostKeyText = Text.Get("FirstRun_RecoveryRestore_LostBody");
+        }
         if (next == FirstRunStep.Done && DoneText.Length == 0)
-            DoneText = Text.Get(KeyringStore.Tenant is { Solo: true } ? "FirstRun_Done_Solo" : "FirstRun_Done_Broker");
+            DoneText = Text.Get(KeyringStore.Broker is null ? "FirstRun_Done_SecretsOnly" : "FirstRun_Done_Enrolled");
         Step = next;
     }
 
     void UpdateLostKey()
     {
-        var vault = KeyringStore.Settings.VaultPath;
-        var secrets = File.Exists(vault) ? VaultFile.Load(vault).Secrets.Count : 0;
-        var sealedFiles = UserSecretsFiles.All().Count(f => f.Kind == SecretsFileKind.Sealed);
-        CanReplaceKey = FirstRunPlan.CanReplaceRecoveryKey(secrets, sealedFiles);
+        try
+        {
+            CanReplaceKey = RecoveryKey.CanReplaceUnused;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidDataException
+            or InvalidOperationException or System.Security.Cryptography.CryptographicException)
+        {
+            AppLog.Error(e, "checking whether the unused recovery key can be replaced");
+            CanReplaceKey = false;
+        }
         LostKeyText = Text.Get(CanReplaceKey ? "FirstRun_RecoveryType_LostCanReplace" : "FirstRun_RecoveryType_LostKeep");
     }
 
     void UpdateLabels()
     {
-        if (Step == FirstRunStep.RecoveryType)
-            UpdateLostKey();
-        FirstGroupLabel = Text.Format("FirstRun_RecoveryConfirm_Group", challenge.First + 1);
-        SecondGroupLabel = Text.Format("FirstRun_RecoveryConfirm_Group", challenge.Second + 1);
+        if (pendingPaper is { } paper)
+        {
+            FirstGroupLabel = Text.Format("FirstRun_RecoveryConfirm_Group", paper.Challenge.First + 1);
+            SecondGroupLabel = Text.Format("FirstRun_RecoveryConfirm_Group", paper.Challenge.Second + 1);
+        }
         StepLabel = Step switch
         {
             FirstRunStep.Welcome => Text.Get("FirstRun_StepWelcome"),
@@ -420,6 +487,9 @@ public sealed partial class FirstRunViewModel : ObservableObject
         {
             FirstRunStep.Welcome => "FirstRun_Primary_Start",
             FirstRunStep.Hello => "FirstRun_Primary_Hello",
+            FirstRunStep.RecoveryCreate => "FirstRun_RecoveryRestore_New",
+            FirstRunStep.RecoveryUnavailable => "Common_TryAgain",
+            FirstRunStep.RecoveryConfirm => "FirstRun_Primary_Enroll",
             FirstRunStep.AdminTier => "FirstRun_Primary_AdminTier",
             FirstRunStep.Done => "FirstRun_Primary_Finish",
             _ => "FirstRun_Primary_Continue",

@@ -47,6 +47,7 @@ public interface IDoctorProbe
     bool Enrolled { get; }
     bool HasDeviceKey { get; }
     bool RecoveryKeySet { get; }
+    bool RecoveryKeyNeedsVerification => false;
 
     /// <summary>Enrolled with the broker this device hosts itself (solo mode) rather than a remote one.</summary>
     bool Solo => false;
@@ -156,7 +157,10 @@ public static partial class Doctor
         {
             probe.Enrolled ? new("broker pinned", DoctorStatus.Ok, "enrolled") : new("broker pinned", DoctorStatus.Fail, "not enrolled: run tir enroll"),
             probe.HasDeviceKey ? new("device key", DoctorStatus.Ok, "present") : new("device key", DoctorStatus.Fail, "missing: run tir enroll"),
-            probe.RecoveryKeySet ? new("recovery key", DoctorStatus.Ok, "set") : new("recovery key", DoctorStatus.Fail, "not set: secrets depend on this TPM alone; run tir recovery init"),
+            probe.RecoveryKeySet ? new("recovery key", DoctorStatus.Ok, "set")
+                : new("recovery key", DoctorStatus.Fail, probe.RecoveryKeyNeedsVerification
+                    ? "verify the existing paper key with tir recovery restore"
+                    : "no recovery key enrolled; run tir recovery init"),
             Vault(probe.Vault),
         };
 

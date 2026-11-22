@@ -164,8 +164,11 @@ public class UserSecretsServiceTests
         public static readonly X25519KeyWrapper RecoveryKey = X25519KeyWrapper.ForKey("recovery", Key.Create(KeyAgreementAlgorithm.X25519));
         public bool IsUnlocked { get; set; } = true;
         public bool HasRecovery { get; set; } = true;
+        public bool NeedsEnrollment { get; set; }
         public IKeyWrapper? Unlocked => IsUnlocked ? Hello : null;
-        public IKeyWrapper? Recovery => HasRecovery ? RecoveryKey : null;
+        public IKeyWrapper? Recovery => NeedsEnrollment
+            ? throw new InvalidOperationException("Recovery enrollment required.")
+            : HasRecovery ? RecoveryKey : null;
     }
 
     sealed class Screen : IUserSecretsConsentPrompt
@@ -287,6 +290,36 @@ public class UserSecretsServiceTests
         var onDisk = File.ReadAllText(FilePath);
         Assert.That(SecretsFile.Classify(onDisk), Is.EqualTo(SecretsFileKind.Sealed));
         Assert.That(onDisk, Does.Not.Contain("hunter2").And.Not.Contain("Password"));
+    }
+
+    [Test]
+    public async Task Existing_project_reads_still_ask_for_consent_while_recovery_enrollment_is_pending()
+    {
+        File.WriteAllText(FilePath, """{ "key": "example" }""");
+        await Load();
+        var sealedFile = File.ReadAllText(FilePath);
+        keys.NeedsEnrollment = true;
+        screen.Answers.Enqueue(ConsentAnswer.Deny);
+        screen.Answers.Enqueue(ConsentAnswer.AllowOnce);
+
+        Assert.That((await Load()).Status, Is.EqualTo(AgentStatus.Denied));
+        Assert.That((await Load()).Status, Is.EqualTo(AgentStatus.Ok));
+        Assert.That(screen.Shown, Has.Count.EqualTo(2));
+        Assert.That(File.ReadAllText(FilePath), Is.EqualTo(sealedFile));
+    }
+
+    [Test]
+    public async Task First_seal_waits_for_recovery_enrollment()
+    {
+        const string original = """{ "key": "example" }""";
+        File.WriteAllText(FilePath, original);
+        keys.NeedsEnrollment = true;
+
+        var reply = await Load();
+
+        Assert.That(reply.Status, Is.EqualTo(AgentStatus.Error));
+        Assert.That(reply.Json, Is.Null);
+        Assert.That(File.ReadAllText(FilePath), Is.EqualTo(original));
     }
 
     [Test]

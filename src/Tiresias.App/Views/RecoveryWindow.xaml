@@ -16,9 +16,10 @@
       <StackPanel>
         <TextBlock Text="{l:S Recovery_Heading}" Style="{StaticResource TitleText}" AutomationProperties.HeadingLevel="Level1" />
         <TextBlock Text="{l:S Recovery_Body}" Style="{StaticResource BodyText}" />
-        <TextBox x:Name="TypedKey" Text="{Binding TypedKey, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="80"
+        <TextBox x:Name="TypedKey" Style="{StaticResource RecoveryPaperInput}" Text="{Binding TypedKey, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="80"
                  TextWrapping="Wrap" FontFamily="Cascadia Mono, Consolas" CharacterCasing="Upper"
                  AutomationProperties.Name="{l:S Recovery_KeyName}" />
+        <TextBlock Text="{Binding Fingerprint}" Style="{StaticResource CaptionText}" Margin="0,8,0,0" />
         <TextBlock Text="{Binding Summary}" Style="{StaticResource BodyText}" Margin="0,12,0,0" AutomationProperties.LiveSetting="Polite" />
         <TextBlock Text="{l:S Recovery_Services}" Style="{StaticResource CaptionText}" />
       </StackPanel>
