@@ -1,3 +1,4 @@
+using Tiresias.AdminTier;
 using Tiresias.Audit;
 using Tiresias.Client;
 using Tiresias.Vault;
@@ -37,6 +38,7 @@ public sealed class AgentHost : IAsyncDisposable
         keeper.Locked += reason => Lock(reason);
         solo.Log += Say;
         solo.SecretsUnleased = SealIntoLeaseAsync;
+        solo.Audited += (record, at) => BrokerAudited?.Invoke(record, at);
         decoys.Log += Say;
         decoys.Touched += OnDecoyTouched;
     }
@@ -67,7 +69,7 @@ public sealed class AgentHost : IAsyncDisposable
             if (page.Events.Count > 0)
             {
                 Say("The admin service has decoy incidents awaiting review. See Service incidents in Activity.");
-                ServiceIncidentsReceived?.Invoke();
+                ServiceIncidentsReceived?.Invoke(page.Events);
             }
             after = page.LastId;
         }
@@ -116,7 +118,17 @@ public sealed class AgentHost : IAsyncDisposable
     /// </summary>
     public event Action<DecoyTouch>? DecoyTouched;
 
-    public event Action? ServiceIncidentsReceived;
+    /// <summary>
+    /// Solo mode: a record the broker wrote to its audit log. From the broker this agent hosts, on the broker's
+    /// thread; from the Windows service, what its journal gained since the last look, on a pool thread. A handler must not throw.
+    /// </summary>
+    public event Action<AuditRecord, DateTimeOffset>? BrokerAudited;
+
+    /// <summary>
+    /// Decoy incidents the admin service recorded, a page at a time. After a restart the first pages
+    /// repeat those not yet reviewed.
+    /// </summary>
+    public event Action<IReadOnlyList<AdminEvent>>? ServiceIncidentsReceived;
 
     /// <summary>Whether the decoys' listeners are up (decoys are placed and their ports were free).</summary>
     public bool DecoysListening => decoys.Listening;
@@ -142,6 +154,38 @@ public sealed class AgentHost : IAsyncDisposable
         running.Add(FollowAdminTierAsync(stop.Token));
         await StartSoloBrokerAsync();
         running.Add(FollowBrokerServiceAsync(stop.Token));
+        running.Add(FollowBrokerJournalAsync(stop.Token));
+    }
+
+    /// <summary>The service's broker writes its own audit log; this reads it every 30 seconds so its records reach <see cref="BrokerAudited"/> too.</summary>
+    async Task FollowBrokerJournalAsync(CancellationToken ct)
+    {
+        var tail = new AuditTail();
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(ct))
+            {
+                if (KeyringStore.Tenant is not { Solo: true } || soloService is null or BrokerServiceState.NotInstalled or BrokerServiceState.Stopped)
+                    continue;
+                IReadOnlyList<string>? journal;
+                try
+                {
+                    journal = await BrokerService.ReadJournalAsync().WaitAsync(ct);
+                }
+                catch (Exception) when (!ct.IsCancellationRequested)
+                {
+                    // An unreachable, slow or half-installed service is the status's and the doctor's to report; look again next time.
+                    continue;
+                }
+                if (journal is not null)
+                    foreach (var (record, at) in tail.Next(journal))
+                        BrokerAudited?.Invoke(record, at);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
     }
 
     /// <summary>
