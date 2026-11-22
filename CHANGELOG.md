@@ -10,6 +10,10 @@ its section below.
 
 ### Added
 
+- Signed webhook alerts and a heartbeat: **Add a webhook...** can sign each alert the Standard
+  Webhooks way, so the receiver can prove it came from your PC, and can send "Tiresias is running"
+  every 5 to 60 minutes, so a receiver that expects it notices when alerts stop arriving. Both are
+  off unless you turn them on, and the heartbeat carries only the PC's name and the time.
 - More events raise an alert: a decoy file read, a blocked program asking again, a request refused
   in lockdown, "This wasn't me", a program asking for a secret while the PC is locked, the solo
   broker rejecting the trust chain, a paper key used, the vault rolled back or changed without your

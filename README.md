@@ -97,7 +97,12 @@ so pick one that says nothing more).
   ×1. Open Tiresias."
 - **Add a webhook...** asks for the URL (HTTPS, or plain HTTP to localhost) and an optional header
   such as `Authorization`. Each alert is one `tiresias.alert/v1` JSON POST: the event, its severity
-  and time, and the PC's name.
+  and time, and the PC's name. Optionally it signs every POST the
+  [Standard Webhooks](https://www.standardwebhooks.com/) way (`webhook-id`, `webhook-timestamp`,
+  `webhook-signature`), so the receiver can check it came from this PC with any Standard Webhooks
+  library; paste a `whsec_` secret or make one in the form. And it can send a **heartbeat**,
+  "Tiresias is running" with the PC's name and the time only, every 5 to 60 minutes, so a receiver
+  that expects it (a dead man's switch such as a cron monitor) notices when alerts stop.
 - **Add LcdHub...** puts a line such as "Decoy credential used ×1" in the status strip of the LcdHub
   running on this PC, warnings and worse by default. It goes when Home shows your findings, or after
   24 hours. LcdHub shows nothing while the PC is locked and keeps the line for when you unlock; if
