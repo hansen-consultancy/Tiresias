@@ -127,6 +127,8 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     // On the thread pool: the app runs the doctor from its UI thread, and this waits on a pipe.
     public AdminTierFacts? AdminTier => Task.Run(AdminClient.FactsAsync).GetAwaiter().GetResult() is { Installed: true } tier ? tier : null;
 
+    public ReachFacts Reach => ReachProbe.Read();
+
     public IEnumerable<DoctorFile> Projects() => Found.Projects.Select(Read);
 
     public IEnumerable<DoctorFile> ConfigFiles()

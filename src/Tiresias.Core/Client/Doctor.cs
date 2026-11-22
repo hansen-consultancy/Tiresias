@@ -137,6 +137,8 @@ public interface IDoctorProbe
 
     /// <summary>Alert sinks whose alerts aren't arriving, from the app's sender; empty outside the app.</summary>
     IReadOnlyList<Alerts.FailingSink> FailingAlertSinks => [];
+    /// <summary>What the user's account can open of their containers, WSL and VMs (docs/containers-and-vms.md). No contents.</summary>
+    ReachFacts Reach => ReachFacts.None;
 }
 
 /// <summary>How many decoys are placed, and whether something listens on their endpoints (checked without connecting, which would be a hit).</summary>
@@ -224,6 +226,7 @@ public static partial class Doctor
             checks.Add(new("decoy incidents and program blocks", DoctorStatus.Warn, "The admin service could not supply its incident history and block list."));
         }
         checks.AddRange(CliSignIns(probe.CliConfigs, probe.GitHubAppService));
+        checks.AddRange(Reach(probe.Reach));
         var (uses, runs, installed, now) = (probe.CredentialUses().ToArray(), probe.ProgramRuns().ToArray(), probe.UninstallEntries().ToArray(), DateTimeOffset.UtcNow);
         checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), uses, otherBlocks, now, runs));
         checks.AddRange(UninstallEntries(installed));

@@ -287,7 +287,7 @@ leaving.
      `alerts.failing` (phase 6).
    - **The form takes one header.** `alerts.json` holds any number; a second one waits for a need.
    - **Narrowing in `app.json`** is `SinkNarrowing`: muted, a raised threshold (a lower one is
-     ignored), removed. The card mutes and removes; a raised threshold has no control yet. A removal
+     ignored), removed. The card mutes and removes; a mute also drops what waits for that sink, so unmuting replays nothing; a raised threshold has no control yet. A removal
      stops the sink at once and leaves `alerts.json` at once if unlocked, else at the next unlock,
      since sealing needs the Hello wrapper.
    - **`alerts.json` refuses plain keys beside its seal** instead of merging them as a

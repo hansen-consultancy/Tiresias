@@ -13,6 +13,7 @@
     <Project Path="src/Tiresias.Protocol/Tiresias.Protocol.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="src/Tiresias.App.Tests/Tiresias.App.Tests.csproj" />
     <Project Path="src/Tiresias.Tests/Tiresias.Tests.csproj" />
   </Folder>
 </Solution>
