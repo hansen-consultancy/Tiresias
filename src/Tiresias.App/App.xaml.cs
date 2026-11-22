@@ -99,6 +99,19 @@ public partial class App : Application
             _ = Dispatcher.InvokeAsync(() => NotMeAsync(asker, asked, names)).Task.Unwrap();
         };
         host.Log += AppLog.Info;
+        // Before the broker starts: a trust chain it rejects at startup is audited, and so alerts, then.
+        host.BrokerAudited += (record, at) =>
+        {
+            if (Tiresias.Alerts.AlertSources.Audited(record, at) is { } alert)
+                alertCenter.Raise(alert);
+        };
+        host.ServiceIncidentsReceived += incidents =>
+        {
+            foreach (var incident in incidents)
+                if (AlertFor(new DecoyTouch(incident.Hit, incident.Parents)) is { } alert)
+                    alertCenter.Raise(alert);
+            Dispatcher.BeginInvoke(() => tray?.Notify(Text.Get("Notify_Decoy_Title"), Text.Get("Notify_AdminIncidents")));
+        };
         // A demo serves nothing: no user-secrets pipe, broker or control pipe for tir, whose names the real app's use.
         if (!DemoMode.On)
         {
@@ -131,18 +144,6 @@ public partial class App : Application
             Dispatcher.BeginInvoke(Refresh);
         };
         host.DecoyTouched += OnDecoyTouched;
-        host.BrokerAudited += (record, at) =>
-        {
-            if (Tiresias.Alerts.AlertSources.Audited(record, at) is { } alert)
-                alertCenter.Raise(alert);
-        };
-        host.ServiceIncidentsReceived += incidents =>
-        {
-            foreach (var incident in incidents)
-                if (AlertFor(new DecoyTouch(incident.Hit, incident.Parents)) is { } alert)
-                    alertCenter.Raise(alert);
-            Dispatcher.BeginInvoke(() => tray?.Notify(Text.Get("Notify_Decoy_Title"), Text.Get("Notify_AdminIncidents")));
-        };
         host.UserSecrets.FirstSealed += id => Dispatcher.BeginInvoke(() =>
             tray?.Notify(Text.Get("Notify_FirstSealed_Title"), Text.Format("Notify_FirstSealed_Body", id)));
         SystemEvents.SessionSwitch += OnSessionSwitch;

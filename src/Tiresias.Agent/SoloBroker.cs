@@ -105,9 +105,14 @@ public sealed class SoloBroker : IAsyncDisposable
                 builder.Services.AddHostedService(sp => new BrokerJournal(sp.GetRequiredService<Tiresias.Audit.AuditLog>(), journalReaderSid));
         }
 
+        // Subscribed as it is made: Build resolves the trust chain, which audits a chain rejected at startup.
+        builder.Services.AddSingleton(sp =>
+        {
+            var log = new AuditLog(sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<BrokerOptions>>().Value.AuditPath, sp.GetRequiredService<TimeProvider>());
+            log.Appended += (record, at) => Audited?.Invoke(record, at);
+            return log;
+        });
         var built = BrokerHost.Build(builder);
-        // Before anything resolves the trust chain, which audits a chain rejected at startup.
-        built.Services.GetRequiredService<AuditLog>().Appended += (record, at) => Audited?.Invoke(record, at);
         var state = built.Services.GetRequiredService<BrokerState>();
         built.Use(async (context, next) =>
         {

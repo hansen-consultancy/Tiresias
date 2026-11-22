@@ -173,9 +173,9 @@ public sealed class AgentHost : IAsyncDisposable
                 {
                     journal = await BrokerService.ReadJournalAsync().WaitAsync(ct);
                 }
-                catch (Exception e) when (e is not OperationCanceledException)
+                catch (Exception) when (!ct.IsCancellationRequested)
                 {
-                    // An unreachable or half-installed service is the status's and the doctor's to report.
+                    // An unreachable, slow or half-installed service is the status's and the doctor's to report; look again next time.
                     continue;
                 }
                 if (journal is not null)
