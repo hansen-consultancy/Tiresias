@@ -75,7 +75,8 @@ public static partial class WindowFit
         window.SourceInitialized -= OnSourceInitialized;
         if (DemoMode.On)
             window.Title = Text.Format("Window_DemoTitle", window.Title);
-        else if (AppBuild.Current.Development)
+        // The standalone CLI shares this window without starting the desktop updater.
+        else if (Application.Current is App && AppBuild.Current.Development)
             window.Title = Text.Format("Window_DevTitle", window.Title);
 
         var hwnd = new WindowInteropHelper(window).Handle;

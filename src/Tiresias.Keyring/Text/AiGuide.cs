@@ -112,7 +112,7 @@ static class AiGuide
           after the user allows it. Don't open or edit `secrets.json`; to change a key, the user runs
           `tir secrets set <key>`.
         - NuGet feeds: `dotnet restore`, Visual Studio and Rider ask Tiresias's credential plugin; the
-          user allows each program once.
+          user approves a program for the exact feed URL, username and variable, once or for the session.
 
         ## When something is missing
 

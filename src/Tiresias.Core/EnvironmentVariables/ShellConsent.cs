@@ -7,46 +7,63 @@ public sealed record ShellIdentity(int ProcessId, DateTime Started, string Progr
 
 public enum ShellAnswer
 {
-    /// <summary>Every name was allowed in this shell before: hand them over without asking.</summary>
+    /// <summary>The shell already has approval for every requested delivery.</summary>
     Give,
-    /// <summary>Some names are new to this shell: ask about those.</summary>
+    /// <summary>Ask about new or changed deliveries.</summary>
     Ask,
-    /// <summary>Some names are new, but the user said no in this shell: hand over the others, and don't ask until they say so.</summary>
+    /// <summary>The user declined in this shell. Give only the deliveries whose approvals still match.</summary>
     Refused,
 }
 
 /// <summary>
-/// Consent once per shell session: the names each terminal was allowed, remembered until the shell
-/// exits or the agent locks. Changing to a folder whose set adds names asks about those alone.
-/// A refusal sticks to that shell, so a <c>cd</c> doesn't ask again, until the user asks for it;
-/// what the shell was allowed before it stays allowed.
+/// Remembers each terminal's approvals while the same deliveries remain in its effective environment.
+/// New names, folder overrides and changed routes ask again. A refusal stays quiet until the terminal asks again.
 /// </summary>
 public sealed class ShellConsent
 {
     readonly Lock gate = new();
-    readonly Dictionary<(int, DateTime, ReleaseScope), (HashSet<string> Allowed, bool Refused)> shells = [];
+    readonly Dictionary<(int, DateTime, ReleaseScope), (Dictionary<string, EnvironmentVariableAccess> Allowed, bool Refused)> shells = [];
 
     /// <param name="askAgain">The user asked for the prompt again, overriding an earlier no.</param>
     /// <returns>What to do, and the names the shell hasn't been allowed yet (empty for <see cref="ShellAnswer.Give"/>).</returns>
     public (ShellAnswer Answer, IReadOnlyList<string> New) Check(ShellIdentity shell, IEnumerable<string> names, bool askAgain = false, ReleaseScope scope = default)
     {
+        var (answer, fresh) = Check(shell, names.Select(n => new EnvironmentVariableAccess(n)), askAgain, scope);
+        return (answer, [.. fresh.Select(a => a.Name)]);
+    }
+
+    public (ShellAnswer Answer, IReadOnlyList<EnvironmentVariableAccess> New) Check(ShellIdentity shell, IEnumerable<EnvironmentVariableAccess> requested,
+        bool askAgain = false, ReleaseScope scope = default)
+    {
         lock (gate)
         {
             var known = shells.GetValueOrDefault(Key(shell, scope));
-            var allowed = known.Allowed ?? [];
-            string[] fresh = [.. names.Where(n => !allowed.Contains(n))];
-            if (fresh.Length == 0)
+            List<EnvironmentVariableAccess> fresh = [];
+            var covered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in requested)
+                if (known.Allowed is not null && known.Allowed.TryGetValue(item.Name, out var previous) && item.SameDelivery(previous))
+                    covered.Add(item.Name);
+                else
+                    fresh.Add(item);
+            if (known.Allowed is { } allowed)
+                foreach (var removed in allowed.Keys.Where(name => !covered.Contains(name)).ToArray())
+                    allowed.Remove(removed);
+            if (fresh.Count == 0)
                 return (ShellAnswer.Give, []);
             return (known.Refused && !askAgain ? ShellAnswer.Refused : ShellAnswer.Ask, fresh);
         }
     }
 
-    public void Allow(ShellIdentity shell, IEnumerable<string> names, ReleaseScope scope = default)
+    public void Allow(ShellIdentity shell, IEnumerable<string> names, ReleaseScope scope = default) =>
+        Allow(shell, names.Select(n => new EnvironmentVariableAccess(n)), scope);
+
+    public void Allow(ShellIdentity shell, IEnumerable<EnvironmentVariableAccess> requested, ReleaseScope scope = default)
     {
         lock (gate)
         {
-            var allowed = shells.GetValueOrDefault(Key(shell, scope)).Allowed ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            allowed.UnionWith(names);
+            var allowed = shells.GetValueOrDefault(Key(shell, scope)).Allowed ?? new Dictionary<string, EnvironmentVariableAccess>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in requested)
+                allowed[item.Name] = item;
             shells[Key(shell, scope)] = (allowed, false);
         }
     }
@@ -55,7 +72,7 @@ public sealed class ShellConsent
     public void Refuse(ShellIdentity shell, ReleaseScope scope = default)
     {
         lock (gate)
-            shells[Key(shell, scope)] = (shells.GetValueOrDefault(Key(shell, scope)).Allowed ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase), true);
+            shells[Key(shell, scope)] = (shells.GetValueOrDefault(Key(shell, scope)).Allowed ?? new Dictionary<string, EnvironmentVariableAccess>(StringComparer.OrdinalIgnoreCase), true);
     }
 
     /// <summary>Whether this shell said no, for a check made before anything is unlocked.</summary>

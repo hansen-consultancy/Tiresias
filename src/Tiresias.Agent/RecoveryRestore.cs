@@ -71,7 +71,7 @@ public static class RecoveryRestore
                 files.Add((folder.FilePath, text));
         }
 
-        if (EnvironmentStore.IsSealed)
+        if (EnvironmentStore.Exists)
         {
             var (outcome, text, opens) = EnvironmentStore.Rewrap(hello, recovery);
             Count(outcome, opens, "environment variables");
@@ -106,7 +106,7 @@ public static class RecoveryRestore
     public static bool AnythingSealed() =>
         VaultPaths().Any(path => VaultFile.Load(path).Secrets.Count > 0)
         || UserSecretsFiles.All().Any(f => f.Kind == SecretsFileKind.Sealed)
-        || EnvironmentStore.IsSealed;
+        || EnvironmentStore.Exists;
 
     /// <summary>The sealed items this Windows Hello key can't open, by name; empty when nothing needs restoring. No prompt beyond the unlocked wrapper.</summary>
     public static IReadOnlyList<string> Unopened(IKeyWrapper hello)
@@ -119,7 +119,7 @@ public static class RecoveryRestore
         foreach (var folder in UserSecretsFiles.All().Where(f => f.Kind == SecretsFileKind.Sealed))
             if (!UserSecretsVault.Opens(folder.Id, File.ReadAllText(folder.FilePath), hello))
                 names.Add($"user secrets: {folder.Id}");
-        if (EnvironmentStore.IsSealed && !EnvironmentStore.Opens(hello))
+        if (EnvironmentStore.Exists && !EnvironmentStore.Opens(hello))
             names.Add("environment variables");
         return names;
     }

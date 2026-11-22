@@ -17,22 +17,16 @@ public sealed record UserVariable(string Name, int Length, bool LooksSecret);
 /// </summary>
 public static partial class EnvironmentStore
 {
-    /// <summary>The sealing id. A <c>:</c> can't be in a folder name, so no project's user secrets share it.</summary>
-    const string Id = "tiresias:environment";
-
     const string RegistryKey = "Environment";
 
     public static string FilePath => Path.Combine(KeyringStore.Directory, "environment.json");
 
-    /// <summary>Whether a sealed environment exists here, for the recovery restore. No prompt.</summary>
-    public static bool IsSealed => File.Exists(FilePath) && Protocol.SecretsFile.Classify(File.ReadAllText(FilePath)) == Protocol.SecretsFileKind.Sealed;
+    public static bool Exists => new EnvironmentFile(FilePath).Exists;
 
     /// <summary>The sealed environment and the version it was read from; empty and 0 when nothing is sealed yet.</summary>
-    public static (SealedEnvironment Environment, int Version) Open(IKeyWrapper hello)
-    {
-        var load = UserSecretsVault.Open(Id, File.Exists(FilePath) ? File.ReadAllText(FilePath) : null, hello);
-        return (SealedEnvironment.FromDocument(load.Document), load.Version);
-    }
+    public static (SealedEnvironment Environment, int Version) Open(IKeyWrapper hello) => new EnvironmentFile(FilePath).Open(hello);
+
+    public static EnvironmentSnapshot ReadForDelivery(IKeyWrapper hello) => new EnvironmentFile(FilePath).ReadForDelivery(hello);
 
     /// <summary>Seals <paramref name="environment"/> as the version after <paramref name="loadedVersion"/>.</summary>
     /// <exception cref="InvalidOperationException">No recovery key: nothing sealed may depend on the TPM alone.</exception>
@@ -42,16 +36,16 @@ public static partial class EnvironmentStore
             ?? throw new InvalidOperationException("No recovery key yet, so nothing can be sealed. Create it first (first-run wizard, or tir recovery init).");
         Directory.CreateDirectory(KeyringStore.Directory);
         var temp = FilePath + ".tmp";
-        File.WriteAllText(temp, UserSecretsVault.Seal(Id, loadedVersion + 1, environment.ToDocument(), [hello, recovery]));
+        File.WriteAllText(temp, UserSecretsVault.Seal(EnvironmentFile.Id, loadedVersion + 1, environment.ToDocument(), [hello, recovery]));
         File.Move(temp, FilePath, overwrite: true);
     }
 
     /// <summary>The sealed environment given back to <paramref name="hello"/> by <paramref name="recovery"/>; see <see cref="RecoveryRestore"/>.</summary>
     public static (RewrapOutcome Outcome, string FileText, bool RecoveryOpens) Rewrap(IKeyWrapper hello, IKeyWrapper recovery) =>
-        UserSecretsVault.Rewrap(Id, File.ReadAllText(FilePath), hello, recovery);
+        new EnvironmentFile(FilePath).Rewrap(hello, recovery);
 
-    /// <summary>Whether <paramref name="hello"/> opens the sealed environment; decrypts nothing else.</summary>
-    public static bool Opens(IKeyWrapper hello) => UserSecretsVault.Opens(Id, File.ReadAllText(FilePath), hello);
+    /// <summary>Whether <paramref name="hello"/> opens the authenticated environment.</summary>
+    public static bool Opens(IKeyWrapper hello) => new EnvironmentFile(FilePath).Opens(hello);
 
     /// <summary>The user's own variables (not the machine's), by name, each with its length and whether it looks like a secret.</summary>
     public static IReadOnlyList<UserVariable> UserVariables()

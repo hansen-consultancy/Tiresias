@@ -104,6 +104,66 @@ public class ShellEnvironmentTests
     }
 
     [Test]
+    public void A_folder_override_needs_its_own_consent_even_when_the_name_is_already_global()
+    {
+        var endpoint = new Uri("http://127.0.0.1:7781");
+        EnvironmentVariableAccess[] Access(string directory) => [.. Sample.ResolveWithFolders(directory)
+            .Select(v => EnvironmentVariableAccess.For(Sample, v.Variable.Name, v.Folder, endpoint))];
+        var consent = new ShellConsent();
+        consent.Allow(Terminal, Access(@"C:\elsewhere"));
+
+        var (answer, added) = consent.Check(Terminal, Access(@"C:\src\shop"));
+        Assert.That(answer, Is.EqualTo(ShellAnswer.Ask));
+        Assert.That(added.Select(a => a.Name), Is.EqualTo(new[] { "OPENAI_API_KEY", "SHOP_DB" }));
+        Assert.That(added[0].Describe(), Is.EqualTo(@"OPENAI_API_KEY (folder C:\src\shop, raw value)"));
+        consent.Allow(Terminal, added);
+
+        Assert.That(consent.Check(Terminal, Access("c:/SRC/shop/web")).Answer, Is.EqualTo(ShellAnswer.Give));
+        var nested = consent.Check(Terminal, Access(@"C:\src\shop\admin"));
+        Assert.That(nested.New.Select(a => a.Name), Is.EqualTo(new[] { "SHOP_DB" }));
+        Assert.That(nested.New.Single().Folder, Is.EqualTo(@"C:\src\shop\admin"));
+    }
+
+    [Test]
+    public void Terminal_approval_follows_the_effective_delivery_and_rejecting_a_change_retires_the_previous_grant()
+    {
+        var endpoint = new Uri("http://127.0.0.1:7780");
+        var placeholder = new EnvironmentPlaceholder("A_KEY", "first", "A_URL");
+        var environment = SealedEnvironment.Empty.WithPlaceholder(placeholder);
+        var original = EnvironmentVariableAccess.For(environment, "A_KEY", null, endpoint);
+        Assert.That(original.Describe(), Is.EqualTo("A_KEY (global, placeholder for first, A_URL = http://127.0.0.1:7780/svc/first)"));
+        var consent = new ShellConsent();
+        foreach (var changed in new[] {
+            EnvironmentVariableAccess.For(environment.WithoutPlaceholder("A_KEY"), "A_KEY", null, endpoint),
+            EnvironmentVariableAccess.For(environment.WithPlaceholder(placeholder with { Service = "second" }), "A_KEY", null, endpoint),
+            EnvironmentVariableAccess.For(environment.WithPlaceholder(placeholder with { BaseUrlVariable = "ANOTHER_URL" }), "A_KEY", null, endpoint),
+            EnvironmentVariableAccess.For(environment, "A_KEY", null, new Uri("http://127.0.0.1:7781")),
+        })
+        {
+            consent.Allow(Terminal, [original]);
+            Assert.That(consent.Check(Terminal, [original]).Answer, Is.EqualTo(ShellAnswer.Give));
+            Assert.That(consent.Check(Terminal, [changed]).Answer, Is.EqualTo(ShellAnswer.Ask));
+            consent.Refuse(Terminal);
+            Assert.That(consent.Check(Terminal, [changed]).New, Is.EqualTo(new[] { changed }));
+            Assert.That(consent.Check(Terminal, [original], askAgain: true).Answer, Is.EqualTo(ShellAnswer.Ask));
+        }
+    }
+
+    [Test]
+    public void Leaving_a_folder_forgets_an_unavailable_variable_before_it_returns()
+    {
+        var consent = new ShellConsent();
+        var global = new EnvironmentVariableAccess("GLOBAL");
+        var folder = new EnvironmentVariableAccess("SHOP_DB", @"C:\src\shop");
+        consent.Allow(Terminal, [global, folder]);
+        Assert.That(consent.Check(Terminal, [global]).Answer, Is.EqualTo(ShellAnswer.Give));
+
+        var (answer, fresh) = consent.Check(Terminal, [global, folder]);
+        Assert.That(answer, Is.EqualTo(ShellAnswer.Ask));
+        Assert.That(fresh, Is.EqualTo(new[] { folder }));
+    }
+
+    [Test]
     public void Locking_and_closed_terminals_forget_what_was_allowed()
     {
         var consent = new ShellConsent();
