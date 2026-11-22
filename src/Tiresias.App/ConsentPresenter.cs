@@ -64,24 +64,14 @@ sealed class ConsentPresenter(Dispatcher dispatcher) : IUserSecretsConsentPrompt
     {
         try
         {
-            return await ShowAsync(new ConsentView(
-                Text.Format("Consent_Environment_Heading", program),
-                caller,
-                Text.Format("Consent_Environment_ListLabel", names.Count),
-                names,
-                Text.Get("Consent_Environment_Note"),
-                AllowSession: false,
-                Command: commandLine is { Count: > 0 } ? Joined(commandLine) : null), asker, UserSecretsService.ConsentTimeout, ct) != ConsentAnswer.Deny;
+            return await ShowAsync(ConsentView.ForEnvironment(program, commandLine, names, caller),
+                asker, UserSecretsService.ConsentTimeout, ct) != ConsentAnswer.Deny;
         }
         catch (OperationCanceledException)
         {
             return false;
         }
     }
-
-    /// <summary>The arguments as one line, quoting any that are empty or hold a space, so the boundaries still show.</summary>
-    static string Joined(IReadOnlyList<string> arguments) =>
-        string.Join(' ', arguments.Select(a => a.Length == 0 || a.Any(char.IsWhiteSpace) ? $"\"{a}\"" : a));
 
     /// <summary>The terminal hook asking for the sealed variables for a shell session; <paramref name="shell"/> is its image path.</summary>
     public async Task<bool> AskShellAsync(string shell, int processId, string directory, IReadOnlyList<string> names, CancellationToken ct)

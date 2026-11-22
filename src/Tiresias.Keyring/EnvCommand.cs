@@ -366,7 +366,7 @@ static class EnvCommand
     /// <summary>
     /// <c>tir run -- &lt;command&gt;</c>: the sealed variables for the current directory in that one
     /// process's environment. With the app running it asks there (and unlocks if needed); without
-    /// it, Windows Hello opens the policy and a Windows dialog asks for this one delivery.
+    /// it, Windows Hello opens the policy and the CLI hosts the Tiresias dialog for this one delivery.
     /// </summary>
     public static async Task<int> RunCommandAsync(CommandLine args)
     {
@@ -463,7 +463,7 @@ static class EnvCommand
             throw new UsageException($"Not sealed for this folder: {string.Join(", ", missing)}. See tir env list.");
         using var activity = new AuditLog(AgentHost.ActivityPath, TimeProvider.System);
         var delivery = await StandaloneEnvironmentConsent.RequestAsync(commandLine, terms,
-            message => NativeConsent.Ask("Tiresias — Allow this command once?", message),
+            static (arguments, items) => Tiresias.App.StandaloneConsentDialog.AskEnvironmentAsync(arguments, items),
             () => snapshot.DeliverAsync(variables, endpoint,
                 (placeholder, _) => PlaceholderMinter.MintAsync(hello, placeholder, $"run:{program}", null), PlaceholderMinter.RevokeAsync, CancellationToken.None),
             allowed => activity.Append(AgentHost.EnvironmentRecord(allowed, program, terms, "tir run (Windows Hello)")));

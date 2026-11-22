@@ -1,20 +1,26 @@
-using System.Text.Json;
 using Tiresias.EnvironmentVariables;
 
 namespace Tiresias.Keyring;
 
-/// <summary>One standalone command's release. Only authenticated delivery terms are displayed or recorded.</summary>
+/// <summary>One standalone command's release after a decision on its authenticated delivery terms.</summary>
 internal static class StandaloneEnvironmentConsent
 {
     public static async Task<Delivery?> RequestAsync(IReadOnlyList<string> commandLine, IReadOnlyList<string> terms,
-        Func<string, bool> confirm, Func<Task<Delivery>> deliver, Action<bool> record)
+        Func<IReadOnlyList<string>, IReadOnlyList<string>, Task<bool>> confirm, Func<Task<Delivery>> deliver, Action<bool> record)
     {
         if (terms.Count > 0)
         {
-            // Quote each argument, including embedded line breaks, so it cannot become part of the list of variables.
-            var command = string.Join(' ', commandLine.Select(arg => JsonSerializer.Serialize(arg)));
-            var message = $"Allow this command to receive these variables once?\n\n{command}\n\n{string.Join("\n", terms)}";
-            if (!confirm(message))
+            bool approved;
+            try
+            {
+                approved = await confirm(commandLine, terms);
+            }
+            catch (Exception)
+            {
+                record(false);
+                throw new InvalidOperationException("The Tiresias consent dialog was unavailable. The command was stopped.");
+            }
+            if (!approved)
             {
                 record(false);
                 return null;

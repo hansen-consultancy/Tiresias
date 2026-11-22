@@ -95,8 +95,8 @@ static class CliUsage
             Prints the PowerShell profile hook: tir env hook | Out-String | Invoke-Expression. Each
             terminal asks when it needs a new variable or its folder or delivery settings change.
         tir run [--only NAME[,NAME...]] -- <command> [args...]
-            Runs the command with the sealed environment variables, after you allow it (in the app's
-            dialog, or in a confirmation after Windows Hello when the app is closed). --only gives it just those.
+            Runs the command with the sealed variables you approve in the Tiresias consent dialog.
+            When the app is closed, Windows Hello opens the store first. --only limits the variables.
         tir decoys place <passwords|project|variables> [<path>]
         tir decoys list
         tir decoys remove

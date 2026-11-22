@@ -71,7 +71,8 @@ internal static partial class DecoyEnrollment
             targets = targets.Concat(DecoyPlan.VariableNames);
         var message = "Enable service monitoring for these verified decoy placements?\n\n" + string.Join("\n", targets) +
             $"\n\nHTTP listener: 127.0.0.1:{candidate.Set.HttpPort}\nSQL listener: 127.0.0.1:{candidate.Set.SqlPort}";
-        return NativeConsent.Ask("Tiresias — Verify decoy placements", message);
+        const uint yesNoDefaultNo = 0x0004 | 0x0020 | 0x0100 | 0x2000;
+        return MessageBoxW(0, message, "Tiresias — Verify decoy placements", yesNoDefaultNo) == 6;
     }
 
     static bool Matches(string sid, DecoyStep step)
@@ -92,6 +93,8 @@ internal static partial class DecoyEnrollment
     private static partial nint GetShellWindow();
     [LibraryImport("user32.dll")]
     private static partial uint GetWindowThreadProcessId(nint window, out uint pid);
+    [LibraryImport("user32.dll", StringMarshalling = StringMarshalling.Utf16)]
+    private static partial int MessageBoxW(nint owner, string text, string caption, uint options);
     [LibraryImport("kernel32.dll")]
     private static partial SafeProcessHandle OpenProcess(uint access, [MarshalAs(UnmanagedType.Bool)] bool inherit, uint pid);
     [LibraryImport("advapi32.dll")]
