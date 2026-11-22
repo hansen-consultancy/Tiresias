@@ -355,10 +355,10 @@ public class AlertLcdHubTests
     public void Panels_are_bounded_in_number_and_in_pixels_in_all()
     {
         LcdHubPanel Big(int i) => new($"p{i}", 2048, 2047);
-        Assert.That(LcdHubWire.Panels(FakeHub.PanelsMessage([.. Enumerable.Range(0, 4).Select(Big)])[5..]), Has.Count.EqualTo(4));
-        Assert.Throws<IOException>(() => LcdHubWire.Panels(FakeHub.PanelsMessage([.. Enumerable.Range(0, 5).Select(Big)])[5..]), "pixels in all");
-        Assert.That(LcdHubWire.Panels(FakeHub.PanelsMessage([.. Enumerable.Range(0, 16).Select(i => new LcdHubPanel($"p{i}", 8, 8))])[5..]), Has.Count.EqualTo(16));
-        Assert.Throws<IOException>(() => LcdHubWire.Panels(FakeHub.PanelsMessage([.. Enumerable.Range(0, 17).Select(i => new LcdHubPanel($"p{i}", 8, 8))])[5..]), "panels");
+        Assert.That(LcdHubWire.Panels(FakeHub.PanelsMessage([.. Enumerable.Range(0, 4).Select(Big)]).AsSpan(5)), Has.Count.EqualTo(4));
+        Assert.Throws<IOException>(() => LcdHubWire.Panels(FakeHub.PanelsMessage([.. Enumerable.Range(0, 5).Select(Big)]).AsSpan(5)), "pixels in all");
+        Assert.That(LcdHubWire.Panels(FakeHub.PanelsMessage([.. Enumerable.Range(0, 16).Select(i => new LcdHubPanel($"p{i}", 8, 8))]).AsSpan(5)), Has.Count.EqualTo(16));
+        Assert.Throws<IOException>(() => LcdHubWire.Panels(FakeHub.PanelsMessage([.. Enumerable.Range(0, 17).Select(i => new LcdHubPanel($"p{i}", 8, 8))]).AsSpan(5)), "panels");
     }
 
     [Test]
