@@ -87,7 +87,7 @@ public partial class AboutPage : UserControl
         // Adding widens what leaves the machine: it is a sealed save, so it needs Windows Hello.
         if (!App.Current.Host.Keys.IsUnlocked && !(await App.Current.UnlockAsync(interactive: true)).Ok)
             return;
-        var window = new AlertWebhookWindow { Owner = Window.GetWindow(this) };
+        var window = new AlertSinkWindow(ntfy: sender == AlertsAddNtfy) { Owner = Window.GetWindow(this) };
         if (window.ShowDialog() == true)
             AlertsOutcome.Text = Text.Format("Alerts_Added", window.AddedId);
     }

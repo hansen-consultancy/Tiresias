@@ -6,7 +6,7 @@ namespace Tiresias.App.Logic;
 /// <summary>One sink as the Alerts card lists it.</summary>
 public sealed record AlertSinkRow(string Id, Phrase Detail, bool Muted);
 
-/// <summary>What the Alerts card in About says (docs/alerts.md, phase 2), and what the add-a-webhook form accepts.</summary>
+/// <summary>What the Alerts card in About says (docs/alerts.md), and what the add-a-webhook and add-ntfy forms accept.</summary>
 public static class AlertsCard
 {
     /// <param name="opened">Whether <c>alerts.json</c> has been opened since the app started (it opens at unlock).</param>
@@ -37,37 +37,60 @@ public static class AlertsCard
     };
 
     /// <summary>
-    /// The form's fields as a sink, or the first problem with them. <paramref name="machine"/> is asked
-    /// only for the first sink (<paramref name="needsMachine"/>) and is required then: never the host name.
+    /// The webhook form's fields as a sink, or the first problem with them. <paramref name="machine"/> is
+    /// asked only for the first sink (<paramref name="needsMachine"/>) and is required then: never the host name.
     /// </summary>
     public static (WebhookSink? Sink, Phrase? Problem) Build(bool needsMachine, string machine, string id, string url,
         string headerName, string headerValue, AlertSeverity threshold, bool trusted, IEnumerable<string> existingIds)
     {
-        if (needsMachine && string.IsNullOrWhiteSpace(machine))
-            return (null, new("Alerts_NeedMachine"));
-        id = id.Trim();
-        if (WebhookRules.CheckId(id) != WebhookProblem.None)
-            return (null, new("Alerts_BadId"));
-        if (existingIds.Contains(id, StringComparer.Ordinal))
-            return (null, new("Alerts_IdTaken", id));
-        if (WebhookRules.CheckUrl(url, out var parsed) is var urlProblem and not WebhookProblem.None)
-            return (null, urlProblem == WebhookProblem.UserInfo ? new("Alerts_UrlUserInfo") : new("Alerts_UrlNotHttps"));
+        if (CheckCommon(needsMachine, machine, ref id, existingIds) is { } common)
+            return (null, common);
+        if (SinkRules.CheckUrl(url, out var parsed) is var urlProblem and not SinkProblem.None)
+            return (null, UrlProblem(urlProblem));
         headerName = headerName.Trim();
         KeyValuePair<string, string>[] headers = headerName.Length == 0 && headerValue.Length == 0 ? [] : [KeyValuePair.Create(headerName, headerValue)];
         foreach (var (name, value) in headers)
         {
-            switch (WebhookRules.CheckHeader(name, value))
+            switch (SinkRules.CheckHeader(name, value))
             {
-                case WebhookProblem.HeaderName:
+                case SinkProblem.HeaderName:
                     return (null, new("Alerts_HeaderName"));
-                case WebhookProblem.HeaderReserved:
+                case SinkProblem.HeaderReserved:
                     return (null, new("Alerts_HeaderReserved", name));
-                case WebhookProblem.HeaderValue:
+                case SinkProblem.HeaderValue:
                     return (null, new("Alerts_HeaderValue"));
             }
         }
-        return (new WebhookSink(id, parsed!, headers, threshold, trusted ? AlertRedaction.Trusted : AlertRedaction.Public), null);
+        return (new WebhookSink(id, parsed!, headers, threshold, Redaction(trusted)), null);
     }
+
+    /// <summary>The ntfy form's fields as a sink, or the first problem with them. An empty token is an open topic.</summary>
+    public static (NtfySink? Sink, Phrase? Problem) BuildNtfy(bool needsMachine, string machine, string id, string server, string topic,
+        string token, AlertSeverity threshold, bool trusted, IEnumerable<string> existingIds)
+    {
+        if (CheckCommon(needsMachine, machine, ref id, existingIds) is { } common)
+            return (null, common);
+        if (SinkRules.CheckNtfy(server, topic, out var url) is var problem and not SinkProblem.None)
+            return (null, problem == SinkProblem.Topic ? new("Alerts_NtfyTopicBad") : UrlProblem(problem));
+        token = token.Trim();
+        if (token.Length > 0 && SinkRules.CheckToken(token) != SinkProblem.None)
+            return (null, new("Alerts_NtfyTokenBad"));
+        return (new NtfySink(id, url!, token.Length > 0 ? token : null, threshold, Redaction(trusted)), null);
+    }
+
+    static Phrase? CheckCommon(bool needsMachine, string machine, ref string id, IEnumerable<string> existingIds)
+    {
+        if (needsMachine && string.IsNullOrWhiteSpace(machine))
+            return new("Alerts_NeedMachine");
+        id = id.Trim();
+        if (SinkRules.CheckId(id) != SinkProblem.None)
+            return new("Alerts_BadId");
+        return existingIds.Contains(id, StringComparer.Ordinal) ? new("Alerts_IdTaken", id) : null;
+    }
+
+    static Phrase UrlProblem(SinkProblem problem) => problem == SinkProblem.UserInfo ? new("Alerts_UrlUserInfo") : new("Alerts_UrlNotHttps");
+
+    static AlertRedaction Redaction(bool trusted) => trusted ? AlertRedaction.Trusted : AlertRedaction.Public;
 
     static Phrase Severity(AlertSeverity severity) => severity switch
     {

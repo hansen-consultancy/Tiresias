@@ -6,21 +6,31 @@ using Tiresias.Protocol;
 namespace Tiresias.App.Views;
 
 /// <summary>
-/// <b>Add a webhook</b> (docs/alerts.md, phase 2): a sealed save of <c>alerts.json</c> with the unlocked
-/// Windows Hello wrapper. The first sink also asks for the machine label. Kept out of screen capture:
-/// the URL and header can be credentials.
+/// <b>Add a webhook</b> or <b>Add ntfy</b> (docs/alerts.md): a sealed save of <c>alerts.json</c> with the
+/// unlocked Windows Hello wrapper. The first sink also asks for the machine label. Kept out of screen
+/// capture: the URL, header, topic and token can be credentials.
 /// </summary>
-public partial class AlertWebhookWindow : Window
+public partial class AlertSinkWindow : Window
 {
     static readonly AlertSeverity[] Thresholds = [AlertSeverity.Critical, AlertSeverity.High, AlertSeverity.Warning, AlertSeverity.Info];
 
     readonly bool needsMachine;
+    readonly bool ntfy;
 
-    public AlertWebhookWindow()
+    /// <param name="ntfy">The ntfy form; otherwise the webhook form.</param>
+    public AlertSinkWindow(bool ntfy)
     {
         InitializeComponent();
-        // Real input even in a demo: someone trying the flow may paste their real URL and token.
+        // Real input even in a demo: someone trying the flow may paste their real URL, topic or token.
         Desktop.ExcludeFromCapture(this, evenInDemo: true);
+        this.ntfy = ntfy;
+        Title = Heading.Text = Text.Get(ntfy ? "Alerts_NtfyWindowTitle" : "Alerts_WindowTitle");
+        Intro.Text = Text.Get(ntfy ? "Alerts_NtfyWindowIntro" : "Alerts_WindowIntro");
+        WebhookFields.Visibility = ntfy ? Visibility.Collapsed : Visibility.Visible;
+        NtfyFields.Visibility = ntfy ? Visibility.Visible : Visibility.Collapsed;
+        // A trusted ntfy body carries the program's file name only (NtfyFormat), not paths or names.
+        if (ntfy)
+            TrustedBox.Content = Text.Get("Alerts_NtfyTrusted");
         needsMachine = App.Current.Alerts.Center.Config is null;
         MachineField.Visibility = needsMachine ? Visibility.Visible : Visibility.Collapsed;
         ThresholdBox.ItemsSource = new[] { Text.Get("Alerts_Critical"), Text.Get("Alerts_High"), Text.Get("Alerts_Warning"), Text.Get("Alerts_Info") };
@@ -34,8 +44,12 @@ public partial class AlertWebhookWindow : Window
     async void OnSave(object sender, RoutedEventArgs e)
     {
         var existing = App.Current.Alerts.Center.Config?.Sinks.Select(s => s.Id) ?? [];
-        var (sink, problem) = AlertsCard.Build(needsMachine, MachineBox.Text, IdBox.Text, UrlBox.Text, HeaderNameBox.Text, HeaderValueBox.Password,
-            Thresholds[Math.Max(0, ThresholdBox.SelectedIndex)], TrustedBox.IsChecked == true, existing);
+        var threshold = Thresholds[Math.Max(0, ThresholdBox.SelectedIndex)];
+        var trusted = TrustedBox.IsChecked == true;
+        var (sink, problem) = ntfy
+            ? AlertsCard.BuildNtfy(needsMachine, MachineBox.Text, IdBox.Text, ServerBox.Text, TopicBox.Text, TokenBox.Password, threshold, trusted, existing)
+            : ((AlertSink?, Phrase?))AlertsCard.Build(needsMachine, MachineBox.Text, IdBox.Text, UrlBox.Text, HeaderNameBox.Text, HeaderValueBox.Password,
+                threshold, trusted, existing);
         if (problem is not null)
         {
             Message.Text = Text.Of(problem);
@@ -57,8 +71,8 @@ public partial class AlertWebhookWindow : Window
         catch (Exception ex) when (ex is InvalidOperationException or InvalidDataException or IOException or UnauthorizedAccessException
             or System.Security.Cryptography.CryptographicException)
         {
-            // The exception's text names no URL or header (AlertsConfig and the store never quote them); the log keeps the details.
-            AppLog.Error(ex, "alerts: adding a webhook");
+            // The exception's text names no URL, header, topic or token (AlertsConfig and the store never quote them); the log keeps the details.
+            AppLog.Error(ex, "alerts: adding a sink");
             Message.Text = Text.Format("Alerts_SaveFailed", ex.Message);
             SaveButton.IsEnabled = true;
         }
