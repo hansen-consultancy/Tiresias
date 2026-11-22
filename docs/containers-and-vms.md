@@ -1,6 +1,6 @@
 # Containers, WSL and VMs: what your account can reach
 
-Status: **design, not built**. Tracks issue #113. This page designs a doctor check, **Reachable
+Status: **phase 1 built** (account facts: engine pipes, WSL disks, Hyper-V); the rest is design. Tracks issue #113. This page designs a doctor check, **Reachable
 from your account**, that tells you which secrets a normal program running as you could read inside
 your containers, WSL distributions and Hyper-V VMs. It extends the [attack surface](attack-surface.md)
 work (#34) and follows the rules of [more checks](more-checks.md#rules-every-check-keeps).
@@ -171,10 +171,10 @@ Windows-containers engine (host administrator) first, then the Linux engine, the
 **`tir doctor`** prints the account facts as checks, like every other check:
 
 ```text
-WARN  docker engine: open to every program you run while Docker Desktop runs (docker-users)
-ok    hyper-v: not a member of Hyper-V Administrators
-WARN  wsl disks: 2 distributions' disks are files you own: Ubuntu, Debian
-ok    containers: not looked inside; run tir doctor --reach
+WARN  docker engine: docker_engine is open to docker-users and your account, so every program you run can, while Docker runs, read every container's environment, …
+      fix: quit Docker Desktop when you don't use it: its pipe closes with it. …
+ok    hyper-v: not in Hyper-V Administrators: no program you run can open a VM
+ok    wsl disks: 2 distributions' disks are files you own: Ubuntu, Debian. …
 ```
 
 **`tir doctor --reach`** adds the contents, one block per environment, names only:
@@ -293,7 +293,11 @@ Each slice ships alone, with its tests and its line in `CHANGELOG.md`.
 
 1. **Account facts.** Pipe DACLs, Hyper-V membership (enabled vs deny-only), the WSL distribution
    list and disk ownership; the three checks in `tir doctor` and on Home. No contents, no opt-in
-   needed.
+   needed. **Built**: `ReachProbe` reads each security descriptor with `READ_CONTROL` and the pure
+   `ReachAccess` decides who it grants (a deny wins; an owner can read a disk); Hyper-V counts as
+   installed when the `vmms` service exists. Docker Desktop keeps `dockerDesktopWindowsEngine` open
+   in Linux mode too, so the finding says that pipe is administrator *when Windows containers are
+   on*. **How to close it** opens this page's *Findings*.
 2. **`NameScan` and devcontainer files.** The pure scanner with the canary tests; `devcontainer.json`
    and its `.env`/Compose files under the project folders; VS Code's forwarding settings;
    `InjectAtRunTime`. Still no engine.

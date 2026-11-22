@@ -156,15 +156,7 @@ public static class UserSecretsVault
             ?? throw new InvalidDataException($"The sealed secrets do not open with key '{wrapper.Id}' (another user's, another folder's, or tampered with).");
         try
         {
-            var plaintext = SecretEnvelope.Open(secret, dek) ?? throw new InvalidDataException("The sealed secrets were tampered with.");
-            try
-            {
-                return (ParseObject(Encoding.UTF8.GetString(plaintext)), secret.Version);
-            }
-            finally
-            {
-                Array.Clear(plaintext);
-            }
+            return (OpenDocument(secret, dek), secret.Version);
         }
         finally
         {
@@ -172,16 +164,31 @@ public static class UserSecretsVault
         }
     }
 
+    internal static JsonObject OpenDocument(SealedSecret secret, ReadOnlySpan<byte> dek)
+    {
+        var plaintext = SecretEnvelope.Open(secret, dek) ?? throw new InvalidDataException("The sealed secrets were tampered with.");
+        try
+        {
+            return ParseObject(Encoding.UTF8.GetString(plaintext));
+        }
+        finally
+        {
+            Array.Clear(plaintext);
+        }
+    }
+
     static JsonObject ParseObject(string json) =>
         JsonNode.Parse(json, documentOptions: Lenient) as JsonObject ?? throw new InvalidDataException("secrets.json is not a JSON object.");
 
-    static SealedSecret ToSecret(string userSecretsId, byte[] blob)
+    internal static SealedSecret ToSecret(string userSecretsId, byte[] blob)
     {
-        var dto = JsonSerializer.Deserialize<BlobDto>(blob, Web) ?? throw new InvalidDataException("Sealed envelope is empty.");
+        var dto = JsonSerializer.Deserialize<BlobDto>(blob, Web);
+        if (dto is not { WrappedDeks: not null, Nonce: not null, Ciphertext: not null })
+            throw new InvalidDataException("Sealed envelope is incomplete.");
         return new(Slug(userSecretsId), dto.Version, dto.WrappedDeks, dto.Nonce, dto.Ciphertext);
     }
 
-    static byte[] ToBlob(SealedSecret secret) =>
+    internal static byte[] ToBlob(SealedSecret secret) =>
         JsonSerializer.SerializeToUtf8Bytes(new BlobDto(secret.Version, new Dictionary<string, byte[]>(secret.WrappedDeks), secret.Nonce, secret.Ciphertext), Web);
 
     sealed record BlobDto(int Version, Dictionary<string, byte[]> WrappedDeks, byte[] Nonce, byte[] Ciphertext);

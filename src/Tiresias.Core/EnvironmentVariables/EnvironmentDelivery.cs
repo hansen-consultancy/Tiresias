@@ -9,6 +9,31 @@ public sealed record Delivery(IReadOnlyDictionary<string, string> Variables, IRe
 /// <summary>A minted placeholder and when the broker lets it expire (it caps that at the lease's end), or why there is none.</summary>
 public sealed record MintedPlaceholder(string? Token, string? Problem = null, DateTimeOffset? ExpiresAt = null);
 
+/// <summary>The origin and delivery shown for one variable. Consent remembers only these fields, never the value.</summary>
+public sealed record EnvironmentVariableAccess(string Name, string? Folder = null, EnvironmentPlaceholder? Placeholder = null, Uri? Endpoint = null)
+{
+    public static EnvironmentVariableAccess For(SealedEnvironment environment, string name, string? folder, Uri endpoint) =>
+        environment.PlaceholderFor(name) is { } placeholder ? new(name, folder, placeholder, endpoint) : new(name, folder);
+
+    string? NormalizedFolder => Folder is null ? null : SealedEnvironment.Normalize(Folder);
+
+    public bool SameDelivery(EnvironmentVariableAccess other) =>
+        string.Equals(Name, other.Name, StringComparison.OrdinalIgnoreCase)
+        && NormalizedFolder == other.NormalizedFolder
+        && string.Equals(Placeholder?.Service, other.Placeholder?.Service, StringComparison.Ordinal)
+        && string.Equals(Placeholder?.BaseUrlVariable, other.Placeholder?.BaseUrlVariable, StringComparison.OrdinalIgnoreCase)
+        && Endpoint == other.Endpoint;
+
+    public string Describe()
+    {
+        var scope = Folder is null ? "global" : $"folder {Folder}";
+        if (Placeholder is not { } p)
+            return $"{Name} ({scope}, raw value)";
+        var target = Endpoint is null ? p.BaseUrlVariable : $"{p.BaseUrlVariable} = {ExecPlan.ServiceUrl(p.Service, Endpoint)}";
+        return $"{Name} ({scope}, placeholder for {p.Service}, {target})";
+    }
+}
+
 /// <summary>
 /// Turns resolved sealed variables into what a process gets. A variable delivered as a placeholder
 /// gets one from <c>mint</c>, plus the forwarder's URL for its service in its base-URL variable;

@@ -277,7 +277,7 @@ public sealed partial class EnvironmentViewModel : ObservableObject
             AppLog.Info($"environment: couldn't read NuGet.Config: {e.Message}");
         }
         foreach (var step in nugetSteps)
-            NuGetFound.Add(new(step.Credential.Source ?? step.Credential.Key, step.Skip is { } why
+            NuGetFound.Add(new(step.DisplayUrl ?? step.Credential.Key, step.Skip is { } why
                 ? Text.Format("Env_NuGetSkip", why)
                 : Text.Format(step.SealClearText ? "Env_NuGetSealClearText" : step.ProtectFirst ? "Env_NuGetProtect" : "Env_NuGetSealed", step.Variable, Path.GetFileName(step.File)),
                 step.Acts, canPick: step.Acts));

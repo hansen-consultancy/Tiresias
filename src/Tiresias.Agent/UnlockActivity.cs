@@ -10,9 +10,8 @@ internal static class UnlockActivity
         {
             unlock();
         }
-        catch (HelloException e) when (e.Problem is HelloProblem.Cancelled or HelloProblem.Expired)
+        catch (HelloException e) when (e.PromptRefusal is { } reason)
         {
-            var reason = e.Problem == HelloProblem.Cancelled ? "Windows Hello prompt was cancelled." : "Windows Hello prompt expired.";
             activity.Append(new(AuditKind.Deny, Service: "Windows Hello unlock", Reason: reason));
             throw;
         }
