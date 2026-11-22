@@ -2065,6 +2065,9 @@ Store them in clear?</value>
   <data name="Finding_FixUnblock" xml:space="preserve">
     <value>Unblock (that was me)</value>
   </data>
+  <data name="Finding_FixAlerts" xml:space="preserve">
+    <value>Open Alerts</value>
+  </data>
   <data name="Notify_AdminIncidents" xml:space="preserve">
     <value>Decoy activity is awaiting review. Open Service incidents in Activity.</value>
   </data>
