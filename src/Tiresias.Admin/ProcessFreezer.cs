@@ -18,6 +18,9 @@ namespace Tiresias.Admin;
 /// Manager still ends a frozen process. Linked into the agent, whose elevated removal thaws with the
 /// service stopped.
 /// </summary>
+/// <summary>What thawing a job did.</summary>
+enum JobThaw { Thawed, Gone, Failed }
+
 [System.Runtime.Versioning.SupportedOSPlatform("windows")]
 static partial class ProcessFreezer
 {
@@ -113,11 +116,13 @@ static partial class ProcessFreezer
     }
 
     /// <summary>Thaws the job named <paramref name="job"/>.</summary>
-    /// <returns>Whether it was found and thawed; it isn't found once every process in it has ended.</returns>
-    public static bool Thaw(string job)
+    /// <returns><see cref="JobThaw.Gone"/> once every process in it has ended; <see cref="JobThaw.Failed"/> when it exists but couldn't be opened or thawed.</returns>
+    public static JobThaw Thaw(string job)
     {
         using var handle = OpenJobObjectW(JobSetAttributes | JobQuery, false, job);
-        return !handle.IsInvalid && SetFrozen(handle, false);
+        if (handle.IsInvalid)
+            return Marshal.GetLastPInvokeError() == ErrorFileNotFound ? JobThaw.Gone : JobThaw.Failed;
+        return SetFrozen(handle, false) ? JobThaw.Thawed : JobThaw.Failed;
     }
 
     static bool SetFrozen(SafeJobHandle job, bool frozen)
@@ -142,6 +147,7 @@ static partial class ProcessFreezer
     const uint JobSetAttributes = 0x0002;
     const uint JobQuery = 0x0004;
     const int ErrorAlreadyExists = 183;
+    const int ErrorFileNotFound = 2;
     const int JobObjectFreezeInformation = 18;
     const uint FreezeOperation = 0x1;
 

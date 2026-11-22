@@ -88,8 +88,10 @@ sealed partial class LastRunReader
     /// <summary>XPRESS Huffman, as Windows compresses Prefetch files since Windows 10.</summary>
     static unsafe byte[]? Decompress(ReadOnlySpan<byte> compressed, int size)
     {
-        if (RtlGetCompressionWorkSpaceSize(XpressHuff, out var workspaceSize, out _) != 0)
+        // RtlDecompressBufferEx's workspace is the fragment size, the second; the larger of the two leaves no doubt.
+        if (RtlGetCompressionWorkSpaceSize(XpressHuff, out var bufferWorkspace, out var fragmentWorkspace) != 0)
             return null;
+        var workspaceSize = Math.Max(bufferWorkspace, fragmentWorkspace);
         var output = new byte[size];
         var workspace = new byte[workspaceSize];
         fixed (byte* o = output)

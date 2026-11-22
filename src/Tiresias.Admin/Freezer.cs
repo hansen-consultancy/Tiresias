@@ -56,7 +56,7 @@ sealed class Freezer(string stateFolder, ILogger logger)
             // A freeze the record doesn't hold could never be found again to thaw: undo it instead.
             if (!Save(state.Add(new(state.NextId, userSid, program, job, processes, filters, DateTimeOffset.Now))))
             {
-                Undo(job, processes.Count);
+                Undo(job);
                 Lift(filters);
                 return (null, "the admin tier's record of freezes can't be written");
             }
@@ -72,7 +72,11 @@ sealed class Freezer(string stateFolder, ILogger logger)
             if (State() is not { } state)
                 return (null, "the admin tier's record of freezes can't be read");
             var (thawed, lift, left) = state.Thaw(userSid, program);
-            var count = thawed.Sum(e => Undo(e.Job, e.Processes.Count));
+            var outcomes = thawed.Select(e => (e, Outcome: ProcessFreezer.Thaw(e.Job))).ToArray();
+            // Dropped from the record, a job still frozen could never be thawed again: keep it all, and a retry thaws it.
+            if (outcomes.Any(o => o.Outcome == JobThaw.Failed))
+                return (null, "the program's processes can't all be thawed");
+            var count = outcomes.Where(o => o.Outcome == JobThaw.Thawed).Sum(o => o.e.Processes.Count);
             // Filters only the record can name: kept in it until lifted, so a later thaw or the removal retries them.
             if (!Lift(lift))
                 return (null, "the program's network block can't be lifted");
@@ -90,10 +94,12 @@ sealed class Freezer(string stateFolder, ILogger logger)
         {
             tornDown = true;
             var state = State();
-            var count = state?.Entries.Sum(e => Undo(e.Job, e.Processes.Count)) ?? 0;
+            var outcomes = state?.Entries.Select(e => (e, Outcome: ProcessFreezer.Thaw(e.Job))).ToArray() ?? [];
+            var count = outcomes.Where(o => o.Outcome == JobThaw.Thawed).Sum(o => o.e.Processes.Count);
             // With the record damaged the filters are still in Tiresias's sublayer, whose removal Windows refuses while any is.
             var lifted = Lift(state?.Entries.SelectMany(e => e.Filters) ?? []) && RemoveProvider();
-            if (state is not null && lifted)
+            // A job still frozen keeps the record, for the removal's own undo to retry.
+            if (state is not null && lifted && outcomes.All(o => o.Outcome != JobThaw.Failed))
             {
                 File.Delete(path);
                 frozen = AdminFrozen.Empty;
@@ -109,7 +115,7 @@ sealed class Freezer(string stateFolder, ILogger logger)
             return State()?.For(userSid) ?? 0;
     }
 
-    static int Undo(string job, int processes) => ProcessFreezer.Thaw(job) ? processes : 0;
+    static void Undo(string job) => ProcessFreezer.Thaw(job);
 
     bool Lift(IEnumerable<ulong> filters)
     {

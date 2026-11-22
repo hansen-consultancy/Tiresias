@@ -237,8 +237,9 @@ A decoy *use* freezes the program; a *read* never does, as today.
   (`SYNCHRONIZE`): the name lives as long as any of them runs, and `thaw` opens the job by name
   after the service restarts. A machine restart ends the processes anyway. While `frozen.json`
   can't be read, the service freezes nothing; a freeze it can't write there it undoes and refuses,
-  and a thaw whose filters can't be lifted, or whose record can't be rewritten, keeps them recorded
-  and fails, so a retry finishes it.
+  and a thaw with a job that exists but can't be thawed, filters that can't be lifted, or a record
+  that can't be rewritten, keeps them recorded and fails, so a retry finishes it; the removal
+  likewise keeps `frozen.json` while any job is still frozen.
 - **This wasn't me**: the app asks `freeze` for the process it found, as the user; the service
   freezes it only when it is that user's, and the incident window says it is frozen.
 - **Undo**: Home's finding gets **Thaw and unblock** instead of **Unblock**. Both, and unblocking a
