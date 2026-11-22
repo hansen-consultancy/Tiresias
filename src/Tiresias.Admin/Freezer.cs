@@ -76,7 +76,9 @@ sealed class Freezer(string stateFolder, ILogger logger)
             // Filters only the record can name: kept in it until lifted, so a later thaw or the removal retries them.
             if (!Lift(lift))
                 return (null, "the program's network block can't be lifted");
-            Save(left);
+            // Left recorded, a lifted filter would still read as blocking: refuse, and a retry rewrites it.
+            if (!Save(left))
+                return (null, "the admin tier's record of freezes can't be written");
             return (new(count), null);
         }
     }
@@ -139,8 +141,17 @@ sealed class Freezer(string stateFolder, ILogger logger)
     {
         if (!loaded)
         {
-            frozen = AdminFrozen.Parse(File.Exists(path) ? File.ReadAllText(path) : null);
-            loaded = true;
+            try
+            {
+                frozen = AdminFrozen.Parse(File.Exists(path) ? File.ReadAllText(path) : null);
+                // Damaged stays damaged; a file that couldn't be opened is read again next time.
+                loaded = true;
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                frozen = null;
+                logger.LogError("frozen.json can't be opened: {Kind}", e.GetType().Name);
+            }
             if (frozen is null)
                 logger.LogError("frozen.json can't be read: nothing is frozen until it can");
         }
