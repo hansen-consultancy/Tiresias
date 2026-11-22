@@ -113,6 +113,34 @@ public class EngineTests
         });
     }
 
+    [TestCase("C:\\src\\shop\" & calc & \"")]
+    [TestCase("C:\\src\\$(calc)")]
+    [TestCase("C:\\src\\%PATH%")]
+    public void An_engine_label_that_would_break_out_of_a_pasted_command_is_left_out(string label)
+    {
+        var listed = EngineScan.Containers(Bytes(JsonSerializer.Serialize(new[]
+        {
+            new { Id = "c1", Names = new[] { "/a;calc" }, ImageID = "i1", State = "running", Labels = new Dictionary<string, string> { ["devcontainer.local_folder"] = label } },
+        })))[0];
+        var docker = new EngineContents("docker_engine", [Container(listed, [new("API_TOKEN", false, false, false, false)])], [new("i1", "evil:1\"&calc", [new("BAKED_TOKEN", false, false, false, false)])]);
+        var fixes = Checks(new(docker)).Select(c => c.Fix).OfType<InjectAtRunTime>().ToArray();
+        Assert.Multiple(() =>
+        {
+            Assert.That(fixes.Select(f => f.Commands + f.Instruction), Has.All.Not.Contain("calc").And.All.Not.Contain("%PATH%"));
+            Assert.That(fixes[0].Commands, Does.EndWith("docker run --rm -e API_TOKEN <image>"));
+            Assert.That(fixes[1].Instruction, Does.StartWith("rebuild the image without"));
+        });
+    }
+
+    [Test]
+    public async Task An_engine_label_that_would_break_out_is_not_scanned_for_devcontainer_files()
+    {
+        var probe = new ContentsProbe();
+        var docker = new EngineContents("docker_engine", [new("a", true, "i", [], [], "C:\\x\" & calc & \""), new("b", true, "i", [], [], @"C:\src\shop")], []);
+        await Doctor.RunAsync(probe, new(docker));
+        Assert.That(probe.Workspaces, Is.EqualTo(new[] { @"C:\src\shop" }));
+    }
+
     [Test]
     public void Not_asked_says_how_to_look_only_while_an_engine_is_open()
     {

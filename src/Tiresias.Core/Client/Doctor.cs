@@ -239,7 +239,7 @@ public static partial class Doctor
         var reach = probe.Reach;
         checks.AddRange(Reach(reach));
         checks.AddRange(Contents(reach, contents));
-        string[] workspaces = [.. contents?.Docker?.Containers.Select(c => c.Workspace).OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase) ?? []];
+        string[] workspaces = [.. contents?.Docker?.Containers.Select(c => PastableFolder(c.Workspace)).OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase) ?? []];
         checks.AddRange(Devcontainers(probe.Devcontainers(workspaces), probe.DevcontainerForwarding));
         var (uses, runs, installed, now) = (probe.CredentialUses().ToArray(), probe.ProgramRuns().ToArray(), probe.UninstallEntries().ToArray(), DateTimeOffset.UtcNow);
         checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), uses, otherBlocks, now, runs));

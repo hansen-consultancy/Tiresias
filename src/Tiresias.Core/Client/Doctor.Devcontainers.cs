@@ -231,7 +231,7 @@ public sealed record InjectAtRunTime(IReadOnlyList<string> Names, string? Folder
         ? "in the devcontainer file, put each in remoteEnv as \"NAME\": \"${localEnv:NAME}\" and delete its value from containerEnv, runArgs and env files. "
             + "Seal them, quit VS Code, and start it through tir run, which hands them over after you approve"
         : Baked
-            ? $"rebuild {Image} without the ENV lines that set them: a value in an image layer outlives every container. Seal them, and pass them in when a container starts"
+            ? $"rebuild {Image ?? "the image"} without the ENV lines that set them: a value in an image layer outlives every container. Seal them, and pass them in when a container starts"
             : "seal them, and start the container through tir run, which hands them in after you approve; --rm removes it when it stops, so its config doesn't keep them")
         + $": {Commands.Replace("\n", "; ", StringComparison.Ordinal)}";
 }

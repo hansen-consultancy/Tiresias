@@ -225,7 +225,7 @@ public static partial class Doctor
                 var devcontainer = container.Workspace is null ? "" : $", the devcontainer for {container.Workspace}";
                 yield return new($"container {container.Name}", DoctorStatus.Warn,
                     $"{string.Join(", ", own.Select(n => n.Shown))}: in the environment of this {state} container{devcontainer}, which the engine shows any program you run",
-                    new InjectAtRunTime([.. own.Select(n => n.Name)], container.Workspace, container.Name, image?.Tag),
+                    new InjectAtRunTime([.. own.Select(n => n.Name)], PastableFolder(container.Workspace), Word(container.Name), Word(image?.Tag)),
                     Position.Plaintext, Position.SealedApproved, "containers holding secrets");
             }
             var mounted = container.Mounts.Where(IsCredentialFolder).ToArray();
@@ -245,7 +245,7 @@ public static partial class Doctor
             findings++;
             yield return new($"image {image.Tag}", DoctorStatus.Warn,
                 $"{string.Join(", ", baked.Select(n => n.Shown))}: set by the image's ENV lines, so every container made from it and anyone holding a copy has them",
-                new InjectAtRunTime([.. baked.Select(n => n.Name)], Image: image.Tag, Baked: true),
+                new InjectAtRunTime([.. baked.Select(n => n.Name)], Image: Word(image.Tag), Baked: true),
                 Now: Position.Plaintext, Kind: "images with secrets baked in");
         }
         if (findings == 0)
@@ -256,4 +256,14 @@ public static partial class Doctor
     /// <summary>The last segment of a host path (Windows, or the engine's <c>/run/desktop/mnt/host/c/…</c>), as a credential folder.</summary>
     static bool IsCredentialFolder(string source) =>
         CredentialFolders.Contains(source.TrimEnd('/', '\\').Split('/', '\\')[^1]);
+
+    /// <summary>
+    /// A name or tag from the engine, only when it can go into a command the user pastes. The engine
+    /// is anyone's to fill (an image pulled from a registry carries its own labels), so a value with a
+    /// quote, <c>$</c> or <c>&amp;</c> is left out and the fix falls back to its generic form.
+    /// </summary>
+    static string? Word(string? value) => value is not null && Pastable(value) ? value : null;
+
+    /// <summary>A <c>devcontainer.local_folder</c> label, only when it can go into a pasted command (see <see cref="Word"/>).</summary>
+    internal static string? PastableFolder(string? folder) => folder is not null && Pastable(folder, path: true) ? folder : null;
 }
