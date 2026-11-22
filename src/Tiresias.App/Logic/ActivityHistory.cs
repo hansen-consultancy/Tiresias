@@ -9,9 +9,12 @@ public sealed record ActivityHistory(IReadOnlyList<ActivityEntry> Entries, Servi
 {
     /// <summary>While a service is installed only its verified journal represents current broker decisions.</summary>
     public static ActivityHistory From(IEnumerable<string> agent, IEnumerable<string> localBroker, BrokerServiceState? service,
-        IReadOnlyList<string>? serviceJournal)
+        IReadOnlyList<string>? serviceJournal, IReadOnlyList<DateTimeOffset>? enrollmentApprovals = null)
     {
         var entries = Parse(agent, ActivitySource.UserSecrets).ToList();
+        foreach (var time in enrollmentApprovals ?? [])
+            entries.Add(new(time, ActivitySource.UserSecrets, AuditKind.Allow, null, "Recovery key enrollment", null,
+                "The administrator approved recovery key enrollment.", null, null, null));
         entries.AddRange(Parse(localBroker, service == BrokerServiceState.NotInstalled ? ActivitySource.Broker : ActivitySource.LegacyBroker));
         if (service == BrokerServiceState.NotInstalled)
             return new(entries, ServiceJournalState.InApp);

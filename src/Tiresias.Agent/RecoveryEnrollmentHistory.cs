@@ -99,6 +99,22 @@ internal static partial class RecoveryEnrollmentHistory
             throw InvalidRecord();
         if (count == 0)
             return null;
+        return ReadChange(state, ownerSid, last, protectedStore);
+    }
+
+    internal static IReadOnlyList<DateTimeOffset> ApprovalTimes(RegistryKey? state, string ownerSid, bool protectedStore = true)
+    {
+        if (Latest(state, ownerSid, protectedStore) is not { } latest)
+            return [];
+        var times = new DateTimeOffset[latest.Number];
+        for (int i = 1; i < latest.Number; i++)
+            times[i - 1] = ReadChange(state!, ownerSid, i, protectedStore).At;
+        times[^1] = latest.At;
+        return times;
+    }
+
+    static RecoveryChange ReadChange(RegistryKey state, string ownerSid, int last, bool protectedStore)
+    {
         var latest = last.ToString(CultureInfo.InvariantCulture);
         using var entry = protectedStore ? OpenProtected(state, latest, create: false, ownerSid) : OpenRead(state, latest);
         if (entry is null || entry.GetValue("change", null, RegistryValueOptions.DoNotExpandEnvironmentNames) is not string { Length: <= 1024 } json ||

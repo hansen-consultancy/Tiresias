@@ -123,6 +123,20 @@ internal static class RecoveryEnrollment
 
     internal static InvalidOperationException Changed() => RecoveryEnrollmentHistory.Changed();
 
+    internal static IReadOnlyList<DateTimeOffset> ApprovalTimes()
+    {
+#if DEBUG
+        if (DemoMode.CurrentUser is { } demo)
+        {
+            using var history = demo.OpenSubKey("RecoveryEnrollment");
+            return RecoveryEnrollmentHistory.ApprovalTimes(history, DemoSid, protectedStore: false);
+        }
+#endif
+        var sid = UserSid();
+        using var state = RecoveryEnrollmentHistory.Open(sid, create: false);
+        return RecoveryEnrollmentHistory.ApprovalTimes(state, sid);
+    }
+
     static string UserSid()
     {
         using var user = WindowsIdentity.GetCurrent();

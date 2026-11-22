@@ -10,7 +10,8 @@ static class ActivityLog
 {
     public static bool HasHistory() => new FileInfo(AgentHost.ActivityPath) is { Exists: true, Length: > 0 }
         || new FileInfo(AgentHost.RecoveryActivityPath) is { Exists: true, Length: > 0 }
-        || new FileInfo(SoloBroker.AuditPath) is { Exists: true, Length: > 0 } || ServiceState() != BrokerServiceState.NotInstalled;
+        || new FileInfo(SoloBroker.AuditPath) is { Exists: true, Length: > 0 } || ServiceState() != BrokerServiceState.NotInstalled
+        || ReadEnrollmentApprovals().Count > 0;
 
     public static ActivityHistory ReadAll()
     {
@@ -26,7 +27,17 @@ static class ActivityLog
         {
             AppLog.Error(e, "reading the broker service journal");
         }
-        return ActivityHistory.From((Read(AgentHost.ActivityPath) ?? []).Concat(Read(AgentHost.RecoveryActivityPath) ?? []), Read(SoloBroker.AuditPath) ?? [], state, serviceJournal);
+        return ActivityHistory.From((Read(AgentHost.ActivityPath) ?? []).Concat(Read(AgentHost.RecoveryActivityPath) ?? []), Read(SoloBroker.AuditPath) ?? [], state, serviceJournal, ReadEnrollmentApprovals());
+    }
+
+    static IReadOnlyList<DateTimeOffset> ReadEnrollmentApprovals()
+    {
+        try { return RecoveryKey.EnrollmentApprovalTimes(); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or System.Security.SecurityException)
+        {
+            AppLog.Error(e, "reading recovery enrollment approvals");
+            return [];
+        }
     }
 
     static BrokerServiceState? ServiceState()

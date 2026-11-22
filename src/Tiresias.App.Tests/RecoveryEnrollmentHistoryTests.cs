@@ -3,6 +3,8 @@ using System.Security.Principal;
 using Microsoft.Win32;
 using NSec.Cryptography;
 using NUnit.Framework;
+using Tiresias.App.Logic;
+using Tiresias.Client;
 using Tiresias.Agent;
 
 namespace Tiresias.App.Tests;
@@ -68,6 +70,23 @@ public class RecoveryEnrollmentHistoryTests
             var acl = key.GetAccessControl(AccessControlSections.Owner | AccessControlSections.Access);
             Assert.DoesNotThrow(() => RecoveryEnrollmentHistory.RequireProtected(acl, Owner));
             Assert.Throws<UnauthorizedAccessException>(() => RecoveryEnrollmentHistory.RequireProtected(acl, Admin));
+        });
+    }
+
+    [Test]
+    public void Each_committed_enrollment_appears_once_in_allowed_activity()
+    {
+        WithIsolatedKey(state =>
+        {
+            using var pending = state.CreateSubKey("pending-" + Guid.NewGuid().ToString("N"), true, RegistryOptions.Volatile);
+            Append(state, null, NewKey());
+            var first = Latest(state)!;
+            Append(state, first.Binding.Revision, NewKey());
+            var times = RecoveryEnrollmentHistory.ApprovalTimes(state, Owner, protectedStore: false);
+            var history = ActivityHistory.From([], [], BrokerServiceState.NotInstalled, null, times);
+            var rows = ActivityQuery.Filter(history.Entries, new("Recovery key enrollment", ActivityOutcome.Allowed), DateTimeOffset.Now);
+            Assert.That(rows.Select(r => r.Time), Is.EquivalentTo(new[] { first.At, Latest(state)!.At }));
+            Assert.That(rows.Select(r => r.Reason), Is.All.EqualTo("The administrator approved recovery key enrollment."));
         });
     }
 

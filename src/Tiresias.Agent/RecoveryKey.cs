@@ -39,6 +39,8 @@ public static class RecoveryKey
 
     public static string? PublicKey => RecoveryEnrollment.Current()?.PublicKey;
 
+    public static IReadOnlyList<DateTimeOffset> EnrollmentApprovalTimes() => RecoveryEnrollment.ApprovalTimes();
+
     public static bool IsEnrolled => RecoveryEnrollment.Current() is not null;
 
     public static bool NeedsVerification => !IsEnrolled && HasUnverifiedSetup;
