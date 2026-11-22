@@ -374,12 +374,18 @@ leaving.
      it, and the secret or variable names asked for. A `tir` placeholder or `tir exec` approval
      carries no names: its lines are `tir`'s own text, which can hold a command. The request's heading
      and command line never go.
-   - **Broker events come from the solo broker's audit log as it writes it** (`AuditLog.Appended`),
-     only in the app's own broker. `trust.rejected` carries the verifier's failure kind (`Fork`,
+   - **Broker events come from the solo broker's audit log**: as it writes it (`AuditLog.Appended`)
+     when the app hosts the broker, or from the Windows service's journal, read every 30 seconds while
+     the service runs (`AuditTail`). The journal's first read after the app starts only sets where to
+     begin, as does one that no longer extends the last (replaced, shrunk, or a chain that doesn't
+     verify): records the app didn't see written never alert late. `trust.rejected` carries the verifier's failure kind (`Fork`,
      `Rollback`...), `trust.break-glass` nothing, `vault.rolled-back` and `vault.unapproved` the
      secret's name (`policy-not-approved: <slug>` is the refused reload's record), `approval.invalid`
      the service and the calling process. The record's free-text reason never goes whole. A reload
      that refuses several secrets writes a record, and so an alert, per secret.
+   - **The admin tier's decoy incidents** (decoys the admin service holds) raise `decoy.used` as the
+     app receives them, with the program, its process chain and the decoy kind, as a decoy the app
+     holds does. After a restart, incidents not yet reviewed in Activity alert once more.
    - **`findings.new` is one event per background check run**, naming each new finding by its title,
      never its detail: a warning when any of them fails, info when they only warn. New means open, not
      shown on Home (`seen-findings.json`) and not alerted on before by this run of the app; a finding

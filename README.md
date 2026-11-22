@@ -107,9 +107,9 @@ Topics, tokens, URLs and headers are sealed like your secrets and saving needs W
 muting or removing one doesn't. **Send a test alert** checks it arrives. One you mark trusted also
 gets program paths and names (ntfy: the program's file name only); nothing ever gets a value or a
 token. Alerts open at the first unlock after the app starts, then keep working while the session is
-locked. What raises one: a decoy credential used or a decoy file read; a blocked program asking
+locked. What raises one: a decoy credential used (including one the admin service holds) or a decoy file read; a blocked program asking
 again, a request refused in lockdown, "This wasn't me", and a program asking for a secret while
-the PC is locked; the solo broker rejecting the trust chain, a paper key used, the vault rolled back
+the PC is locked; the solo broker (in the app or the Windows service) rejecting the trust chain, a paper key used, the vault rolled back
 or changed without your approval, and an unapproved broker request; and new findings the background
 checks turn up that Home hasn't shown. A program asking while you're at the PC doesn't: you are at
 the dialog (see [docs/alerts.md](docs/alerts.md)).

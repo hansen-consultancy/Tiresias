@@ -160,6 +160,21 @@ public sealed class AuditLog : IDisposable
         return null;
     }
 
+    /// <summary>A line's record and when it was written, or <c>null</c> when it isn't a record this version reads.</summary>
+    public static (AuditRecord Record, DateTimeOffset At)? Parse(string line)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<Line>(line, Json) is { } r
+                ? (new(r.Kind, r.LeaseId, r.Consumer, r.Service, r.Grant, r.Method, r.Path, r.Status, r.Reason, r.Token, r.Process, r.Evidence), r.Time)
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
     internal static string Hash(string line) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(line)));
 
     sealed record Line(

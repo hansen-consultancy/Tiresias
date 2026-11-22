@@ -140,8 +140,13 @@ public partial class App : Application
             if (Tiresias.Alerts.AlertSources.Audited(record, at) is { } alert)
                 alertCenter.Raise(alert);
         };
-        host.ServiceIncidentsReceived += () => Dispatcher.BeginInvoke(() =>
-            tray?.Notify(Text.Get("Notify_Decoy_Title"), Text.Get("Notify_AdminIncidents")));
+        host.ServiceIncidentsReceived += incidents =>
+        {
+            foreach (var incident in incidents)
+                if (AlertFor(new DecoyTouch(incident.Hit, incident.Parents)) is { } alert)
+                    alertCenter.Raise(alert);
+            Dispatcher.BeginInvoke(() => tray?.Notify(Text.Get("Notify_Decoy_Title"), Text.Get("Notify_AdminIncidents")));
+        };
         host.UserSecrets.FirstSealed += id => Dispatcher.BeginInvoke(() =>
             tray?.Notify(Text.Get("Notify_FirstSealed_Title"), Text.Format("Notify_FirstSealed_Body", id)));
         SystemEvents.SessionSwitch += OnSessionSwitch;
@@ -383,6 +388,10 @@ public partial class App : Application
         IncidentWindow.Show(view);
     }
 
+    static Tiresias.Alerts.AlertEvent? AlertFor(DecoyTouch touch) =>
+        Tiresias.Alerts.AlertSources.DecoyUsed(touch.Hit, touch.Parents, touch.What)
+            ?? Tiresias.Alerts.AlertSources.DecoyRead(touch.Hit, touch.Parents, touch.What, touch.Routine);
+
     /// <summary>
     /// A decoy credential was used (docs/decoys.md): block the program, say so, and let Home raise
     /// the finding where the user says whether it was them. A decoy file opened blocks nothing: an
@@ -391,8 +400,7 @@ public partial class App : Application
     /// </summary>
     void OnDecoyTouched(DecoyTouch touch)
     {
-        if ((Tiresias.Alerts.AlertSources.DecoyUsed(touch.Hit, touch.Parents, touch.What)
-            ?? Tiresias.Alerts.AlertSources.DecoyRead(touch.Hit, touch.Parents, touch.What, touch.Routine)) is { } alert)
+        if (AlertFor(touch) is { } alert)
             alerts?.Center.Raise(alert);
         var program = touch.Hit.Program;
         if (touch.Hit.Use == DecoyUse.Read)
