@@ -53,7 +53,13 @@ sealed class Freezer(string stateFolder, ILogger logger)
                     logger.LogError("A frozen program's network can't be blocked ({Code})", e.NativeErrorCode);
                 }
             }
-            Save(state.Add(new(state.NextId, userSid, program, job, processes, filters, DateTimeOffset.Now)));
+            // A freeze the record doesn't hold could never be found again to thaw: undo it instead.
+            if (!Save(state.Add(new(state.NextId, userSid, program, job, processes, filters, DateTimeOffset.Now))))
+            {
+                Undo(job, processes.Count);
+                Lift(filters);
+                return (null, "the admin tier's record of freezes can't be written");
+            }
             return (new(processes.Count, blocked), null);
         }
     }
@@ -67,7 +73,9 @@ sealed class Freezer(string stateFolder, ILogger logger)
                 return (null, "the admin tier's record of freezes can't be read");
             var (thawed, lift, left) = state.Thaw(userSid, program);
             var count = thawed.Sum(e => Undo(e.Job, e.Processes.Count));
-            Lift(lift);
+            // Filters only the record can name: kept in it until lifted, so a later thaw or the removal retries them.
+            if (!Lift(lift))
+                return (null, "the program's network block can't be lifted");
             Save(left);
             return (new(count), null);
         }
@@ -139,18 +147,20 @@ sealed class Freezer(string stateFolder, ILogger logger)
         return frozen;
     }
 
-    void Save(AdminFrozen state)
+    bool Save(AdminFrozen state)
     {
-        frozen = state;
         try
         {
             var temp = path + ".tmp";
             File.WriteAllText(temp, state.ToJson());
             File.Move(temp, path, overwrite: true);
+            frozen = state;
+            return true;
         }
-        catch (IOException e)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             logger.LogError("frozen.json can't be written: {Kind}", e.GetType().Name);
+            return false;
         }
     }
 
