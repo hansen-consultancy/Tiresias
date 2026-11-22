@@ -14,7 +14,11 @@ running as the user can end the app, block its traffic with a per-user proxy set
 `LcdHub` pipe name, or flood low-severity events to drain the rate limits, and then trip a decoy
 unseen.
 
-**Today.** Not built. The design gives `critical` its own rate-limit bucket, so a flood of findings
+**Today.** Webhook, ntfy and LcdHub are built; the failing-sink finding is not (phase 6). A
+program that serves the `LcdHub` pipe before the hub does takes the status items, and Tiresias
+can't tell: `CurrentUserOnly` refuses only another user's pipe, and a check of the serving
+program's name would stop the real hub (which runs from anywhere, under any name) sooner than a
+squatter (which can take that name). The design gives `critical` its own rate-limit bucket, so a flood of findings
 can't hide a decoy, collapses storms per source, and raises a finding and an `alerts.failing` alert
 on the other sinks when one stops delivering. Killing the app also stops the decoy listener and the
 consent gate, which the next unlock shows.

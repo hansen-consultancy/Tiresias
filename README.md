@@ -84,8 +84,9 @@ unlock.
 
 ## Alerts when you're away
 
-The tray app can push serious events to your phone through [ntfy](https://ntfy.sh), or post them
-to a webhook of your choice, so a used decoy credential reaches you when you aren't at the PC. In
+The tray app can push serious events to your phone through [ntfy](https://ntfy.sh), post them
+to a webhook of your choice, or show them on an [LcdHub](https://github.com/stevehansen/LcdHub)
+screen beside the PC, so a used decoy credential reaches you when you aren't looking. In
 **About**, **Alerts**, the first one you add asks for a name for this PC (it goes with every alert,
 so pick one that says nothing more).
 
@@ -97,12 +98,16 @@ so pick one that says nothing more).
 - **Add a webhook...** asks for the URL (HTTPS, or plain HTTP to localhost) and an optional header
   such as `Authorization`. Each alert is one `tiresias.alert/v1` JSON POST: the event, its severity
   and time, and the PC's name.
+- **Add LcdHub...** puts a line such as "Decoy credential used ×1" in the status strip of the LcdHub
+  running on this PC, warnings and worse by default. It goes when Home shows your findings, or after
+  24 hours. LcdHub shows nothing while the PC is locked and keeps the line for when you unlock; if
+  LcdHub isn't running, the line waits for it. It never shows more than the event and how often.
 
 Topics, tokens, URLs and headers are sealed like your secrets and saving needs Windows Hello;
 muting or removing one doesn't. **Send a test alert** checks it arrives. One you mark trusted also
 gets program paths and names (ntfy: the program's file name only); nothing ever gets a value or a
 token. Alerts open at the first unlock after the app starts, then keep working while the session is
-locked. Today only a used decoy credential raises one; LcdHub and more events are planned (see
+locked. Today only a used decoy credential raises one; more events are planned (see
 [docs/alerts.md](docs/alerts.md)).
 
 ## AI coding agents

@@ -1,6 +1,6 @@
 # Out-of-band alerts
 
-Status: **phase 3 built**: webhook and ntfy end to end, with `decoy.used` the only event wired so far. Tracks issue #101. This page designs how Tiresias tells you about a
+Status: **phase 4 built**: webhook, ntfy and LcdHub end to end, with `decoy.used` the only event wired so far. Tracks issue #101. This page designs how Tiresias tells you about a
 serious event when you aren't looking at the app: a push to your phone through
 [ntfy](https://ntfy.sh), a line on a [LcdHub](https://github.com/stevehansen/LcdHub) screen beside
 the machine, or a JSON POST to a webhook of your choice.
@@ -325,7 +325,39 @@ leaving.
    - The canary runs through the decoy mapping, the planner and the ntfy formatter into the captured
      request line, headers and body: no name canary on a public sink, only the program's file name on
      a trusted one, never a value, a placeholder or the folder; the token once, in `Authorization`.
-4. **LcdHub.** The pipe client (wire v4 status items) and clearing items from `FindingWatch.Shown`.
+4. **LcdHub. Done.** `LcdHubLink` (the pipe client, wire v4 status items), `LcdHubFormat`, an
+   **Add LcdHub...** form on the Alerts card, and clearing from `FindingWatch.Shown`. What it settled
+   or changed:
+   - **The link stays connected while it has something to show, and only then.** LcdHub drops a
+     producer's status items when it disconnects, so a one-shot send would vanish at once. The link
+     connects when an item arrives, sends every item again after the hub restarts or starts late
+     (with what is left of its lifetime), and disconnects when nothing is left, so Tiresias isn't in
+     the hub's producer list (as `Tiresias`) while idle. It writes only Hello and Status and skips
+     whatever the hub sends.
+   - **No hub is not a failure.** LcdHub deliveries don't go through `AlertSender`'s queue and retries:
+     an item waits in the link, retried every 5 seconds, until a hub appears or its 24 hours end.
+     A screen that isn't running is normal, so phase 6 won't count it as a failing sink.
+   - **One item per event, counting up.** The key is `tiresias:<event>`, so a second subject of the
+     same event updates the line instead of adding one. The count adds every delivery since the item
+     was last cleared (a dedupe summary's `count` holds only the repeats), the level is the worst
+     seen, and each update renews the 24 hours.
+   - **Never `detail`, trusted or not.** The text is the title and count only, so the form has no
+     trusted choice: the screen faces whoever stands at the desk.
+   - **Clearing takes every Tiresias item off**, not just findings: Home showing the findings means
+     you are back at the machine, which is what the "while you were away" view waits for. Removing
+     the sink clears it too. Muting stops new items and leaves what is shown to its lifetime.
+   - **One LcdHub sink per machine**, default id `desk`, default threshold `warning`. In `alerts.json`
+     it is `{"id", "kind": "lcdhub", "threshold", "redaction"}`, with no address or credential.
+   - **Send a test alert** shows "Test alert ×1" for one minute, not 24 hours, and reports whether a
+     hub took it within 3 seconds; if none did, it still shows should one start within the minute.
+   - **Pipe squatting is not checked beyond `CurrentUserOnly`**, which already refuses a pipe served
+     by another user. The serving process could be compared to `LcdHub.exe`, but anything running as
+     you can take that name, and the hub can sit anywhere under any name, so the check would refuse
+     a real hub before it stopped a squatter. What a squatter learns is what the screen shows anyone:
+     event titles and counts (I-101, D-alerts-silenced).
+   - A demo (`--demo`) leaves the real LcdHub alone.
+   - The canary runs through the decoy mapping, the planner and the link into the bytes a fake hub
+     received, for a public and a trusted sink: no canary, no user name, no machine label.
 5. **The other events.** Blocklist and lockdown refusals, "This wasn't me", `consent.while-locked`,
    broker audit events from the solo broker, `findings.new`.
 6. **Failing sinks.** The finding on Home, `alerts.failing`, D-alerts-silenced updated.

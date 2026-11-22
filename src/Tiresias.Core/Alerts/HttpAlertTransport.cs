@@ -80,6 +80,7 @@ public static class SinkRules
     {
         WebhookSink webhook => Check(webhook),
         NtfySink ntfy => Check(ntfy),
+        LcdHubSink hub => CheckId(hub.Id),
         _ => throw new ArgumentOutOfRangeException(nameof(sink), sink.Kind, "Not a sink kind this build knows."),
     };
 

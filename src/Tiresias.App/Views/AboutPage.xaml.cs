@@ -80,6 +80,7 @@ public partial class AboutPage : UserControl
         AlertsText.Text = Text.Of(AlertsCard.Describe(alerts.Opened, config));
         AlertSinks.ItemsSource = AlertsCard.Rows(config, AppAlerts.Narrowing, alerts.Center.Sender.IsStopped)
             .Select(r => new AlertRow(r.Id, Text.Of(r.Detail), Text.Get(r.Muted ? "Alerts_Unmute" : "Alerts_Mute"))).ToList();
+        AlertsAddLcdHub.Visibility = AlertsCard.HasLcdHub(config?.Live(AppAlerts.Narrowing)) ? Visibility.Collapsed : Visibility.Visible;
     }
 
     async void OnAlertAdd(object sender, RoutedEventArgs e)
@@ -87,7 +88,8 @@ public partial class AboutPage : UserControl
         // Adding widens what leaves the machine: it is a sealed save, so it needs Windows Hello.
         if (!App.Current.Host.Keys.IsUnlocked && !(await App.Current.UnlockAsync(interactive: true)).Ok)
             return;
-        var window = new AlertSinkWindow(ntfy: sender == AlertsAddNtfy) { Owner = Window.GetWindow(this) };
+        var form = sender == AlertsAddNtfy ? SinkForm.Ntfy : sender == AlertsAddLcdHub ? SinkForm.LcdHub : SinkForm.Webhook;
+        var window = new AlertSinkWindow(form) { Owner = Window.GetWindow(this) };
         if (window.ShowDialog() == true)
             AlertsOutcome.Text = Text.Format("Alerts_Added", window.AddedId);
     }

@@ -2509,7 +2509,7 @@ Store them in clear?</value>
     <value>Unlock to see and change alerts. They open at the first unlock after the app starts, then keep working while locked.</value>
   </data>
   <data name="Alerts_None" xml:space="preserve">
-    <value>Tiresias can push serious events, such as a decoy credential used, to your phone through ntfy or to a webhook of your choice, so you hear about them when you aren't at this PC. Nothing is set up.</value>
+    <value>Tiresias can push serious events, such as a decoy credential used, to your phone through ntfy, to a webhook of your choice or to an LcdHub screen beside this PC, so you hear about them when you aren't looking. Nothing is set up.</value>
   </data>
   <data name="Alerts_Summary" xml:space="preserve">
     <value>Serious events on “{0}” are posted to:</value>
@@ -2693,5 +2693,20 @@ Store them in clear?</value>
   </data>
   <data name="Alerts_NtfyTokenBad" xml:space="preserve">
     <value>The token can't hold spaces or line breaks.</value>
+  </data>
+  <data name="Alerts_AddLcdHub" xml:space="preserve">
+    <value>Add LcdHub…</value>
+  </data>
+  <data name="Alerts_LcdHubWindowTitle" xml:space="preserve">
+    <value>Add LcdHub</value>
+  </data>
+  <data name="Alerts_LcdHubWindowIntro" xml:space="preserve">
+    <value>Tiresias puts a line such as “Decoy credential used ×1” in the status strip of the LcdHub running on this PC, for you to see when you're back. It goes when Home shows your findings, or after 24 hours. LcdHub shows nothing while this PC is locked, and keeps the line for when you unlock. Only the event and how often it happened are shown, never a program or a name.</value>
+  </data>
+  <data name="Alerts_LcdHubTaken" xml:space="preserve">
+    <value>LcdHub is already set up.</value>
+  </data>
+  <data name="Alerts_TestNoHub" xml:space="preserve">
+    <value>No LcdHub is running for {0}. The test shows if one starts within a minute.</value>
   </data>
 </root>

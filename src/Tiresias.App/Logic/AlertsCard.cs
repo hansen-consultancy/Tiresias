@@ -6,7 +6,7 @@ namespace Tiresias.App.Logic;
 /// <summary>One sink as the Alerts card lists it.</summary>
 public sealed record AlertSinkRow(string Id, Phrase Detail, bool Muted);
 
-/// <summary>What the Alerts card in About says (docs/alerts.md), and what the add-a-webhook and add-ntfy forms accept.</summary>
+/// <summary>What the Alerts card in About says (docs/alerts.md), and what the add-a-webhook, add-ntfy and add-LcdHub forms accept.</summary>
 public static class AlertsCard
 {
     /// <param name="opened">Whether <c>alerts.json</c> has been opened since the app started (it opens at unlock).</param>
@@ -33,6 +33,7 @@ public static class AlertsCard
         { Status: DeliveryStatus.Delivered } => new("Alerts_TestDelivered", sinkId),
         { StatusCode: { } code } => new("Alerts_TestRefused", sinkId, code),
         { Error: "Timeout" } => new("Alerts_TestTimeout", sinkId),
+        { Error: AlertCenter.NoHub } => new("Alerts_TestNoHub", sinkId),
         _ => new("Alerts_TestUnreachable", sinkId, result.Error),
     };
 
@@ -77,6 +78,24 @@ public static class AlertsCard
             return (null, new("Alerts_NtfyTokenBad"));
         return (new NtfySink(id, url!, token.Length > 0 ? token : null, threshold, Redaction(trusted)), null);
     }
+
+    /// <summary>
+    /// The LcdHub form's fields as a sink, or the first problem with them. There is no address, no
+    /// credential and no trusted choice: the screen shows the title and count only, so it is always public.
+    /// </summary>
+    public static (LcdHubSink? Sink, Phrase? Problem) BuildLcdHub(bool needsMachine, string machine, string id, AlertSeverity threshold,
+        IEnumerable<AlertSink> existing)
+    {
+        var sinks = existing.ToList();
+        if (HasLcdHub(sinks))
+            return (null, new("Alerts_LcdHubTaken"));
+        if (CheckCommon(needsMachine, machine, ref id, sinks.Select(s => s.Id)) is { } common)
+            return (null, common);
+        return (new LcdHubSink(id, threshold), null);
+    }
+
+    /// <summary>A machine has one LcdHub, so it takes one LcdHub sink; the card offers to add one only while there is none.</summary>
+    public static bool HasLcdHub(IEnumerable<AlertSink>? sinks) => sinks?.Any(s => s is LcdHubSink) == true;
 
     static Phrase? CheckCommon(bool needsMachine, string machine, ref string id, IEnumerable<string> existingIds)
     {

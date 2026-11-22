@@ -52,6 +52,20 @@ public sealed record NtfySink(
 }
 
 /// <summary>
+/// The LcdHub on this machine (docs/alerts.md, <i>Sinks</i>): status items over the per-user pipe
+/// <c>LcdHub</c>. No address and no credential; a machine has one hub, so it has at most one such sink.
+/// </summary>
+public sealed record LcdHubSink(
+    string Id,
+    AlertSeverity Threshold = AlertSeverity.Warning,
+    AlertRedaction Redaction = AlertRedaction.Public) : AlertSink(Id, Threshold, Redaction)
+{
+    public override string Kind => "lcdhub";
+
+    public override bool SameTarget(AlertSink other) => other is LcdHubSink;
+}
+
+/// <summary>
 /// What a user narrowed about a sink without Windows Hello, kept in <c>app.json</c>: muted, a raised
 /// threshold, or removed. It can only take away from what <c>alerts.json</c> allows, never add.
 /// </summary>
@@ -153,14 +167,14 @@ public sealed record AlertsConfig
             {
                 var sink = node as JsonObject ?? throw new InvalidDataException("An alert sink is not an object.");
                 var id = (string)sink["id"]!;
-                var url = new Uri((string)sink["url"]!, UriKind.Absolute);
                 var threshold = Parse((string)sink["threshold"]!);
                 var redaction = (string?)sink["redaction"] == "trusted" ? AlertRedaction.Trusted : AlertRedaction.Public;
                 return (string?)sink["kind"] switch
                 {
-                    "webhook" => (AlertSink)new WebhookSink(id, url,
+                    "webhook" => (AlertSink)new WebhookSink(id, Url(sink),
                         (sink["headers"] as JsonObject ?? []).Select(h => KeyValuePair.Create(h.Key, (string)h.Value!)).ToArray(), threshold, redaction),
-                    "ntfy" => new NtfySink(id, url, (string?)sink["token"], threshold, redaction),
+                    "ntfy" => new NtfySink(id, Url(sink), (string?)sink["token"], threshold, redaction),
+                    "lcdhub" => new LcdHubSink(id, threshold, redaction),
                     var kind => throw new InvalidDataException($"Alert sink kind '{kind}' is not one this build knows."),
                 };
             }).ToArray();
@@ -176,6 +190,8 @@ public sealed record AlertsConfig
     public override string ToString() => $"alerts for {Machine}, {Sinks.Count} sink(s)";
 
     static string Name(AlertSeverity severity) => severity.ToString().ToLowerInvariant();
+
+    static Uri Url(JsonObject sink) => new((string)sink["url"]!, UriKind.Absolute);
 
     static AlertSeverity Parse(string name) => Enum.Parse<AlertSeverity>(name, ignoreCase: true);
 }
