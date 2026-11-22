@@ -19,7 +19,8 @@ public partial class AlertWebhookWindow : Window
     public AlertWebhookWindow()
     {
         InitializeComponent();
-        Desktop.ExcludeFromCapture(this);
+        // Real input even in a demo: someone trying the flow may paste their real URL and token.
+        Desktop.ExcludeFromCapture(this, evenInDemo: true);
         needsMachine = App.Current.Alerts.Center.Config is null;
         MachineField.Visibility = needsMachine ? Visibility.Visible : Visibility.Collapsed;
         ThresholdBox.ItemsSource = new[] { Text.Get("Alerts_Critical"), Text.Get("Alerts_High"), Text.Get("Alerts_Warning"), Text.Get("Alerts_Info") };
