@@ -29,11 +29,15 @@ public partial class App : Application
     AgentHost? host;
     TrayController? tray;
     AppUpdates? updates;
+    AppAlerts? alerts;
     readonly Dictionary<Type, Window> windows = [];
     /// <summary>tir, a terminal, NuGet and the tray asking at once share one Windows Hello prompt.</summary>
     readonly SingleFlight<UnlockResult?> unlocking = new();
 
     internal AgentHost Host => host!;
+
+    /// <summary>Out-of-band alerts (docs/alerts.md): opened at unlock, kept while locked.</summary>
+    internal AppAlerts Alerts => alerts!;
 
     internal ConsentPresenter Consent => consent!;
 
@@ -108,8 +112,12 @@ public partial class App : Application
         AppLog.Info($"started {Text.Of(AppBuild.Current.Label)} from {AppBuild.Current.Folder}");
 
         tray = new TrayController(this);
+        alerts = new AppAlerts();
         host.StateChanged += () =>
         {
+            // The first unlock opens alerts.json; from then on alerts work while locked too.
+            if (host.Keys.Hello is { } hello)
+                _ = Task.Run(() => alerts.Unlocked(hello));
             // Locked: every terminal asks again, as it would after a restart.
             if (!host.Keys.IsUnlocked)
                 ClearEnvironmentConsent();
@@ -366,6 +374,8 @@ public partial class App : Application
     /// </summary>
     void OnDecoyTouched(DecoyTouch touch)
     {
+        if (Tiresias.Alerts.AlertSources.DecoyUsed(touch.Hit, touch.Parents, touch.What) is { } alert)
+            alerts?.Center.Raise(alert);
         var program = touch.Hit.Program;
         if (touch.Hit.Use == DecoyUse.Read)
         {
@@ -689,6 +699,8 @@ public partial class App : Application
         await stop.CancelAsync();
         if (host is not null)
             await host.DisposeAsync();
+        if (alerts is not null)
+            await alerts.DisposeAsync();
         consent?.Dispose();
         instance?.ReleaseMutex();
         instance?.Dispose();

@@ -2517,4 +2517,163 @@ Store them in clear?</value>
     <value>Kept {0}: changed since Tiresias placed it, so it is yours now.</value>
     <comment>{0}: paths or variable names</comment>
   </data>
+  <data name="Alerts_Heading" xml:space="preserve">
+    <value>Alerts</value>
+  </data>
+  <data name="Alerts_Locked" xml:space="preserve">
+    <value>Unlock to see and change alerts. They open at the first unlock after the app starts, then keep working while locked.</value>
+  </data>
+  <data name="Alerts_None" xml:space="preserve">
+    <value>Tiresias can post serious events, such as a decoy credential used, to a webhook of your choice, so you hear about them when you aren't at this PC. Nothing is set up.</value>
+  </data>
+  <data name="Alerts_Summary" xml:space="preserve">
+    <value>Serious events on “{0}” are posted to:</value>
+  </data>
+  <data name="Alerts_RowPublic" xml:space="preserve">
+    <value>{0} and above. Event, severity and time only.</value>
+  </data>
+  <data name="Alerts_RowTrusted" xml:space="preserve">
+    <value>{0} and above. Trusted: also program paths and names, never a value.</value>
+  </data>
+  <data name="Alerts_RowMuted" xml:space="preserve">
+    <value>Muted. Nothing is sent until you unmute it.</value>
+  </data>
+  <data name="Alerts_RowStopped" xml:space="preserve">
+    <value>Stopped: the webhook refused an alert, so nothing more is sent. Fix it on the receiving side and send a test alert, or remove it and add it again.</value>
+  </data>
+  <data name="Alerts_Critical" xml:space="preserve">
+    <value>Critical</value>
+  </data>
+  <data name="Alerts_High" xml:space="preserve">
+    <value>High</value>
+  </data>
+  <data name="Alerts_Warning" xml:space="preserve">
+    <value>Warning</value>
+  </data>
+  <data name="Alerts_Info" xml:space="preserve">
+    <value>Everything</value>
+  </data>
+  <data name="Alerts_Test" xml:space="preserve">
+    <value>Send a test alert</value>
+  </data>
+  <data name="Alerts_Mute" xml:space="preserve">
+    <value>Mute</value>
+  </data>
+  <data name="Alerts_Unmute" xml:space="preserve">
+    <value>Unmute</value>
+  </data>
+  <data name="Alerts_Remove" xml:space="preserve">
+    <value>Remove</value>
+  </data>
+  <data name="Alerts_AddWebhook" xml:space="preserve">
+    <value>Add a webhook…</value>
+  </data>
+  <data name="Alerts_Added" xml:space="preserve">
+    <value>{0} added. Send a test alert to check it arrives.</value>
+  </data>
+  <data name="Alerts_Testing" xml:space="preserve">
+    <value>Sending a test alert to {0}…</value>
+  </data>
+  <data name="Alerts_TestDelivered" xml:space="preserve">
+    <value>{0} accepted the test alert.</value>
+  </data>
+  <data name="Alerts_TestRefused" xml:space="preserve">
+    <value>{0} answered {1}. Check the URL and header.</value>
+  </data>
+  <data name="Alerts_TestTimeout" xml:space="preserve">
+    <value>{0} didn't answer within 10 seconds.</value>
+  </data>
+  <data name="Alerts_TestUnreachable" xml:space="preserve">
+    <value>Couldn't reach {0} ({1}).</value>
+  </data>
+  <data name="Alerts_TestGone" xml:space="preserve">
+    <value>{0} is no longer set up.</value>
+  </data>
+  <data name="Alerts_RemoveHeading" xml:space="preserve">
+    <value>Remove this webhook?</value>
+  </data>
+  <data name="Alerts_RemoveBody" xml:space="preserve">
+    <value>{0} gets no more alerts, starting now. To use it again you add it again, with Windows Hello.</value>
+  </data>
+  <data name="Alerts_Removed" xml:space="preserve">
+    <value>{0} removed.</value>
+  </data>
+  <data name="Alerts_RemoveFailed" xml:space="preserve">
+    <value>Couldn't save that. The details are in the app log.</value>
+  </data>
+  <data name="Alerts_WindowTitle" xml:space="preserve">
+    <value>Add a webhook</value>
+  </data>
+  <data name="Alerts_WindowHeading" xml:space="preserve">
+    <value>Add a webhook</value>
+  </data>
+  <data name="Alerts_WindowIntro" xml:space="preserve">
+    <value>Tiresias posts each alert as JSON (tiresias.alert/v1). The URL and header are sealed like your secrets, for Windows Hello and the recovery key.</value>
+  </data>
+  <data name="Alerts_Machine" xml:space="preserve">
+    <value>Name for this PC</value>
+  </data>
+  <data name="Alerts_MachineHint" xml:space="preserve">
+    <value>Every alert carries it, so you know which machine it came from. Pick one that tells you nothing more, such as “desk” or “build box”: it leaves this PC with each alert.</value>
+  </data>
+  <data name="Alerts_Id" xml:space="preserve">
+    <value>Name for this webhook</value>
+  </data>
+  <data name="Alerts_IdHint" xml:space="preserve">
+    <value>Lowercase letters, digits and dashes, such as “siem”. The app log uses it; it never leaves this PC.</value>
+  </data>
+  <data name="Alerts_Url" xml:space="preserve">
+    <value>URL</value>
+  </data>
+  <data name="Alerts_UrlHint" xml:space="preserve">
+    <value>HTTPS. Plain HTTP only to this PC (localhost), for a local relay. Redirects aren't followed.</value>
+  </data>
+  <data name="Alerts_HeaderNameLabel" xml:space="preserve">
+    <value>Header (optional)</value>
+  </data>
+  <data name="Alerts_HeaderValueLabel" xml:space="preserve">
+    <value>Header value</value>
+  </data>
+  <data name="Alerts_HeaderHint" xml:space="preserve">
+    <value>For example Authorization with Bearer and a token. Sent with every alert, to this URL only.</value>
+  </data>
+  <data name="Alerts_Threshold" xml:space="preserve">
+    <value>Send alerts that are at least</value>
+  </data>
+  <data name="Alerts_Trusted" xml:space="preserve">
+    <value>Trusted: also send program paths and secret names</value>
+  </data>
+  <data name="Alerts_TrustedHint" xml:space="preserve">
+    <value>Only for a receiver you run yourself. Without it a webhook learns what happened and when, never where. No webhook ever gets a value or a token.</value>
+  </data>
+  <data name="Alerts_Save" xml:space="preserve">
+    <value>Save with Windows Hello</value>
+  </data>
+  <data name="Alerts_SaveFailed" xml:space="preserve">
+    <value>Couldn't save: {0}</value>
+  </data>
+  <data name="Alerts_NeedMachine" xml:space="preserve">
+    <value>Give this PC a name first.</value>
+  </data>
+  <data name="Alerts_BadId" xml:space="preserve">
+    <value>Name the webhook with 1 to 32 lowercase letters, digits or dashes.</value>
+  </data>
+  <data name="Alerts_IdTaken" xml:space="preserve">
+    <value>A webhook named {0} is already set up. Pick another name, or remove that one first.</value>
+  </data>
+  <data name="Alerts_UrlNotHttps" xml:space="preserve">
+    <value>Enter a full HTTPS URL, such as https://hooks.example.com/tiresias. Plain HTTP works only to localhost.</value>
+  </data>
+  <data name="Alerts_UrlUserInfo" xml:space="preserve">
+    <value>Leave the user name and password out of the URL; put them in the header instead.</value>
+  </data>
+  <data name="Alerts_HeaderName" xml:space="preserve">
+    <value>A header name is letters, digits and - only, such as Authorization.</value>
+  </data>
+  <data name="Alerts_HeaderReserved" xml:space="preserve">
+    <value>Tiresias sets {0} itself; pick another header.</value>
+  </data>
+  <data name="Alerts_HeaderValue" xml:space="preserve">
+    <value>The header value can't hold line breaks.</value>
+  </data>
 </root>
