@@ -6,7 +6,7 @@ namespace Tiresias.App.Logic;
 /// <summary>One sink as the Alerts card lists it.</summary>
 public sealed record AlertSinkRow(string Id, Phrase Detail, bool Muted);
 
-/// <summary>What the Alerts card in About says (docs/alerts.md, phase 2), and what the add-a-webhook form accepts.</summary>
+/// <summary>What the Alerts card in About says (docs/alerts.md), and what the add-a-webhook, add-ntfy and add-LcdHub forms accept.</summary>
 public static class AlertsCard
 {
     /// <param name="opened">Whether <c>alerts.json</c> has been opened since the app started (it opens at unlock).</param>
@@ -33,41 +33,94 @@ public static class AlertsCard
         { Status: DeliveryStatus.Delivered } => new("Alerts_TestDelivered", sinkId),
         { StatusCode: { } code } => new("Alerts_TestRefused", sinkId, code),
         { Error: "Timeout" } => new("Alerts_TestTimeout", sinkId),
+        { Error: AlertCenter.NoHub } => new("Alerts_TestNoHub", sinkId),
         _ => new("Alerts_TestUnreachable", sinkId, result.Error),
     };
 
+    /// <summary>What the webhook form's heartbeat box offers, in minutes; 0 is off, the default.</summary>
+    public static IReadOnlyList<int> HeartbeatChoices { get; } = [0, 5, 15, 30, 60];
+
     /// <summary>
-    /// The form's fields as a sink, or the first problem with them. <paramref name="machine"/> is asked
-    /// only for the first sink (<paramref name="needsMachine"/>) and is required then: never the host name.
+    /// The webhook form's fields as a sink, or the first problem with them. <paramref name="machine"/> is
+    /// asked only for the first sink (<paramref name="needsMachine"/>) and is required then: never the host name.
+    /// An empty <paramref name="signing"/> sends unsigned; <paramref name="heartbeatMinutes"/> 0 sends no heartbeat.
     /// </summary>
     public static (WebhookSink? Sink, Phrase? Problem) Build(bool needsMachine, string machine, string id, string url,
-        string headerName, string headerValue, AlertSeverity threshold, bool trusted, IEnumerable<string> existingIds)
+        string headerName, string headerValue, AlertSeverity threshold, bool trusted, IEnumerable<string> existingIds,
+        string signing = "", int heartbeatMinutes = 0)
     {
-        if (needsMachine && string.IsNullOrWhiteSpace(machine))
-            return (null, new("Alerts_NeedMachine"));
-        id = id.Trim();
-        if (WebhookRules.CheckId(id) != WebhookProblem.None)
-            return (null, new("Alerts_BadId"));
-        if (existingIds.Contains(id, StringComparer.Ordinal))
-            return (null, new("Alerts_IdTaken", id));
-        if (WebhookRules.CheckUrl(url, out var parsed) is var urlProblem and not WebhookProblem.None)
-            return (null, urlProblem == WebhookProblem.UserInfo ? new("Alerts_UrlUserInfo") : new("Alerts_UrlNotHttps"));
+        if (CheckCommon(needsMachine, machine, ref id, existingIds) is { } common)
+            return (null, common);
+        if (SinkRules.CheckUrl(url, out var parsed) is var urlProblem and not SinkProblem.None)
+            return (null, UrlProblem(urlProblem));
         headerName = headerName.Trim();
         KeyValuePair<string, string>[] headers = headerName.Length == 0 && headerValue.Length == 0 ? [] : [KeyValuePair.Create(headerName, headerValue)];
         foreach (var (name, value) in headers)
         {
-            switch (WebhookRules.CheckHeader(name, value))
+            switch (SinkRules.CheckHeader(name, value))
             {
-                case WebhookProblem.HeaderName:
+                case SinkProblem.HeaderName:
                     return (null, new("Alerts_HeaderName"));
-                case WebhookProblem.HeaderReserved:
+                case SinkProblem.HeaderReserved:
                     return (null, new("Alerts_HeaderReserved", name));
-                case WebhookProblem.HeaderValue:
+                case SinkProblem.HeaderValue:
                     return (null, new("Alerts_HeaderValue"));
             }
         }
-        return (new WebhookSink(id, parsed!, headers, threshold, trusted ? AlertRedaction.Trusted : AlertRedaction.Public), null);
+        signing = signing.Trim();
+        if (signing.Length > 0 && SinkRules.CheckSigning(signing) != SinkProblem.None)
+            return (null, new("Alerts_SigningBad"));
+        TimeSpan? heartbeat = heartbeatMinutes == 0 ? null : TimeSpan.FromMinutes(heartbeatMinutes);
+        if (heartbeat is { } every && SinkRules.CheckHeartbeat(every) != SinkProblem.None)
+            return (null, new("Alerts_HeartbeatBad"));
+        return (new WebhookSink(id, parsed!, headers, threshold, Redaction(trusted), signing.Length > 0 ? signing : null, heartbeat), null);
     }
+
+    /// <summary>The ntfy form's fields as a sink, or the first problem with them. An empty token is an open topic.</summary>
+    public static (NtfySink? Sink, Phrase? Problem) BuildNtfy(bool needsMachine, string machine, string id, string server, string topic,
+        string token, AlertSeverity threshold, bool trusted, IEnumerable<string> existingIds)
+    {
+        if (CheckCommon(needsMachine, machine, ref id, existingIds) is { } common)
+            return (null, common);
+        if (SinkRules.CheckNtfy(server, topic, out var url) is var problem and not SinkProblem.None)
+            return (null, problem == SinkProblem.Topic ? new("Alerts_NtfyTopicBad") : UrlProblem(problem));
+        token = token.Trim();
+        if (token.Length > 0 && SinkRules.CheckToken(token) != SinkProblem.None)
+            return (null, new("Alerts_NtfyTokenBad"));
+        return (new NtfySink(id, url!, token.Length > 0 ? token : null, threshold, Redaction(trusted)), null);
+    }
+
+    /// <summary>
+    /// The LcdHub form's fields as a sink, or the first problem with them. There is no address, no
+    /// credential and no trusted choice: the screen shows the title and count only, so it is always public.
+    /// </summary>
+    public static (LcdHubSink? Sink, Phrase? Problem) BuildLcdHub(bool needsMachine, string machine, string id, AlertSeverity threshold,
+        IEnumerable<AlertSink> existing)
+    {
+        var sinks = existing.ToList();
+        if (HasLcdHub(sinks))
+            return (null, new("Alerts_LcdHubTaken"));
+        if (CheckCommon(needsMachine, machine, ref id, sinks.Select(s => s.Id)) is { } common)
+            return (null, common);
+        return (new LcdHubSink(id, threshold), null);
+    }
+
+    /// <summary>A machine has one LcdHub, so it takes one LcdHub sink; the card offers to add one only while there is none.</summary>
+    public static bool HasLcdHub(IEnumerable<AlertSink>? sinks) => sinks?.Any(s => s is LcdHubSink) == true;
+
+    static Phrase? CheckCommon(bool needsMachine, string machine, ref string id, IEnumerable<string> existingIds)
+    {
+        if (needsMachine && string.IsNullOrWhiteSpace(machine))
+            return new("Alerts_NeedMachine");
+        id = id.Trim();
+        if (SinkRules.CheckId(id) != SinkProblem.None)
+            return new("Alerts_BadId");
+        return existingIds.Contains(id, StringComparer.Ordinal) ? new("Alerts_IdTaken", id) : null;
+    }
+
+    static Phrase UrlProblem(SinkProblem problem) => problem == SinkProblem.UserInfo ? new("Alerts_UrlUserInfo") : new("Alerts_UrlNotHttps");
+
+    static AlertRedaction Redaction(bool trusted) => trusted ? AlertRedaction.Trusted : AlertRedaction.Public;
 
     static Phrase Severity(AlertSeverity severity) => severity switch
     {

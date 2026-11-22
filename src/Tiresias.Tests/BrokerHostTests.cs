@@ -57,6 +57,30 @@ public class BrokerHostTests
         TestDirectory.Delete(dir);
     }
 
+    [Test]
+    public async Task A_host_s_own_audit_log_is_the_one_the_broker_writes_to_from_its_startup_checks_on()
+    {
+        var builder = Microsoft.AspNetCore.Builder.WebApplication.CreateBuilder(new Microsoft.AspNetCore.Builder.WebApplicationOptions
+        {
+            Args = [],
+            ContentRootPath = dir,
+            EnvironmentName = "Production",
+        });
+        Microsoft.Extensions.Configuration.MemoryConfigurationBuilderExtensions.AddInMemoryCollection(builder.Configuration, new Dictionary<string, string?>
+        {
+            ["Broker:VaultPath"] = Path.Combine(dir, "vault.json"),
+            ["Broker:AuditPath"] = Path.Combine(dir, "audit.jsonl"),
+            ["Broker:IdentityKeyPath"] = Path.Combine(dir, "identity.key"),
+            ["Broker:Devices:laptop"] = Convert.ToBase64String(device.PublicKey.Export(KeyBlobFormat.RawPublicKey)),
+        });
+        var own = new AuditLog(Path.Combine(dir, "audit.jsonl"), TimeProvider.System);
+        builder.Services.AddSingleton(own);
+
+        await using var app = BrokerHost.Build(builder);
+
+        Assert.That(app.Services.GetRequiredService<AuditLog>(), Is.SameAs(own));
+    }
+
     HttpRequestMessage Signed(string endpoint, object? body = null, string signedEndpoint = "")
     {
         var bytes = body is null ? [] : JsonSerializer.SerializeToUtf8Bytes(body, JsonSerializerOptions.Web);

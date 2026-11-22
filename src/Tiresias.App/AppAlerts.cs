@@ -17,9 +17,11 @@ internal sealed class AppAlerts : IAsyncDisposable
 
     public AppAlerts()
     {
-        // A demo's webhooks are made up: nothing leaves the machine, and every post "gets through".
-        var transport = DemoMode.On ? new WebhookTransport(new DemoHandler(), TimeProvider.System) : new WebhookTransport();
-        Center = new AlertCenter(transport, TimeProvider.System, AppLog.Info);
+        // A demo's webhooks and ntfy topics are made up: nothing leaves the machine, and every post "gets through".
+        // It runs beside the installed app, so it leaves the real LcdHub to that app.
+        var transport = DemoMode.On ? new HttpAlertTransport(new DemoHandler(), TimeProvider.System) : new HttpAlertTransport();
+        Center = new AlertCenter(transport, TimeProvider.System, AppLog.Info,
+            DemoMode.On ? null : new LcdHubLink(TimeProvider.System, AppLog.Info));
         Center.Start();
     }
 
@@ -72,7 +74,7 @@ internal sealed class AppAlerts : IAsyncDisposable
 
     /// <summary>Adds <paramref name="sink"/> (a widening edit): a sealed save with the Hello wrapper. Asks for the label with the first sink.</summary>
     /// <exception cref="InvalidOperationException">No recovery key, or no label for a first sink.</exception>
-    public void Add(string? machine, WebhookSink sink, IKeyWrapper hello)
+    public void Add(string? machine, AlertSink sink, IKeyWrapper hello)
     {
         var (config, version) = AlertsStore.Open(hello);
         var narrowing = Narrowing;

@@ -24,11 +24,12 @@ public sealed record AlertKind(string Event, AlertSeverity Severity, string Titl
     public static readonly AlertKind AlertsFailing = new("alerts.failing", AlertSeverity.Warning, "Alerts to a sink are failing");
     public static readonly AlertKind AlertsSuppressed = new("alerts.suppressed", AlertSeverity.Warning, "Alerts held back");
     public static readonly AlertKind AlertsTest = new("alerts.test", AlertSeverity.Info, "Test alert");
+    public static readonly AlertKind AlertsAlive = new("alerts.alive", AlertSeverity.Info, "Tiresias is running");
 
     public static IReadOnlyList<AlertKind> All { get; } =
     [
         DecoyUsed, DecoyRead, TrustRejected, VaultRolledBack, TrustBreakGlass, VaultUnapproved, ApprovalInvalid,
         ProgramBlocked, LockdownRefused, IncidentReported, ConsentWhileLocked, FindingsFailing, FindingsWarning,
-        AlertsFailing, AlertsSuppressed, AlertsTest,
+        AlertsFailing, AlertsSuppressed, AlertsTest, AlertsAlive,
     ];
 }
