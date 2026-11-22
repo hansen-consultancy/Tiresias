@@ -21,6 +21,34 @@ static class DevcontainerProbe
         return new(path, workspace, sources);
     }
 
+    /// <summary>
+    /// The devcontainer files in folders running containers were started for. Only local folders: a
+    /// <c>\wsl.localhost</c> path would start its distribution.
+    /// </summary>
+    public static IEnumerable<string> In(IEnumerable<string> workspaces)
+    {
+        foreach (var folder in workspaces.Where(w => Path.IsPathFullyQualified(w) && !w.StartsWith(@"\\", StringComparison.Ordinal)))
+        {
+            string[] candidates;
+            try
+            {
+                var nested = Path.Combine(folder, ".devcontainer");
+                candidates =
+                [
+                    Path.Combine(folder, ".devcontainer.json"),
+                    Path.Combine(nested, "devcontainer.json"),
+                    .. Directory.Exists(nested) ? Directory.EnumerateDirectories(nested).Select(d => Path.Combine(d, "devcontainer.json")) : [],
+                ];
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+                continue;
+            }
+            foreach (var path in candidates.Where(File.Exists))
+                yield return Path.GetFullPath(path);
+        }
+    }
+
     /// <summary><c>null</c> unless VS Code has the Dev Containers extension; its forwarding is on by default.</summary>
     public static DevcontainerForwarding? Forwarding()
     {

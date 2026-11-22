@@ -45,6 +45,24 @@ public static class NameScan
         }
         finally
         {
+            // A read that failed half way left bytes Consume never saw.
+            CryptographicOperations.ZeroMemory(buffer);
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
+    }
+
+    /// <inheritdoc cref="Read"/>
+    public static async Task<T> ReadAsync<T>(Stream stream, SpanScanner<T> scan, CancellationToken ct)
+    {
+        var buffer = ArrayPool<byte>.Shared.Rent(MaxBytes + 1);
+        try
+        {
+            var read = await stream.ReadAtLeastAsync(buffer.AsMemory(0, MaxBytes + 1), MaxBytes + 1, throwOnEndOfStream: false, ct);
+            return read > MaxBytes ? Consume(buffer.AsSpan(0, read), _ => scan([])) : Consume(buffer.AsSpan(0, read), scan);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(buffer);
             ArrayPool<byte>.Shared.Return(buffer);
         }
     }

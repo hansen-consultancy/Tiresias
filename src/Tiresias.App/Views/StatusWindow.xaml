@@ -302,6 +302,23 @@
           </StackPanel>
         </Border>
 
+        <!-- Containers: looking inside the Docker engine is opt-in (docs/containers-and-vms.md, "Consent"). -->
+        <Border Style="{StaticResource Card}" Visibility="{Binding ReachVisibility}">
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+              <TextBlock Text="{l:S Reach_Title}" Style="{StaticResource SubtitleText}" />
+              <TextBlock Text="{Binding ReachText}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
+              <CheckBox Content="{l:S Reach_Daily}" IsChecked="{Binding IsReachDaily}" Visibility="{Binding ReachDailyVisibility}" Margin="0,6,0,0" />
+            </StackPanel>
+            <Button Grid.Column="1" VerticalAlignment="Center" Padding="12,6" Margin="12,0,0,0" MinWidth="96"
+                    Content="{l:S Reach_CheckNow}" Click="OnLookInside" />
+          </Grid>
+        </Border>
+
         <!-- Decoys: fake credentials that work nowhere, so a program using one names itself (docs/decoys.md). Links, not buttons (rule 11). -->
         <Border Style="{StaticResource Card}">
           <StackPanel>

@@ -5,7 +5,8 @@ namespace Tiresias.App;
 
 /// <summary>The app's own preferences, <c>%LOCALAPPDATA%\Tiresias\app.json</c>. A missing or unreadable file means the defaults.</summary>
 /// <param name="SetupSkipped">The user finished the first-run wizard without a broker.</param>
-public sealed record AppSettings(bool SetupSkipped = false, DateTimeOffset? LastUpdateCheck = null)
+/// <param name="ReachScan">Whether the checks look inside the Docker engine: not yet, when asked, or daily.</param>
+public sealed record AppSettings(bool SetupSkipped = false, DateTimeOffset? LastUpdateCheck = null, Logic.ReachScan ReachScan = Logic.ReachScan.Off)
 {
     static string Path => System.IO.Path.Combine(KeyringStore.Directory, "app.json");
 

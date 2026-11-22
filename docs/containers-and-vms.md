@@ -1,6 +1,6 @@
 # Containers, WSL and VMs: what your account can reach
 
-Status: **phases 1 and 2 built** (account facts: engine pipes, WSL disks, Hyper-V; devcontainer files and forwarding); the rest is design. Tracks issue #113. This page designs a doctor check, **Reachable
+Status: **phases 1 to 3 built** (account facts: engine pipes, WSL disks, Hyper-V; devcontainer files and forwarding; Docker engine contents, opt-in); the rest is design. Tracks issue #113. This page designs a doctor check, **Reachable
 from your account**, that tells you which secrets a normal program running as you could read inside
 your containers, WSL distributions and Hyper-V VMs. It extends the [attack surface](attack-surface.md)
 work (#34) and follows the rules of [more checks](more-checks.md#rules-every-check-keeps).
@@ -311,7 +311,17 @@ Each slice ships alone, with its tests and its line in `CHANGELOG.md`.
    `tir run -- code .` lines; VS Code must be quit first, or `code` hands the folder to the running
    window, which never sees the values.
 3. **Docker engine contents, opt-in.** `tir doctor --reach`, the app's card and setting, containers,
-   images and mounts, the `devcontainer.local_folder` link to phase 2's folders.
+   images and mounts, the `devcontainer.local_folder` link to phase 2's folders. **Built**, with
+   these differences: the probe never looks on its own; the caller passes what it read into
+   `Doctor.RunAsync`, so `tir doctor` looks only with `--reach` and the app only after **Check now**
+   (or daily, once ticked). The app keeps the last look in memory for its lifetime, so Home and
+   the background checks keep showing its findings between looks; nothing about contents is
+   written to disk. Only Docker is read, over whichever open pipe answers first, with GETs only and
+   at most 200 containers and 200 images inspected. A container's own names are its `Config.Env`
+   minus its image's; the image's are reported once, on the image. The fix runs the container with
+   `docker run --rm -e NAME`, because a value passed with `-e` still lands in the container's
+   config and `--rm` takes it away with the container. A `devcontainer.local_folder` label is
+   followed only when it is a local path, since opening a WSL path would start its distribution.
 4. **WSL contents.** Running distributions only; known credential files and `.env` names; the
    `WSLENV` fix.
 5. **Hyper-V detail.** WMI for members, file DACLs for everyone.

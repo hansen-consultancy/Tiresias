@@ -138,8 +138,14 @@ public interface IDoctorProbe
     /// <summary>What the user's account can open of their containers, WSL and VMs (docs/containers-and-vms.md). No contents.</summary>
     ReachFacts Reach => ReachFacts.None;
 
-    /// <summary>The devcontainer files in the project folders, with the names in them and their env files; empty unless asked for. Never a value.</summary>
-    IEnumerable<DevcontainerFile> Devcontainers() => [];
+    /// <summary>Names inside the environments in <paramref name="scope"/>, through read-only calls; only when the user asked. Never a value.</summary>
+    Task<ReachContents> ReachContentsAsync(ReachScope scope, CancellationToken ct) => Task.FromResult(new ReachContents(null));
+
+    /// <summary>
+    /// The devcontainer files in the project folders and in <paramref name="workspaces"/> (the folders
+    /// running containers were started for), with the names in them and their env files. Never a value.
+    /// </summary>
+    IEnumerable<DevcontainerFile> Devcontainers(IReadOnlyCollection<string> workspaces) => [];
 
     /// <summary>What VS Code's Dev Containers forwards into containers; <c>null</c> when it isn't installed.</summary>
     DevcontainerForwarding? DevcontainerForwarding => null;
@@ -156,7 +162,8 @@ public sealed record DoctorDecoys(int Placed, bool Listening, bool Held = false)
 /// </summary>
 public static partial class Doctor
 {
-    public static async Task<IReadOnlyList<DoctorCheck>> RunAsync(IDoctorProbe probe)
+    /// <param name="contents">What <see cref="IDoctorProbe.ReachContentsAsync"/> found, when the user asked to look inside; <c>null</c> otherwise.</param>
+    public static async Task<IReadOnlyList<DoctorCheck>> RunAsync(IDoctorProbe probe, ReachContents? contents = null)
     {
         var checks = new List<DoctorCheck>
         {
@@ -229,8 +236,11 @@ public static partial class Doctor
             checks.Add(new("decoy incidents and program blocks", DoctorStatus.Warn, "The admin service could not supply its incident history and block list."));
         }
         checks.AddRange(CliSignIns(probe.CliConfigs, probe.GitHubAppService));
-        checks.AddRange(Reach(probe.Reach));
-        checks.AddRange(Devcontainers(probe.Devcontainers(), probe.DevcontainerForwarding));
+        var reach = probe.Reach;
+        checks.AddRange(Reach(reach));
+        checks.AddRange(Contents(reach, contents));
+        string[] workspaces = [.. contents?.Docker?.Containers.Select(c => c.Workspace).OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase) ?? []];
+        checks.AddRange(Devcontainers(probe.Devcontainers(workspaces), probe.DevcontainerForwarding));
         var (uses, runs, installed, now) = (probe.CredentialUses().ToArray(), probe.ProgramRuns().ToArray(), probe.UninstallEntries().ToArray(), DateTimeOffset.UtcNow);
         checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), uses, otherBlocks, now, runs));
         checks.AddRange(UninstallEntries(installed));

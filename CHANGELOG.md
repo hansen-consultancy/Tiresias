@@ -17,6 +17,10 @@ its section below.
   (`containerEnv`, `remoteEnv`, `runArgs` and the env files they name), with the commands to seal
   them and hand them in when VS Code starts the container; and they say when VS Code's Dev
   Containers forwards your git credentials or Docker logins into every container. Names only.
+- `tir doctor --reach`, and **Check now** on Home's new containers card, look inside your Docker
+  engine: which containers and images hold secret-looking names in their environment, and which
+  containers mount your `.ssh`, `.aws` or other credential folders, with the commands to seal them
+  and hand them in at start instead. Only when you ask (or daily, if you tick it); names only.
 - `tir solo service install` (as administrator) runs solo mode's broker as a Windows service under
   its own account, so programs running as you can't read its memory or rewrite the files it
   trusts, and an older `vault.json` restored while locked is refused. `tir solo service uninstall`

@@ -141,7 +141,12 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public IEnumerable<DoctorFile> GitConfigs() => Found.Repositories.Select(Read).Where(f => f.Text is not null);
 
-    public IEnumerable<DevcontainerFile> Devcontainers() => Found.Devcontainers.Select(DevcontainerProbe.Read).OfType<DevcontainerFile>();
+    public IEnumerable<DevcontainerFile> Devcontainers(IReadOnlyCollection<string> workspaces) =>
+        Found.Devcontainers.Concat(DevcontainerProbe.In(workspaces)).Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(DevcontainerProbe.Read).OfType<DevcontainerFile>();
+
+    public Task<ReachContents> ReachContentsAsync(ReachScope scope, CancellationToken ct) =>
+        scope.HasFlag(ReachScope.Docker) && !DemoMode.On ? EngineProbe.ReadAsync(Reach, ct) : Task.FromResult(new ReachContents(null));
 
     public DevcontainerForwarding? DevcontainerForwarding => DevcontainerProbe.Forwarding();
 

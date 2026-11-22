@@ -66,7 +66,7 @@ static class FindingWatch
         try
         {
             var probe = new MachineProbe(ProjectIndexStore.Load().Folders) { Hello = App.Current.Host.Keys.Hello };
-            var checks = await Task.Run(() => Doctor.RunAsync(probe));
+            var checks = await Task.Run(async () => await Doctor.RunAsync(probe, await ReachMemory.ForRunAsync(probe, asked: false)));
             var dismissals = DismissalStore.Load();
             Home.LastFindings = FindingView.Of(checks, dismissals).Open.Count;
             Set(FindingBadge.New(FindingBadge.Open(checks, dismissals), ReadSeen()));

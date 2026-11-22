@@ -254,6 +254,8 @@ public partial class StatusWindow : Window
 
     void OnRecoveryClosed(object? sender, EventArgs e) => model.Refresh();
 
+    async void OnLookInside(object sender, RoutedEventArgs e) => await model.LookInsideAsync();
+
     /// <summary>Opens the window that fixes the row's finding, filled in from it.</summary>
     void OnReview(object sender, RoutedEventArgs e)
     {
@@ -791,6 +793,55 @@ public sealed partial class StatusViewModel : ObservableObject
 
     bool rerun;
 
+    /// <summary>Check now was pressed: the next run looks inside the Docker engine.</summary>
+    bool lookInside;
+
+    /// <summary>Looks inside the containers now, as part of a full run of the checks.</summary>
+    public async Task LookInsideAsync()
+    {
+        lookInside = true;
+        if (IsRunning)
+            rerun = true;
+        else
+            await RunAsync();
+    }
+
+    /// <summary>The containers card: while an engine is open to every program, the way to look inside it.</summary>
+    void ShowReach()
+    {
+        var setting = AppSettings.Load().ReachScan;
+        ReachVisibility = last.Any(c => c.Name == Doctor.DockerEngineCheck) ? Visibility.Visible : Visibility.Collapsed;
+        ReachText = ReachMemory.LookedAt is { } at ? Text.Format("Reach_Looked", at.ToLocalTime()) : Text.Get("Reach_Intro");
+        ReachDailyVisibility = setting == ReachScan.Off ? Visibility.Collapsed : Visibility.Visible;
+        isReachDaily = setting == ReachScan.Daily;
+        OnPropertyChanged(nameof(IsReachDaily));
+    }
+
+    [ObservableProperty]
+    public partial Visibility ReachVisibility { get; set; } = Visibility.Collapsed;
+
+    [ObservableProperty]
+    public partial string ReachText { get; set; } = "";
+
+    [ObservableProperty]
+    public partial Visibility ReachDailyVisibility { get; set; } = Visibility.Collapsed;
+
+    bool isReachDaily;
+
+    /// <summary>The Check daily switch, saved as it changes.</summary>
+    public bool IsReachDaily
+    {
+        get => isReachDaily;
+        set
+        {
+            if (isReachDaily == value)
+                return;
+            isReachDaily = value;
+            (AppSettings.Load() with { ReachScan = value ? ReachScan.Daily : ReachScan.Once }).Save();
+            OnPropertyChanged();
+        }
+    }
+
     /// <summary>The state line now, then the checks; a change during a run queues one more run rather than overlapping it.</summary>
     public void Refresh()
     {
@@ -872,7 +923,10 @@ public sealed partial class StatusViewModel : ObservableObject
             // The project folders the secrets editor scans are where appsettings and certificates live.
             var clock = System.Diagnostics.Stopwatch.StartNew();
             var probe = new MachineProbe(ProjectIndexStore.Load().Folders) { Hello = App.Current.Host.Keys.Hello };
-            last = await Task.Run(() => Doctor.RunAsync(probe));
+            var asked = lookInside;
+            lookInside = false;
+            last = await Task.Run(async () => await Doctor.RunAsync(probe, await ReachMemory.ForRunAsync(probe, asked)));
+            ShowReach();
             var checks = clock.Elapsed;
             Show();
             // Measured until the page has been laid out and drawn, which is what the wait looks like.

@@ -41,13 +41,15 @@ static class CliUsage
         tir grant <service> --consumer <name> --purpose <text> --for <duration> [--ceiling <grant>]
         tir elevate <service> <grant> [--for 15m]
         tir exec <service>[,<service>...] --purpose <text> [--for 1h] [--ceiling <grant>] -- <command> [args...]
-        tir doctor [--projects <dir>] [--surface]
+        tir doctor [--projects <dir>] [--surface] [--reach]
             Checks this device and how its credentials are delivered. --projects also looks under <dir>
             for projects without the protected provider, passwords in appsettings*.json connection
             strings, and private keys in files. A finding shows where it sits on the two axes (E5/C3:
             readable, used silently) and where its fix takes it. --surface also lists what is
             installed: extensions with what their host reached, global dotnet/npm/pipx/cargo tools,
-            and what starts at log-on with its signature and last use. Read-only and offline.
+            and what starts at log-on with its signature and last use. --reach also asks the Docker
+            engine which secret-looking names its containers and images hold, and what they mount;
+            values are never kept. Read-only and offline.
         tir advise ["<what you need>"]
             The ways to meet a need, strongest first on both axes, and what each gives up: "OpenAI key
             for a script", "my EF Core app talks to Azure SQL". With no words, every need. The words are
