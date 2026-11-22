@@ -139,6 +139,8 @@ public interface IDoctorProbe
     /// <summary>The optional admin tier (docs/admin-tier.md); <c>null</c> when it isn't installed.</summary>
     AdminTierFacts? AdminTier => null;
 
+    /// <summary>Alert sinks whose alerts aren't arriving, from the app's sender; empty outside the app.</summary>
+    IReadOnlyList<Alerts.FailingSink> FailingAlertSinks => [];
     /// <summary>What the user's account can open of their containers, WSL and VMs (docs/containers-and-vms.md). No contents.</summary>
     ReachFacts Reach => ReachFacts.None;
 
@@ -200,6 +202,7 @@ public static partial class Doctor
             checks.Add(DecoysLine(decoys));
         if (probe.AdminTier is { Installed: true } adminTier)
             checks.Add(AdminTierLine(adminTier));
+        checks.AddRange(FailingAlerts(probe.FailingAlertSinks));
         checks.AddRange(probe.UserSecretsFiles().Select(UserSecretsFile).OfType<DoctorCheck>());
         checks.AddRange(probe.Projects().Select(Project).OfType<DoctorCheck>());
         checks.Add(probe.ExposedVariables switch

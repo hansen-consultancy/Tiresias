@@ -37,11 +37,13 @@ public partial class StatusWindow : Window
         App.Current.Host.StateChanged += OnAgentStateChanged;
         App.Current.Guard.Changed += OnGuardChanged;
         App.Current.Host.DecoyTouched += OnDecoyTouched;
+        App.Current.Alerts.Center.FailingChanged += OnAlertsFailingChanged;
         Closed += (_, _) =>
         {
             App.Current.Host.StateChanged -= OnAgentStateChanged;
             App.Current.Guard.Changed -= OnGuardChanged;
             App.Current.Host.DecoyTouched -= OnDecoyTouched;
+            App.Current.Alerts.Center.FailingChanged -= OnAlertsFailingChanged;
         };
     }
 
@@ -49,6 +51,9 @@ public partial class StatusWindow : Window
 
     /// <summary>A decoy use is a new finding: run the checks again.</summary>
     void OnDecoyTouched(DecoyTouch _) => Dispatcher.BeginInvoke(model.Refresh);
+
+    /// <summary>A sink started or stopped failing: its finding comes or goes.</summary>
+    void OnAlertsFailingChanged() => Dispatcher.BeginInvoke(model.Refresh);
 
     async void OnUnblock(object sender, RoutedEventArgs e)
     {
@@ -319,6 +324,9 @@ public partial class StatusWindow : Window
                 break;
             case UninstallApp:
                 Navigate<InstalledPage>();
+                break;
+            case ReviewAlerts:
+                Navigate<AboutPage>();
                 break;
             case UnblockProgram { Path: var program }:
                 _ = UnblockAsync(program);
@@ -875,7 +883,11 @@ public sealed partial class StatusViewModel : ObservableObject
         {
             // The project folders the secrets editor scans are where appsettings and certificates live.
             var clock = System.Diagnostics.Stopwatch.StartNew();
-            var probe = new MachineProbe(ProjectIndexStore.Load().Folders) { Hello = App.Current.Host.Keys.Hello };
+            var probe = new MachineProbe(ProjectIndexStore.Load().Folders)
+            {
+                Hello = App.Current.Host.Keys.Hello,
+                FailingAlertSinks = App.Current.Alerts.Center.Failing,
+            };
             last = await Task.Run(() => Doctor.RunAsync(probe));
             var checks = clock.Elapsed;
             Show();

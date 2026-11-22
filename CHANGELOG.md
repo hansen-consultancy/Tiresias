@@ -10,6 +10,15 @@ its section below.
 
 ### Added
 
+- Alerts tell you when they stop arriving: a sink whose receiver refuses them, or that hasn't
+  delivered for 15 minutes, is a finding on Home ("alerts to `phone` aren't arriving") and an
+  "Alerts to a sink are failing" alert on your other sinks, whatever their threshold. Only a
+  trusted sink learns which one is failing. The finding goes when the sink delivers again or you
+  fix or remove it.
+- Signed webhook alerts and a heartbeat: **Add a webhook...** can sign each alert the Standard
+  Webhooks way, so the receiver can prove it came from your PC, and can send "Tiresias is running"
+  every 5 to 60 minutes, so a receiver that expects it notices when alerts stop arriving. Both are
+  off unless you turn them on, and the heartbeat carries only the PC's name and the time.
 - More events raise an alert: a decoy file read, a blocked program asking again, a request refused
   in lockdown, "This wasn't me", a program asking for a secret while the PC is locked, the solo
   broker rejecting the trust chain, a paper key used, the vault rolled back or changed without your

@@ -188,6 +188,9 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     /// <summary>The unlocked key, for the checks that need the sealed environment's names; <c>null</c> skips them. Never prompts.</summary>
     public IKeyWrapper? Hello { get; init; }
 
+    /// <summary>The app's failing alert sinks (<c>AlertCenter.Failing</c>); empty from <c>tir doctor</c>, which sends no alerts.</summary>
+    public IReadOnlyList<Alerts.FailingSink> FailingAlertSinks { get; init; } = [];
+
     /// <summary>Opening the environment decrypts its values too; only names leave this property.</summary>
     public DoctorEnvironment? SealedEnvironment
     {
