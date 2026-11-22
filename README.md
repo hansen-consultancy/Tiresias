@@ -82,6 +82,19 @@ it with Windows Hello: the secret is then bound to that service's settings, and 
 it if anything else edits them. `tir service list` and `tir service remove` do the rest. The solo broker picks vault changes up at its next request, without a lock and
 unlock.
 
+## Alerts when you're away
+
+The tray app can post serious events to a webhook of your choice, so a used decoy credential
+reaches you when you aren't at the PC. In **About**, **Alerts**, **Add a webhook...** asks for a
+name for this PC (it goes with every alert, so pick one that says nothing more), the URL (HTTPS, or
+plain HTTP to localhost) and an optional header such as `Authorization`. The URL and header are
+sealed like your secrets and saving needs Windows Hello; muting or removing a webhook doesn't.
+**Send a test alert** checks it arrives. Each alert is one `tiresias.alert/v1` JSON POST: the
+event, its severity and time, and the PC's name. A webhook you mark trusted also gets program paths
+and names; no webhook ever gets a value or a token. Alerts open at the first unlock after the app
+starts, then keep working while the session is locked. Today only a used decoy credential raises
+one; ntfy, LcdHub and more events are planned (see [docs/alerts.md](docs/alerts.md)).
+
 ## AI coding agents
 
 `tir ai --install` writes a few lines into `~/.claude/CLAUDE.md` (`--install <file>`: your agent's
