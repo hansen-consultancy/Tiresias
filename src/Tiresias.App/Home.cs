@@ -23,7 +23,7 @@ static class Home
         Read(() => VaultEditor.Load().Services.Count, "vault services"),
         Read(() => UserSecretsFiles.All().Any(f => f.Kind == SecretsFileKind.Sealed), "sealed user secrets"),
         Read(() => ProjectIndexStore.Load().Folders.Count > 0, "project folders"),
-        Read(() => EnvironmentStore.IsSealed, "sealed variables"),
+        Read(() => EnvironmentStore.Exists, "sealed variables"),
         Read(ActivityLog.HasHistory, "activity log"),
         [.. fixes],
         [.. Opened]));
