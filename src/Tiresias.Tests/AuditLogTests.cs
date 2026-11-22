@@ -20,6 +20,20 @@ public class AuditLogTests
     }
 
     [Test]
+    public void Appended_reports_each_record_once_it_is_written()
+    {
+        var at = new DateTimeOffset(2026, 11, 17, 9, 0, 0, TimeSpan.Zero);
+        var log = new AuditLog(path, new ManualTime(at));
+        var seen = new List<(AuditRecord, DateTimeOffset, int)>();
+        log.Appended += (record, when) => seen.Add((record, when, File.ReadAllLines(path).Length));
+        var written = new AuditRecord(AuditKind.TrustRejected, Consumer: "startup", Reason: "Fork at seq 2: x");
+
+        log.Append(written);
+
+        Assert.That(seen, Is.EqualTo(new[] { (written, at, 1) }));
+    }
+
+    [Test]
     public void A_valid_chain_verifies()
     {
         Write(4);
@@ -100,6 +114,49 @@ public class AuditLogTests
         (lines[1], lines[2]) = (lines[2], lines[1]);
         File.WriteAllLines(path, lines);
         Assert.That(AuditLog.Verify(path), Is.EqualTo(2));
+    }
+
+    [Test]
+    public void A_line_parses_back_to_its_record_and_time()
+    {
+        var at = new DateTimeOffset(2026, 11, 17, 9, 0, 0, TimeSpan.Zero);
+        var written = new AuditRecord(AuditKind.Deny, Consumer: "claude:test", Service: "llm", Reason: "approval-invalid", Process: "a.exe (pid 4)");
+        new AuditLog(path, new ManualTime(at)).Append(written);
+
+        Assert.That(AuditLog.Parse(File.ReadAllLines(path)[0]), Is.EqualTo((written, at)));
+        Assert.That(AuditLog.Parse("not json"), Is.Null);
+    }
+
+    [Test]
+    public void A_tail_reports_only_records_written_after_its_first_snapshot()
+    {
+        Write(2);
+        var tail = new AuditTail();
+        Assert.That(tail.Next(File.ReadAllLines(path)), Is.Empty);
+
+        Write(1);
+        Assert.That(tail.Next(File.ReadAllLines(path)).Select(r => r.Record.Path), Is.EqualTo(new[] { "/v1/models/0" }));
+        Assert.That(tail.Next(File.ReadAllLines(path)), Is.Empty);
+    }
+
+    [Test]
+    public void A_tail_starts_over_without_reporting_when_the_log_no_longer_extends_what_it_saw()
+    {
+        Write(3);
+        var tail = new AuditTail();
+        tail.Next(File.ReadAllLines(path));
+        File.Delete(path);
+        new AuditLog(path, TimeProvider.System).Append(new(AuditKind.Deny));
+        Write(3);
+        Assert.That(tail.Next(File.ReadAllLines(path)), Is.Empty, "replaced");
+
+        Write(1);
+        var edited = File.ReadAllLines(path);
+        edited[1] = edited[1].Replace("\"status\":200", "\"status\":403", StringComparison.Ordinal);
+        Assert.That(tail.Next(edited), Is.Empty, "an earlier line edited");
+
+        Write(1);
+        Assert.That(tail.Next(File.ReadAllLines(path).Take(1).ToArray()), Is.Empty, "shrunk");
     }
 
     [Test]
