@@ -506,7 +506,7 @@ public class AlertLcdHubTests
     /// A stand-in for LcdHub on a pipe of its own: reads the hello, answers with an empty Panels message
     /// (so the link has something to skip), and records every status item and every byte it gets.
     /// </summary>
-    sealed class FakeHub : IAsyncDisposable
+    internal sealed class FakeHub : IAsyncDisposable
     {
         public sealed record Status(string Key, string Text, LcdHubLevel Level, uint LifetimeMs);
 

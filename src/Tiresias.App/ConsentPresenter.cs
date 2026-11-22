@@ -1,6 +1,8 @@
 using System.Windows.Threading;
+using Tiresias.Alerts;
 using Tiresias.App.Logic;
 using Tiresias.App.Views;
+using Tiresias.EnvironmentVariables;
 using Tiresias.UserSecrets;
 
 namespace Tiresias.App;
@@ -24,8 +26,17 @@ sealed class ConsentPresenter(Dispatcher dispatcher) : IUserSecretsConsentPrompt
     /// <summary>Whether a request may be shown at all; refused requests are answered Deny without a dialog.</summary>
     public Func<string?, GateDecision>? Gate { get; set; }
 
-    /// <summary>The user chose "This wasn't me": called before the next waiting request is looked at, with the program and what it asked for.</summary>
-    public Action<Asker, string>? NotMe { get; set; }
+    /// <summary>The user chose "This wasn't me": called before the next waiting request is looked at, with the program, what it asked for and the secret or variable names, if any.</summary>
+    public Action<Asker, string, IReadOnlyList<string>?>? NotMe { get; set; }
+
+    /// <summary>Whether the Windows session is locked, so nobody can be at a dialog.</summary>
+    public Func<bool>? SessionLocked { get; set; }
+
+    /// <summary>
+    /// A request the gate refused, or one shown while the session is locked (<see cref="AlertTriggers.Consent"/>):
+    /// its kind, the program and the secret or variable names, never the heading, a command line or a value.
+    /// </summary>
+    public Action<AlertKind, Asker, IReadOnlyList<string>?>? Alert { get; set; }
 
     /// <summary>Whether a consent dialog is on screen; an update never restarts the app under one.</summary>
     public bool Busy => one.CurrentCount == 0;
@@ -38,7 +49,7 @@ sealed class ConsentPresenter(Dispatcher dispatcher) : IUserSecretsConsentPrompt
             request.Keys.Count == 1 ? Text.Get("Consent_UserSecrets_KeysLabelOne") : Text.Format("Consent_UserSecrets_KeysLabel", request.Keys.Count),
             request.Keys,
             Text.Get("Consent_UserSecrets_Note"),
-            AllowSession: true), new(request.Executable, null), UserSecretsService.ConsentTimeout, ct);
+            AllowSession: true), new(request.Executable, null), request.Keys, UserSecretsService.ConsentTimeout, ct);
 
     /// <summary>Locked: the same dialog, naming the program, with "Unlock with Windows Hello" as the way to answer it.</summary>
     public async Task<bool> AskUnlockAsync(string? executable, string userSecretsId, CancellationToken ct)
@@ -52,7 +63,7 @@ sealed class ConsentPresenter(Dispatcher dispatcher) : IUserSecretsConsentPrompt
             [],
             Text.Get("Consent_Unlock_Note"),
             AllowSession: false,
-            Unlock: true), new(executable, null), UserSecretsService.ConsentTimeout, ct);
+            Unlock: true), new(executable, null), null, UserSecretsService.ConsentTimeout, ct);
         // Cancelled (lock, time out) propagates: the service then says why rather than "unlock first".
         return answer != ConsentAnswer.Deny && await dispatcher.InvokeAsync(unlock).Task.Unwrap();
     }
@@ -63,24 +74,14 @@ sealed class ConsentPresenter(Dispatcher dispatcher) : IUserSecretsConsentPrompt
     {
         try
         {
-            return await ShowAsync(new ConsentView(
-                Text.Format("Consent_Environment_Heading", program),
-                caller,
-                Text.Format("Consent_Environment_ListLabel", names.Count),
-                names,
-                Text.Get("Consent_Environment_Note"),
-                AllowSession: false,
-                Command: commandLine is { Count: > 0 } ? Joined(commandLine) : null), asker, UserSecretsService.ConsentTimeout, ct) != ConsentAnswer.Deny;
+            return await ShowAsync(ConsentView.ForEnvironment(program, commandLine, names, caller),
+                asker, names, UserSecretsService.ConsentTimeout, ct) != ConsentAnswer.Deny;
         }
         catch (OperationCanceledException)
         {
             return false;
         }
     }
-
-    /// <summary>The arguments as one line, quoting any that are empty or hold a space, so the boundaries still show.</summary>
-    static string Joined(IReadOnlyList<string> arguments) =>
-        string.Join(' ', arguments.Select(a => a.Length == 0 || a.Any(char.IsWhiteSpace) ? $"\"{a}\"" : a));
 
     /// <summary>The terminal hook asking for the sealed variables for a shell session; <paramref name="shell"/> is its image path.</summary>
     public async Task<bool> AskShellAsync(string shell, int processId, string directory, IReadOnlyList<string> names, CancellationToken ct)
@@ -93,7 +94,7 @@ sealed class ConsentPresenter(Dispatcher dispatcher) : IUserSecretsConsentPrompt
                 Text.Format("Consent_Shell_ListLabel", names.Count, directory),
                 names,
                 Text.Get("Consent_Shell_Note"),
-                AllowSession: false), new(shell, processId), UserSecretsService.ConsentTimeout, ct) != ConsentAnswer.Deny;
+                AllowSession: false), new(shell, processId), names, UserSecretsService.ConsentTimeout, ct) != ConsentAnswer.Deny;
         }
         catch (OperationCanceledException)
         {
@@ -102,17 +103,17 @@ sealed class ConsentPresenter(Dispatcher dispatcher) : IUserSecretsConsentPrompt
     }
 
     /// <summary>A NuGet feed's token for one program (<paramref name="program"/> is its image path), allowed once or until the agent locks.</summary>
-    public async Task<ConsentAnswer> AskNuGetAsync(string program, int processId, string source, string variable, CancellationToken ct)
+    public async Task<ConsentAnswer> AskNuGetAsync(string program, int processId, NuGetSource source, CancellationToken ct)
     {
         try
         {
             return await ShowAsync(new ConsentView(
                 Text.Format("Consent_NuGet_Heading", System.IO.Path.GetFileNameWithoutExtension(program)),
                 program,
-                Text.Format("Consent_NuGet_ListLabel", source),
-                [variable],
+                Text.Format("Consent_NuGet_ListLabel", source.Source, source.Username),
+                [source.Variable],
                 Text.Get("Consent_NuGet_Note"),
-                AllowSession: true), new(program, processId), UserSecretsService.ConsentTimeout, ct);
+                AllowSession: true), new(program, processId), [source.Variable], UserSecretsService.ConsentTimeout, ct);
         }
         catch (OperationCanceledException)
         {
@@ -132,7 +133,8 @@ sealed class ConsentPresenter(Dispatcher dispatcher) : IUserSecretsConsentPrompt
                 Text.Get("Consent_Placeholder_ListLabel"),
                 lines,
                 Text.Get("Consent_Placeholder_Note"),
-                AllowSession: false), asker, UserSecretsService.ConsentTimeout, ct) != ConsentAnswer.Deny;
+                // The lines are tir's own text (a service, a command): no names an alert may carry.
+                AllowSession: false), asker, null, UserSecretsService.ConsentTimeout, ct) != ConsentAnswer.Deny;
         }
         catch (OperationCanceledException)
         {
@@ -152,7 +154,8 @@ sealed class ConsentPresenter(Dispatcher dispatcher) : IUserSecretsConsentPrompt
     /// Nobody answered: the session locked, the time ran out or the caller gave up. Only the Deny button
     /// returns <see cref="ConsentAnswer.Deny"/>, so the program is told the real reason, not "you declined".
     /// </exception>
-    async Task<ConsentAnswer> ShowAsync(ConsentView view, Asker asker, TimeSpan timeout, CancellationToken ct)
+    /// <param name="names">The secret or variable names asked for, for an alert; <c>null</c> when the request has none it may carry.</param>
+    async Task<ConsentAnswer> ShowAsync(ConsentView view, Asker asker, IReadOnlyList<string>? names, TimeSpan timeout, CancellationToken ct)
     {
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, session.Token);
         linked.CancelAfter(timeout);
@@ -171,7 +174,10 @@ sealed class ConsentPresenter(Dispatcher dispatcher) : IUserSecretsConsentPrompt
         {
             var others = Interlocked.Decrement(ref waiting);
             // Asked once it is this request's turn, so a "This wasn't me" on the dialog before it already counts.
-            if (Gate?.Invoke(asker.Image) is { } decision and not GateDecision.Ask)
+            var decision = Gate?.Invoke(asker.Image) ?? GateDecision.Ask;
+            if (AlertTriggers.Consent(decision, SessionLocked?.Invoke() == true) is { } alert)
+                Alert?.Invoke(alert, asker, names);
+            if (decision != GateDecision.Ask)
             {
                 AppLog.Info($"refused without asking ({decision}): {asker.Image ?? "unknown program"}");
                 return ConsentAnswer.Deny;
@@ -180,7 +186,7 @@ sealed class ConsentPresenter(Dispatcher dispatcher) : IUserSecretsConsentPrompt
             var choice = await shown;
             if (choice == ConsentChoice.NotMe)
             {
-                NotMe?.Invoke(asker, view.Heading);
+                NotMe?.Invoke(asker, view.Heading, names);
                 return ConsentAnswer.Deny;
             }
             if (choice == ConsentChoice.Deny && (linked.IsCancellationRequested || DateTimeOffset.Now >= deadline))

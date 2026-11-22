@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <RootNamespace>Tiresias.Tests</RootNamespace>
     <!-- Gives WebApplication.CreateBuilder a user-secrets source to add in Development, for the interceptor test. Nothing is stored under it. -->
     <UserSecretsId>tiresias-tests-0d1f</UserSecretsId>
@@ -42,11 +43,27 @@
   <!-- The desktop app is Windows-only, so its pure decisions are compiled in here rather than referenced. -->
   <ItemGroup>
     <Compile Include="..\Tiresias.App\Logic\**\*.cs" Link="AppLogic\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\Tiresias.Admin\PipeCallerIdentity.cs" Link="Admin\PipeCallerIdentity.cs" />
+    <Compile Include="..\Tiresias.Admin\DecoyHold.cs" Link="Admin\DecoyHold.cs" />
+    <Compile Include="..\Tiresias.Agent\ProcessTree.cs" Link="Agent\ProcessTree.cs" />
+    <Compile Include="..\Tiresias.Agent\SourceHandle.cs" Link="Agent\SourceHandle.cs" />
+    <Compile Include="..\Tiresias.Admin\ActionLog.cs" Link="Admin\ActionLog.cs" />
+  </ItemGroup>
+
+  <!-- The broker enrollment and saved offer are portable decisions shared with the Windows client. -->
+  <ItemGroup>
+    <Compile Include="..\Tiresias.Agent\BrokerEnrollment.cs" Link="Agent\BrokerEnrollment.cs" />
+    <Compile Include="..\Tiresias.Agent\BrokerVaultAccess.cs" Link="Agent\BrokerVaultAccess.cs" />
+    <Compile Include="..\Tiresias.Agent\BrokerJournalAccess.cs" Link="Agent\BrokerJournalAccess.cs" />
+    <Compile Include="..\Tiresias.Agent\ServicePipeIdentity.cs" Link="Agent\ServicePipeIdentity.cs" />
+    <Compile Include="..\Tiresias.Agent\HelloException.cs" Link="Agent\HelloException.cs" />
+    <Compile Include="..\Tiresias.Agent\UnlockActivity.cs" Link="Agent\UnlockActivity.cs" />
   </ItemGroup>
 
   <!-- Likewise tir's usage and agent guide, plain text checked against each other. -->
   <ItemGroup>
     <Compile Include="..\Tiresias.Keyring\Text\*.cs" Link="KeyringText\%(Filename)%(Extension)" />
+    <Compile Include="..\Tiresias.Keyring\StandaloneEnvironmentConsent.cs" Link="Keyring\StandaloneEnvironmentConsent.cs" />
   </ItemGroup>
 
   <ItemGroup>

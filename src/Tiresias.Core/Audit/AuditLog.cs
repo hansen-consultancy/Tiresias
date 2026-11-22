@@ -98,16 +98,32 @@ public sealed class AuditLog : IDisposable
     /// <summary>Short reference to a placeholder for audit records: the first 8 hex digits of its hash.</summary>
     public static string TokenRef(byte[] tokenHash) => Convert.ToHexStringLower(tokenHash)[..8];
 
-    public void Append(AuditRecord record)
+    /// <summary>Raised after a record is written, outside the log's lock, on the writer's thread. The app alerts on some (docs/alerts.md).</summary>
+    public event Action<AuditRecord, DateTimeOffset>? Appended;
+
+    /// <summary>Captures the last complete record boundary. Later appends can proceed while a client reads this prefix.</summary>
+    public (FileStream File, long Length) OpenSnapshot()
     {
         lock (gate)
         {
+            var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            return (file, file.Length);
+        }
+    }
+
+    public void Append(AuditRecord record)
+    {
+        DateTimeOffset at;
+        lock (gate)
+        {
             ObjectDisposedException.ThrowIf(disposed, this);
-            var line = JsonSerializer.Serialize(new Line(lastHash, time.GetUtcNow(), record.Kind, record.LeaseId, record.Consumer,
+            at = time.GetUtcNow();
+            var line = JsonSerializer.Serialize(new Line(lastHash, at, record.Kind, record.LeaseId, record.Consumer,
                 record.Service, record.Grant, record.Method, record.Path, record.Status, record.Reason, record.Token, record.Process, record.Evidence), Json);
             File.AppendAllText(path, line + "\n");
             lastHash = Hash(line);
         }
+        Appended?.Invoke(record, at);
     }
 
     /// <summary>Waits for a line in progress; every later <see cref="Append"/> throws.</summary>
@@ -118,17 +134,21 @@ public sealed class AuditLog : IDisposable
     }
 
     /// <returns>The 1-based number of the first line whose chain is broken, or <c>null</c> when the whole file verifies.</returns>
-    public static int? Verify(string path)
+    public static int? Verify(string path) => Verify(File.ReadLines(path));
+
+    /// <summary>Verifies the same snapshot that the caller will display.</summary>
+    public static int? Verify(IEnumerable<string> lines)
     {
         var expected = Genesis;
         var number = 0;
-        foreach (var line in File.ReadLines(path))
+        foreach (var line in lines)
         {
             number++;
             try
             {
                 using var doc = JsonDocument.Parse(line);
-                if (!doc.RootElement.TryGetProperty("prevHash", out var prev) || prev.GetString() != expected)
+                if (doc.RootElement.ValueKind != JsonValueKind.Object || !doc.RootElement.TryGetProperty("prevHash", out var prev)
+                    || prev.ValueKind != JsonValueKind.String || prev.GetString() != expected)
                     return number;
             }
             catch (JsonException)
@@ -138,6 +158,21 @@ public sealed class AuditLog : IDisposable
             expected = Hash(line);
         }
         return null;
+    }
+
+    /// <summary>A line's record and when it was written, or <c>null</c> when it isn't a record this version reads.</summary>
+    public static (AuditRecord Record, DateTimeOffset At)? Parse(string line)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<Line>(line, Json) is { } r
+                ? (new(r.Kind, r.LeaseId, r.Consumer, r.Service, r.Grant, r.Method, r.Path, r.Status, r.Reason, r.Token, r.Process, r.Evidence), r.Time)
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     internal static string Hash(string line) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(line)));

@@ -113,4 +113,26 @@ public class EnvironmentPlaceholderTests
 
         Assert.That((await cache.GetAsync(shell, Sealed.Placeholders[0], Mint)).Token, Is.EqualTo("tirph_openai_2"), "the broker's 20:00, not 01:00");
     }
+
+    [Test]
+    public async Task A_terminal_revokes_a_previous_placeholder_when_its_destination_or_delivery_changes()
+    {
+        var cache = new ShellPlaceholders(TimeProvider.System);
+        var shell = new ShellIdentity(42, DateTime.UnixEpoch, @"C:\pwsh.exe");
+        var placeholder = Sealed.Placeholders[0];
+        var access = EnvironmentVariableAccess.For(Sealed, placeholder.Variable, null, Forwarder);
+        var remapped = EnvironmentVariableAccess.For(Sealed.WithPlaceholder(placeholder with { Service = "another" }), placeholder.Variable, null, Forwarder);
+        var minted = 0;
+        Task<MintedPlaceholder> Mint() => Task.FromResult(new MintedPlaceholder($"fixture-{++minted}"));
+        var first = await cache.GetAsync(shell, access, Mint);
+        Assert.That((await cache.GetAsync(shell, access, Mint)).Token, Is.EqualTo(first.Token));
+        Assert.That((await cache.GetAsync(shell, remapped, Mint)).Token, Is.Not.EqualTo(first.Token));
+        Assert.That(cache.Release((_, _) => true), Is.EqualTo(new[] { first.Token }));
+
+        var raw = new EnvironmentVariableAccess(placeholder.Variable);
+        var current = new Dictionary<string, EnvironmentVariableAccess>(StringComparer.OrdinalIgnoreCase) { [raw.Name] = raw };
+        Assert.That(cache.ReleaseChanged(shell, current), Is.EqualTo(new[] { "fixture-2" }));
+        Assert.That(cache.ReleaseChanged(shell, current), Is.Empty);
+        Assert.That((await cache.GetAsync(shell, remapped, Mint)).Token, Is.EqualTo("fixture-3"));
+    }
 }

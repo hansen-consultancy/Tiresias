@@ -54,6 +54,22 @@ public sealed class SignatureDerivedWrapper(string id, Func<byte[], byte[]> sign
         return Access.ApprovalKey.Derive(approvalRoot!, leaseId);
     }
 
+    /// <summary>The service enrolls the public half once and verifies subsequent vault revisions with it.</summary>
+    public Key RevisionKey()
+    {
+        DerivedKey();
+        Span<byte> seed = stackalloc byte[32];
+        try
+        {
+            HKDF.DeriveKey(HashAlgorithmName.SHA256, approvalRoot!, seed, salt: [], info: "tiresias/v1/vault-revision-key"u8);
+            return Key.Import(SignatureAlgorithm.Ed25519, seed, KeyBlobFormat.RawPrivateKey);
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(seed);
+        }
+    }
+
     public void Dispose()
     {
         key?.Dispose();

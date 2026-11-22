@@ -17,6 +17,12 @@ its section below.
   Webhooks way, so the receiver can prove it came from your PC, and can send "Tiresias is running"
   every 5 to 60 minutes, so a receiver that expects it notices when alerts stop arriving. Both are
   off unless you turn them on, and the heartbeat carries only the PC's name and the time.
+- More events raise an alert: a decoy file read, a blocked program asking again, a request refused
+  in lockdown, "This wasn't me", a program asking for a secret while the PC is locked, the solo
+  broker rejecting the trust chain, a paper key used, the vault rolled back or changed without your
+  approval, an unapproved broker request (from the app's broker or the Windows service), a decoy the
+  admin service holds being used, and new findings Home hasn't shown (a warning when one
+  fails, info when they only warn). A program asking while you're at the PC still doesn't alert.
 - Alerts on an LcdHub screen: **About**, **Alerts**, **Add LcdHub...** shows serious events as a
   line in the status strip of the LcdHub running on this PC, such as "Decoy credential used ×1",
   until Home shows your findings or for 24 hours. It shows only the event and its count.
@@ -30,6 +36,17 @@ its section below.
   Windows Hello; mute, remove and **Send a test alert** are on the same card. Alerts carry the
   event, its time and a name you give the PC, never a secret's name unless you mark the webhook
   trusted, and never a value.
+- Home and `tir doctor` say when every program you run can open your Docker engine (and with it
+  every container's environment), when you are in Hyper-V Administrators, and which WSL
+  distributions' disks are files you own. Nothing inside a container, distribution or VM is read.
+- `tir doctor --projects` and Home name secret-looking values written in your devcontainer files
+  (`containerEnv`, `remoteEnv`, `runArgs` and the env files they name), with the commands to seal
+  them and hand them in when VS Code starts the container; and they say when VS Code's Dev
+  Containers forwards your git credentials or Docker logins into every container. Names only.
+- `tir solo service install` (as administrator) runs solo mode's broker as a Windows service under
+  its own account, so programs running as you can't read its memory or rewrite the files it
+  trusts, and an older `vault.json` restored while locked is refused. `tir solo service uninstall`
+  moves it back into the app.
 - `Tiresias.Core` and `Tiresias.Protocol` carry the groundwork for out-of-band alerts: the
   `tiresias.alert/v1` payload and the planner that decides, per sink, what to send, with dedupe,
   rate limits and redaction.
@@ -80,8 +97,11 @@ its section below.
 - An optional admin tier: with one Windows admin prompt, the app sets up a small Tiresias service
   that runs from Program Files. First run offers it once (**Not now** changes nothing); About shows
   whether it runs and offers **Set up**, **Update** or **Remove**, and `tir doctor` reports it.
-  This release sets up the service only; what it does (holding decoys out of reach, noticing
-  them used from boot) comes in the next ones.
+  With it, your decoys are held by the service: programs running as you can no longer read which
+  files are decoys or their values, a decoy used while the app is closed is caught from boot and
+  shown when the app next runs, and Home and `tir decoys list` show the kinds held. Removing the
+  decoys, or the admin tier, gives them back first (one more admin prompt). Auditing reads and
+  stopping the program come in the next releases.
 
 ### Changed
 

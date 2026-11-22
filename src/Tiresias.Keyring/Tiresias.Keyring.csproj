@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Tiresias.Agent\Tiresias.Agent.csproj" />
+    <ProjectReference Include="..\Tiresias.App\Tiresias.App.csproj" />
     <ProjectReference Include="..\Tiresias.Core\Tiresias.Core.csproj" />
   </ItemGroup>
 

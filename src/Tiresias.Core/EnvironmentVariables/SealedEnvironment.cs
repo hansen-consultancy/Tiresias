@@ -6,7 +6,16 @@ namespace Tiresias.EnvironmentVariables;
 public sealed record FolderSet(string Folder, IReadOnlyList<SealedVariable> Variables);
 
 /// <summary>A NuGet package source that authenticates with a sealed variable as its password. <paramref name="Source"/> is an https URL.</summary>
-public sealed record NuGetSource(string Source, string Variable, string Username);
+public sealed record NuGetSource(string Source, string Variable, string Username)
+{
+    public const string UrlRequirement = "Use an HTTPS feed URL without user information, a query string or a fragment";
+
+    public static Uri? ParseUrl(string? source) =>
+        Uri.TryCreate(source, UriKind.Absolute, out var uri) && IsSupported(uri) ? uri : null;
+
+    internal static bool IsSupported(Uri uri) => uri.IsAbsoluteUri && uri.Scheme == Uri.UriSchemeHttps
+        && uri.UserInfo.Length == 0 && uri.Query.Length == 0 && uri.Fragment.Length == 0;
+}
 
 /// <summary>
 /// A variable delivered as a broker placeholder instead of its value: the process gets a
@@ -36,13 +45,18 @@ public sealed record SealedEnvironment(IReadOnlyList<SealedVariable> Global, IRe
     public bool IsEmpty => Global.Count == 0 && Folders.All(f => f.Variables.Count == 0);
 
     /// <summary>The variables for a command run in <paramref name="directory"/>.</summary>
-    public IReadOnlyList<SealedVariable> Resolve(string directory)
+    public IReadOnlyList<SealedVariable> Resolve(string directory) => [.. ResolveWithFolders(directory).Select(v => v.Variable)];
+
+    /// <summary>The same overlay with each variable's origin, so terminal approval can distinguish a folder override from a global value.</summary>
+    public IReadOnlyList<(SealedVariable Variable, string? Folder)> ResolveWithFolders(string directory)
     {
         var here = Normalize(directory);
-        return SealedVariables.With(Global, Folders
+        var scoped = Folders
             .Where(f => Contains(Normalize(f.Folder), here))
             .OrderBy(f => Normalize(f.Folder).Length)
-            .SelectMany(f => f.Variables));
+            .SelectMany(f => f.Variables.Select(v => (Variable: v, Folder: (string?)f.Folder)));
+        return [.. Global.Select(v => (Variable: v, Folder: (string?)null)).Concat(scoped)
+            .GroupBy(v => v.Variable.Name, StringComparer.OrdinalIgnoreCase).Select(group => group.Last())];
     }
 
     /// <summary>The global set with <paramref name="added"/> replacing any of the same name.</summary>
@@ -68,38 +82,41 @@ public sealed record SealedEnvironment(IReadOnlyList<SealedVariable> Global, IRe
     }
 
     /// <summary><paramref name="source"/> replacing any mapping for the same URL.</summary>
-    public SealedEnvironment WithNuGetSource(NuGetSource source) =>
-        this with { NuGetSources = [.. NuGetSources.Where(s => !SameSource(s.Source, source.Source)), source] };
+    public SealedEnvironment WithNuGetSource(NuGetSource source)
+    {
+        if (NuGetSource.ParseUrl(source.Source) is null)
+            throw new ArgumentException(NuGetSource.UrlRequirement, nameof(source));
+        return this with { NuGetSources = [.. NuGetSources.Where(s => !SameSource(s.Source, source.Source)), source] };
+    }
 
     public SealedEnvironment WithoutNuGetSource(string source) =>
         this with { NuGetSources = [.. NuGetSources.Where(s => !SameSource(s.Source, source))] };
 
     /// <summary>
-    /// The mapping NuGet's request for <paramref name="uri"/> falls under: the source itself, or a
-    /// URL under the folder its service index is in (where feeds serve packages). Https only, same
-    /// host, so a mapping never answers for another server.
+    /// NuGet asks its credential provider for the configured package source. Other endpoints,
+    /// including package URLs published by the service index, do not identify that source.
     /// </summary>
     public NuGetSource? NuGetSourceFor(Uri uri)
     {
-        if (uri.Scheme != Uri.UriSchemeHttps)
+        if (!NuGetSource.IsSupported(uri))
             return null;
-        var asked = uri.GetLeftPart(UriPartial.Path).TrimEnd('/');
-        return NuGetSources
-            .Where(s => Uri.TryCreate(s.Source, UriKind.Absolute, out var source) && source.Scheme == Uri.UriSchemeHttps
-                && string.Equals(source.Host, uri.Host, StringComparison.OrdinalIgnoreCase) && source.Port == uri.Port)
-            .Where(s => SameSource(s.Source, asked) || asked.StartsWith(Base(s.Source) + "/", StringComparison.OrdinalIgnoreCase))
-            .OrderByDescending(s => s.Source.Length)
-            .FirstOrDefault();
+        NuGetSource? match = null;
+        foreach (var mapping in NuGetSources)
+        {
+            if (NuGetSource.ParseUrl(mapping.Source) is not { } source || !SameEndpoint(source, uri))
+                continue;
+            if (match is not null)
+                return null;
+            match = mapping;
+        }
+        return match;
     }
 
-    static bool SameSource(string a, string b) => string.Equals(a.TrimEnd('/'), b.TrimEnd('/'), StringComparison.OrdinalIgnoreCase);
+    static bool SameSource(string a, string b) => a == b ||
+        (NuGetSource.ParseUrl(a) is { } left && NuGetSource.ParseUrl(b) is { } right && SameEndpoint(left, right));
 
-    /// <summary>The folder a service index (<c>.../index.json</c>) is in; a source not ending in <c>.json</c> is its own folder.</summary>
-    static string Base(string source)
-    {
-        var trimmed = source.TrimEnd('/');
-        return trimmed.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ? trimmed[..trimmed.LastIndexOf('/', StringComparison.Ordinal)] : trimmed;
-    }
+    static bool SameEndpoint(Uri left, Uri right) => left.Port == right.Port && left.AbsolutePath == right.AbsolutePath
+        && string.Equals(left.IdnHost, right.IdnHost, StringComparison.OrdinalIgnoreCase);
 
     /// <summary><paramref name="placeholder"/> replacing any delivery for the same variable.</summary>
     public SealedEnvironment WithPlaceholder(EnvironmentPlaceholder placeholder) =>
@@ -190,7 +207,7 @@ public sealed record SealedEnvironment(IReadOnlyList<SealedVariable> Global, IRe
     static bool Contains(string folder, string directory) =>
         directory == folder || directory.StartsWith(folder.EndsWith('/', StringComparison.Ordinal) || folder.EndsWith(':', StringComparison.Ordinal) ? folder : folder + "/", StringComparison.Ordinal);
 
-    static string Normalize(string path) => Trim(path).Replace('\\', '/').ToUpperInvariant();
+    internal static string Normalize(string path) => Trim(path).Replace('\\', '/').ToUpperInvariant();
 
     static string Trim(string path) => path.Length > 1 ? path.TrimEnd('\\', '/') : path;
 }

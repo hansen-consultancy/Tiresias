@@ -7,6 +7,7 @@ using Tiresias.Trust;
 using Tiresias.Vault;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using NSec.Cryptography;
 using Tiresias.Forwarder;
 
 namespace Tiresias.Broker;
@@ -26,7 +27,8 @@ public static class BrokerHost
         builder.Services.Configure<BrokerOptions>(builder.Configuration.GetSection("Broker"));
         builder.Services.TryAddSingleton(TimeProvider.System);
         // One instance: two writers on the same file would each keep their own prevHash and break the chain.
-        builder.Services.AddSingleton(sp => new AuditLog(
+        // A host may register its own first, to subscribe before the startup trust check writes to it.
+        builder.Services.TryAddSingleton(sp => new AuditLog(
             sp.GetRequiredService<IOptions<BrokerOptions>>().Value.AuditPath, sp.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton(sp =>
         {
@@ -37,7 +39,10 @@ public static class BrokerHost
                 LeaseTerms.Workday(TimeZoneInfo.FindSystemTimeZoneById(options.TimeZone)),
                 sp.GetRequiredService<AuditLog>(),
                 BrokerIdentity.LoadOrCreate(sp.GetRequiredService<IIdentityKeyStore>(), sp.GetRequiredService<ILogger<BrokerState>>()),
-                time);
+                time,
+                options.HighWaterPath is { } marks ? new HighWaterMarks(marks, PublicKey.Import(SignatureAlgorithm.Ed25519,
+                    Convert.FromBase64String(options.RevisionPublicKey ?? throw new InvalidOperationException("Enroll the broker service's revision key before opening its vault.")),
+                    KeyBlobFormat.RawPublicKey)) : null);
         });
         builder.Services.TryAddSingleton(sp => IdentityKeyStore.ForPlatform(
             sp.GetRequiredService<IOptions<BrokerOptions>>().Value.IdentityKeyPath, sp.GetRequiredService<ILogger<IIdentityKeyStore>>()));
@@ -103,7 +108,7 @@ public static class BrokerHost
 
         app.MapPost("/lease/seal", (LeaseSealRequest body, BrokerState state) =>
         {
-            var (result, refusal) = state.Seal(body.LeaseId, body.Deks, body.ApprovalKey);
+            var (result, refusal) = state.Seal(body.LeaseId, body.Deks, body.ApprovalKey, body.RevisionSignature);
             return refusal is null ? Results.Ok(result) : Refused(refusal);
         });
 
@@ -176,7 +181,7 @@ public static class BrokerHost
 sealed record LeaseBeginResponse(string LeaseId, string LeaseKey, long HardCapAt, string Signature);
 
 /// <param name="ApprovalKey">The lease's approval key (raw Ed25519 public key), bound into each DEK's context.</param>
-sealed record LeaseSealRequest(string LeaseId, Dictionary<string, byte[]> Deks, byte[]? ApprovalKey);
+sealed record LeaseSealRequest(string LeaseId, Dictionary<string, byte[]> Deks, byte[]? ApprovalKey, byte[]? RevisionSignature = null);
 
 sealed record LeaseRef(string LeaseId);
 

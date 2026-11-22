@@ -14,15 +14,18 @@ public sealed class ShellPlaceholders(TimeProvider time)
     /// <summary>Minted again when less than this is left, so a terminal's next folder change refreshes it.</summary>
     static readonly TimeSpan Margin = TimeSpan.FromMinutes(30);
 
-    readonly Dictionary<(ShellIdentity Shell, string Variable), (string Token, DateTimeOffset ExpiresAt)> held = [];
+    readonly Dictionary<(ShellIdentity Shell, string Variable), (EnvironmentVariableAccess Access, string Token, DateTimeOffset ExpiresAt)> held = [];
     readonly List<string> replaced = [];
     readonly Lock gate = new();
 
-    public async Task<MintedPlaceholder> GetAsync(ShellIdentity shell, EnvironmentPlaceholder placeholder, Func<Task<MintedPlaceholder>> mint)
+    public Task<MintedPlaceholder> GetAsync(ShellIdentity shell, EnvironmentPlaceholder placeholder, Func<Task<MintedPlaceholder>> mint) =>
+        GetAsync(shell, new EnvironmentVariableAccess(placeholder.Variable, Placeholder: placeholder), mint);
+
+    public async Task<MintedPlaceholder> GetAsync(ShellIdentity shell, EnvironmentVariableAccess access, Func<Task<MintedPlaceholder>> mint)
     {
-        var key = (shell, placeholder.Variable.ToUpperInvariant());
+        var key = (shell, access.Name.ToUpperInvariant());
         lock (gate)
-            if (held.TryGetValue(key, out var existing) && existing.ExpiresAt - time.GetUtcNow() > Margin)
+            if (held.TryGetValue(key, out var existing) && access.SameDelivery(existing.Access) && existing.ExpiresAt - time.GetUtcNow() > Margin)
                 return new(existing.Token);
         var minted = await mint();
         lock (gate)
@@ -30,9 +33,22 @@ public sealed class ShellPlaceholders(TimeProvider time)
             if (held.Remove(key, out var old))
                 replaced.Add(old.Token);
             if (minted.Token is { } token)
-                held[key] = (token, minted.ExpiresAt ?? time.GetUtcNow() + Consent.MaxDuration);
+                held[key] = (access, token, minted.ExpiresAt ?? time.GetUtcNow() + Consent.MaxDuration);
         }
         return minted;
+    }
+
+    /// <summary>Revoke a terminal's previous placeholders when the corresponding delivery is removed or remapped.</summary>
+    public IReadOnlyList<string> ReleaseChanged(ShellIdentity shell, IReadOnlyDictionary<string, EnvironmentVariableAccess> current)
+    {
+        lock (gate)
+        {
+            var changed = held.Where(pair => pair.Key.Shell == shell
+                && (!current.TryGetValue(pair.Key.Variable, out var access) || !access.SameDelivery(pair.Value.Access))).ToArray();
+            foreach (var old in changed)
+                held.Remove(old.Key);
+            return [.. changed.Select(pair => pair.Value.Token)];
+        }
     }
 
     /// <summary>Takes out the placeholders replaced since the last call and those of terminals no longer running.</summary>

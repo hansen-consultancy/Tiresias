@@ -98,6 +98,26 @@ public class NuGetConfigTests
         Assert.That(steps[3].Skip, Does.Contain("another config file"));
     }
 
+    [TestCase("http://feeds.example/v3/index.json")]
+    [TestCase("https://reader@feeds.example/v3/index.json")]
+    [TestCase("https://feeds.example/v3/index.json?view=preview")]
+    [TestCase("https://feeds.example/v3/index.json#v3")]
+    public void Unsupported_source_urls_are_rejected_on_setup_and_left_in_NuGet_config(string url)
+    {
+        var mapping = new NuGetSource(url, "FEED_TOKEN", "reader");
+        var credential = new NuGetConfigCredential("sample", url, "reader", NuGetPasswordKind.ClearText, "sample-value");
+        var environment = SealedEnvironment.Empty;
+        Assert.That(() => environment.WithNuGetSource(mapping), Throws.ArgumentException.With.Message.Contains(NuGetSource.UrlRequirement));
+
+        var step = NuGetImport.Plan([("NuGet.Config", credential)], environment, _ => false, _ => null).Single();
+        Assert.That(step.Acts, Is.False);
+        Assert.That(step.Skip, Is.EqualTo(NuGetSource.UrlRequirement));
+        Assert.That(step.DisplayUrl, Is.Null);
+
+        var previous = environment with { NuGetSources = [mapping] };
+        Assert.That(previous.NuGetSourceFor(new Uri("https://feeds.example/v3/index.json")), Is.Null);
+    }
+
     [Test]
     public void A_sealed_variable_is_mapped_without_sealing_again_and_a_folder_one_is_refused()
     {

@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Tiresias.AdminTier;
 using Tiresias.Agent;
 using Tiresias.App.Logic;
 using Tiresias.Client;
@@ -49,12 +50,31 @@ public partial class StatusWindow : Window
     /// <summary>A decoy use is a new finding: run the checks again.</summary>
     void OnDecoyTouched(DecoyTouch _) => Dispatcher.BeginInvoke(model.Refresh);
 
-    void OnUnblock(object sender, RoutedEventArgs e)
+    async void OnUnblock(object sender, RoutedEventArgs e)
     {
         if (((FrameworkElement)sender).DataContext is BlockedRow row)
+            await UnblockAsync(row.Path);
+    }
+
+    async Task UnblockAsync(string program)
+    {
+        try
         {
-            AppLog.Info($"unblocked {row.Path}");
-            App.Current.Guard.Unblock(row.Path);
+            if (await AdminProgramBlocks.ListAsync() is not null &&
+                (await AdminTierElevation.RunAsync("unblock-program", program) != AdminSetupResult.Done ||
+                (await AdminProgramBlocks.ListAsync())?.Any(p => string.Equals(p.Path, program, StringComparison.OrdinalIgnoreCase)) != false))
+            {
+                model.GuardMessage = Text.Get("Status_UnblockIncomplete");
+                return;
+            }
+            App.Current.Guard.Unblock(program);
+            AppLog.Info($"unblocked {program}");
+            model.Refresh();
+        }
+        catch (IOException e)
+        {
+            AppLog.Error(e, "unblocking program");
+            model.GuardMessage = Text.Get("Status_BlocksUnavailable");
         }
     }
 
@@ -75,7 +95,7 @@ public partial class StatusWindow : Window
             return;
         try
         {
-            var placed = DecoyStore.Place(link.Kind, link.Kind == DecoyKind.Variables ? null : where);
+            var placed = AdminDecoys.Place(link.Kind, link.Kind == DecoyKind.Variables ? null : where);
             AppLog.Info($"placed a decoy ({placed.Kind}) at {placed.Where}");
             model.ShowDecoys();
             // The doctor's decoys check says whether they are listened for.
@@ -87,10 +107,17 @@ public partial class StatusWindow : Window
         }
     }
 
-    void OnRemoveDecoys(object sender, RoutedEventArgs e)
+    async void OnRemoveDecoys(object sender, RoutedEventArgs e)
     {
         if (!AskWindow.Confirm(this, Text.Get("Decoys_RemoveHeading"), Text.Get("Decoys_RemoveBody"), Text.Get("Decoys_RemoveAction")))
             return;
+        // Held by the admin tier: getting the set back takes the UAC prompt; then it is removed as always.
+        if (DecoyStore.Current is null && await Task.Run(AdminDecoys.Status) is ({ Held: true } or { NeedsVerification: true })
+            && (await AdminTierElevation.RunAsync("release-decoys") is not AdminSetupResult.Done || DecoyStore.Current is null))
+        {
+            model.ShowDecoys(Text.Get("Decoys_StillHeld"));
+            return;
+        }
         var (left, kept) = DecoyStore.RemoveAll();
         AppLog.Info($"removed the decoys; {left.Count} left, {kept.Count} kept as changed");
         model.ShowDecoys(string.Join(" ", new[]
@@ -98,6 +125,13 @@ public partial class StatusWindow : Window
             kept.Count == 0 ? "" : Text.Format("Decoys_RemoveKept", string.Join(", ", kept)),
             left.Count == 0 ? "" : Text.Format("Decoys_RemoveLeft", string.Join(", ", left)),
         }.Where(m => m.Length > 0)));
+        model.Refresh();
+    }
+
+    async void OnEnrollDecoys(object sender, RoutedEventArgs e)
+    {
+        var result = await AdminTierElevation.RunAsync("adopt-decoys");
+        model.ShowDecoys(result == AdminSetupResult.Done ? "" : Text.Get("Decoys_EnrollmentIncomplete"));
         model.Refresh();
     }
 
@@ -286,15 +320,19 @@ public partial class StatusWindow : Window
                 Navigate<InstalledPage>();
                 break;
             case UnblockProgram { Path: var program }:
-                AppLog.Info($"unblocked {program}: the decoy use was the user's");
-                App.Current.Guard.Unblock(program);
-                model.Refresh();
+                _ = UnblockAsync(program);
                 break;
             case RunThroughExec { Setup: { } setup }:
                 Navigate<ServicesPage>()?.Add(setup.Upstream);
                 break;
             case RunThroughExec exec:
                 model.CopyFix(exec.Instruction);
+                break;
+            case InjectAtRunTime inject:
+                model.CopyFix(inject.Commands);
+                break;
+            case ReachGuide:
+                Desktop.Open(FindingView.ReachGuideUrl(AppBuild.Repository));
                 break;
         }
     }
@@ -547,14 +585,35 @@ public sealed partial class StatusViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(GuardVisibility))]
     public partial Visibility LockedDownVisibility { get; set; } = Visibility.Collapsed;
 
-    public Visibility GuardVisibility => LockedDownVisibility == Visibility.Visible || Blocked.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(GuardVisibility))]
+    public partial string GuardMessage { get; set; } = "";
+
+    public Visibility GuardVisibility => LockedDownVisibility == Visibility.Visible || Blocked.Count > 0 || GuardMessage.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+    int guardRead;
 
     /// <summary>The lockdown and the blocklist as they are now.</summary>
-    public void ShowGuard()
+    public async void ShowGuard()
     {
+        int read = ++guardRead;
+        IReadOnlyList<AdminBlockedProgram> service = [];
+        string message = "";
+        try
+        {
+            service = await AdminProgramBlocks.ListAsync() ?? [];
+        }
+        catch (IOException e)
+        {
+            AppLog.Error(e, "reading blocked programs");
+            message = Text.Get("Status_BlocksUnavailable");
+        }
+        if (read != guardRead)
+            return;
+        GuardMessage = message;
         var list = App.Current.Guard.Current;
         Blocked.Clear();
-        foreach (var program in list.Programs.OrderByDescending(p => p.Since))
+        var programs = service.Select(p => new BlockedProgram(p.Path, p.Sha256, p.Since)).Concat(list.Programs);
+        foreach (var program in programs.DistinctBy(p => p.Path, StringComparer.OrdinalIgnoreCase).OrderByDescending(p => p.Since))
             Blocked.Add(new(program.Path, Text.Format("Status_BlockedSince", program.Since.ToLocalTime())));
         LockedDownVisibility = list.LockedDown ? Visibility.Visible : Visibility.Collapsed;
         OnPropertyChanged(nameof(GuardVisibility));
@@ -566,6 +625,9 @@ public sealed partial class StatusViewModel : ObservableObject
 
     [ObservableProperty]
     public partial Visibility DecoysRemovableVisibility { get; set; } = Visibility.Collapsed;
+
+    [ObservableProperty]
+    public partial Visibility DecoysEnrollVisibility { get; set; } = Visibility.Collapsed;
 
     /// <summary>Why the last place or remove fell short; empty when it didn't.</summary>
     [ObservableProperty]
@@ -586,15 +648,18 @@ public sealed partial class StatusViewModel : ObservableObject
         {
             set = null;
         }
-        var card = DecoyCard.Of(set);
+        var card = DecoyCard.Of(set, AdminClient.Installed ? AdminDecoys.Status() : null);
         Decoys.Clear();
         foreach (var placed in card.Placed)
             Decoys.Add(new(Text.Get(DecoyCard.Keys(placed.Kind).Name), placed.Where, Text.Format("Decoys_Since", placed.Placed.ToLocalTime())));
+        foreach (var kind in card.Held)
+            Decoys.Add(new(Text.Get(DecoyCard.Keys(kind).Name), Text.Get(card.Listening ? "Decoys_Held" : "Decoys_PendingListener"), ""));
         DecoyLinks.Clear();
         foreach (var kind in card.Placeable)
             DecoyLinks.Add(new(kind, Text.Get(DecoyCard.Keys(kind).Place)));
-        DecoysRemovableVisibility = card.Placed.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-        DecoyMessage = message;
+        DecoysRemovableVisibility = card.Removable ? Visibility.Visible : Visibility.Collapsed;
+        DecoysEnrollVisibility = card.CanEnroll ? Visibility.Visible : Visibility.Collapsed;
+        DecoyMessage = message.Length == 0 && card.NeedsVerification ? Text.Get("Decoys_VerifyLegacy") : message;
     }
 
     [ObservableProperty]

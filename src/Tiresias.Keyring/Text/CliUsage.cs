@@ -16,6 +16,9 @@ static class CliUsage
         tir solo init
             Solo mode: the broker runs inside the Tiresias app on this PC, no server needed. Creates
             the recovery key if there is none (or asks for it) and a one-device trust chain.
+        tir solo service install | uninstall
+            As administrator: runs the solo broker as the Tiresias Windows service, under its own
+            account, so programs running as you can't read its memory. Quit the app first.
         tir trust bind-hello
             Names this PC's Windows Hello key in the trust chain, for a chain made before Tiresias
             asked for it: one Hello prompt and the recovery key, once. Solo mode needs the app running.
@@ -75,8 +78,9 @@ static class CliUsage
         tir env nuget list
         tir env nuget remove <source-url>
             NuGet package sources that authenticate with a sealed variable: dotnet restore, Visual
-            Studio and Rider ask the app for the token, and you allow each program once. import
-            finds the sources NuGet.Config gives a token (as %NAME% or in plain text), seals it and
+            Studio and Rider request a token for the exact configured HTTPS source URL. You approve
+            a program for that URL, username and variable, once or for the session. import finds
+            the sources NuGet.Config gives a token (as %NAME% or in plain text), seals it and
             takes it out of the file.
         tir env import <file> <entry> <NAME>
             Seal the token an .npmrc (entry: its key, //registry.npmjs.org/:_authToken) or a .pypirc
@@ -89,13 +93,14 @@ static class CliUsage
             the forwarder's address in the tool's base-URL variable (OPENAI_API_KEY: OPENAI_BASE_URL).
         tir env hook [pwsh]
             Prints the PowerShell profile hook: tir env hook | Out-String | Invoke-Expression. Each
-            terminal asks once for the sealed variables, and changing folder applies its set.
+            terminal asks when it needs a new variable or its folder or delivery settings change.
         tir run [--only NAME[,NAME...]] -- <command> [args...]
-            Runs the command with the sealed environment variables, after you allow it (in the app's
-            dialog, or with Windows Hello when the app isn't running). --only gives it just those.
+            Runs the command with the sealed variables you approve in the Tiresias consent dialog.
+            When the app is closed, Windows Hello opens the store first. --only limits the variables.
         tir decoys place <passwords|project|variables> [<path>]
         tir decoys list
         tir decoys remove
+        tir decoys adopt
             Decoy credentials that open nothing and point to a port only Tiresias listens on, so a
             program that finds and uses one is named in the activity log (and blocked by the app).
             passwords: a passwords.txt (Documents by default); project: a new folder with an

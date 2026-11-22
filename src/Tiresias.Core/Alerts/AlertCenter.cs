@@ -1,21 +1,6 @@
-using Tiresias.Decoys;
 using Tiresias.Protocol;
 
 namespace Tiresias.Alerts;
-
-/// <summary>Turns what a source reports into an <see cref="AlertEvent"/>: names and paths only, never a value.</summary>
-public static class AlertSources
-{
-    /// <summary>
-    /// <c>decoy.used</c> for a decoy credential used; <c>null</c> for a decoy file read, which is
-    /// <c>decoy.read</c>'s (a later phase). The endpoint is left out: it can carry what the program sent.
-    /// </summary>
-    /// <param name="parents">The processes that started it, nearest first.</param>
-    /// <param name="what">Which decoy, in the activity log's words (<c>DecoyTouch.What</c>).</param>
-    public static AlertEvent? DecoyUsed(DecoyHit hit, IReadOnlyList<string> parents, string what) =>
-        hit.Use == DecoyUse.Read ? null
-            : new(AlertKind.DecoyUsed, new AlertSubject(Program: hit.Program, ProcessId: hit.ProcessId, Parents: parents, What: what), hit.At);
-}
 
 /// <summary>
 /// The app's alerting, sources to sinks (docs/alerts.md): events go through <see cref="AlertPlanner"/>
@@ -80,7 +65,8 @@ public sealed class AlertCenter : IAsyncDisposable
             setup = current?.Setup(narrowing);
             opened = true;
             var live = current?.Live(narrowing) ?? [];
-            Sender.Configure(live.Where(s => s is not LcdHubSink));
+            // A muted sink leaves the sender, and what waits for it (a backlog held while it failed) goes with it.
+            Sender.Configure(live.Where(s => s is not LcdHubSink && narrowing?.GetValueOrDefault(s.Id)?.Muted != true));
             if (!live.Any(s => s is LcdHubSink))
                 hub?.ClearAll();
             while (waiting.TryDequeue(out var e))

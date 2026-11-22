@@ -1,8 +1,10 @@
 # The admin tier: a privileged service, optional
 
-Status: **step 1 built** (#91): the service, its pipe and `status`, install, update and remove,
-the first-run and About offers, the doctor line and the action log ([Build order](#build-order)).
-None of the features is built yet; the service answers `status` and refuses every other action.
+Status: **steps 1 and 2 built** (#91): the service, its pipe and `status`, install, update and
+remove, the first-run and About offers, the doctor line and the action log; and the decoys held
+and listened for from boot (`decoys.adopt`, `decoys.status`, `decoys.release`, `events.wait`)
+([Build order](#build-order)). Auditing, freezing and `lastrun` are not built yet; the service
+refuses those actions.
 
 Tiresias works for an ordinary user account and keeps doing so. A user who can approve one UAC
 prompt can add a small Windows service that does what an ordinary account can't: hold the decoys
@@ -55,8 +57,11 @@ broker.
   decoys back to the user's agent), then stops and deletes the service and both folders.
   Uninstalling the app runs it too, when the service exists, behind its own UAC prompt; Velopack
   gives an uninstall hook only seconds, so the app waits 20 s for it and uninstalls anyway.
-  Until `teardown` is built (step 2 onwards, as each feature lands) there is nothing to undo, and
-  remove only stops and deletes.
+  In step 2 the only thing to undo is the held decoys: remove stops the service, then hands each
+  user's set back to that user's `decoys.json` (as `decoys.release` does, below) before deleting.
+  A set that can't go back stays in the state folder, which is then kept, and the step reports
+  failure; installing again picks the set up. `teardown` is built when there is more to undo
+  (step 3 onwards).
 - The elevated process reports back by exit code (`AdminSetupResult`): done, failed, files missing
   (a development build without the `admin\` folder), or set up but stopped again at once (the
   service found its state folder or pipe name not its own; the Windows event log says which).
@@ -67,7 +72,8 @@ broker.
 of SYSTEM full control, Authenticated Users read and write (not create), and NETWORK denied:
 Authenticated Users includes callers over SMB, whose process ids mean nothing here. The next
 instance is created before a connected one is served, so the name is never free for another
-process to take.
+process to take. At most 32 connections are served at once; past that, callers wait, so long polls
+held open by a program can't run the service out of handles.
 
 **Both ends check the other.**
 
@@ -126,16 +132,41 @@ deletes its `decoys.json`. The service writes the set to its state folder. Malwa
 user can no longer read which files are decoys, the ports, or the values; it can still read the
 decoy files themselves, which is the point.
 
-`decoys.status` gives the app the kinds for Home's card, without places. `tir decoys list` shows
-places only elevated.
+`decoys.status` gives the app the kinds for Home's card, without places, and `tir decoys list`
+the kinds and file count. While the service holds a set, no other is placed beside it: the
+agent refuses and says to remove the held one first. The agent offers the set when it is placed,
+and at its start for decoys placed before the tier was installed; when the tier isn't running or
+refuses, `decoys.json` stays and the agent listens, as without the tier.
+
+**Handing back.** `decoys.release` stops listening, forgets the set and returns it, to an elevated
+caller only: `tir decoys remove` and Home's **Remove decoys** start an elevated copy of themselves
+(`tir decoys release`, `Tiresias.exe --admin-tier release-decoys`) through UAC. That process
+writes the set to the session user's `decoys.json` (their profile's `AppData\Local\Tiresias`, from
+the profile list when it runs as an administrator over the user's shoulder) as a **new file
+only**, and checks the file's final path on its open handle: a link anywhere on the way, which the
+user can make in their own profile, would steer an administrator's write, so such a file is
+deleted again and the set is offered back to the service; if the service doesn't take it (stopped
+meanwhile), the elevated process writes it to the state folder, where the service holds it again at
+its next start. The unelevated agent then removes the
+decoys as it always has. Not built: listing places elevated.
+
+**Doctor.** With the set held, the decoys check counts the service as the listener (or warns
+that a port is taken). It can no longer skip decoy files by place: a decoy `appsettings.json` or
+`.env` may show as a file to seal. Decoy variables are still skipped (their names are fixed).
 
 ### Listening from boot
 
 The service binds the set's two ports on `127.0.0.1` at start, with the same listeners as the agent
-(`DecoyListener`, `DecoyTds`), and names the caller from the TCP table. A hit becomes an event for
-the user, and the service freezes the program at once (below). The app, when it runs, reads the
-event and does what it does today: block list, notification, activity record, finding. With the
-service holding the set, the agent does not listen.
+(`DecoyListener`, `DecoyTds`), and names the caller from the TCP table (the forwarder's
+`TcpConnectionOwner`, linked) and the processes that started it. A set whose ports are taken (the
+agent may hold them a moment after offering the set) is tried again every 5 s. A hit becomes an
+event for the user, kept in the state folder (`events\<sid>.json`, the newest 100) until
+acknowledged, so it survives the app being closed and the machine restarting; from step 4 the
+service also freezes the program at once (below). The agent, in the app or `tir agent`, long-polls
+`events.wait` (30 s), and runs each event through the path of a use it saw itself: activity record
+(consumer `decoy`), then block list, notification and finding in the app. It acknowledges by id on
+the next wait. With the service holding the set, `decoys.json` is gone and the agent does not
+listen.
 
 ### Every read named: auditing
 
@@ -183,18 +214,19 @@ asked. [Attack surface](attack-surface.md) uses it for "last used"; a decoy find
   is installed but stopped, or runs but gives no answer from its own process, a failing check;
   older than the app, a warning.
 
-Built in step 1, the first-run offer names the features to come and says they aren't in this
-version yet. The Home finding **Update the admin tier** is not built yet: About and the doctor
+The first-run offer names the features and says the rest arrive in the next updates. The Home finding **Update the admin tier** is not built yet: About and the doctor
 line say when the service is older.
 
-## Open questions
+## Over-the-shoulder elevation
 
-- **Over-the-shoulder elevation.** A standard user approves a UAC prompt with an administrator's
-  password: the elevated caller is then the administrator, in the user's session, so the session
-  rule refuses it, and its SID isn't the user's anyway. Install and remove don't use the pipe, so
-  step 1 is unaffected; `thaw` and `decoys.release` (steps 2 and 4) need an answer, such as the
-  elevated caller naming the user it acts for, accepted only from an administrator in that user's
-  session.
+A standard user approves a UAC prompt with an administrator's password: the elevated caller is
+then the administrator, in the user's session, and its SID isn't the user's. **An elevated caller
+acts for the user signed in to its session** (`AdminDecision.ActingFor`): `decoys.release` returns
+that user's set, `thaw` will thaw that user's program. An unelevated caller acts only for itself,
+and only when it is that session's user. The alternative, the caller naming the user it acts for
+in an argument, adds an argument to every op and a check that it names the session's user, and
+gives nothing more: the session's user is the only one it could name. An administrator could read
+the state folder anyway, so acting for the session's user grants nothing new.
 
 ## Build order
 
