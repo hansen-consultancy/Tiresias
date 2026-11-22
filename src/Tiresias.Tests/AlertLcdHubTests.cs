@@ -341,6 +341,16 @@ public class AlertLcdHubTests
         Assert.Throws<IOException>(() => LcdHubWire.Panels(new byte[] { 1, 0, 9, 0 }));
     }
 
+    [TestCase(0, 8)]
+    [TestCase(32, 0)]
+    [TestCase(65535, 65535)]
+    [TestCase(4096, 1024)]
+    public void A_panel_no_frame_fits_is_refused_like_a_bad_message(int width, int height)
+    {
+        var lying = FakeHub.PanelsMessage([new LcdHubPanel("main", width, height)])[5..];
+        Assert.Throws<IOException>(() => LcdHubWire.Panels(lying));
+    }
+
     [Test]
     public void The_card_shows_the_severity_the_title_and_the_count_only()
     {
@@ -445,6 +455,25 @@ public class AlertLcdHubTests
         var drawn = string.Join("\n", renderer.Drawn.SelectMany(d => d.Card.Lines));
         Assert.That(drawn, Is.EqualTo("CRITICAL\nDecoy credential used\n×1 · Open Tiresias"));
         Assert.That(drawn + Encoding.UTF8.GetString(hub.Raw), Does.Not.Contain("CANARY").And.Not.Contain("alice").And.Not.Contain("4242").And.Not.Contain("workstation"));
+    }
+
+    [Test]
+    public async Task A_critical_frame_comes_back_when_a_test_frame_ends()
+    {
+        await using var hub = FakeHub.Start(null, Wide);
+        var time = new SteppedTime(DateTimeOffset.UtcNow);
+        var renderer = new FakeRenderer();
+        await using var link = new LcdHubLink(time, _ => { }, hub.PipeName, renderer.Render);
+        link.Show(Payload());
+        await Until(() => hub.Frames.Count == 1);
+
+        Assert.That(await link.ShowAndWaitAsync(Payload("alerts.test", AlertSeverity.Info, title: "Test alert"), TimeSpan.FromSeconds(10), CancellationToken.None), Is.True);
+        await Until(() => hub.Frames.Count == 2 && time.Pending > 0);
+        time.Advance(LcdHubFormat.TestLifetime + TimeSpan.FromSeconds(1));
+
+        await Until(() => hub.Frames.Count == 3);
+        Assert.That(renderer.Drawn.Select(d => d.Card.Severity), Is.EqualTo(new[] { AlertSeverity.Critical, AlertSeverity.Info, AlertSeverity.Critical }));
+        Assert.That(hub.Frames[2].LifetimeMs, Is.InRange(86_000_000u, 86_400_000u), "the rest of the critical item's lifetime");
     }
 
     [Test]

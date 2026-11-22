@@ -90,6 +90,7 @@ internal static class LcdHubWire
     const byte MsgHello = 1, MsgPanels = 2, MsgFrame = 3, MsgStatus = 6, StatusLifetime = 2;
     const byte FrameAlert = 1, FrameLifetime = 4;
     const int MaxMessageBytes = 16 << 20;
+    const int MaxPanelPixels = (MaxMessageBytes - 1024) / 4;
 
     public static byte[] Hello(string name)
     {
@@ -129,7 +130,7 @@ internal static class LcdHubWire
     }
 
     /// <summary>A Panels body: u16 count, then per panel its id, u16 width and u16 height.</summary>
-    /// <exception cref="IOException">Truncated.</exception>
+    /// <exception cref="IOException">Truncated, or a panel no frame could be sent to: empty, or more pixels than a message holds.</exception>
     public static IReadOnlyList<LcdHubPanel> Panels(ReadOnlySpan<byte> body)
     {
         try
@@ -142,7 +143,12 @@ internal static class LcdHubWire
                 var length = BinaryPrimitives.ReadUInt16LittleEndian(body[at..]);
                 var id = Encoding.UTF8.GetString(body.Slice(at + 2, length));
                 at += 2 + length;
-                panels.Add(new(id, BinaryPrimitives.ReadUInt16LittleEndian(body[at..]), BinaryPrimitives.ReadUInt16LittleEndian(body[(at + 2)..])));
+                var width = BinaryPrimitives.ReadUInt16LittleEndian(body[at..]);
+                var height = BinaryPrimitives.ReadUInt16LittleEndian(body[(at + 2)..]);
+                // A lying hub is treated as gone, like a bad length: its sizes are untrusted input (I-101).
+                if (width == 0 || height == 0 || (long)width * height > MaxPanelPixels)
+                    throw new IOException("impossible panel size");
+                panels.Add(new(id, width, height));
                 at += 4;
             }
             return panels;
@@ -259,6 +265,8 @@ public sealed class LcdHubLink : IAsyncDisposable
     IReadOnlyList<LcdHubPanel> panels = [];
     // The alert frame: which item it shows, at what severity, and whether the hub needs it (again) or must drop it.
     (string Key, AlertSeverity Severity)? frame;
+    // The latest critical, which the frame goes back to when a test's frame ends.
+    (string Key, AlertSeverity Severity)? critical;
     bool frameDue, frameWithdraw;
     readonly CancellationTokenSource stop = new();
     TaskCompletionSource signal = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -346,7 +354,7 @@ public sealed class LcdHubLink : IAsyncDisposable
             }
             items.Clear();
             due.Clear();
-            frame = null;
+            frame = critical = null;
             frameDue = false;
             Wake();
         }
@@ -365,6 +373,8 @@ public sealed class LcdHubLink : IAsyncDisposable
             {
                 // The latest critical takes the panels, or a test shows what one looks like; a later non-critical leaves it.
                 frame = (key, payload.Severity);
+                if (LcdHubFormat.TakesOver(payload))
+                    critical = frame;
                 frameDue = true;
                 frameWithdraw = false;
             }
@@ -559,8 +569,10 @@ public sealed class LcdHubLink : IAsyncDisposable
             due.Remove(key);
         }
         // The hub drops the frame by itself too: it was sent with its item's lifetime.
+        if (critical is var (live, _) && !items.ContainsKey(live))
+            critical = null;
         if (frame is var (shown, _) && !items.ContainsKey(shown))
-            (frame, frameDue) = (null, false);
+            (frame, frameDue) = (critical, critical is not null);
     }
 
     /// <summary>
