@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.ComponentModel;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Threading;
@@ -12,7 +13,16 @@ namespace Tiresias.App.Views;
 /// <param name="AllowSession">Offer "Allow for this session": user secrets only, where the agent remembers the answer.</param>
 /// <param name="Unlock">Tiresias is locked: the one way forward is "Unlock with Windows Hello" (or Deny), and there is no list.</param>
 /// <param name="Command">The command line about to run, shown under the heading.</param>
-public sealed record ConsentView(string Heading, string? Program, string ListLabel, IReadOnlyList<string> Items, string Note, bool AllowSession, bool Unlock = false, string? Command = null);
+public sealed record ConsentView(string Heading, string? Program, string ListLabel, IReadOnlyList<string> Items, string Note, bool AllowSession, bool Unlock = false, string? Command = null)
+{
+    public bool CanReportIncident { get; init; } = true;
+
+    public static ConsentView ForEnvironment(string program, IReadOnlyList<string>? commandLine, IReadOnlyList<string> terms, string? caller) =>
+        new(Text.Format("Consent_Environment_Heading", program), caller, Text.Format("Consent_Environment_ListLabel", terms.Count),
+            terms, Text.Get("Consent_Environment_Note"), AllowSession: false,
+            // Keep argument boundaries and control characters visible in the command field.
+            Command: commandLine is { Count: > 0 } ? string.Join(' ', commandLine.Select(arg => JsonSerializer.Serialize(arg))) : null);
+}
 
 /// <summary>The button the user pressed; closing, timing out or locking counts as <see cref="Deny"/>.</summary>
 public enum ConsentChoice
@@ -61,6 +71,7 @@ public partial class ConsentWindow : Window
         }
         Note.Text = waiting > 0 ? $"{view.Note} {Text.Format("Consent_Waiting", waiting)}" : view.Note;
         AllowSession.Visibility = view.AllowSession ? Visibility.Visible : Visibility.Collapsed;
+        ReportIncident.Visibility = view.CanReportIncident ? Visibility.Visible : Visibility.Collapsed;
         (view.AllowSession ? AllowSession : AllowOnce).Style = (Style)FindResource("LeadChoice");
         tick.Tick += (_, _) => UpdateCountdown();
         UpdateCountdown();

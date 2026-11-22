@@ -65,7 +65,8 @@ public sealed class AlertCenter : IAsyncDisposable
             setup = current?.Setup(narrowing);
             opened = true;
             var live = current?.Live(narrowing) ?? [];
-            Sender.Configure(live.Where(s => s is not LcdHubSink));
+            // A muted sink leaves the sender, and what waits for it (a backlog held while it failed) goes with it.
+            Sender.Configure(live.Where(s => s is not LcdHubSink && narrowing?.GetValueOrDefault(s.Id)?.Muted != true));
             if (!live.Any(s => s is LcdHubSink))
                 hub?.ClearAll();
             while (waiting.TryDequeue(out var e))

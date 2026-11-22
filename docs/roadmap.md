@@ -34,7 +34,7 @@ design and issue. A PR that finishes, starts or adds an item edits this page in 
 - [ ] Out-of-band alerts: ntfy, LcdHub and a webhook, public by default ([design](alerts.md), #101).
       The planner, the webhook and ntfy built; LcdHub and the other events in review
 - [ ] Secrets reachable in containers, WSL and VMs from the user's account
-      ([design](containers-and-vms.md), #113). Designed, not built
+      ([design](containers-and-vms.md), #113). Phase 1 (what your account can open) built
 - [x] `tir ai`: instructions for AI coding agents ([guide](ai-agents.md))
 - [x] Velopack installer and auto-update from GitHub Releases (`app-release.yml`)
 - [x] Signed with Azure Artifact Signing ([releasing.md](releasing.md))
