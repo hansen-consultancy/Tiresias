@@ -6,7 +6,19 @@
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
-      <RowDefinition Height="*" />
+      <RowDefinition Height="3*" />
+      <RowDefinition MaxHeight="186">
+        <RowDefinition.Style>
+          <Style TargetType="RowDefinition">
+            <Setter Property="Height" Value="2*" />
+            <Style.Triggers>
+              <DataTrigger Binding="{Binding Selected}" Value="{x:Null}">
+                <Setter Property="Height" Value="0" />
+              </DataTrigger>
+            </Style.Triggers>
+          </Style>
+        </RowDefinition.Style>
+      </RowDefinition>
       <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
@@ -15,7 +27,7 @@
     <WrapPanel Grid.Row="1" Margin="0,0,0,12">
       <StackPanel Margin="0,0,12,8">
         <Label x:Name="SearchLabel" Content="{l:S Activity_Search}" Target="{Binding ElementName=Search}" Padding="0,0,0,4" />
-        <TextBox x:Name="Search" Width="240" Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}"
+        <TextBox x:Name="Search" Width="210" Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}"
                  AutomationProperties.LabeledBy="{Binding ElementName=SearchLabel}" />
       </StackPanel>
       <StackPanel Margin="0,0,12,8">
@@ -36,7 +48,7 @@
     </WrapPanel>
 
     <Grid Grid.Row="2">
-      <DataGrid ItemsSource="{Binding Rows}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"
+      <DataGrid ItemsSource="{Binding Rows}" SelectedItem="{Binding Selected}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column"
                 GridLinesVisibility="None" CanUserAddRows="False" SelectionMode="Single"
                 AutomationProperties.Name="{l:S Activity_ListName}">
         <DataGrid.Columns>
@@ -62,7 +74,17 @@
       </TextBlock>
     </Grid>
 
-    <Grid Grid.Row="3" Margin="0,16,0,0">
+    <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,8,0,0" Padding="12,6" Visibility="{Binding DetailsVisibility}">
+      <DockPanel>
+        <Button DockPanel.Dock="Right" Style="{StaticResource RowButton}" VerticalAlignment="Top"
+                Content="{l:S Status_CopyDetails}" Click="OnCopyDetails" />
+        <TextBox x:Name="SelectedDetails" Text="{Binding Selected.FullText, Mode=OneWay}" Style="{StaticResource SelectableText}"
+                 VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                 AutomationProperties.Name="{l:S Activity_ColDetail}" />
+      </DockPanel>
+    </Border>
+
+    <Grid Grid.Row="4" Margin="0,16,0,0">
       <TextBlock Text="{Binding Summary}" Style="{StaticResource CaptionText}" VerticalAlignment="Center" />
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
         <Button x:Name="Incidents" Style="{StaticResource RowButton}" Content="{l:S AdminIncidents_Title}" Click="OnIncidents" />
