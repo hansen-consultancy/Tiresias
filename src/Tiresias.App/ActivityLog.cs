@@ -9,6 +9,7 @@ namespace Tiresias.App;
 static class ActivityLog
 {
     public static bool HasHistory() => new FileInfo(AgentHost.ActivityPath) is { Exists: true, Length: > 0 }
+        || new FileInfo(AgentHost.RecoveryActivityPath) is { Exists: true, Length: > 0 }
         || new FileInfo(SoloBroker.AuditPath) is { Exists: true, Length: > 0 } || ServiceState() != BrokerServiceState.NotInstalled;
 
     public static ActivityHistory ReadAll()
@@ -25,7 +26,7 @@ static class ActivityLog
         {
             AppLog.Error(e, "reading the broker service journal");
         }
-        return ActivityHistory.From(Read(AgentHost.ActivityPath) ?? [], Read(SoloBroker.AuditPath) ?? [], state, serviceJournal);
+        return ActivityHistory.From((Read(AgentHost.ActivityPath) ?? []).Concat(Read(AgentHost.RecoveryActivityPath) ?? []), Read(SoloBroker.AuditPath) ?? [], state, serviceJournal);
     }
 
     static BrokerServiceState? ServiceState()

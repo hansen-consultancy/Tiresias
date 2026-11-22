@@ -1,3 +1,4 @@
+using Tiresias.Audit;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
@@ -53,30 +54,71 @@ internal static class RecoveryEnrollment
             start.ArgumentList.Add(guard.Name);
             start.ArgumentList.Add(Environment.ProcessId.ToString(CultureInfo.InvariantCulture));
         }
-        int exitCode;
-        try
+        var exitCode = RunHelper(() => Process.Start(start), helper =>
         {
-            using var helper = Process.Start(start) ?? throw new InvalidOperationException("Recovery enrollment could not start.");
             if (guard is not null)
                 guard.Wait(helper, () => RecoveryKey.CanReplaceUnused);
             else
                 helper.WaitForExit();
-            exitCode = helper.ExitCode;
+        }, AgentHost.RecoveryActivityPath);
+        // Once published, the caller must keep the paper even if the helper failed during final flush or exit.
+        if (Current() is { } applied && applied.Revision != expected?.Revision && applied.PublicKey == publicKey)
+            return;
+        if (exitCode != 0)
+            throw new InvalidOperationException("Recovery enrollment could not be completed.");
+        throw Changed();
+    }
+
+    internal static int RunHelper(Func<Process?> launch, Action<Process> wait, string activityPath)
+    {
+        Process helper;
+        try
+        {
+            helper = launch() ?? throw new InvalidOperationException("Recovery enrollment could not start.");
+        }
+        catch (Win32Exception e) when (e.NativeErrorCode == 1223)
+        {
+            throw Denied(activityPath, "The Windows UAC prompt was cancelled.", e);
         }
         catch (Win32Exception e)
         {
-            throw new InvalidOperationException("Recovery enrollment was declined or could not be started.", e);
+            throw new InvalidOperationException("Recovery enrollment could not be started.", e);
+        }
+        using var launched = helper;
+        try
+        {
+            wait(helper);
         }
         catch (OperationCanceledException e)
         {
             throw new InvalidOperationException("The recovery enrollment check timed out.", e);
         }
-        // Once published, the caller must keep the paper even if the helper failed during final flush or exit.
-        if (Current() is { } applied && applied.Revision != expected?.Revision && applied.PublicKey == publicKey)
-            return;
-        if (exitCode != 0)
-            throw new InvalidOperationException("Recovery enrollment was declined or could not be completed.");
-        throw Changed();
+        if (helper.ExitCode == (int)RecoveryEnrollmentResult.Declined)
+            throw Denied(activityPath, "No was selected in the recovery enrollment helper.");
+        return helper.ExitCode;
+    }
+
+    static InvalidOperationException Denied(string path, string reason, Exception? cause = null)
+    {
+        // The CLI and desktop can both enroll. Serialize their journal writes across this user's sessions.
+        using var gate = new Mutex(false, "Tiresias.RecoveryActivity", new NamedWaitHandleOptions { CurrentUserOnly = true, CurrentSessionOnly = false });
+        try
+        {
+            try { if (!gate.WaitOne(TimeSpan.FromSeconds(10))) throw new IOException("Recovery Activity is busy."); }
+            catch (AbandonedMutexException) { }
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                using var journal = new AuditLog(path, TimeProvider.System);
+                journal.Append(new(AuditKind.Deny, Service: "Recovery key enrollment", Reason: reason));
+            }
+            finally { gate.ReleaseMutex(); }
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return new InvalidOperationException(reason + " The denial could not be recorded in Activity.", e);
+        }
+        return new InvalidOperationException(reason, cause);
     }
 
     internal static InvalidOperationException Changed() => RecoveryEnrollmentHistory.Changed();

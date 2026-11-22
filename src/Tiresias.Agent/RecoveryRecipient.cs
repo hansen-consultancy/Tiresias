@@ -3,6 +3,8 @@ using System.Numerics;
 
 namespace Tiresias.Agent;
 
+internal enum RecoveryEnrollmentResult { Applied = 0, Declined = 3 }
+
 internal sealed record RecoveryBinding(Guid Revision, string PublicKey);
 
 internal static class RecoveryRecipient

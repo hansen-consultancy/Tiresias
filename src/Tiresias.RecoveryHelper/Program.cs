@@ -16,14 +16,12 @@ internal static partial class Program
             switch (args)
             {
                 case ["recovery", "enroll-recipient", var sid, var revision, var key]:
-                    RecoveryEnrollmentAuthority.ApplyElevated(sid, revision, key);
-                    return 0;
+                    return (int)RecoveryEnrollmentAuthority.ApplyElevated(sid, revision, key);
                 case ["recovery", "enroll-recipient", var sid, var revision, var key, "unused", var nonce, var pid]
                     when Guid.TryParseExact(nonce, "D", out _) &&
                          int.TryParse(pid, NumberStyles.None, CultureInfo.InvariantCulture, out var desktopPid) && desktopPid > 0:
-                    RecoveryEnrollmentAuthority.ApplyElevated(sid, revision, key, onlyIfUnused: true,
+                    return (int)RecoveryEnrollmentAuthority.ApplyElevated(sid, revision, key, onlyIfUnused: true,
                         confirmUnused: () => { RecoveryChangeGuard.Confirm(nonce, desktopPid); return true; });
-                    return 0;
                 default:
                     return 2;
             }

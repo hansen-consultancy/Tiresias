@@ -9,7 +9,7 @@ namespace Tiresias.Agent;
 /// <summary>Publishes one independently confirmed change for the account signed in to this session.</summary>
 internal static partial class RecoveryEnrollmentAuthority
 {
-    internal static void ApplyElevated(string ownerSid, string expectedRevision, string publicKey, bool onlyIfUnused = false,
+    internal static RecoveryEnrollmentResult ApplyElevated(string ownerSid, string expectedRevision, string publicKey, bool onlyIfUnused = false,
         Func<bool>? confirmUnused = null)
     {
         using var admin = WindowsIdentity.GetCurrent();
@@ -30,7 +30,7 @@ internal static partial class RecoveryEnrollmentAuthority
         if (previous?.Revision != expected)
             throw RecoveryEnrollmentHistory.Changed();
         if (!Confirm(desktop!.Name, ownerSid, previous, publicKey, onlyIfUnused))
-            throw new InvalidOperationException("Recovery enrollment was declined.");
+            return RecoveryEnrollmentResult.Declined;
         using var state = RecoveryEnrollmentHistory.Open(ownerSid, create: true)!;
         RecoveryEnrollmentHistory.Append(state, ownerSid, author!, expected, publicKey, protectedStore: true,
             beforePublish: onlyIfUnused ? () =>
@@ -38,6 +38,7 @@ internal static partial class RecoveryEnrollmentAuthority
                 if (confirmUnused?.Invoke() != true)
                     throw new InvalidOperationException("The desktop could not confirm that the recovery enrollment is unused.");
             } : null);
+        return RecoveryEnrollmentResult.Applied;
     }
 
     internal static void RequireDesktop(string ownerSid, string? desktopSid)
@@ -54,8 +55,15 @@ internal static partial class RecoveryEnrollmentAuthority
         var unused = onlyIfUnused ? "\nThis request requires an unused setup. No previous paper key was presented.\n" : "";
         var message = $"{question} for {account} ({sid})?\n{unused}{old}\nNew SHA-256 fingerprint:\n{Fingerprint(key)}\n\nNewly sealed secrets will be recoverable with this paper key.";
         const uint yesNoDefaultNo = 0x0004 | 0x0020 | 0x0100 | 0x2000;
-        return MessageBoxW(0, message, "Tiresias - Verify recovery recipient", yesNoDefaultNo) == 6;
+        return Confirmed(MessageBoxW(0, message, "Tiresias - Verify recovery recipient", yesNoDefaultNo));
     }
+
+    internal static bool Confirmed(int decision) => decision switch
+    {
+        6 => true,  // IDYES
+        7 => false, // IDNO
+        _ => throw new InvalidOperationException("The recovery enrollment confirmation could not be displayed."),
+    };
 
     [LibraryImport("user32.dll", StringMarshalling = StringMarshalling.Utf16)]
     [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
