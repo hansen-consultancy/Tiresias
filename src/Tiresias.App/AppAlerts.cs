@@ -1,3 +1,4 @@
+using System.Net.Http;
 using Tiresias.Agent;
 using Tiresias.Alerts;
 using Tiresias.Vault;
@@ -16,8 +17,16 @@ internal sealed class AppAlerts : IAsyncDisposable
 
     public AppAlerts()
     {
-        Center = new AlertCenter(new HttpAlertTransport(), TimeProvider.System, AppLog.Info);
+        // A demo's webhooks and ntfy topics are made up: nothing leaves the machine, and every post "gets through".
+        var transport = DemoMode.On ? new HttpAlertTransport(new DemoHandler(), TimeProvider.System) : new HttpAlertTransport();
+        Center = new AlertCenter(transport, TimeProvider.System, AppLog.Info);
         Center.Start();
+    }
+
+    sealed class DemoHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
+            Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK));
     }
 
     public AlertCenter Center { get; }
