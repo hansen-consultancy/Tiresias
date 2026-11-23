@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Net.Http.Json;
 using Tiresias.Protocol;
@@ -37,9 +38,18 @@ static class Program
             start.Environment[name] = value;
         // The ticket opens nothing the command needs.
         start.Environment.Remove(DevcontainerWire.TicketVariable);
-        using var child = Process.Start(start)!;
-        await child.WaitForExitAsync();
-        return child.ExitCode;
+        try
+        {
+            using var child = Process.Start(start)!;
+            await child.WaitForExitAsync();
+            return child.ExitCode;
+        }
+        catch (Win32Exception e)
+        {
+            // 127, as a shell answers for a command it can't run.
+            Console.Error.WriteLine($"Could not start {command.Command[0]} ({e.Message}). For a shell command, run it through the shell: tir-remote run -- sh -c \"{string.Join(' ', command.Command)}\"");
+            return 127;
+        }
     }
 
     static async Task<DevcontainerReply> AskAsync(string ticket, IReadOnlyList<string>? names)
