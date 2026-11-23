@@ -23,11 +23,11 @@ static class DevcontainerProbe
 
     /// <summary>
     /// The devcontainer files in folders running containers were started for. Only local folders: a
-    /// <c>\wsl.localhost</c> path would start its distribution.
+    /// <c>\wsl.localhost</c> path, in either slash, would start its distribution.
     /// </summary>
     public static IEnumerable<string> In(IEnumerable<string> workspaces)
     {
-        foreach (var folder in workspaces.Where(w => Path.IsPathFullyQualified(w) && !w.StartsWith(@"\\", StringComparison.Ordinal)))
+        foreach (var folder in workspaces.Where(w => Path.IsPathFullyQualified(w) && !w.StartsWith(@"\\", StringComparison.Ordinal) && !w.StartsWith('/', StringComparison.Ordinal)))
         {
             string[] candidates;
             try

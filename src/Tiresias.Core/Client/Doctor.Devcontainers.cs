@@ -225,7 +225,7 @@ public sealed record InjectAtRunTime(IReadOnlyList<string> Names, string? Folder
         : [.. Names.Select(n => $"tir env set {n}"), .. Remove,
             $"tir run --only {string.Join(",", Names)} -- docker run --rm {string.Join(" ", Names.Select(n => $"-e {n}"))} {Image ?? "<image>"}"]);
 
-    string[] Remove => Container is null ? [] : [$"docker rm {Container}"];
+    string[] Remove => Container is null ? [] : [$"docker stop {Container}", $"docker rm {Container}"];
 
     public override string Instruction => (Folder is not null
         ? "in the devcontainer file, put each in remoteEnv as \"NAME\": \"${localEnv:NAME}\" and delete its value from containerEnv, runArgs and env files. "

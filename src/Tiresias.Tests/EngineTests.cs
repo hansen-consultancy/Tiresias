@@ -99,7 +99,7 @@ public class EngineTests
             Assert.That(fix.Commands.Split('\n'), Is.EqualTo(new[]
             {
                 "tir env set OPENAI_API_KEY --folder \"C:\\src\\shop\"", "tir env set DATABASE_URL --folder \"C:\\src\\shop\"",
-                "docker rm api-dev", "cd \"C:\\src\\shop\"", "tir run -- code .",
+                "docker stop api-dev", "docker rm api-dev","cd \"C:\\src\\shop\"", "tir run -- code .",
             }));
             Assert.That(checks["container redis"].Detail, Does.Contain("stopped container"));
             Assert.That(((InjectAtRunTime)checks["container redis"].Fix!).Commands, Does.EndWith("tir run --only REDIS_PASSWORD -- docker run --rm -e REDIS_PASSWORD redis:7"));
@@ -136,7 +136,7 @@ public class EngineTests
     public async Task An_engine_label_that_would_break_out_is_not_scanned_for_devcontainer_files()
     {
         var probe = new ContentsProbe();
-        var docker = new EngineContents("docker_engine", [new("a", true, "i", [], [], "C:\\x\" & calc & \""), new("b", true, "i", [], [], @"C:\src\shop")], []);
+        var docker = new EngineContents("docker_engine", [new("a", true, "i", [], [], "C:\\x\" & calc & \""), new("b", true, "i", [], [], @"C:\src\shop"), new("c", true, "i", [], [], "//wsl.localhost/Ubuntu/home/alice/app"), new("d", true, "i", [], [], @"\\wsl.localhost\Ubuntu\app")], []);
         await Doctor.RunAsync(probe, new(docker));
         Assert.That(probe.Workspaces, Is.EqualTo(new[] { @"C:\src\shop" }));
     }
@@ -155,6 +155,14 @@ public class EngineTests
         Assert.That(Checks(new(Docker with { LeftOut = 2 })).Single(c => c.Name == Doctor.DockerContentsCheck).Detail, Does.Contain("2 more were left out"));
         Assert.That(Checks(new(Docker)).Select(c => c.Name), Has.None.EqualTo(Doctor.DockerContentsCheck));
     });
+
+    [Test]
+    public void A_name_the_image_leaves_empty_is_the_container_s_secret()
+    {
+        var image = new EngineImage("i1", "app:1", EngineScan.Env(Bytes("""{ "Config": { "Env": ["FOO_TOKEN="] } }""")));
+        var container = new EngineContainer("app", true, "i1", EngineScan.Env(Bytes($$"""{ "Config": { "Env": ["FOO_TOKEN={{Canary}}"] } }""")), [], null);
+        Assert.That(Checks(new(new("docker_engine", [container], [image]))).Single().Name, Is.EqualTo("container app"));
+    }
 
     [Test]
     public void Not_asked_says_how_to_look_only_while_an_engine_is_open()

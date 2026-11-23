@@ -217,7 +217,8 @@ public static partial class Doctor
         foreach (var container in docker.Containers)
         {
             var image = images.GetValueOrDefault(container.ImageId);
-            var fromImage = new HashSet<string>(image?.Env.Select(n => n.Name) ?? [], StringComparer.Ordinal);
+            // Only what the image itself reports: an image's empty FOO_TOKEN= is filled in by the container.
+            var fromImage = new HashSet<string>(image?.Env.Where(n => n.LooksSecret).Select(n => n.Name) ?? [], StringComparer.Ordinal);
             var own = container.Env.Where(n => n.LooksSecret && !fromImage.Contains(n.Name)).ToArray();
             var state = container.Running ? "running" : "stopped";
             if (own.Length > 0)
@@ -268,6 +269,11 @@ public static partial class Doctor
     /// </summary>
     static string? Word(string? value) => value is not null && Pastable(value) ? value : null;
 
-    /// <summary>A <c>devcontainer.local_folder</c> label, only when it can go into a pasted command (see <see cref="Word"/>).</summary>
-    internal static string? PastableFolder(string? folder) => folder is not null && Pastable(folder, path: true) ? folder : null;
+    /// <summary>
+    /// A <c>devcontainer.local_folder</c> label, only when it is a folder on a local drive (<c>C:\…</c>)
+    /// that can go into a pasted command (see <see cref="Word"/>): a UNC path, in either slash, could be
+    /// <c>\\wsl.localhost</c>, and opening it starts the distribution.
+    /// </summary>
+    internal static string? PastableFolder(string? folder) =>
+        folder is [var drive, ':', '\\', ..] && char.IsAsciiLetter(drive) && Pastable(folder, path: true) ? folder : null;
 }
