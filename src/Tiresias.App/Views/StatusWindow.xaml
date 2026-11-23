@@ -157,7 +157,8 @@
   <!-- One window (docs/app-design.md, rule 10): the places on the left, the page on a lighter panel on the right. -->
   <Grid>
     <Grid.ColumnDefinitions>
-      <ColumnDefinition Width="220" />
+      <!-- Fits "Environment variables" and a two-digit count untrimmed, at 100% text size. -->
+      <ColumnDefinition Width="228" />
       <ColumnDefinition Width="*" />
     </Grid.ColumnDefinitions>
     <!-- Only the areas this machine uses (HomeAreas); the rest are reached through Add.... About sits at the bottom. -->
