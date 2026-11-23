@@ -161,6 +161,8 @@ its section below.
 
 ### Fixed
 
+- The app's windows have the Windows 11 look (rounded buttons, cards, the light or dark theme)
+  instead of the classic Windows style they fell back to.
 - An app loading its user secrets through `Tiresias.Extensions.Configuration` now lets the
   consent dialog and Windows Hello prompt come to the front, as `tir` already did, instead of
   opening behind the IDE.
