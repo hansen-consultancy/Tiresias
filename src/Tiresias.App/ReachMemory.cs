@@ -24,7 +24,7 @@ static class ReachMemory
         switch (ReachLook.Decide(settings.ReachScan, last?.At, now, asked))
         {
             case ReachStep.Look:
-                var contents = await probe.ReachContentsAsync(ReachScope.Docker, CancellationToken.None);
+                var contents = await probe.ReachContentsAsync(ReachScope.All, CancellationToken.None);
                 if (!ReachLook.Counts(contents))
                     return contents;
                 last = new(contents, now);

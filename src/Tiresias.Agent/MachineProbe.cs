@@ -145,8 +145,15 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
         Found.Devcontainers.Concat(DevcontainerProbe.In(workspaces)).Distinct(StringComparer.OrdinalIgnoreCase)
             .Select(DevcontainerProbe.Read).OfType<DevcontainerFile>();
 
-    public Task<ReachContents> ReachContentsAsync(ReachScope scope, CancellationToken ct) =>
-        scope.HasFlag(ReachScope.Docker) && !DemoMode.On ? EngineProbe.ReadAsync(Reach, ct) : Task.FromResult(new ReachContents(null));
+    public async Task<ReachContents> ReachContentsAsync(ReachScope scope, CancellationToken ct)
+    {
+        if (DemoMode.On)
+            return new(null);
+        var facts = Reach;
+        var docker = scope.HasFlag(ReachScope.Docker) ? EngineProbe.ReadAsync(facts, ct) : Task.FromResult(new ReachContents(null));
+        var wsl = scope.HasFlag(ReachScope.Wsl) ? WslProbe.ReadAsync(facts, ct) : Task.FromResult<IReadOnlyList<WslContents>?>(null);
+        return (await docker) with { Wsl = await wsl };
+    }
 
     public DevcontainerForwarding? DevcontainerForwarding => DevcontainerProbe.Forwarding();
 

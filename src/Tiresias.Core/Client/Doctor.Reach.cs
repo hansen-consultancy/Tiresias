@@ -103,7 +103,7 @@ public static partial class Doctor
         }
 
         var readable = facts.Distributions
-            .Where(d => d.ReadableFor.Count > 0 && !d.Name.StartsWith("docker-desktop", StringComparison.OrdinalIgnoreCase))
+            .Where(d => d.ReadableFor.Count > 0 && !IsDockerDesktop(d.Name))
             .Select(d => d.Name).ToArray();
         if (readable.Length > 0)
             yield return new(WslDisksCheck, DoctorStatus.Ok,
@@ -115,14 +115,15 @@ public static partial class Doctor
     public const string YourAccount = "your account";
 }
 
-public enum ReachTopic { DockerEngine, HyperV, DevcontainerForwarding, ContainerMounts }
+public enum ReachTopic { DockerEngine, HyperV, DevcontainerForwarding, ContainerMounts, Wsl }
 
 /// <summary>
 /// Steps outside Tiresias to close a path into the user's containers or VMs. Tiresias runs none:
 /// each needs Docker quit, an administrator, or a change inside a guest.
 /// </summary>
 /// <param name="DirectGrant">The engine pipe names the user's account itself, so leaving <c>docker-users</c> doesn't close it.</param>
-public sealed record ReachGuide(ReachTopic Topic, bool DirectGrant = false) : DoctorFix
+/// <param name="Distribution">The WSL distribution, for <see cref="ReachTopic.Wsl"/>, when its name can go into a pasted command.</param>
+public sealed record ReachGuide(ReachTopic Topic, bool DirectGrant = false, string? Distribution = null) : DoctorFix
 {
     /// <summary>The page whose <i>Findings</i> explain each topic, relative to the repository.</summary>
     public const string Page = "docs/containers-and-vms.md";
@@ -134,6 +135,9 @@ public sealed record ReachGuide(ReachTopic Topic, bool DirectGrant = false) : Do
             : "quit Docker Desktop when you don't use it: its pipe closes with it. If you don't use Docker, leave the group as an administrator: Remove-LocalGroupMember -Group docker-users -Member \"$env:USERDOMAIN\\$env:USERNAME\"",
         ReachTopic.ContainerMounts => "remove the mount from the devcontainer file's mounts or runArgs, or from the docker run that made the container, and recreate it. "
             + "Hand in the one credential it needs instead: tir run --only NAME -- docker run --rm -e NAME <image>",
+        ReachTopic.Wsl => "seal each secret with tir env set NAME and delete the file, then hand it in only to the command that needs it: "
+            + $"$env:WSLENV = \"NAME/u\"; tir run --only NAME -- wsl -d {Distribution ?? "<distribution>"} <command>. "
+            + "SSH keys and cloud logins can stay on Windows instead, used through its ssh-agent or the cloud's CLI",
         ReachTopic.DevcontainerForwarding => "if your containers don't need them, add to VS Code's user settings: "
             + "\"dev.containers.gitCredentialHelperConfigLocation\": \"none\", \"dev.containers.dockerCredentialHelper\": false",
         _ => "if you don't manage VMs, leave the group as an administrator: Remove-LocalGroupMember -SID S-1-5-32-578 -Member \"$env:USERDOMAIN\\$env:USERNAME\". "

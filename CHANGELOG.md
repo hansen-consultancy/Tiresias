@@ -52,6 +52,10 @@ its section below.
   engine: which containers and images hold secret-looking names in their environment, and which
   containers mount your `.ssh`, `.aws` or other credential folders, with the commands to seal them
   and hand them in at start instead. Only when you ask (or daily, if you tick it); names only.
+- The same look now reads your running WSL distributions too: AWS profiles, SSH keys, cloud and
+  Kubernetes logins, registry logins, npm, PyPI and GitHub CLI tokens, and secret-looking `.env`
+  names in each home, with the commands to seal them on Windows and pass them in through
+  `WSLENV`. A stopped distribution is never opened, since that would start it.
 - `tir solo service install` (as administrator) runs solo mode's broker as a Windows service under
   its own account, so programs running as you can't read its memory or rewrite the files it
   trusts, and an older `vault.json` restored while locked is refused. `tir solo service uninstall`
