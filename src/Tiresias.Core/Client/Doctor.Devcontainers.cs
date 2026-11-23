@@ -189,7 +189,7 @@ public static partial class Doctor
             yield return new($"devcontainer {file.Path}", DoctorStatus.Warn,
                 $"{string.Join("; ", found.Select(s => $"{s.Where}: {string.Join(", ", s.Names.Select(n => n.Shown))}"))}: in plain text, which any program running as you can read. "
                 + "Hand them in when the container starts instead",
-                new InjectAtRunTime(file.Workspace, names), Position.Plaintext, Position.SealedApproved, "devcontainer files holding secrets");
+                new InjectAtRunTime(names, file.Workspace), Position.Plaintext, Position.SealedApproved, "devcontainer files holding secrets");
         }
 
         if (forwarding is null)
@@ -210,17 +210,39 @@ public static partial class Doctor
 }
 
 /// <summary>
-/// Take secrets out of a devcontainer file and hand them in when VS Code starts it: sealed in the
-/// workspace's folder set, given to VS Code by <c>tir run</c>, read by <c>remoteEnv</c>'s
-/// <c>${localEnv:NAME}</c>. <c>remoteEnv</c> isn't in the container's config, so the engine doesn't show it either.
+/// Take secrets out of where they sit in plain text and hand them in at start instead, sealed and
+/// given over by <c>tir run</c> after consent. For a devcontainer (<paramref name="Folder"/>) that is
+/// the workspace's folder set and <c>remoteEnv</c>'s <c>${localEnv:NAME}</c>, which isn't in the
+/// container's config, so the engine doesn't show it; otherwise <c>docker run --rm -e NAME</c>.
 /// </summary>
-public sealed record InjectAtRunTime(string Folder, IReadOnlyList<string> Names) : DoctorFix
+/// <param name="Container">The container that holds them now and has to go.</param>
+/// <param name="Image">The image to run; with <paramref name="Baked"/>, the one whose <c>ENV</c> lines set them.</param>
+public sealed record InjectAtRunTime(IReadOnlyList<string> Names, string? Folder = null, string? Container = null, string? Image = null, bool Baked = false) : DoctorFix
 {
-    /// <summary>The commands to run, one per line, which the app copies.</summary>
-    public string Commands => string.Join("\n",
-        Names.Select(n => $"tir env set {n} --folder \"{Folder}\"").Append($"cd \"{Folder}\"").Append("tir run -- code ."));
+    /// <summary>
+    /// The commands to run, one per line, which the app copies. Names and folders come from files and
+    /// engines anyone can write, so each part goes in only when <see cref="Doctor.Pastable"/> takes it,
+    /// and a placeholder stands in otherwise: the user fills in <c>&lt;NAME&gt;</c>, never runs a
+    /// stranger's <c>$(…)</c>.
+    /// </summary>
+    public string Commands => string.Join("\n", Folder is not null
+        ? (string[])[.. Pasted.Select(n => $"tir env set {n} --folder \"{Place}\""), .. Remove, $"cd \"{Place}\"", "tir run -- code ."]
+        : [.. Pasted.Select(n => $"tir env set {n}"), .. Remove,
+            $"tir run --only {string.Join(",", Pasted)} -- docker run --rm {string.Join(" ", Pasted.Select(n => $"-e {n}"))} {Safe(Image) ?? "<image>"}"]);
 
-    public override string Instruction =>
-        $"in the devcontainer file, put each in remoteEnv as \"NAME\": \"${{localEnv:NAME}}\" and delete its value from containerEnv, runArgs and env files. "
-        + $"Seal them, quit VS Code, and start it through tir run, which hands them over after you approve: {Commands.Replace("\n", "; ", StringComparison.Ordinal)}";
+    string[] Pasted => Names.Where(n => Doctor.Pastable(n)).ToArray() is { Length: > 0 } names ? names : ["<NAME>"];
+
+    string Place => Folder is not null && Doctor.Pastable(Folder, path: true) ? Folder : "<project folder>";
+
+    string[] Remove => Safe(Container) is { } container ? [$"docker stop {container}", $"docker rm {container}"] : [];
+
+    static string? Safe(string? word) => word is not null && Doctor.Pastable(word) ? word : null;
+
+    public override string Instruction => (Folder is not null
+        ? "in the devcontainer file, put each in remoteEnv as \"NAME\": \"${localEnv:NAME}\" and delete its value from containerEnv, runArgs and env files. "
+            + "Seal them, quit VS Code, and start it through tir run, which hands them over after you approve"
+        : Baked
+            ? $"rebuild {Safe(Image) ?? "the image"} without the ENV lines that set them: a value in an image layer outlives every container. Seal them, and pass them in when a container starts"
+            : "seal them, and start the container through tir run, which hands them in after you approve; --rm removes it when it stops, so its config doesn't keep them")
+        + $": {Commands.Replace("\n", "; ", StringComparison.Ordinal)}";
 }

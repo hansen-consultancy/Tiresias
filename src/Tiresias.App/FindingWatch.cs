@@ -76,7 +76,7 @@ static class FindingWatch
                 Hello = App.Current.Host.Keys.Hello,
                 FailingAlertSinks = App.Current.Alerts.Center.Failing,
             };
-            var checks = await Task.Run(() => Doctor.RunAsync(probe));
+            var checks = await Task.Run(async () => await Doctor.RunAsync(probe, await ReachMemory.ForRunAsync(probe, asked: false)));
             var dismissals = DismissalStore.Load();
             Home.LastFindings = FindingView.Of(checks, dismissals).Open.Count;
             var seen = ReadSeen();

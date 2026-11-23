@@ -2431,6 +2431,21 @@ Store them in clear?</value>
   <data name="Installed_SearchOnlineTip" xml:space="preserve">
     <value>Opens your browser with a web search for this name and version</value>
   </data>
+  <data name="Reach_Title" xml:space="preserve">
+    <value>See what your containers expose</value>
+  </data>
+  <data name="Reach_Intro" xml:space="preserve">
+    <value>Every program you run can open your Docker engine. Check now asks it which secret-looking names your containers and images hold, and what they mount. Values are never kept.</value>
+  </data>
+  <data name="Reach_Looked" xml:space="preserve">
+    <value>Looked inside at {0:t}. The findings are with the others; Check now looks again.</value>
+  </data>
+  <data name="Reach_CheckNow" xml:space="preserve">
+    <value>Check now</value>
+  </data>
+  <data name="Reach_Daily" xml:space="preserve">
+    <value>Check daily</value>
+  </data>
   <data name="Decoys_Title" xml:space="preserve">
     <value>Decoys</value>
   </data>

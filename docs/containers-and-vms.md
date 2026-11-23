@@ -1,6 +1,6 @@
 # Containers, WSL and VMs: what your account can reach
 
-Status: **phases 1 and 2 built** (account facts: engine pipes, WSL disks, Hyper-V; devcontainer files and forwarding); the rest is design. Tracks issue #113. This page designs a doctor check, **Reachable
+Status: **phases 1 to 3 built** (account facts: engine pipes, WSL disks, Hyper-V; devcontainer files and forwarding; Docker engine contents, opt-in); the rest is design. Tracks issue #113. This page designs a doctor check, **Reachable
 from your account**, that tells you which secrets a normal program running as you could read inside
 your containers, WSL distributions and Hyper-V VMs. It extends the [attack surface](attack-surface.md)
 work (#34) and follows the rules of [more checks](more-checks.md#rules-every-check-keeps).
@@ -143,7 +143,7 @@ Each is a `DoctorCheck` with a `Kind`, so one kind is one line on Home with its 
 | Finding | Raised when | Position | Fix |
 |---|---|---|---|
 | Docker engine open to every program you run | A pipe exists and grants your token | none | `ReachGuide("Docker engine")`: quit Docker Desktop when you don't use it (the pipe goes with it); if you don't use Docker, leave the group with `Remove-LocalGroupMember -Group docker-users -Member <you>`, which needs an administrator, so it is printed, not run |
-| Secrets in a container's environment | A container (running or stopped) or image has secret-looking env names | E5/C3 → E4/C1 | `InjectAtRunTime(container)`: for a devcontainer, move the name from `containerEnv` to `remoteEnv` as `"${localEnv:NAME}"`, seal it with `tir env set NAME --folder <project>`, and start VS Code with `tir run -- code <project>`. `remoteEnv` isn't in the container's config, so the engine no longer shows it. Otherwise `tir run --only NAME -- docker run -e NAME …`, which keeps it off disk and out of the image. Then `docker rm` the old container |
+| Secrets in a container's environment | A container (running or stopped) or image has secret-looking env names | E5/C3 → E4/C1 | `InjectAtRunTime(container)`: for a devcontainer, move the name from `containerEnv` to `remoteEnv` as `"${localEnv:NAME}"`, seal it with `tir env set NAME --folder <project>`, and start VS Code with `tir run -- code <project>`. `remoteEnv` isn't in the container's config, so the engine no longer shows it. Otherwise `tir run --only NAME -- docker run -e NAME …`, which keeps it off disk and out of the image. Then `docker stop` and `docker rm` the old container |
 | Secret baked into an image | An image's `Config.Env` has a secret-looking name | E5/C3 | The same, plus rebuild without the `ENV` line; a value in an image layer outlives every container |
 | Host credential folder mounted into a container | A mount source is one of the folders above | none | `ReachGuide("Container mounts")`: remove the mount from `devcontainer.json`'s `mounts` or `runArgs` |
 | Secrets in a devcontainer file | `containerEnv`, `remoteEnv` or a named `.env` holds a secret-looking name with a literal value | E5/C3 → E4/C1 | `InjectAtRunTime(folder)`, as above: the file keeps `${localEnv:NAME}` |
@@ -311,7 +311,18 @@ Each slice ships alone, with its tests and its line in `CHANGELOG.md`.
    `tir run -- code .` lines; VS Code must be quit first, or `code` hands the folder to the running
    window, which never sees the values.
 3. **Docker engine contents, opt-in.** `tir doctor --reach`, the app's card and setting, containers,
-   images and mounts, the `devcontainer.local_folder` link to phase 2's folders.
+   images and mounts, the `devcontainer.local_folder` link to phase 2's folders. **Built**, with
+   these differences: the probe never looks on its own; the caller passes what it read into
+   `Doctor.RunAsync`, so `tir doctor` looks only with `--reach` and the app only after **Check now**
+   (or daily, once ticked). The app keeps the last look in memory for its lifetime, so Home and
+   the background checks keep showing its findings between looks; nothing about contents is
+   written to disk. Only Docker is read, over whichever open pipe answers first, with GETs only and
+   at most 200 containers and 200 images inspected; each call has 10 seconds, its body included. A container or image gone or too large to inspect is left out and counted on the passing line, but the two lists must answer whole, or the check says Docker didn't answer rather than that it found nothing. A container's own names are its `Config.Env`
+   minus the names its image reports as secret; those are reported once, on the image. The fix runs the container with
+   `docker run --rm -e NAME`, because a value passed with `-e` still lands in the container's
+   config and `--rm` takes it away with the container. A `devcontainer.local_folder` label is
+   followed only when it is a folder on a local drive, never a UNC path in either slash, since
+   opening a WSL path would start its distribution. The fix stops and removes the old container.
 4. **WSL contents.** Running distributions only; known credential files and `.env` names; the
    `WSLENV` fix.
 5. **Hyper-V detail.** WMI for members, file DACLs for everyone.

@@ -167,4 +167,16 @@ public class DevcontainerTests
             Assert.That(Doctor.Devcontainers([], null), Is.Empty, "Dev Containers not installed");
         });
     }
+
+    [TestCase("TOKEN\" & calc & \"")]
+    [TestCase("TOKEN$(calc)")]
+    [TestCase("API_KEY`calc`")]
+    public void A_name_or_folder_that_would_break_out_of_a_pasted_command_becomes_a_placeholder(string name)
+    {
+        var sources = DevcontainerScan.Read(Bytes(JsonSerializer.Serialize(new { containerEnv = new Dictionary<string, string> { [name] = "x7Gq2", ["GOOD_TOKEN"] = "x7Gq2" } }))).Sources;
+        var fix = (InjectAtRunTime)Doctor.Devcontainers([new(@"C:\src\$(calc)\.devcontainer\devcontainer.json", @"C:\src\$(calc)", sources)], null).Single().Fix!;
+        Assert.That(fix.Commands + fix.Instruction, Does.Not.Contain("calc"));
+        Assert.That(fix.Commands, Does.StartWith("tir env set GOOD_TOKEN --folder \"<project folder>\""));
+        Assert.That(new InjectAtRunTime([name], Container: "x;calc", Image: "a&calc").Commands, Is.EqualTo("tir env set <NAME>\ntir run --only <NAME> -- docker run --rm -e <NAME> <image>"));
+    }
 }
