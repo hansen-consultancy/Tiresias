@@ -8,6 +8,8 @@ its section below.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-23
+
 ### Added
 
 - **Sealed variables for .NET apps an IDE starts.** `tir env config add <NAME>` (or
@@ -454,7 +456,8 @@ were published as 0.2.0 and are unchanged.
   - `Tiresias.Core` is the vault, the trust chain, grants, leases and the audit log.
   - `Tiresias.Protocol` holds the wire formats.
 
-[Unreleased]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.2.1...HEAD
+[Unreleased]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.3.0...HEAD
+[0.3.0]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.2.1...app-v0.3.0
 [0.2.1]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.1.0-preview.4...app-v0.2.1
 [0.2.0]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.1.0-preview.4...app-v0.2.0
 [0.1.0-preview.4]: https://github.com/hansen-consultancy/Tiresias/compare/v0.1.0-preview.2...app-v0.1.0-preview.4
