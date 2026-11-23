@@ -1,6 +1,6 @@
 # Developer tools appear when the machine is a developer's
 
-Status: **design**, issue #141. Builds on [what is in use](what-do-you-need.md#phase-4-what-is-in-use).
+Status: **built**, issue #141. Builds on [what is in use](what-do-you-need.md#phase-4-what-is-in-use).
 
 ## The problem
 
@@ -130,7 +130,8 @@ A free-text search that matches a developer need still finds it, with developer 
   tools off they move to Passed as notes. This is the one place where a Warn line is quieter than
   today, chosen over keeping them as Warn for everyone.
 - **First-run Mode.** Broker and Secrets only matter to a developer or a team. Without a signal,
-  first run picks Solo and doesn't ask. About keeps the way to change it.
+  the Mode step offers Solo only, so its Next still says what is set up. About keeps the way to
+  show the tools.
 - **Installed and attack surface.** Tagged **E**. The extension findings are D, but they are
   findings, so they show whenever they fire.
 
@@ -150,9 +151,12 @@ read. Through `UserMachine` they read the made-up machine in demo mode.
 | WSL | `HKCU\...\Lxss` has a distribution (`ReachProbe.Distributions`) | 1 registry key |
 | Docker | an engine pipe exists (`ReachProbe.Engines`) | pipe list |
 | Sealed variables | `EnvironmentStore.Exists` | 1 file |
-| `tir` in use | an activity record whose consumer is `environment` or `nuget` (`tir run`, `tir exec`, the shell hook, the NuGet plugin) | `ActivityLog`, already read for Home |
-| Vault has secrets or services | `VaultEditor` counts, already read for Home | — |
+| Vault has services | `VaultEditor` counts, already read for Home | — |
 | Project folders set | `ProjectIndexStore`, already read for Home | — |
+
+`tir` in use is no signal of its own: `tir run`, `tir exec` and the NuGet plugin need a vault
+service or sealed variables, which are. A vault with secrets and no service doesn't count, since
+anyone can keep a secret.
 
 VS Code alone is a weak signal, since writers and students use it too. It still counts: showing
 too much to a few people costs less than hiding tools from a developer who never finds the
@@ -182,12 +186,13 @@ flowchart LR
 - **`HomeAreas.Plan`** gets one more fact. User secrets, Services and Environment variables are
   listed when they are in use, *or* when developer tools show (the setting's Off removes only
   the second).
-- **`DoctorCheck` gains `Audience`** (`Everyone`, `Developer`, `Admin`, `Tiresias`), set where each
-  check is built in Core. A test asserts that every check name the doctor can produce has one.
-  `FindingView` drops Ok lines tagged `Developer` from Passed when the tools are hidden. `tir
-  doctor` ignores it.
-- **`Need` gains `Developer`** in `NeedCatalog`. `NeedsWindow` lists only everyone's needs when
-  the tools are hidden, and the free-text match searches all of them.
+- **`DoctorCheck` gains `ForDevelopers` and `SoloNote`**, set in `Doctor.RunAsync` on the
+  developer groups (user secrets, projects, config, git, publishing keys, RavenDB, CLI sign-ins
+  through devcontainers) and the two solo lines. Two flags were enough: the audit's Admin and
+  Tiresias tags change nothing on screen. `FindingView` drops passing `ForDevelopers` lines and
+  shows a `SoloNote` as passed when the tools are hidden. `tir doctor` ignores both.
+- **`Need.ForDevelopers`**, from the need's id. `NeedsWindow` lists only everyone's needs when
+  the tools are hidden, unless the user typed a search.
 - **Strings:** the Home line, the About setting and its three options. `Strings.resx`, as usual.
 
 ## Design twice
@@ -210,9 +215,9 @@ answer.
 - **A developer who wants it hidden.** Off. In-use areas, findings and fixes stay (see
   [Off never hides what you use](#off-never-hides-what-you-use)); Passed, needs and hints go quiet.
 - **Demo mode.** The signals read through `UserMachine`, so `everyday` (a developer's laptop)
-  shows the tools. A new scenario, `home`, has no signals, no projects and a vault with no
-  secrets, so the everyone view can be checked and captured. HKLM and `PATH` reads take their
-  values from the scenario, which gains a `developer` block (`sdk`, `git`, `visualStudio`).
+  shows the tools. A scenario, `home`, has no signals, no projects and a vault with one secret
+  and no service, so the everyone view can be checked and captured. The machine-wide signals
+  (the SDK, Visual Studio, `PATH`, Docker's pipes) are this PC's, so a demo reads them as absent.
 - **The admin tier.** Orthogonal. Its card, incidents and the decoy enrol and thaw actions depend
   on the service, not on developer tools: a home user is exactly who it is for.
 - **Managed PCs.** IT installing the SDK everywhere turns the tools on for everyone; Off fixes
@@ -231,10 +236,9 @@ rule that findings and Warn/Fail lines are never filtered rules that out. The on
 the solo egress and isolation notes, which can't be acted on and expose nothing. So there is no
 threat entry.
 
-## Phases
+## Built
 
-1. `Audience` on `DoctorCheck`, `Developer` on `Need`, and the test that every check and need has one.
-2. `DeveloperTools.Plan`, the signals, the setting in About, the Home line, and the `home` demo
-   scenario.
-3. Wire up `HomeAreas`, `FindingView`, `NeedsWindow`, first run's Mode step, the Project decoy and
-   the tray solo line. Update `desktop-app.md` and the CHANGELOG.
+`DeveloperTools.Plan` and the signals (`DeveloperSignals`), the About setting, the Home line,
+the `home` demo scenario, and the wiring in `HomeAreas`, `FindingView`, `NeedsWindow`, first
+run's Mode step, the Project decoy and the tray's Solo line. Not done: hiding the `tir` hints,
+which stay for everyone.
