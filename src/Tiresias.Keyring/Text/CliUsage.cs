@@ -49,7 +49,8 @@ static class CliUsage
             installed: extensions with what their host reached, global dotnet/npm/pipx/cargo tools,
             and what starts at log-on with its signature and last use. --reach also asks the Docker
             engine which secret-looking names its containers and images hold, and what they mount,
-            and lists credential files in running WSL distributions; values are never kept. Read-only and offline.
+            lists credential files in running WSL distributions, and which Hyper-V VM files you can read;
+            values are never kept. Read-only and offline.
         tir advise ["<what you need>"]
             The ways to meet a need, strongest first on both axes, and what each gives up: "OpenAI key
             for a script", "my EF Core app talks to Azure SQL". With no words, every need. The words are

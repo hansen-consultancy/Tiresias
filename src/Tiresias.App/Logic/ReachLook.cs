@@ -34,11 +34,11 @@ public static class ReachLook
         : ReachStep.Skip;
 
     /// <summary>
-    /// Whether a look counts as one: only when Docker or WSL answered. One that reached nothing is shown
+    /// Whether a look counts as one: only when Docker, WSL or Hyper-V answered. One that reached nothing is shown
     /// for that run (Docker didn't answer) but not remembered, so the card never says it looked, the
     /// setting stays, and the next run tries again rather than a day later.
     /// </summary>
-    public static bool Counts(ReachContents contents) => contents.Docker is not null || contents.Wsl is not null;
+    public static bool Counts(ReachContents contents) => contents.Docker is not null || contents.Wsl is not null || contents.HyperV is not null;
 
     /// <summary>The setting once the user has looked: <see cref="ReachScan.Daily"/> stays, anything else is <see cref="ReachScan.Once"/>.</summary>
     public static ReachScan AfterLooking(ReachScan setting) => setting == ReachScan.Daily ? ReachScan.Daily : ReachScan.Once;

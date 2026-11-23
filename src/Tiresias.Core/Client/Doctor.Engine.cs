@@ -4,7 +4,7 @@ namespace Tiresias.Client;
 
 /// <summary>Which environments to look inside (docs/containers-and-vms.md, "Consent").</summary>
 [Flags]
-public enum ReachScope { None = 0, Docker = 1, Wsl = 2, All = Docker | Wsl }
+public enum ReachScope { None = 0, Docker = 1, Wsl = 2, HyperV = 4, All = Docker | Wsl | HyperV }
 
 /// <summary>A container, running or stopped, as the engine lists it. Names only: <paramref name="Env"/> holds what <see cref="NameScan"/> kept.</summary>
 /// <param name="ImageId">The image it was made from, to tell its own variables from the image's.</param>
@@ -22,7 +22,8 @@ public sealed record EngineContents(string Pipe, IReadOnlyList<EngineContainer> 
 /// <summary>What was found inside, when the user asked to look (<c>tir doctor --reach</c>, or Home's card).</summary>
 /// <param name="Docker"><c>null</c> when no engine answered.</param>
 /// <param name="Wsl">The running distributions looked inside; <c>null</c> when WSL didn't answer or wasn't asked.</param>
-public sealed record ReachContents(EngineContents? Docker, IReadOnlyList<WslContents>? Wsl = null);
+/// <param name="HyperV">The VM files looked at; <c>null</c> when Hyper-V isn't installed or wasn't asked.</param>
+public sealed record ReachContents(EngineContents? Docker, IReadOnlyList<WslContents>? Wsl = null, HyperVContents? HyperV = null);
 
 /// <summary>
 /// The Docker engine API's JSON, read for names: no value in <c>Config.Env</c> becomes a string.

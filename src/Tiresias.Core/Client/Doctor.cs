@@ -255,6 +255,7 @@ public static partial class Doctor
         checks.AddRange(Reach(reach));
         checks.AddRange(Contents(reach, contents));
         checks.AddRange(WslContents(reach, contents));
+        checks.AddRange(HyperVContents(reach, contents));
         string[] workspaces = [.. contents?.Docker?.Containers.Select(c => PastableFolder(c.Workspace)).OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase) ?? []];
         checks.AddRange(Devcontainers(probe.Devcontainers(workspaces), probe.DevcontainerForwarding));
         var (uses, now) = (probe.CredentialUses().ToArray(), DateTimeOffset.UtcNow);

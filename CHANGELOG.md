@@ -56,6 +56,10 @@ its section below.
   Kubernetes logins, registry logins, npm, PyPI and GitHub CLI tokens, and secret-looking `.env`
   names in each home, with the commands to seal them on Windows and pass them in through
   `WSLENV`. A stopped distribution is never opened, since that would start it.
+- It also checks which Hyper-V disks, checkpoints and saved states your account can read without
+  Hyper-V Administrators: a copy of one is the guest's files or memory, offline. Only the files'
+  permissions are read, never the files. If you are in Hyper-V Administrators, it names the VMs
+  the group opens.
 - `tir solo service install` (as administrator) runs solo mode's broker as a Windows service under
   its own account, so programs running as you can't read its memory or rewrite the files it
   trusts, and an older `vault.json` restored while locked is refused. `tir solo service uninstall`

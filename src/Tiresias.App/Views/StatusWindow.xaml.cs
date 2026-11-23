@@ -822,7 +822,7 @@ public sealed partial class StatusViewModel : ObservableObject
     void ShowReach()
     {
         var setting = AppSettings.Load().ReachScan;
-        ReachVisibility = last.Any(c => c.Name is Doctor.DockerEngineCheck or Doctor.WslDisksCheck or Doctor.WslContentsCheck) ? Visibility.Visible : Visibility.Collapsed;
+        ReachVisibility = last.Any(c => c.Name is Doctor.DockerEngineCheck or Doctor.WslDisksCheck or Doctor.WslContentsCheck or Doctor.HyperVContentsCheck) ? Visibility.Visible : Visibility.Collapsed;
         ReachText = ReachMemory.LookedAt is { } at ? Text.Format("Reach_Looked", at.ToLocalTime()) : Text.Get("Reach_Intro");
         ReachDailyVisibility = setting == ReachScan.Off ? Visibility.Collapsed : Visibility.Visible;
         isReachDaily = setting == ReachScan.Daily;

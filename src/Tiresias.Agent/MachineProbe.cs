@@ -152,7 +152,8 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
         var facts = Reach;
         var docker = scope.HasFlag(ReachScope.Docker) ? EngineProbe.ReadAsync(facts, ct) : Task.FromResult(new ReachContents(null));
         var wsl = scope.HasFlag(ReachScope.Wsl) ? WslProbe.ReadAsync(facts, ct) : Task.FromResult<IReadOnlyList<WslContents>?>(null);
-        return (await docker) with { Wsl = await wsl };
+        var hyperV = scope.HasFlag(ReachScope.HyperV) ? Task.Run(() => HyperVProbe.Read(facts), ct) : Task.FromResult<HyperVContents?>(null);
+        return (await docker) with { Wsl = await wsl, HyperV = await hyperV };
     }
 
     public DevcontainerForwarding? DevcontainerForwarding => DevcontainerProbe.Forwarding();
