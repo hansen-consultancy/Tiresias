@@ -219,19 +219,30 @@ public static partial class Doctor
 /// <param name="Image">The image to run; with <paramref name="Baked"/>, the one whose <c>ENV</c> lines set them.</param>
 public sealed record InjectAtRunTime(IReadOnlyList<string> Names, string? Folder = null, string? Container = null, string? Image = null, bool Baked = false) : DoctorFix
 {
-    /// <summary>The commands to run, one per line, which the app copies.</summary>
+    /// <summary>
+    /// The commands to run, one per line, which the app copies. Names and folders come from files and
+    /// engines anyone can write, so each part goes in only when <see cref="Doctor.Pastable"/> takes it,
+    /// and a placeholder stands in otherwise: the user fills in <c>&lt;NAME&gt;</c>, never runs a
+    /// stranger's <c>$(…)</c>.
+    /// </summary>
     public string Commands => string.Join("\n", Folder is not null
-        ? (string[])[.. Names.Select(n => $"tir env set {n} --folder \"{Folder}\""), .. Remove, $"cd \"{Folder}\"", "tir run -- code ."]
-        : [.. Names.Select(n => $"tir env set {n}"), .. Remove,
-            $"tir run --only {string.Join(",", Names)} -- docker run --rm {string.Join(" ", Names.Select(n => $"-e {n}"))} {Image ?? "<image>"}"]);
+        ? (string[])[.. Pasted.Select(n => $"tir env set {n} --folder \"{Place}\""), .. Remove, $"cd \"{Place}\"", "tir run -- code ."]
+        : [.. Pasted.Select(n => $"tir env set {n}"), .. Remove,
+            $"tir run --only {string.Join(",", Pasted)} -- docker run --rm {string.Join(" ", Pasted.Select(n => $"-e {n}"))} {Safe(Image) ?? "<image>"}"]);
 
-    string[] Remove => Container is null ? [] : [$"docker stop {Container}", $"docker rm {Container}"];
+    string[] Pasted => Names.Where(n => Doctor.Pastable(n)).ToArray() is { Length: > 0 } names ? names : ["<NAME>"];
+
+    string Place => Folder is not null && Doctor.Pastable(Folder, path: true) ? Folder : "<project folder>";
+
+    string[] Remove => Safe(Container) is { } container ? [$"docker stop {container}", $"docker rm {container}"] : [];
+
+    static string? Safe(string? word) => word is not null && Doctor.Pastable(word) ? word : null;
 
     public override string Instruction => (Folder is not null
         ? "in the devcontainer file, put each in remoteEnv as \"NAME\": \"${localEnv:NAME}\" and delete its value from containerEnv, runArgs and env files. "
             + "Seal them, quit VS Code, and start it through tir run, which hands them over after you approve"
         : Baked
-            ? $"rebuild {Image ?? "the image"} without the ENV lines that set them: a value in an image layer outlives every container. Seal them, and pass them in when a container starts"
+            ? $"rebuild {Safe(Image) ?? "the image"} without the ENV lines that set them: a value in an image layer outlives every container. Seal them, and pass them in when a container starts"
             : "seal them, and start the container through tir run, which hands them in after you approve; --rm removes it when it stops, so its config doesn't keep them")
         + $": {Commands.Replace("\n", "; ", StringComparison.Ordinal)}";
 }
