@@ -112,7 +112,10 @@ allowance.
 
 - **6a. Validate the relay.** On a machine with Docker Desktop, with the owner's OK: a container
   reaching a test listener on `127.0.0.1` through `host.docker.internal`, and which process the
-  host's TCP table names for it. Nothing else is built until this holds.
+  host's TCP table names for it. Nothing else is built until this holds. **Done** (Docker Desktop
+  4.96, WSL 2 backend): a `node:24-slim` container's `fetch('http://host.docker.internal:7799/')`
+  reached a listener bound to `127.0.0.1:7799` only, and the TCP table named the connection's
+  owner `com.docker.backend.exe`, not anything in the container.
 - **6b. Tickets, the endpoint and `tir-remote run`/`env`.** Placeholders and values on request,
   with consent naming the devcontainer.
 - **6c. Git credentials and the feature.** `git-credential`, the published feature, and phase 2's
