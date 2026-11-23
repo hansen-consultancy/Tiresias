@@ -24,8 +24,9 @@ public sealed record StartupEntry(string Name, string Where, string? Path, bool?
     public const string StartupFolder = "Startup folder";
 }
 
-/// <summary>When the user last started a program themselves, as Windows records it (UserAssist).</summary>
-public sealed record ProgramRun(string Path, DateTimeOffset LastRun);
+/// <summary>When a program last ran for the user, as Windows records it.</summary>
+/// <param name="Opened">The user started it themselves, from Explorer, the Start menu or the taskbar (UserAssist); otherwise it ran some other way too, at log-on, from a script or a service (the admin tier's <c>lastrun</c>).</param>
+public sealed record ProgramRun(string Path, DateTimeOffset LastRun, bool Opened = true);
 
 /// <summary>
 /// Turn off a log-on entry the way Task Manager and Settings do, keeping the program: Settings,
@@ -130,7 +131,8 @@ public static partial class Doctor
                 new RevealFile(entry.Path!), Kind: UnsignedStartupKind);
         }
 
-        var lastRuns = (runs ?? []).GroupBy(r => r.Path, StringComparer.OrdinalIgnoreCase)
+        // Only what the user opened: a program started at log-on runs at every log-on.
+        var lastRuns = (runs ?? []).Where(r => r.Opened).GroupBy(r => r.Path, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.Max(r => r.LastRun), StringComparer.OrdinalIgnoreCase);
         // Tiresias's own entry is left alone: a tray app is used without being opened again, and it is what is asking.
         foreach (var entry in startupEntries.Where(e => e is { Path: not null, Item: not null, InTray: false } && DisableStartup.IsSafeItem(e.Item)

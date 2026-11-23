@@ -118,7 +118,9 @@ public sealed partial class InstalledViewModel : ObservableObject
         (all, icons) = await Task.Run(() =>
         {
             var probe = new MachineProbe();
-            var programs = Doctor.InstalledPrograms(probe.UninstallEntries(), probe.ProgramRuns(), probe.CredentialUses(), DateTimeOffset.UtcNow);
+            var entries = probe.UninstallEntries().ToArray();
+            var runs = probe.ProgramRuns(Doctor.RunsAsked(probe.StartupEntries(), entries, []));
+            var programs = Doctor.InstalledPrograms(entries, runs, probe.CredentialUses(), DateTimeOffset.UtcNow);
             Dictionary<string, ImageSource> read = new(StringComparer.OrdinalIgnoreCase);
             foreach (var entry in programs.Select(p => p.Entry).Where(e => e.Icon is not null && e.IconLocation is not null))
                 if (!read.ContainsKey(entry.Icon!) && Desktop.SmallIcon(entry.IconLocation!.Value.Path, entry.IconLocation.Value.Index) is { } image)

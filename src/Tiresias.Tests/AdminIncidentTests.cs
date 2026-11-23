@@ -82,6 +82,32 @@ public class AdminIncidentTests
     }
 
     [Test]
+    public void A_routine_read_is_kept_and_crosses_the_wire_without_blocking()
+    {
+        var journal = new AdminIncidentJournal(folder, Sid);
+        var hit = new DecoyHit(DecoyUse.Read, @"C:\Users\alice\passwords.txt", 4242, @"C:\Windows\explorer.exe", DateTimeOffset.UnixEpoch);
+        journal.Record(hit, [], Hash, routine: "File Explorer");
+
+        var back = AdminReply.Ok(new AdminIncidentJournal(folder, Sid).Read(0, false)).ResultAs<AdminEvents>()!.Events.Single();
+
+        Assert.That(back.Routine, Is.EqualTo("File Explorer"), "after a restart, on the wire");
+        Assert.That(back.Hit, Is.EqualTo(hit));
+        Assert.That(journal.Check(hit.Program, Hash).Blocked, Is.False);
+    }
+
+    [Test]
+    public void A_frozen_use_is_kept_on_its_incident_and_blocks()
+    {
+        var journal = new AdminIncidentJournal(folder, Sid);
+        journal.Record(Hit(), [], Hash, frozen: true);
+
+        var back = AdminReply.Ok(new AdminIncidentJournal(folder, Sid).Read(0, false)).ResultAs<AdminEvents>()!.Events.Single();
+
+        Assert.That(back.Frozen, Is.True);
+        Assert.That(journal.Check(Program, Hash).Blocked, Is.True);
+    }
+
+    [Test]
     public void A_block_survives_restart_and_only_an_explicit_unblock_changes_its_decision()
     {
         var journal = new AdminIncidentJournal(folder, Sid);

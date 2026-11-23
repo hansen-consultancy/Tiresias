@@ -66,7 +66,8 @@ public sealed class AgentHost : IAsyncDisposable
                 await Task.Delay(TimeSpan.FromSeconds(30), ct);
                 continue;
             }
-            if (page.Events.Count > 0)
+            // A routine opener's read is kept as evidence and raises nothing.
+            if (page.Events.Any(e => e.Routine is null))
             {
                 Say("The admin service has decoy incidents awaiting review. See Service incidents in Activity.");
                 ServiceIncidentsReceived?.Invoke(page.Events);
@@ -100,9 +101,9 @@ public sealed class AgentHost : IAsyncDisposable
     /// Records "This wasn't me" in the activity log: what was asked, the program and the processes
     /// that started it (nearest first), and whether it is now blocked. Never a value.
     /// </summary>
-    public void RecordIncident(string asked, string? process, IEnumerable<string> parents, bool blocked) =>
+    public void RecordIncident(string asked, string? process, IEnumerable<string> parents, bool blocked, bool frozen = false) =>
         activity.Append(new(AuditKind.Deny, Consumer: "incident", Service: asked, Process: process,
-            Reason: $"This wasn't me: locked{(blocked ? ", program blocked" : "")}; started by {(parents.Any() ? string.Join(" < ", parents) : "unknown")}"));
+            Reason: $"This wasn't me: locked{(blocked ? ", program blocked" : "")}{(frozen ? ", frozen by the admin tier" : "")}; started by {(parents.Any() ? string.Join(" < ", parents) : "unknown")}"));
 
     public UserSecretsService UserSecrets { get; }
 

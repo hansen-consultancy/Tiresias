@@ -234,8 +234,8 @@ static partial class SurfaceProbe
     public static IEnumerable<DecoyUseRecord> DecoyUses()
     {
         var service = AdminIncidents.History() ?? throw new IOException("The admin service incident history is unavailable.");
-        return Doctor.DecoyUses(Lines(AgentHost.ActivityPath)).Concat(service.Events.Select(e =>
-            new DecoyUseRecord(e.Hit.Program, new DecoyTouch(e.Hit, e.Parents).What, e.Hit.At)));
+        return Doctor.DecoyUses(Lines(AgentHost.ActivityPath)).Concat(service.Events.Where(e => e.Routine is null).Select(e =>
+            new DecoyUseRecord(e.Hit.Program, new DecoyTouch(e.Hit, e.Parents).What, e.Hit.At, e.Frozen)));
     }
 
     public static IEnumerable<CredentialUse> CredentialUses() =>

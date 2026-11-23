@@ -66,9 +66,11 @@ public sealed class AdminIncidentJournal
         catch (FileNotFoundException) { }
     }
 
-    public AdminEvent Record(DecoyHit hit, IReadOnlyList<string> parents, string? sha256)
+    /// <param name="routine">A read by a routine opener: recorded as evidence, never blocking.</param>
+    /// <param name="frozen">The service froze the program for this use.</param>
+    public AdminEvent Record(DecoyHit hit, IReadOnlyList<string> parents, string? sha256, string? routine = null, bool frozen = false)
     {
-        var e = new AdminEvent(checked(lastId + 1), hit, parents);
+        var e = new AdminEvent(checked(lastId + 1), hit, parents, routine, frozen);
         Append(new(1, "incident", hit.At, Event: e, Sha256: sha256));
         return e;
     }

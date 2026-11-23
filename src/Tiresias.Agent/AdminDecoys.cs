@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using Microsoft.Win32;
 using Microsoft.Win32.SafeHandles;
+using Tiresias.Admin;
 using Tiresias.AdminTier;
 using Tiresias.Decoys;
 using Tiresias.Protocol;
@@ -40,7 +41,23 @@ public static partial class AdminDecoys
     public static AdminDecoysStatus? Status() => Send(AdminOps.DecoysStatus)?.ResultAs<AdminDecoysStatus>()?.ConfirmedStatus();
 
     /// <summary>
-    /// Run elevated (<c>tir decoys release</c>, <c>Tiresias.exe --admin-tier release-decoys</c>):
+    /// For the app's <i>This wasn't me</i>: asks the admin tier to freeze the process and block its
+    /// program's network, as it does on a decoy use.
+    /// </summary>
+    /// <returns>What it did; <c>null</c> when it doesn't answer or refuses.</returns>
+    public static async Task<AdminFreezeResult?> FreezeAsync(int processId) =>
+        (await AdminClient.SendAsync(AdminOps.Freeze, new JsonObject { ["pid"] = processId }))?.ResultAs<AdminFreezeResult>();
+
+    /// <summary>Run elevated (<c>Tiresias.exe --admin-tier unblock-program &lt;program&gt;</c>, before the unblock): thaws the session user's freezes of the program and lifts its network block.</summary>
+    public static AdminSetupResult Thaw(string program) =>
+        Send(AdminOps.Thaw, new JsonObject { ["program"] = program }) is { Status: AdminStatus.Ok } ? AdminSetupResult.Done : AdminSetupResult.Failed;
+
+    /// <summary>Run elevated by the tier's removal: asks the running service to undo its work (<see cref="AdminInstallStep.Teardown"/>).</summary>
+    /// <returns>Whether it answered that it did.</returns>
+    public static bool Teardown() => Send(AdminOps.Teardown) is { Status: AdminStatus.Ok };
+
+    /// <summary>
+    /// Run elevated (<c>tir decoys release</c>,<c>Tiresias.exe --admin-tier release-decoys</c>):
     /// takes the session user's set back from the admin tier and writes it to that user's
     /// <c>decoys.json</c>. The service keeps its original registration until the local file is durable.
     /// </summary>
@@ -64,26 +81,52 @@ public static partial class AdminDecoys
 
     /// <summary>
     /// Run elevated by the tier's removal, the service stopped: hands every set in its state folder
-    /// back to its user, deleting each one that went.
+    /// back to its user, deleting each one that went, and undoes the service's read auditing: the
+    /// rules on the sets' files, and File System success auditing once no set is left, if the
+    /// service turned it on (<c>audit.json</c>).
     /// </summary>
     /// <returns>Whether every set went back; one that didn't stays in the state folder.</returns>
     public static bool HandBackAll(string stateFolder)
     {
         var folder = Path.Combine(stateFolder, "decoys");
-        if (!Directory.Exists(folder))
-            return true;
         var all = true;
-        foreach (var file in Directory.EnumerateFiles(folder, "*.json"))
+        var privileged = Privileged();
+        foreach (var file in Directory.Exists(folder) ? Directory.EnumerateFiles(folder, "*.json") : [])
         {
             var sid = Path.GetFileNameWithoutExtension(file);
-            using var restored = AdminArgs.UserSid(sid) && AdminHeldDecoys.Parse(File.ReadAllText(file)) is { } held && KeyringFolder(sid) is { } keyring
+            var held = AdminArgs.UserSid(sid) ? AdminHeldDecoys.Parse(File.ReadAllText(file)) : null;
+            using var restored = held is not null && KeyringFolder(sid) is { } keyring
                 ? OpenHandBack(Path.Combine(keyring, DecoySet.FileName), held.Set) : null;
             if (restored is not null)
+            {
+                if (privileged)
+                    foreach (var path in held!.Files)
+                        AuditRules.Remove(path);
                 File.Delete(file);
+            }
             else
                 all = false;
         }
+        var audit = Path.Combine(stateFolder, "audit.json");
+        if (all && privileged && File.Exists(audit) && AdminAuditState.Parse(File.ReadAllText(audit)).Release(0).TurnOff)
+        {
+            AuditRules.SetSuccess(false);
+            File.Delete(audit);
+        }
         return all;
+    }
+
+    static bool Privileged()
+    {
+        try
+        {
+            AuditRules.EnablePrivilege();
+            return true;
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            return false;
+        }
     }
 
     /// <summary>Holds the exact durable file until its service receipt commits. A retry accepts the identical file.</summary>

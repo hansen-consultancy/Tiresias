@@ -240,6 +240,29 @@ public class DecoyTests
     }
 
     [Test]
+    public async Task The_hit_is_raised_before_the_caller_is_answered()
+    {
+        var set = DecoySet.Mint(Free);
+        Task<HttpResponseMessage>? call = null;
+        var answeredDuringHit = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var listener = new DecoyListener(set, (_, _) => (4242, "caller"), TimeProvider.System);
+        listener.Hit += _ =>
+        {
+            // Long enough for a reply already sent to arrive: the admin tier freezes the caller here.
+            Thread.Sleep(300);
+            answeredDuringHit.TrySetResult(Volatile.Read(ref call)?.IsCompleted ?? false);
+        };
+        listener.Start();
+        using var http = new HttpClient();
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", set.Values.AdminToken);
+
+        Volatile.Write(ref call, http.GetAsync($"{set.HttpUrl}/admin"));
+        await call;
+
+        Assert.That(await answeredDuringHit.Task.WaitAsync(TimeSpan.FromSeconds(10)), Is.False);
+    }
+
+    [Test]
     public async Task A_bare_connection_to_a_decoy_port_is_still_a_hit()
     {
         var set = DecoySet.Mint(Free);

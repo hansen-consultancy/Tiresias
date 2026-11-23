@@ -10,6 +10,9 @@ its section below.
 
 ### Added
 
+- A critical alert, such as a used decoy credential, takes the LcdHub screen over in red with the
+  event and its count, until Home shows your findings or for 24 hours. **Send a test alert** shows
+  what it looks like for a minute.
 - Alerts tell you when they stop arriving: a sink whose receiver refuses them, or that hasn't
   delivered for 15 minutes, is a finding on Home ("alerts to `phone` aren't arriving") and an
   "Alerts to a sink are failing" alert on your other sinks, whatever their threshold. Only a
@@ -65,6 +68,17 @@ its section below.
   installed for, the credentials it used in the last 90 days, its folder, its publisher and who
   signed it (checked on your PC), and **Search online...** to look it up in your browser. **Open Installed apps
   in Settings** is where you uninstall it.
+- Admin tier: every read of a decoy file is named, from Windows' own file auditing, with the
+  program that read it and what started it; reads by routine openers such as Windows Search are
+  kept in the incident history and raise nothing.
+- Admin tier: it now tells Tiresias when your programs last ran, from Windows' records only an
+  administrator can read (the Background Activity Moderator and Prefetch), for the programs the
+  doctor looks at and only for you. Unused applications are found more reliably, and a decoy
+  finding says when Windows last saw the program run.
+- Admin tier: a program that uses a decoy credential is now frozen, together with what it started,
+  and cut off the network until you decide. Home's finding offers **Thaw and unblock (that was me)**
+  behind an admin prompt, as does unblocking it from the blocked programs list; dismissing it keeps
+  the program frozen. **This wasn't me** freezes the program too. Removing the admin tier thaws everything and lifts every network block first.
 - `tir doctor --surface` also lists what is installed: each editor's extensions with the
   credentials that editor used through Tiresias in the last 90 days, global `dotnet`, `npm`, `pipx`
   and `cargo` tools, and what starts at log-on with its signature and when you last opened it.
@@ -106,8 +120,9 @@ its section below.
   With it, your decoys are held by the service: programs running as you can no longer read which
   files are decoys or their values, a decoy used while the app is closed is caught from boot and
   shown when the app next runs, and Home and `tir decoys list` show the kinds held. Removing the
-  decoys, or the admin tier, gives them back first (one more admin prompt). Auditing reads and
-  stopping the program come in the next releases.
+  decoys, or the admin tier, gives them back first (one more admin prompt). Every read of a held
+  decoy file is seen through Windows auditing, even one made while the app was closed, and is
+  shown as a read the app saw itself. Stopping the program comes in a next release.
 
 ### Changed
 

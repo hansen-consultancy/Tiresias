@@ -27,10 +27,12 @@ design and issue. A PR that finishes, starts or adds an item edits this page in 
 - [x] Attack surface: installed software, extensions and global tools, ranked by what uses
       credentials ([design](attack-surface.md), #34)
 - [ ] Decoys: canary credentials that point home, and tripwires on decoy files
-      ([design](decoys.md), #39). Canary credentials, the read tripwire and the Home card built;
-      decoys held by the admin tier in review
+      ([design](decoys.md), #39). Canary credentials, the read tripwire, the Home card and
+      decoys held by the admin tier built
 - [ ] Optional admin tier: a privileged service for what the user account can't protect
-      ([design](admin-tier.md), #91). Step 1 built (the service, its pipe, setup)
+      ([design](admin-tier.md), #91). Steps 1-2 built (the service, its pipe, setup; holding the
+      decoys from boot); steps 3-5 in review (decoy read auditing, freezing a program that used a
+      decoy and blocking its network, lastrun from BAM and Prefetch)
 - [ ] Out-of-band alerts: ntfy, LcdHub and a webhook, public by default ([design](alerts.md), #101).
       The planner, the webhook and ntfy built; LcdHub and the other events in review
 - [ ] Secrets reachable in containers, WSL and VMs from the user's account

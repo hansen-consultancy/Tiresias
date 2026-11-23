@@ -107,8 +107,9 @@ public partial class App : Application
         };
         host.ServiceIncidentsReceived += incidents =>
         {
-            foreach (var incident in incidents)
-                if (AlertFor(new DecoyTouch(incident.Hit, incident.Parents)) is { } alert)
+            // A routine opener's read is evidence only, as in AgentHost.
+            foreach (var incident in incidents.Where(i => i.Routine is null))
+                if (AlertFor(new DecoyTouch(incident.Hit, incident.Parents, null, incident.Frozen)) is { } alert)
                     alertCenter.Raise(alert);
             Dispatcher.BeginInvoke(() => tray?.Notify(Text.Get("Notify_Decoy_Title"), Text.Get("Notify_AdminIncidents")));
         };
@@ -363,7 +364,8 @@ public partial class App : Application
     /// <summary>
     /// "This wasn't me", after the lockdown is already in place: lock (which forgets every session
     /// consent, terminal and NuGet allowance, revokes the terminals' placeholders and ends the lease),
-    /// find the process and what started it, block the program, record it and show what to do next.
+    /// find the process and what started it, block the program, have the admin tier (when installed)
+    /// freeze the process and block its network, record it and show what to do next.
     /// </summary>
     async Task NotMeAsync(Asker asker, string asked, IReadOnlyList<string>? names)
     {
@@ -378,10 +380,13 @@ public partial class App : Application
         });
         guard!.Block(asker.Image, sha);
         var blocked = asker.Image is { } image && guard.Current.Programs.Any(p => string.Equals(p.Path, image, StringComparison.OrdinalIgnoreCase));
-        host!.RecordIncident(asked, process is null ? asker.Image : $"{process.Program} ({process.ProcessId})", chain, blocked);
+        var frozen = process is not null && await AdminDecoys.FreezeAsync(process.ProcessId) is { Processes: > 0 } or { NetworkBlocked: true };
+        if (frozen)
+            AppLog.Info($"this wasn't me: the admin tier froze {process!.Program} ({process.ProcessId})");
+        host!.RecordIncident(asked, process is null ? asker.Image : $"{process.Program} ({process.ProcessId})", chain, blocked, frozen);
         alerts!.Center.Raise(Tiresias.Alerts.AlertSources.Asked(Tiresias.Alerts.AlertKind.IncidentReported,
             process?.Program ?? asker.Image, process?.ProcessId ?? asker.ProcessId, names, chain, DateTimeOffset.UtcNow));
-        IncidentView view = new(asked, asker.Image, process, chain, blocked);
+        IncidentView view = new(asked, asker.Image, process, chain, blocked, frozen);
         IncidentWindow.Show(view);
     }
 

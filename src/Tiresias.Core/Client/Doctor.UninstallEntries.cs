@@ -209,6 +209,20 @@ public static partial class Doctor
     }
 
     /// <summary>
+    /// What the doctor asks the admin tier's <c>lastrun</c> about: the programs started at log-on,
+    /// the installed programs' own folders and the blocked programs, as many as one request takes.
+    /// </summary>
+    public static IReadOnlyCollection<string> RunsAsked(IEnumerable<StartupEntry> startup, IEnumerable<UninstallEntry> installed, IEnumerable<string> blocked) =>
+    [
+        .. startup.Select(s => s.Path).OfType<string>()
+            .Concat(installed.Where(e => e is { FolderExists: true, Folder: { } folder } && Deep(folder)).Select(e => e.Folder!))
+            .Concat(blocked)
+            .Where(p => p.Length <= Tiresias.AdminTier.AdminArgs.MaxPath && !p.Any(char.IsControl) && Tiresias.AdminTier.AdminArgs.FullPath(p))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(Tiresias.AdminTier.AdminArgs.MaxRunPaths),
+    ];
+
+    /// <summary>
     /// The <see cref="ProgramUse.Unused"/> programs of <see cref="InstalledPrograms"/> as findings,
     /// except one already reported as broken (its uninstaller is gone). Hygiene, not a warning: the
     /// status is <see cref="DoctorStatus.Ok"/>, so on Home they are one line, last, and don't count
