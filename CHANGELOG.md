@@ -10,6 +10,9 @@ its section below.
 
 ### Added
 
+- A critical alert, such as a used decoy credential, takes the LcdHub screen over in red with the
+  event and its count, until Home shows your findings or for 24 hours. **Send a test alert** shows
+  what it looks like for a minute.
 - Alerts tell you when they stop arriving: a sink whose receiver refuses them, or that hasn't
   delivered for 15 minutes, is a finding on Home ("alerts to `phone` aren't arriving") and an
   "Alerts to a sink are failing" alert on your other sinks, whatever their threshold. Only a

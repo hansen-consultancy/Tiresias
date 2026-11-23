@@ -23,6 +23,19 @@ public sealed record LcdHubItem(string Key, string Title, LcdHubLevel Level, int
 }
 
 /// <summary>
+/// What the alert frame for a <c>critical</c> alert shows (docs/alerts.md, <i>LcdHub alert frame</i>):
+/// the severity, the event's title and its count, never more. The app draws it at each panel's size.
+/// </summary>
+/// <param name="Lines">Top to bottom; the first is the largest.</param>
+public sealed record LcdHubCard(AlertSeverity Severity, IReadOnlyList<string> Lines);
+
+/// <summary>Draws a card at a panel's size: <c>width × height</c> top-down BGRX pixels, as LcdHub takes them.</summary>
+public delegate uint[] LcdHubRenderer(LcdHubCard card, int width, int height);
+
+/// <summary>One of the hub's panels, as its Panels message announces it.</summary>
+public sealed record LcdHubPanel(string Id, int Width, int Height);
+
+/// <summary>
 /// An alert as an LcdHub status item (docs/alerts.md, <i>Sinks</i>). Pure. Built from the event, the
 /// title and the count alone, on a trusted sink too: the screen faces whoever stands at the desk, so
 /// no <see cref="TrustedDetail"/> ever reaches it.
@@ -35,6 +48,13 @@ public static class LcdHubFormat
     public static readonly TimeSpan TestLifetime = TimeSpan.FromMinutes(1);
 
     public static string Key(string alertEvent) => "tiresias:" + alertEvent;
+
+    /// <summary>Whether a delivery also takes the panels over with an alert frame: <c>critical</c> only.</summary>
+    public static bool TakesOver(AlertPayload payload) => payload.Severity == AlertSeverity.Critical;
+
+    /// <summary>The frame for <paramref name="item"/>: its severity, title and count. Built from the item, so a trusted sink shows no more.</summary>
+    public static LcdHubCard Card(LcdHubItem item, AlertSeverity severity) =>
+        new(severity, [severity.ToString().ToUpperInvariant(), item.Title, $"×{item.Count} · Open Tiresias"]);
 
     public static LcdHubLevel Level(AlertSeverity severity) => severity switch
     {
@@ -61,14 +81,19 @@ public static class LcdHubFormat
 /// <summary>
 /// LcdHub's producer wire, version 4 (github.com/stevehansen/LcdHub, <c>Client/LcdHubClient.cs</c>):
 /// each message a little-endian u32 length of what follows, a u8 type, then its body; strings a u16
-/// byte count and UTF-8. Tiresias sends only Hello and Status, and skips whatever the hub sends.
+/// byte count and UTF-8. Tiresias sends Hello, Status and alert Frames, and reads only the hub's Panels.
 /// </summary>
 internal static class LcdHubWire
 {
     public const string PipeName = "LcdHub";
     public const ushort Version = 4;
-    const byte MsgHello = 1, MsgStatus = 6, StatusLifetime = 2;
+    const byte MsgHello = 1, MsgPanels = 2, MsgFrame = 3, MsgStatus = 6, StatusLifetime = 2;
+    const byte FrameAlert = 1, FrameLifetime = 4;
     const int MaxMessageBytes = 16 << 20;
+    const int MaxPanelPixels = (MaxMessageBytes - 1024) / 4;
+    // A hub has a handful of panels; these bound what one redraw allocates and writes.
+    const int MaxPanels = 16;
+    const long MaxTotalPixels = 4L * MaxPanelPixels;
 
     public static byte[] Hello(string name)
     {
@@ -89,6 +114,76 @@ internal static class LcdHubWire
         if (lifetimeMs > 0)
             w.U32(lifetimeMs);
         return w.Done();
+    }
+
+    /// <summary>
+    /// Panel id, u8 flags (1 alert, 4 lifetime), with flag 4 a u32 lifetime in ms, then <paramref name="pixels"/> as
+    /// little-endian u32 BGRX. <paramref name="alert"/> takes the panel over; no pixels withdraws the frame.
+    /// </summary>
+    public static byte[] Frame(string panelId, bool alert, uint lifetimeMs, ReadOnlySpan<uint> pixels)
+    {
+        var w = new Writer(MsgFrame);
+        w.Str(panelId);
+        w.U8((byte)((alert ? FrameAlert : 0) | (lifetimeMs > 0 ? FrameLifetime : 0)));
+        if (lifetimeMs > 0)
+            w.U32(lifetimeMs);
+        foreach (var pixel in pixels)
+            w.U32(pixel);
+        return w.Done();
+    }
+
+    /// <summary>A Panels body: u16 count, then per panel its id, u16 width and u16 height.</summary>
+    /// <exception cref="IOException">Truncated, or panels no frame could be sent to: one empty or with more pixels than a
+    /// message holds, more than 16 panels, or more pixels in all than four full messages.</exception>
+    public static IReadOnlyList<LcdHubPanel> Panels(ReadOnlySpan<byte> body)
+    {
+        try
+        {
+            var count = BinaryPrimitives.ReadUInt16LittleEndian(body);
+            if (count > MaxPanels)
+                throw new IOException("too many panels");
+            var at = 2;
+            var total = 0L;
+            var panels = new List<LcdHubPanel>(count);
+            for (var i = 0; i < count; i++)
+            {
+                var length = BinaryPrimitives.ReadUInt16LittleEndian(body[at..]);
+                var id = Encoding.UTF8.GetString(body.Slice(at + 2, length));
+                at += 2 + length;
+                var width = BinaryPrimitives.ReadUInt16LittleEndian(body[at..]);
+                var height = BinaryPrimitives.ReadUInt16LittleEndian(body[(at + 2)..]);
+                // A lying hub is treated as gone, like a bad length: its sizes are untrusted input (I-101).
+                if (width == 0 || height == 0 || (long)width * height > MaxPanelPixels || (total += (long)width * height) > MaxTotalPixels)
+                    throw new IOException("impossible panel size");
+                panels.Add(new(id, width, height));
+                at += 4;
+            }
+            return panels;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            throw new IOException("truncated panels message");
+        }
+    }
+
+    /// <summary>Reads one message, keeping the body of a Panels message only.</summary>
+    /// <returns><c>null</c> at a clean end of stream; else the panels it announced, or <c>null</c> panels for any other message.</returns>
+    /// <exception cref="IOException">A bad length or a truncated message.</exception>
+    public static async Task<(IReadOnlyList<LcdHubPanel>? Panels, bool More)> ReadAsync(Stream stream, CancellationToken ct)
+    {
+        var head = new byte[5];
+        var read = await stream.ReadAtLeastAsync(head, head.Length, throwOnEndOfStream: false, ct);
+        if (read == 0)
+            return (null, false);
+        if (read < head.Length)
+            throw new IOException("truncated message");
+        var length = BinaryPrimitives.ReadInt32LittleEndian(head);
+        if (length is < 1 or > MaxMessageBytes)
+            throw new IOException("bad message length");
+        var body = new byte[length - 1];
+        if (await stream.ReadAtLeastAsync(body, body.Length, throwOnEndOfStream: false, ct) < body.Length)
+            throw new IOException("truncated message");
+        return (head[4] == MsgPanels ? Panels(body) : null, true);
     }
 
     /// <summary>Reads one message and drops it.</summary>
@@ -173,17 +268,36 @@ public sealed class LcdHubLink : IAsyncDisposable
     readonly HashSet<string> due = new(StringComparer.Ordinal);
     readonly HashSet<string> withdraw = new(StringComparer.Ordinal);
     readonly List<(string Key, TaskCompletionSource Done)> waiters = [];
+    readonly LcdHubRenderer? render;
+    IReadOnlyList<LcdHubPanel> panels = [];
+    // The alert frame: which item it shows, at what severity, and whether the hub needs it (again) or must drop it.
+    (string Key, AlertSeverity Severity)? frame;
+    // The latest critical, which the frame goes back to when a test's frame ends.
+    (string Key, AlertSeverity Severity)? critical;
+    bool frameDue, frameWithdraw;
     readonly CancellationTokenSource stop = new();
     TaskCompletionSource signal = new(TaskCreationOptions.RunContinuationsAsynchronously);
     Task? running;
     bool connected;
 
     /// <param name="pipeName">Tests pass their own; anything else uses LcdHub's.</param>
-    public LcdHubLink(TimeProvider time, Action<string> log, string pipeName = LcdHubWire.PipeName)
+    /// <param name="render">Draws the alert frame for a <c>critical</c> alert; <c>null</c> shows status items only.</param>
+    public LcdHubLink(TimeProvider time, Action<string> log, string pipeName = LcdHubWire.PipeName, LcdHubRenderer? render = null)
     {
         this.time = time;
         this.log = log;
         this.pipeName = pipeName;
+        this.render = render;
+    }
+
+    /// <summary>The card the panels show now, if any.</summary>
+    public LcdHubCard? Card
+    {
+        get
+        {
+            lock (gate)
+                return CurrentCard(time.GetUtcNow());
+        }
     }
 
     public bool Connected
@@ -241,9 +355,14 @@ public sealed class LcdHubLink : IAsyncDisposable
             if (items.Count == 0)
                 return;
             if (connected)
+            {
                 withdraw.UnionWith(items.Keys);
+                frameWithdraw |= frame is not null;
+            }
             items.Clear();
             due.Clear();
+            frame = critical = null;
+            frameDue = false;
             Wake();
         }
     }
@@ -257,6 +376,17 @@ public sealed class LcdHubLink : IAsyncDisposable
             items[key] = item = LcdHubFormat.Merge(items.GetValueOrDefault(key), payload, time.GetUtcNow(), lifetime);
             withdraw.Remove(key);
             due.Add(key);
+            if (render is not null && (LcdHubFormat.TakesOver(payload) || lifetime == LcdHubFormat.TestLifetime))
+            {
+                // The latest critical takes the panels, or a test shows what one looks like; a later non-critical leaves it.
+                frame = (key, payload.Severity);
+                if (LcdHubFormat.TakesOver(payload))
+                    critical = frame;
+                frameDue = true;
+                frameWithdraw = false;
+            }
+            else if (frame?.Key == key)
+                frameDue = true;
             running ??= Task.Run(() => RunAsync(stop.Token));
             Wake();
         }
@@ -328,16 +458,22 @@ public sealed class LcdHubLink : IAsyncDisposable
                 connected = true;
                 withdraw.Clear();
                 due.UnionWith(items.Keys);
+                panels = [];
+                frameWithdraw = false;
             }
             log("alerts: LcdHub connected");
             await pipe.WriteAsync(LcdHubWire.Hello(ProducerName), ct);
-            reader = DrainAsync(pipe, reading.Token);
+            reader = ReadAsync(pipe, reading.Token);
             while (!ct.IsCancellationRequested)
             {
                 var wake = NextWake();
-                var (messages, delivered, next) = Collect();
+                var (messages, delivered, next, draw) = Collect();
                 foreach (var message in messages)
                     await pipe.WriteAsync(message, ct);
+                // Drawn outside the lock: the renderer may wait for the app's UI thread, which may be in Show.
+                if (draw is var (card, lifetimeMs, onto))
+                    foreach (var panel in onto)
+                        await pipe.WriteAsync(LcdHubWire.Frame(panel.Id, alert: true, lifetimeMs, Draw(card, panel)), ct);
                 await pipe.FlushAsync(ct);
                 foreach (var done in delivered)
                     done.TrySetResult();
@@ -370,14 +506,50 @@ public sealed class LcdHubLink : IAsyncDisposable
         }
     }
 
-    /// <summary>What to write now, the waiters it satisfies, and how long until the next item expires (<c>null</c>: nothing left).</summary>
-    (List<byte[]> Messages, List<TaskCompletionSource> Delivered, TimeSpan? Next) Collect()
+    /// <summary>The card in pixels at <paramref name="panel"/>'s size, or black if the renderer fails or gets the size wrong (the hub would drop that).</summary>
+    uint[] Draw(LcdHubCard card, LcdHubPanel panel)
+    {
+        try
+        {
+            var pixels = render!(card, panel.Width, panel.Height);
+            if (pixels.Length == panel.Width * panel.Height)
+                return pixels;
+            log($"alerts: LcdHub frame drawn at the wrong size for a {panel.Width}x{panel.Height} panel");
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            // A frame that won't draw mustn't take the status items down with it.
+            log($"alerts: LcdHub frame not drawn ({e.GetType().Name})");
+        }
+        return new uint[panel.Width * panel.Height];
+    }
+
+    /// <summary>The frame's card while its item is shown.</summary>
+    LcdHubCard? CurrentCard(DateTimeOffset now) =>
+        frame is var (key, severity) && items.TryGetValue(key, out var item) && item.Until > now ? LcdHubFormat.Card(item, severity) : null;
+
+    /// <summary>
+    /// What to write now, the waiters it satisfies, how long until the next item expires (<c>null</c>:
+    /// nothing left), and the frame to draw on each panel, if it is due.
+    /// </summary>
+    (List<byte[]> Messages, List<TaskCompletionSource> Delivered, TimeSpan? Next, (LcdHubCard Card, uint LifetimeMs, IReadOnlyList<LcdHubPanel> Panels)? Draw) Collect()
     {
         lock (gate)
         {
             var now = time.GetUtcNow();
             Prune(now);
             var messages = new List<byte[]>();
+            if (frameWithdraw)
+                foreach (var panel in panels)
+                    messages.Add(LcdHubWire.Frame(panel.Id, alert: false, 0, []));
+            frameWithdraw = false;
+            (LcdHubCard, uint, IReadOnlyList<LcdHubPanel>)? draw = null;
+            if (frameDue && panels.Count > 0 && CurrentCard(now) is { } card)
+            {
+                var left = Math.Clamp((items[frame!.Value.Key].Until - now).TotalMilliseconds, 1, uint.MaxValue);
+                draw = (card, (uint)left, panels);
+                frameDue = false;
+            }
             foreach (var key in withdraw)
                 messages.Add(LcdHubWire.Status(key, "", LcdHubLevel.Info, 0));
             withdraw.Clear();
@@ -391,7 +563,7 @@ public sealed class LcdHubLink : IAsyncDisposable
             // Put marks an item due, so the first write after it carries it: a waiter whose item is still here got it.
             var delivered = waiters.Where(w => items.ContainsKey(w.Key)).Select(w => w.Done).ToList();
             TimeSpan? next = items.Count == 0 ? null : items.Values.Min(i => i.Until) - now;
-            return (messages, delivered, next);
+            return (messages, delivered, next, draw);
         }
     }
 
@@ -403,15 +575,32 @@ public sealed class LcdHubLink : IAsyncDisposable
             items.Remove(key);
             due.Remove(key);
         }
+        // The hub drops the frame by itself too: it was sent with its item's lifetime.
+        if (critical is var (live, _) && !items.ContainsKey(live))
+            critical = null;
+        if (frame is var (shown, _) && !items.ContainsKey(shown))
+            (frame, frameDue) = (critical, critical is not null);
     }
 
-    /// <summary>Reads what the hub sends (panels, style, visibility) and drops it: Tiresias draws no frames. Ends when the hub goes.</summary>
-    static async Task<bool> DrainAsync(Stream pipe, CancellationToken ct)
+    /// <summary>
+    /// Reads what the hub sends until it goes. Keeps its panels: a new list means it forgot every frame,
+    /// so the alert frame is due again at the new sizes. Style and visibility are dropped: an alert
+    /// frame is drawn in its own colours and sent even to a hidden panel, as LcdHub asks of alerts.
+    /// </summary>
+    async Task<bool> ReadAsync(Stream pipe, CancellationToken ct)
     {
         try
         {
-            while (await LcdHubWire.SkipAsync(pipe, ct))
+            while (await LcdHubWire.ReadAsync(pipe, ct) is { More: true } message)
             {
+                if (message.Panels is not { } announced)
+                    continue;
+                lock (gate)
+                {
+                    panels = announced;
+                    frameDue |= frame is not null;
+                    Wake();
+                }
             }
         }
         catch (Exception e) when (e is IOException or ObjectDisposedException or OperationCanceledException)
