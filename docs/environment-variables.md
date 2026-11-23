@@ -158,7 +158,7 @@ service's grants, and the activity log records each request.
   - NuGet finds `nuget-plugin-*` on PATH from NuGet 6.13 (.NET SDK 9.0.200, Visual Studio 17.13);
     older ones also wanted plugins Authenticode-signed. Don't set `NUGET_PLUGIN_PATHS`: it
     replaces NuGet's own discovery.
-- **.NET apps** started by an IDE (F5 in Visual Studio or Rider) read `Section__Key` variables
+- **.NET apps** started by an IDE (F5 in Visual Studio or Rider) read environment variables
   through configuration: see [.NET configuration](#net-configuration) (designed, phase 5).
 - Anything else that only reads its environment at start-up stays in the registry, and the status
   page lists it as **unprotected** with the program that needs it, so the gap is visible rather
@@ -168,8 +168,8 @@ service's grants, and the activity log records each request.
 
 **Status:** designed, not built (phase 5).
 
-.NET's default host reads environment variables into configuration: `Payments__ApiKey` becomes
-`Payments:ApiKey`. Many apps get a shared signing key or API key that way, with no setup. Once
+.NET's default host reads every environment variable into configuration, under its own name
+(`Payments__ApiKey` becomes `Payments:ApiKey`, `OPENAI_API_KEY` stays `OPENAI_API_KEY`). Many apps get a shared signing key or API key that way, with no setup. Once
 **Protect** seals such a variable, an app started from a terminal with the hook, or by `tir run`,
 still gets it. One started by an IDE does not: the IDE's environment never had it, and its debug
 child inherits that. Starting the IDE itself through `tir run` works, but hands every sealed
@@ -181,7 +181,8 @@ configuration variables**, asked of the app by the app being configured, not by 
 
 - **Which variables:** only those marked for configuration delivery, a third delivery beside value
   and placeholder, set per variable (`tir env config add <NAME>`, a checkbox in the window).
-  Only a name containing `__` can be marked. Nothing is handed to an app it wasn't marked for,
+  Any sealed variable can be marked: the name says nothing about whether an app reads it, since
+  the host injects them all. Nothing is handed to an app it wasn't marked for,
   and an app never sees the whole sealed set the way a terminal does.
 - **Folder sets apply** by the app's content root (its working directory when the host doesn't
   say), so a folder can override a global value for one solution.
@@ -203,9 +204,9 @@ configuration variables**, asked of the app by the app being configured, not by 
 - **Wire:** a new agent pipe op, `environment.load`, carrying the app's folder; the reply's JSON
   maps the variable names (`Payments__ApiKey`) to values. The provider converts the names exactly
   as `AddEnvironmentVariables` does, so the keys match.
-- **Protect warns:** a name containing `__` that isn't marked for configuration gets a note in the
-  Protect dialog and in `tir env protect`: ".NET apps started outside a terminal will stop seeing
-  this; mark it for configuration." `tir doctor` lists sealed `__` variables not marked.
+- **Protect asks:** the Protect dialog has a **Also for .NET apps** checkbox per variable, and
+  `tir env protect` a `--config` flag, with a note that programs started outside a terminal stop
+  seeing a variable that isn't marked.
 
 What it does not cover: an app that doesn't reference the package (one `PackageReference`, often
 in a shared `Directory.Build.props`), and non-.NET programs started by an IDE. Those keep
