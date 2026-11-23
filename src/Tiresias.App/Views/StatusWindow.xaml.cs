@@ -251,6 +251,13 @@ public partial class StatusWindow : Window
 
     void OnAdd(object sender, RoutedEventArgs e) => App.Current.ShowWindow<NeedsWindow>();
 
+    /// <summary>The developer tools setting changed: the nav follows at once, the checks' lists on the next run.</summary>
+    public void DeveloperToolsChanged() => model.ShowAreas();
+
+    void OnDeveloperChange(object sender, RoutedEventArgs e) => Navigate<AboutPage>();
+
+    void OnDeveloperClose(object sender, RoutedEventArgs e) => model.CloseDeveloperLine();
+
     void OnRestore(object sender, RoutedEventArgs e)
     {
         var window = App.Current.ShowWindow<RecoveryWindow>();
@@ -662,7 +669,7 @@ public sealed partial class StatusViewModel : ObservableObject
         {
             set = null;
         }
-        var card = DecoyCard.Of(set, AdminClient.Installed ? AdminDecoys.Status() : null);
+        var card = DecoyCard.Of(set, AdminClient.Installed ? AdminDecoys.Status() : null, DeveloperSignals.View().Shown);
         Decoys.Clear();
         foreach (var placed in card.Placed)
             Decoys.Add(new(Text.Get(DecoyCard.Keys(placed.Kind).Name), placed.Where, Text.Format("Decoys_Since", placed.Placed.ToLocalTime())));
@@ -884,7 +891,23 @@ public sealed partial class StatusViewModel : ObservableObject
         OnPropertyChanged(nameof(ServicesVisibility));
         OnPropertyChanged(nameof(EnvironmentVisibility));
         OnPropertyChanged(nameof(ActivityVisibility));
+        var developer = DeveloperSignals.View();
+        DeveloperLine = DeveloperTools.ShowHomeLine(developer, AppSettings.Load().DeveloperToolsNoted)
+            ? Text.Format("DevTools_HomeLine", DeveloperSignals.Reasons(developer)) : "";
         _ = ShowCountsAsync();
+    }
+
+    /// <summary>Why developer tools appeared, until the user closes it (docs/developer-tools.md); empty otherwise.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DeveloperLineVisibility))]
+    public partial string DeveloperLine { get; set; } = "";
+
+    public Visibility DeveloperLineVisibility => DeveloperLine.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+
+    public void CloseDeveloperLine()
+    {
+        (AppSettings.Load() with { DeveloperToolsNoted = true }).Save();
+        DeveloperLine = "";
     }
 
     [ObservableProperty]
@@ -970,7 +993,7 @@ public sealed partial class StatusViewModel : ObservableObject
     /// <summary>Sorts the last run's lines into findings, dismissed findings and the other checks.</summary>
     void Show()
     {
-        var split = FindingView.Of(last, DismissalStore.Load());
+        var split = FindingView.Of(last, DismissalStore.Load(), DeveloperSignals.View().Shown);
         allFindings = [.. split.Open.Select((group, i) => new FindingRow(group) { IsOpen = i == 0, Number = i + 1 })];
         if (last.Count > 0)
         {

@@ -1,0 +1,38 @@
+// A family PC with nothing a developer would have: no SDK, user secrets, git, IDE, WSL or Docker,
+// and a vault with one secret and no services. The app shows what everyone sees, without developer tools
+// (docs/developer-tools.md). Everything is made up.
+{
+  "description": "A PC that isn't a developer's: the app without developer tools",
+  "setUp": true,
+  "unlocked": true,
+  "files": {
+    "AppData/Local/Programs/PhotoFrame/photoframe.exe": "demo",
+    "AppData/Local/Programs/PhotoFrame/uninstall.exe": "demo",
+    "AppData/Local/Programs/RecipeBox/recipebox.exe": "demo",
+    "AppData/Local/Programs/RecipeBox/uninstall.exe": "demo"
+  },
+  // The Installed page: PhotoFrame is in use, RecipeBox hasn't been opened in 200 days.
+  "registry": {
+    "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\PhotoFrame": {
+      "DisplayName": "PhotoFrame",
+      "DisplayVersion": "3.2",
+      "Publisher": "Example Photos",
+      "InstallLocation": "{{profile}}\\AppData\\Local\\Programs\\PhotoFrame",
+      "UninstallString": "\"{{profile}}\\AppData\\Local\\Programs\\PhotoFrame\\uninstall.exe\""
+    },
+    "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\RecipeBox": {
+      "DisplayName": "RecipeBox",
+      "DisplayVersion": "1.4",
+      "Publisher": "Example Kitchen",
+      "InstallLocation": "{{profile}}\\AppData\\Local\\Programs\\RecipeBox",
+      "UninstallString": "\"{{profile}}\\AppData\\Local\\Programs\\RecipeBox\\uninstall.exe\""
+    }
+  },
+  "programRuns": {
+    "{{profile}}\\AppData\\Local\\Programs\\PhotoFrame\\photoframe.exe": "{{now-3h}}",
+    "{{profile}}\\AppData\\Local\\Programs\\RecipeBox\\recipebox.exe": "{{now-200d}}"
+  },
+  "secrets": {
+    "photo-backup": "demo-backup-0000000000"
+  }
+}

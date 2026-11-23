@@ -55,8 +55,14 @@ public static class FindingView
     /// <summary>Findings dismissed together: one kind, one reason, and the keys that bring them back.</summary>
     public sealed record DismissedGroup(string Title, string Reason, IReadOnlyList<string> Keys);
 
-    public static Split Of(IReadOnlyList<DoctorCheck> checks, Dismissals dismissals)
+    /// <param name="developerTools">Developer tools show. Without them, a developer check's passing line is left out and
+    /// a solo note shows as passed; findings and Warn/Fail lines show either way (docs/developer-tools.md).</param>
+    public static Split Of(IReadOnlyList<DoctorCheck> checks, Dismissals dismissals, bool developerTools = true)
     {
+        if (!developerTools)
+            checks = [.. checks
+                .Where(c => c.IsFinding || !c.ForDevelopers || c.Status != DoctorStatus.Ok)
+                .Select(c => c.SoloNote && !c.IsFinding ? c with { Status = DoctorStatus.Ok } : c)];
         var findings = checks.Where(c => c.IsFinding).Select(c => (Check: c, Dismissal: dismissals.For(c))).ToArray();
         var open = findings.Where(f => f.Dismissal is null).Select(f => f.Check)
             .GroupBy(KindOf)

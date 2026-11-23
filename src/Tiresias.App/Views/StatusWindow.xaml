@@ -259,6 +259,15 @@
 
     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
       <StackPanel>
+        <!-- Why developer tools appeared, once (docs/developer-tools.md). -->
+        <Border Style="{StaticResource Card}" Visibility="{Binding DeveloperLineVisibility}">
+          <DockPanel>
+            <Button DockPanel.Dock="Right" Content="{l:S DevTools_Close}" Padding="12,6" Margin="8,0,0,0" VerticalAlignment="Center" Click="OnDeveloperClose" />
+            <Button DockPanel.Dock="Right" Content="{l:S DevTools_Change}" Padding="12,6" Margin="12,0,0,0" VerticalAlignment="Center" Click="OnDeveloperChange" />
+            <TextBlock Text="{Binding DeveloperLine}" Style="{StaticResource BodyText}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0" />
+          </DockPanel>
+        </Border>
+
         <!-- Sealed secrets this PC's Windows Hello can't open: only the recovery key gives them back. -->
         <Border Style="{StaticResource Card}" Visibility="{Binding RestoreVisibility}">
           <Grid>

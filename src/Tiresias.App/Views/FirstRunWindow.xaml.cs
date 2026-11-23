@@ -123,6 +123,9 @@ public sealed partial class FirstRunViewModel : ObservableObject
     [ObservableProperty]
     public partial bool IsSolo { get; set; } = true;
 
+    /// <summary>A broker or secrets only matter to a developer or a team: elsewhere the Mode step offers solo alone (docs/developer-tools.md).</summary>
+    public bool DeveloperTools { get; } = DeveloperSignals.View().Shown;
+
     [ObservableProperty]
     public partial bool IsBroker { get; set; }
 

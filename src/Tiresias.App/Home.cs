@@ -26,7 +26,8 @@ static class Home
         Read(() => EnvironmentStore.Exists, "sealed variables"),
         Read(ActivityLog.HasHistory, "activity log"),
         [.. fixes],
-        [.. Opened]));
+        [.. Opened],
+        DeveloperSignals.View().Shown));
 
     /// <summary>
     /// The counts beside the places on the left and in the tray, each <c>null</c> when it couldn't be
