@@ -46,14 +46,14 @@ public class DecoyHandoffTests
         File.WriteAllText(path, original.ToJson());
 
         string receipt;
-        await using (var first = new DecoyHold(directory, NullLogger.Instance))
+        await using (var first = new DecoyHold(directory, new Freezer(directory, NullLogger.Instance), NullLogger.Instance))
         {
             receipt = first.PrepareRelease(Sid).Receipt!;
             // The caller can disconnect or find its local manifest occupied without consuming the record.
             Assert.That(first.Status(Sid).NeedsVerification, Is.EqualTo(!verified));
             Assert.That(File.ReadAllText(path), Is.EqualTo(original.ToJson()));
         }
-        await using var restarted = new DecoyHold(directory, NullLogger.Instance);
+        await using var restarted = new DecoyHold(directory, new Freezer(directory, NullLogger.Instance), NullLogger.Instance);
         Assert.That(restarted.PrepareRelease(Sid).Receipt, Is.EqualTo(receipt));
         Assert.That(await restarted.CommitReleaseAsync(Sid, new string('0', 64)), Is.False);
         using (File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read))

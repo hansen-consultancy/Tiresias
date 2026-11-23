@@ -61,7 +61,8 @@ public static class AdminOps
 /// <param name="Version">The service's version, in the app's form ("0.2.1", "0.3.0-preview.1").</param>
 public sealed record AdminStatusResult(string Version, int ProtocolVersion, AdminFeatures Features);
 
-public sealed record AdminFeatures(bool DecoysHeld = false, bool Listening = false, bool Auditing = false);
+/// <param name="Frozen">How many of the caller's freezes are in place: programs that used a decoy, held until an elevated thaw.</param>
+public sealed record AdminFeatures(bool DecoysHeld = false, bool Listening = false, bool Auditing = false, int Frozen = 0);
 
 /// <summary>
 /// Wire format between the app (or tir) and the admin tier's service: the agent pipe's framing

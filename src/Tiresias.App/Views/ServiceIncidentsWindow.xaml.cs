@@ -41,7 +41,7 @@ public partial class ServiceIncidentsWindow : Window
         {
             Time = e.Hit.At.ToLocalTime().ToString("g", CultureInfo.CurrentCulture),
             Program = e.Hit.Program ?? Text.Get("Consent_ProgramUnknown"),
-            Detail = new DecoyTouch(e.Hit, e.Parents).Record().Reason,
+            Detail = new DecoyTouch(e.Hit, e.Parents, e.Routine, e.Frozen).Record().Reason,
             Reviewed = e.Id <= page.ReviewedThrough
         }).ToArray();
         History.ItemsSource = rows;

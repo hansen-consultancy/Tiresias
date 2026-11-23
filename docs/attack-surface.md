@@ -42,7 +42,9 @@ Read-only, per user wherever possible, from sources each check can name:
   only what the user starts from Explorer, Start or the taskbar, so a program with an icon in the
   notification area (the taskbar's `NotifyIconSettings`) is used from there unseen: its last use is
   unknown.
-- Anything with admin rights granted: Prefetch, the Background Activity Moderator.
+- Anything, with the [admin tier](admin-tier.md#last-run) installed: its `lastrun` reads the
+  user's Background Activity Moderator and Prefetch for the programs asked about. These runs count
+  for unused applications, not for log-on programs (which run at every log-on).
 - Command-line tools: the activity log and the terminal hook's records of what ran under
   Tiresias. File access times are not reliable on Windows and are not used.
 - Extensions: their host's last use, and the extension folder's own install or update time.
@@ -203,8 +205,9 @@ only **Unblock** lifts.
 - **Installed items**: kind, id, version, install scope, publisher and signer, and for an
   extension its host program, from the sources under *Discovery*.
 - **Last use** where Windows records it per user (UserAssist), and the activity log's last record
-  per program. Prefetch and the Background Activity Moderator need an administrator and stay
-  unused unless the user is one.
+  per program. Prefetch and the Background Activity Moderator need an administrator: the admin
+  tier's `lastrun` reads them, for the startup programs, installed folders and blocked programs
+  asked (`Doctor.RunsAsked`), when installed.
 - **Startup entries**: user and machine Run keys, startup folders, the user's scheduled tasks.
 - **Credential use**: per program path, the services it asked for and when, from the local
   activity log. The log holds no values, so neither does this.
@@ -309,7 +312,7 @@ against the disk, raising the gone, can't-be-uninstalled and stale-duplicate fin
 **Remove entry...** for the user's own entries and the commands for machine-wide ones; `Repair`
 names winget's command once the inventory knows the package id, and the steps until then.
 **Unused applications are found**: an installed program whose folder had nothing opened in 90
-days (UserAssist), never one with no recorded run or one that runs unseen (a tray icon, a service,
+days (UserAssist, and with the admin tier the Background Activity Moderator and Prefetch), never one with no recorded run or one that runs unseen (a tray icon, a service,
 a driver, a log-on entry, a folder on `PATH`), nor one that used a credential. It is a finding with
 status `ok`, so it sorts last and doesn't count for the badge; all of them are one line on Home,
 "*n* programs you haven't opened in 90 days", whose one button opens the **Installed** page. That

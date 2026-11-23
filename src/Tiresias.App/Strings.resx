@@ -757,6 +757,10 @@ Switch to this copy, {2}, from {3}? The other copy quits first, ending its lease
     <value>Still running as process {0}.</value>
     <comment>{0}: process id</comment>
   </data>
+  <data name="Incident_ProcessFrozen" xml:space="preserve">
+    <value>Process {0} is frozen, with the processes it started, and its program can't use the network: the admin tier stopped it. End it here, or thaw it from Home if it was you after all.</value>
+    <comment>{0}: process id</comment>
+  </data>
   <data name="Incident_ProcessEnded" xml:space="preserve">
     <value>Process {0} is no longer running.</value>
     <comment>{0}: process id</comment>
@@ -1304,7 +1308,7 @@ Store them in clear?</value>
 • It can stop a program that used one until you say otherwise.</value>
   </data>
   <data name="FirstRun_AdminTier_Note" xml:space="preserve">
-    <value>This version holds the decoys and listens for them from boot; the rest arrives in the next updates. Not now changes nothing, and About offers it again any time.</value>
+    <value>Not now changes nothing, and About offers it again any time.</value>
   </data>
   <data name="FirstRun_Primary_AdminTier" xml:space="preserve">
     <value>Set up...</value>
@@ -2065,6 +2069,9 @@ Store them in clear?</value>
   <data name="Finding_FixUnblock" xml:space="preserve">
     <value>Unblock (that was me)</value>
   </data>
+  <data name="Finding_FixThaw" xml:space="preserve">
+    <value>Thaw and unblock (that was me)</value>
+  </data>
   <data name="Finding_FixAlerts" xml:space="preserve">
     <value>Open Alerts</value>
   </data>
@@ -2084,7 +2091,7 @@ Store them in clear?</value>
     <value>Mark {0} service incidents through {1} reviewed for the signed-in user? Their history will remain available in Activity.</value>
   </data>
   <data name="AdminIncidents_ConfirmUnblock" xml:space="preserve">
-    <value>Unblock this program for the signed-in user and allow it to request credentials again?
+    <value>Unblock this program for the signed-in user and allow it to request credentials again? If the admin tier froze it, it is thawed and its network unblocked too.
 
 {0}</value>
   </data>

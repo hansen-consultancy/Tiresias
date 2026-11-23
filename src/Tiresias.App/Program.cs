@@ -35,6 +35,7 @@ static class Program
         }
         if (args is [AdminTierElevation.Argument, "unblock-program", var program])
             return AdminTier.AdminArgs.Program(program) && Confirm(Text.Format("AdminIncidents_ConfirmUnblock", program))
+                && AdminDecoys.Thaw(program) == AdminTier.AdminSetupResult.Done
                 ? (int)AdminProgramBlocks.Unblock(program) : (int)AdminTier.AdminSetupResult.Failed;
         var app = new App();
         app.InitializeComponent();

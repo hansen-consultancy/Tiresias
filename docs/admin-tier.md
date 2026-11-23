@@ -1,10 +1,10 @@
 # The admin tier: a privileged service, optional
 
-Status: **steps 1 and 2 built** (#91): the service, its pipe and `status`, install, update and
-remove, the first-run and About offers, the doctor line and the action log; and the decoys held
-and listened for from boot (`decoys.adopt`, `decoys.status`, `decoys.release`, `events.wait`)
-([Build order](#build-order)). Auditing, freezing and `lastrun` are not built yet; the service
-refuses those actions.
+Status: **all 5 steps built** (#91): the service, its pipe and `status`, install, update and
+remove, the first-run and About offers, the doctor line and the action log; the decoys held and
+listened for from boot (`decoys.adopt`, `decoys.status`, `decoys.release`, `events.wait`); every
+read of a held decoy file audited; a program that used a decoy frozen and cut off the network
+(`freeze`, `thaw`, `teardown`); and `lastrun` ([Build order](#build-order)).
 
 Tiresias works for an ordinary user account and keeps doing so. A user who can approve one UAC
 prompt can add a small Windows service that does what an ordinary account can't: hold the decoys
@@ -57,11 +57,15 @@ broker.
   decoys back to the user's agent), then stops and deletes the service and both folders.
   Uninstalling the app runs it too, when the service exists, behind its own UAC prompt; Velopack
   gives an uninstall hook only seconds, so the app waits 20 s for it and uninstalls anyway.
-  In step 2 the only thing to undo is the held decoys: remove stops the service, then hands each
-  user's set back to that user's `decoys.json` (as `decoys.release` does, below) before deleting.
-  A set that can't go back stays in the state folder, which is then kept, and the step reports
-  failure; installing again picks the set up. `teardown` is built when there is more to undo
-  (step 3 onwards).
+  First, while the service runs, remove sends `teardown` (below). Then, whether or not it
+  answered, remove stops the service, hands each user's set back to that user's `decoys.json` (as `decoys.release` does,
+  below) and takes the audit rules off its files, then turns *File System* success auditing off
+  again if the service turned it on and every set went back (`audit.json`), before deleting. The
+  elevated remove process does this itself (`SeSecurityPrivilege`), so it works with the service
+  stopped. It then undoes from `frozen.json` whatever freeze `teardown` didn't (the service didn't
+  answer, or failed): thaws each job by name, lifts the filters, removes Tiresias's filtering
+  provider. A set that can't go back, or a freeze that can't be undone, stays in the state folder,
+  which is then kept, and the step reports failure; installing again picks it up.
 - The elevated process reports back by exit code (`AdminSetupResult`): done, failed, files missing
   (a development build without the `admin\` folder), or set up but stopped again at once (the
   service found its state folder or pipe name not its own; the Windows event log says which).
@@ -108,15 +112,15 @@ Never an argument. It rolls over at 10 MB.
 
 | Op | Caller | Does |
 |---|---|---|
-| `status` | any | Version, protocol version, which features are on (decoys held, listening, auditing), counts only |
-| `events.wait` | any | Waits up to 30 s for the caller's next events (decoy use, decoy read, freeze), then returns them; the app acknowledges by id. Events wait in the queue while the app is closed |
+| `status` | any | Version, protocol version, which features are on (decoys held, listening, auditing), and how many of the caller's freezes are in place; counts only |
+| `events.wait` | any | Waits up to 30 s for the caller's next events (decoy use, decoy read; a use says whether it froze the program), then returns them; the app acknowledges by id. Events wait in the queue while the app is closed |
 | `decoys.adopt` | any | Takes the caller's decoy set (as `decoys.json` holds it today) and the paths of its decoy files. The service listens on the set's ports, adds audit rules, and from then on the agent keeps no copy |
 | `decoys.status` | any | The kinds placed and how many files, never paths, ports or values |
 | `freeze` | any | Freezes a process of the caller's own user and the processes it started (below), and blocks its program's network. Used by the service itself on a decoy use; the app asks for it on **This wasn't me** |
-| `thaw` | **elevated** | Undoes a freeze: thaws the processes, lifts the network block |
+| `thaw` | **elevated** | Undoes the session user's freezes of a program, named by its full path: thaws the processes, lifts the network block |
 | `decoys.release` | **elevated** | Hands the set back (for `tir decoys remove` or removal of the tier), removes audit rules, stops listening |
 | `lastrun` | any | For paths the caller names, when each last ran for the caller's user (Background Activity Moderator) and how often (Prefetch). Nothing about programs not asked for, nothing about other users |
-| `teardown` | **elevated** | What remove does, before the service is deleted |
+| `teardown` | **elevated** | For remove: thaws every freeze, lifts every filter and removes the provider, stops listening, takes the audit rules off and the policy back. Until it restarts, the service then freezes and listens to nothing; the sets stay for remove to hand back once the service has stopped |
 
 Machine-wide environment variables are **not** a service action: writing them affects every user
 and every service, so the app does it through its own UAC prompt when the user asks. A service
@@ -161,8 +165,8 @@ The service binds the set's two ports on `127.0.0.1` at start, with the same lis
 `TcpConnectionOwner`, linked) and the processes that started it. A set whose ports are taken (the
 agent may hold them a moment after offering the set) is tried again every 5 s. A hit becomes an
 event for the user, kept in the state folder (`events\<sid>.json`, the newest 100) until
-acknowledged, so it survives the app being closed and the machine restarting; from step 4 the
-service also freezes the program at once (below). The agent, in the app or `tir agent`, long-polls
+acknowledged, so it survives the app being closed and the machine restarting. A hit by a process
+it could name first freezes that process (below), before answering it (a quick caller would be gone by then), and the event says so. The agent, in the app or `tir agent`, long-polls
 `events.wait` (30 s), and runs each event through the path of a use it saw itself: activity record
 (consumer `decoy`), then block list, notification and finding in the app. It acknowledges by id on
 the next wait. With the service holding the set, `decoys.json` is gone and the agent does not
@@ -170,39 +174,115 @@ listen.
 
 ### Every read named: auditing
 
-On `decoys.adopt` the service adds a SACL entry to each decoy file (Everyone, `FILE_READ_DATA`,
-success), opening it with `FILE_FLAG_OPEN_REPARSE_POINT` and checking it is a regular file owned by
-the caller. It turns on the *File System* audit subcategory for success if it was off, and
-remembers that so teardown can turn it off again.
+**Rules.** On `decoys.adopt`, and again at each start for every held set, the service adds an
+audit entry to each decoy file's SACL (Everyone, `FILE_READ_DATA`, success). It opens the file
+with `FILE_FLAG_OPEN_REPARSE_POINT` and decides on that handle (`AdminAudit.RuleRefusal`): only a
+regular file with one name, owned by the user whose set it is. A link, a folder, a hard link or
+another owner's file (something the user swapped in to have SYSTEM change) gets no rule; the
+service logs it and `decoys.status` reports `auditing` false for that user. Only Tiresias's own
+entry is added or taken away; any other entry in the SACL stays.
 
-It subscribes to the Security log for event 4663 on those paths. The event carries the process id
-and image, so every read is named, every time, including the reads made while the app was closed
-(the log keeps them). Routine openers (`DecoyReads.RoutineOpener`) are dropped as today. With
-auditing on, the agent's oplock tripwire stands down for those files.
+**Policy.** The rules log nothing unless the *File System* audit subcategory audits success. The
+service turns that on when it was off and remembers it did (`audit.json` in its state folder).
+When the last set is released, or at start with no set held, it turns it off again, only if it
+turned it on; one that was on before stays on. While on, any other SACL on the machine logs too:
+that is Windows' setting, not Tiresias's, and it ends with the last set.
+
+**Reading.** The service reads event 4663 from the Security log every 2 s (an `EventLogReader`: a subscription ignores the query's record id) from the last
+record it handled, kept in `audit.json`: reads made while the service was stopped (or the machine
+off) are read at its next start, as long as the log still has them. The first time, it starts at
+the log's end. An event is a read when its mask has `FILE_READ_DATA` and it names a held file; it
+becomes a `Read` event for that file's user, queued and fetched through `events.wait` like a
+use, so the app does what it does for a read the tripwire saw: activity record and notification,
+never a block. It names the process by the event's id and image; the processes that started it
+only when the process now under that id started before the read (a later one has the id since).
+Each program and file is reported once a minute (`DecoyHitFilter`).
+
+**Routine openers.** `DecoyReads.RoutineOpener` decides as the agent does: Windows Search,
+Defender, Explorer and machine-wide OneDrive by name and folder, recorded and raising nothing. For
+Tiresias's own programs (`tir.exe`, `Tiresias.exe`) the folder is the decoy owner's
+`%LOCALAPPDATA%\Tiresias`, from the profile list: that is where the app installs, and the folder
+the agent vouches for when it watches itself. A program running as the user can write there, so
+one named `Tiresias.exe` placed there reads unflagged; it is still in the activity log.
+
+**The tripwire.** With the set held, `decoys.json` is gone and the agent's oplock tripwire
+watches no file: the audit takes its place, and names every read where the oplock fired once.
 
 ### Stopping the program
 
 A decoy *use* freezes the program; a *read* never does, as today.
 
-- **Freeze**: the service puts the process into a job object only SYSTEM can open, with every
-  process it started that is still running, and freezes the job (`JobObjectFreezeInformation`).
-  New children land in the job and are frozen with it.
-- **Network**: Windows Filtering Platform filters, in a Tiresias sublayer, block connect and
-  accept for the program's image path, IPv4 and IPv6, until lifted.
-- **Undo**: Home's finding gets **Thaw**, which runs `thaw` (UAC). Dismissing the finding keeps it
-  frozen. A frozen process holds its memory and handles; killing it stays the user's choice
-  (Task Manager kills a frozen process).
+- **Freeze**: the service puts the process into a job object, with every process it started that
+  is still running (each started after its parent, so a reused parent id isn't followed), and
+  freezes the job (`JobObjectFreezeInformation`, through `NtSetInformationJobObject`: the Win32
+  `SetInformationJobObject` refuses that class). New children land in the job and are frozen with
+  it. The job's ACL is SYSTEM and Administrators only; its name is `Global\Tiresias.Freeze.<guid>`,
+  unguessable, since any user can create a job under a `Global\` name first.
+- **Never frozen** (`AdminFreeze`, a pure planner): the idle and system processes, the service
+  itself, a process of another user or whose owner or image can't be read, one Windows marks
+  critical, Windows' session and shell processes run from the Windows folder (`csrss`, `winlogon`,
+  `lsass`, `svchost`, `explorer`, `dwm`, `sihost`, `conhost` and the like), and Tiresias's own
+  programs in its own folders. A refused descendant is left out; a refused process asked for
+  refuses the freeze.
+- **Network**: Windows Filtering Platform filters, in Tiresias's own provider and sublayer, both
+  persistent, block connect and accept for the program's image path, IPv4 and IPv6, until lifted.
+  One set per program: a second freeze of it adds none, and a thaw leaves the filters while another
+  user's freeze of the same program still needs them.
+- **Kept**: each freeze (user, program, job name, processes by id and start time, filter ids) is in
+  `frozen.json` in the state folder, so a restart can still thaw and lift. The filters are
+  persistent, so they survive a restart of the service or the machine. A job lives as long as a
+  handle to it, but its *name* goes with the last handle, and a frozen process whose job can't be
+  opened can only be ended, never thawed (assigning it to a second job and thawing that fails). So
+  the service gives each frozen process a handle to its own job that allows only waiting
+  (`SYNCHRONIZE`): the name lives as long as any of them runs, and `thaw` opens the job by name
+  after the service restarts. A machine restart ends the processes anyway. While `frozen.json`
+  can't be read, the service freezes nothing; a freeze it can't write there it undoes and refuses,
+  and a thaw with a job that exists but can't be thawed, filters that can't be lifted, or a record
+  that can't be rewritten, keeps them recorded and fails, so a retry finishes it; the removal
+  likewise keeps `frozen.json` while any job is still frozen.
+- **This wasn't me**: the app asks `freeze` for the process it found, as the user; the service
+  freezes it only when it is that user's, and the incident window says it is frozen.
+- **Undo**: Home's finding gets **Thaw and unblock** instead of **Unblock**. Both, and unblocking a
+  program on Home's list, run the app's `--admin-tier unblock-program <program>` (one UAC prompt),
+  which runs `thaw` and then `blocks.unblock`; a failed thaw leaves it blocked. Dismissing the finding keeps it frozen. A frozen
+  process holds its memory and handles; killing it stays the user's choice (Task Manager kills a
+  frozen process).
 
-To check before building: that `NtResumeProcess` from the user's own token does not thaw a job
-freeze. If it does, the freeze also removes the user's `PROCESS_SUSPEND_RESUME` from the process's
-DACL, and says the residual in the threat file.
+**Checked by hand** (unprivileged, on the author's own child process): a job freeze set from the
+user's own token is undone neither by `NtResumeProcess` (repeated) nor by `ResumeThread` on every
+thread, from the user's own token; the job's thaw undoes it; `TerminateProcess` still ends a frozen
+process. Resuming doesn't thaw, so the freeze leaves `PROCESS_SUSPEND_RESUME` in the process's
+DACL. Not checked: the service's calls as SYSTEM with only the privileges it keeps, and the filters
+on a real connection; those need the service installed.
+
+**Residual**: a process started between the service's snapshot of the processes and the job's
+assignment isn't in the job. A process running as the user can close the waiting handle inside a
+frozen process (the user owns it); after a service restart that freeze can then only be ended, not
+thawed. The filters match the image path: a copy of the program elsewhere isn't blocked.
 
 ### Last run
 
-`lastrun` reads `HKLM\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings\<caller SID>` and
-the `C:\Windows\Prefetch\*.pf` files (decompressed with `RtlDecompressBufferEx`) for the paths
-asked. [Attack surface](attack-surface.md) uses it for "last used"; a decoy finding uses it for
-"first ran on".
+`lastrun` takes up to 256 drive-rooted paths, each a program or a folder (it covers the programs
+under it), and answers at most 1024 programs. It reads the acting user's
+`HKLM\SYSTEM\CurrentControlSet\Services\bam\State\UserSettings\<SID>` (the older
+`bam\UserSettings` too): one value per program, named by its device path
+(`\Device\HarddiskVolume3\...`), mapped to a drive path by each fixed or removable drive's device
+name; other values and unmapped volumes are skipped. Then the `C:\Windows\Prefetch\*.pf` files of
+those programs (MAM-compressed ones decompressed with `RtlDecompressBufferEx`, XPRESS Huffman;
+versions 30 and 31), for the run count and the last 8 run times; Prefetch names volumes
+`\VOLUME{<created>-<serial>}`, mapped by serial number. Parsed files are kept until they change.
+The parsing is pure (`AdminLastRun`, `Prefetch`), checks every offset and size, and reads a damaged
+file as nothing.
+
+**Prefetch is the machine's**, every user's runs together, so it is added only to programs the
+acting user's BAM lists: nothing for a path not asked, nothing for a program only another user ran.
+BAM keeps about a week.
+
+The agent's `IDoctorProbe.ProgramRuns` adds these runs to UserAssist's, marked not *opened*: a run
+the user may not have started (at log-on, from a script). [Attack surface](attack-surface.md)
+counts them for unused applications but not for log-on programs, which run at every log-on. It
+asks about startup programs, installed programs' folders and blocked programs. A decoy finding says
+when Windows last saw the program run.
 
 ## Offered where
 
@@ -214,7 +294,7 @@ asked. [Attack surface](attack-surface.md) uses it for "last used"; a decoy find
   is installed but stopped, or runs but gives no answer from its own process, a failing check;
   older than the app, a warning.
 
-The first-run offer names the features and says the rest arrive in the next updates. The Home finding **Update the admin tier** is not built yet: About and the doctor
+The first-run offer names the features. The Home finding **Update the admin tier** is not built yet: About and the doctor
 line say when the service is older.
 
 ## Over-the-shoulder elevation
@@ -222,7 +302,7 @@ line say when the service is older.
 A standard user approves a UAC prompt with an administrator's password: the elevated caller is
 then the administrator, in the user's session, and its SID isn't the user's. **An elevated caller
 acts for the user signed in to its session** (`AdminDecision.ActingFor`): `decoys.release` returns
-that user's set, `thaw` will thaw that user's program. An unelevated caller acts only for itself,
+that user's set, `thaw` thaws that user's program. An unelevated caller acts only for itself,
 and only when it is that session's user. The alternative, the caller naming the user it acts for
 in an argument, adds an argument to every op and a check that it names the session's user, and
 gives nothing more: the session's user is the only one it could name. An administrator could read

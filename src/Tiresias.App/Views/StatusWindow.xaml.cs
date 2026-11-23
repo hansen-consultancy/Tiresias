@@ -61,6 +61,7 @@ public partial class StatusWindow : Window
             await UnblockAsync(row.Path);
     }
 
+    /// <summary>With the admin tier, one UAC prompt thaws a program it froze, lifts its network block and unblocks it.</summary>
     async Task UnblockAsync(string program)
     {
         try
@@ -329,6 +330,9 @@ public partial class StatusWindow : Window
                 break;
             case UnblockProgram { Path: var program }:
                 _ = UnblockAsync(program);
+                break;
+            case ThawProgram { Path: var frozen }:
+                _ = UnblockAsync(frozen);
                 break;
             case RunThroughExec { Setup: { } setup }:
                 Navigate<ServicesPage>()?.Add(setup.Upstream);

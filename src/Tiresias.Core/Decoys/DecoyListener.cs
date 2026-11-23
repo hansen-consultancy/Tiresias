@@ -36,13 +36,17 @@ public sealed class DecoyListener : IAsyncDisposable
         this.time = time;
     }
 
-    /// <summary>Raised after a caller has been answered (or gave up): once per program and use a minute (<see cref="DecoyHitFilter"/>). Never carries a value.</summary>
+    /// <summary>
+    /// Raised once a caller's request is read and before it is answered, so a handler can stop the
+    /// caller first (the admin tier freezes it); or once it gave up. Once per program and use a
+    /// minute (<see cref="DecoyHitFilter"/>). Never carries a value.
+    /// </summary>
     public event Action<DecoyHit>? Hit;
 
     /// <exception cref="SocketException">A port is taken.</exception>
     public void Start()
     {
-        foreach (var (port, serve) in new (int, Func<Stream, CancellationToken, Task<(DecoyUse, string)>>)[] { (set.HttpPort, ServeHttpAsync), (set.SqlPort, ServeSqlAsync) })
+        foreach (var (port, serve) in new (int, Func<Stream, Action<DecoyUse, string>, CancellationToken, Task<(DecoyUse, string)>>)[] { (set.HttpPort, ServeHttpAsync), (set.SqlPort, ServeSqlAsync) })
         {
             var listener = new TcpListener(IPAddress.Loopback, port);
             listener.Start();
@@ -51,7 +55,7 @@ public sealed class DecoyListener : IAsyncDisposable
         }
     }
 
-    async Task AcceptAsync(TcpListener listener, int port, Func<Stream, CancellationToken, Task<(DecoyUse, string)>> serve)
+    async Task AcceptAsync(TcpListener listener, int port, Func<Stream, Action<DecoyUse, string>, CancellationToken, Task<(DecoyUse, string)>> serve)
     {
         while (!stop.IsCancellationRequested)
         {
@@ -78,25 +82,33 @@ public sealed class DecoyListener : IAsyncDisposable
         }
     }
 
-    async Task HandleAsync(TcpClient client, int port, Func<Stream, CancellationToken, Task<(DecoyUse, string)>> serve)
+    async Task HandleAsync(TcpClient client, int port, Func<Stream, Action<DecoyUse, string>, CancellationToken, Task<(DecoyUse, string)>> serve)
     {
         using (client)
         {
             var caller = client.Client.RemoteEndPoint is IPEndPoint remote ? identify(remote, port) : null;
             var (use, endpoint) = (DecoyUse.Connected, port == set.SqlPort ? "SQL Server" : "HTTP");
+            var raised = false;
+            void Raise(DecoyUse use, string endpoint)
+            {
+                if (raised)
+                    return;
+                raised = true;
+                var hit = new DecoyHit(use, endpoint, caller?.Pid, caller?.Program, time.GetUtcNow());
+                if (repeats.ShouldReport(hit))
+                    Hit?.Invoke(hit);
+            }
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(stop.Token);
             timeout.CancelAfter(TimeSpan.FromSeconds(10));
             try
             {
-                (use, endpoint) = await serve(client.GetStream(), timeout.Token);
+                (use, endpoint) = await serve(client.GetStream(), Raise, timeout.Token);
             }
             catch (Exception e) when (e is IOException or SocketException or OperationCanceledException or InvalidDataException or ObjectDisposedException)
             {
                 // A caller that hangs up or speaks something else is still a caller.
             }
-            var hit = new DecoyHit(use, endpoint, caller?.Pid, caller?.Program, time.GetUtcNow());
-            if (repeats.ShouldReport(hit))
-                Hit?.Invoke(hit);
+            Raise(use, endpoint);
         }
     }
 
@@ -111,7 +123,7 @@ public sealed class DecoyListener : IAsyncDisposable
     internal static string PathShape(string path) =>
         Printable(string.Join('/', path.Split('/').Select(segment => segment.Length > 24 ? "…" : segment)), 200);
 
-    async Task<(DecoyUse, string)> ServeHttpAsync(Stream stream, CancellationToken ct)
+    async Task<(DecoyUse, string)> ServeHttpAsync(Stream stream, Action<DecoyUse, string> answering, CancellationToken ct)
     {
         var head = await ReadHeadAsync(stream, ct);
         var request = head.Split("\r\n", 2)[0].Split(' ');
@@ -122,6 +134,7 @@ public sealed class DecoyListener : IAsyncDisposable
             ? """{"error":{"message":"Incorrect API key provided.","type":"invalid_request_error","param":null,"code":"invalid_api_key"}}"""
             : """{"error":"invalid_token"}""";
         var reply = $"HTTP/1.1 401 Unauthorized\r\nContent-Type: application/json\r\nContent-Length: {Encoding.UTF8.GetByteCount(body)}\r\nConnection: close\r\n\r\n{body}";
+        answering(use, endpoint);
         await stream.WriteAsync(Encoding.UTF8.GetBytes(reply), ct);
         return (use, endpoint);
     }
@@ -143,7 +156,7 @@ public sealed class DecoyListener : IAsyncDisposable
         return Encoding.Latin1.GetString(buffer, 0, length);
     }
 
-    async Task<(DecoyUse, string)> ServeSqlAsync(Stream stream, CancellationToken ct)
+    async Task<(DecoyUse, string)> ServeSqlAsync(Stream stream, Action<DecoyUse, string> answering, CancellationToken ct)
     {
         var use = DecoyUse.Connected;
         for (var message = 0; message < 4; message++)
@@ -155,6 +168,7 @@ public sealed class DecoyListener : IAsyncDisposable
             {
                 var login = DecoyTds.ReadLogin(body);
                 use = set.Recognise(login?.Password) ?? DecoyUse.Connected;
+                answering(use, "SQL Server");
                 await stream.WriteAsync(DecoyTds.LoginFailed(login?.User ?? ""), ct);
                 break;
             }

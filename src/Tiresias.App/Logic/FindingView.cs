@@ -29,6 +29,8 @@ public enum FixAction
     RemoveEntry,
     /// <summary>Take a program off the blocklist.</summary>
     Unblock,
+    /// <summary>Thaw a program the admin tier froze (a UAC prompt), then take it off the blocklist.</summary>
+    Thaw,
     /// <summary>The Services page's add form, its address filled in.</summary>
     AddService,
     /// <summary>The Installed page: the whole list, unused programs first.</summary>
@@ -99,6 +101,7 @@ public static class FindingView
         RemoveEntry { Machine: false } => (FixAction.RemoveEntry, "Finding_FixRemoveEntry"),
         RemoveEntry or Repair { Command: not null } => (FixAction.CopyCommand, "Finding_FixCopy"),
         UnblockProgram => (FixAction.Unblock, "Finding_FixUnblock"),
+        ThawProgram => (FixAction.Thaw, "Finding_FixThaw"),
         RunThroughExec { Setup: not null } => (FixAction.AddService, "Finding_FixGitHubApp"),
         RunThroughExec => (FixAction.CopyCommand, "Finding_FixCopy"),
         UninstallApp => (FixAction.OpenInstalledList, "Finding_FixInstalledList"),

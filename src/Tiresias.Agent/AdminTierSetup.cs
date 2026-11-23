@@ -41,12 +41,17 @@ public static class AdminTierSetup
                     return AdminSetupResult.Done;
                 case "remove":
                     var handedBack = true;
+                    var undone = true;
                     foreach (var step in AdminInstallPlan.Remove(service.Facts))
-                        if (step == AdminInstallStep.HandBackDecoys)
+                        if (step == AdminInstallStep.Teardown)
+                            AdminDecoys.Teardown();
+                        else if (step == AdminInstallStep.HandBackDecoys)
                             handedBack = !Trusted(StateFolder) || AdminDecoys.HandBackAll(StateFolder);
-                        else if (step != AdminInstallStep.DeleteStateFolder || handedBack)
+                        else if (step == AdminInstallStep.UndoFreezes)
+                            undone = !Trusted(StateFolder) || AdminFreezes.UndoAll(StateFolder);
+                        else if (step != AdminInstallStep.DeleteStateFolder || handedBack && undone)
                             Do(step, service, appFolder);
-                    return handedBack ? AdminSetupResult.Done : AdminSetupResult.Failed;
+                    return handedBack && undone ? AdminSetupResult.Done : AdminSetupResult.Failed;
                 case "release-decoys":
                     return AdminDecoys.Release();
                 case "adopt-decoys":

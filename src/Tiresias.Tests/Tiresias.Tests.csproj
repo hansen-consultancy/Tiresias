@@ -22,6 +22,8 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="NUnit3TestAdapter" />
+    <!-- For the linked Admin\ReadAudit.cs. -->
+    <PackageReference Include="System.Diagnostics.EventLog" />
   </ItemGroup>
 
   <ItemGroup>
@@ -45,6 +47,11 @@
     <Compile Include="..\Tiresias.App\Logic\**\*.cs" Link="AppLogic\%(RecursiveDir)%(Filename)%(Extension)" />
     <Compile Include="..\Tiresias.Admin\PipeCallerIdentity.cs" Link="Admin\PipeCallerIdentity.cs" />
     <Compile Include="..\Tiresias.Admin\DecoyHold.cs" Link="Admin\DecoyHold.cs" />
+    <Compile Include="..\Tiresias.Admin\ReadAudit.cs" Link="Admin\ReadAudit.cs" />
+    <Compile Include="..\Tiresias.Admin\AuditRules.cs" Link="Admin\AuditRules.cs" />
+    <Compile Include="..\Tiresias.Admin\Freezer.cs" Link="Admin\Freezer.cs" />
+    <Compile Include="..\Tiresias.Admin\ProcessFreezer.cs" Link="Admin\ProcessFreezer.cs" />
+    <Compile Include="..\Tiresias.Admin\NetworkBlock.cs" Link="Admin\NetworkBlock.cs" />
     <Compile Include="..\Tiresias.Agent\ProcessTree.cs" Link="Agent\ProcessTree.cs" />
     <Compile Include="..\Tiresias.Agent\SourceHandle.cs" Link="Agent\SourceHandle.cs" />
     <Compile Include="..\Tiresias.Admin\ActionLog.cs" Link="Admin\ActionLog.cs" />
