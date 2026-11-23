@@ -7,8 +7,15 @@
     ThemeMode="System": the Windows 11 Fluent theme, light or dark as the OS is, with the system
     accent. The styles below only add the type ramp and spacing the windows share; colours come
     from the theme's own brushes, looked up dynamically so a theme switch applies live.
+    Fluent.xaml is merged by name: setting Resources here replaces the dictionary ThemeMode put the
+    theme in, and every window fell back to the classic look.
   -->
   <Application.Resources>
-    <ResourceDictionary Source="/Tiresias;component/WindowStyles.xaml" />
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="pack://application:,,,/PresentationFramework.Fluent;component/Themes/Fluent.xaml" />
+        <ResourceDictionary Source="/Tiresias;component/WindowStyles.xaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
   </Application.Resources>
 </Application>
