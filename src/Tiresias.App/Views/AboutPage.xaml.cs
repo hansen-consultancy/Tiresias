@@ -69,7 +69,10 @@ public partial class AboutPage : UserControl
     }
 
     /// <summary>A sink as the card's row binds it.</summary>
-    public sealed record AlertRow(string Id, string Detail, string MuteLabel);
+    public sealed record AlertRow(string Id, string Detail, string MuteLabel)
+    {
+        public IReadOnlyList<DetailField> Details => [new(Text.Get("Alerts_ColName"), Id), new(Text.Get("Alerts_ColDetail"), Detail)];
+    }
 
     void OnAlertsChanged() => Dispatcher.BeginInvoke(ShowAlerts);
 

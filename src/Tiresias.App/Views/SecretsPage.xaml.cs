@@ -72,12 +72,15 @@ public sealed partial class SecretRow : ObservableObject
     public partial bool IsRevealed { get; set; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Details))]
     public partial string Key { get; set; } = "";
 
     [ObservableProperty]
     public partial string Value { get; set; } = "";
 
     public bool IsHidden => !IsRevealed;
+
+    public IReadOnlyList<DetailField> Details => [new(Text.Get("Secrets_ColKey"), Key)];
 }
 
 public sealed partial class SecretsViewModel : ObservableObject

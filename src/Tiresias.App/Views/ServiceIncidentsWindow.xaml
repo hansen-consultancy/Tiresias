@@ -1,7 +1,8 @@
 <Window x:Class="Tiresias.App.Views.ServiceIncidentsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:l="clr-namespace:Tiresias.App" Title="{l:S AdminIncidents_Title}"
+        xmlns:l="clr-namespace:Tiresias.App"
+        xmlns:v="clr-namespace:Tiresias.App.Views" Title="{l:S AdminIncidents_Title}"
         Width="850" Height="460" WindowStartupLocation="CenterOwner"
         Icon="pack://application:,,,/Assets/tiresias.ico">
   <DockPanel Margin="{StaticResource PagePadding}">
@@ -13,7 +14,8 @@
         <Button Style="{StaticResource RowButton}" Content="{l:S Common_Close}" IsCancel="True" />
       </WrapPanel>
     </StackPanel>
-    <DataGrid x:Name="History" IsReadOnly="True" AutoGenerateColumns="False" CanUserAddRows="False"
+    <v:DetailsPanel DockPanel.Dock="Bottom" Fields="{Binding SelectedItem.Details, ElementName=History}" />
+    <DataGrid x:Name="History" IsReadOnly="True" AutoGenerateColumns="False" CanUserAddRows="False" SelectionMode="Single"
               AutomationProperties.Name="{l:S AdminIncidents_Title}">
       <DataGrid.Columns>
         <DataGridTextColumn Header="{l:S Activity_ColTime}" Binding="{Binding Time}" Width="140" />

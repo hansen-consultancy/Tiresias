@@ -24,6 +24,7 @@
       <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
       <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
     <TextBlock Grid.Row="0" Text="{l:S Services_Heading}" Style="{StaticResource TitleText}" AutomationProperties.HeadingLevel="Level1" />
@@ -117,7 +118,9 @@
       </StackPanel>
     </ScrollViewer>
 
-    <Grid Grid.Row="3" Margin="0,16,0,0">
+    <v:DetailsPanel Grid.Row="3" Fields="{Binding SelectedRow.Details}" Visibility="{Binding IsListing, Converter={StaticResource Visible}}" />
+
+    <Grid Grid.Row="4" Margin="0,16,0,0">
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Visibility="{Binding IsListing, Converter={StaticResource Visible}}">
         <Button Padding="12,6" Content="{l:S Services_Add}" Command="{Binding ChooseNeedCommand}" />
         <Button Padding="12,6" Margin="8,0,0,0" Content="{l:S Services_Edit}" Command="{Binding EditCommand}" />
