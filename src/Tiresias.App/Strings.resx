@@ -157,6 +157,13 @@
   <data name="Consent_Environment_Note" xml:space="preserve">
     <value>They go into this one program's environment, and whatever it starts. Allowing it hands over the values; they are never shown here.</value>
   </data>
+  <data name="Consent_Configuration_Note" xml:space="preserve">
+    <value>A .NET app running in {0} asks for the variables marked for .NET apps, for its configuration. Allow for this session lasts until you lock Tiresias or for 12 hours, whichever comes first.</value>
+    <comment>{0}: the folder the app runs in</comment>
+  </data>
+  <data name="Consent_UnknownProgram" xml:space="preserve">
+    <value>an unknown program</value>
+  </data>
   <data name="Consent_NuGet_Heading" xml:space="preserve">
     <value>Give a NuGet feed's token to {0}?</value>
   </data>

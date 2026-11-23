@@ -30,9 +30,57 @@ static class EnvCommand
         "hook" => Hook(args.At(2)),
         "nuget" => NuGet(args),
         "placeholder" => Placeholder(args),
+        "config" => Config(args),
         "import" => Import(args.Require(2, "file"), args.Require(3, "entry"), args.Require(4, "NAME")),
-        _ => throw new UsageException("tir env takes list, protect, put-back, set, remove, hook, shell, nuget, placeholder or import."),
+        _ => throw new UsageException("tir env takes list, protect, put-back, set, remove, hook, shell, nuget, placeholder, config or import."),
     };
+
+    /// <summary>
+    /// <c>tir env config add|list|remove</c>: the sealed variables a .NET app with
+    /// Tiresias.Extensions.Configuration may ask for itself, when nothing started it with them (F5 in
+    /// an IDE). Marked, not copied: the value stays the sealed one.
+    /// </summary>
+    static int Config(CommandLine args)
+    {
+        using var hello = HelloKeyWrapper.Open(create: false);
+        var (sealedNow, version) = EnvironmentStore.Open(hello);
+        switch (args.At(2))
+        {
+            case "list":
+                if (sealedNow.Configuration.Count == 0)
+                    Console.WriteLine("No sealed variable is marked for .NET apps. Mark one: tir env config add <NAME>.");
+                foreach (var name in sealedNow.Configuration)
+                    Console.WriteLine($"  {name}");
+                return 0;
+            case "add":
+                var adding = args.Require(3, "NAME");
+                if (!sealedNow.IsSealedAnywhere(adding))
+                    throw new UsageException($"{adding} is not a sealed variable. Seal it first: tir env set {adding} (or tir env protect {adding}).");
+                try
+                {
+                    EnvironmentStore.Save(sealedNow.WithConfiguration(adding), version, hello);
+                }
+                catch (InvalidOperationException e)
+                {
+                    Console.Error.WriteLine(e.Message);
+                    return 1;
+                }
+                Console.WriteLine($"{adding} is now handed to .NET apps that ask for it through Tiresias.Extensions.Configuration, after you allow each one.");
+                return 0;
+            case "remove":
+                var removing = args.Require(3, "NAME");
+                if (!sealedNow.IsForConfiguration(removing))
+                {
+                    Console.Error.WriteLine($"{removing} is not marked for .NET apps. See tir env config list.");
+                    return 1;
+                }
+                EnvironmentStore.Save(sealedNow.WithoutConfiguration(removing), version, hello);
+                Console.WriteLine($"{removing} is no longer handed to .NET apps that ask. It stays sealed.");
+                return 0;
+            default:
+                throw new UsageException("tir env config takes add, list or remove.");
+        }
+    }
 
     /// <summary><c>tir env import</c>: a registry token in an <c>.npmrc</c> or <c>.pypirc</c> sealed, and taken out of the file.</summary>
     static int Import(string file, string entry, string name)
@@ -217,13 +265,14 @@ static class EnvCommand
         using var hello = HelloKeyWrapper.Open(create: false);
         var (sealedNow, _) = EnvironmentStore.Open(hello);
         Console.WriteLine($"Sealed ({sealedNow.Global.Count}):");
+        string Line(string name) => EnvironmentDelivery.Describe(sealedNow, name) + (sealedNow.IsForConfiguration(name) ? " (also for .NET apps)" : "");
         foreach (var variable in sealedNow.Global)
-            Console.WriteLine($"  {EnvironmentDelivery.Describe(sealedNow, variable.Name)}");
+            Console.WriteLine($"  {Line(variable.Name)}");
         foreach (var set in sealedNow.Folders.OrderBy(f => f.Folder, StringComparer.OrdinalIgnoreCase))
         {
             Console.WriteLine($"For commands in {set.Folder} ({set.Variables.Count}):");
             foreach (var variable in set.Variables)
-                Console.WriteLine($"  {EnvironmentDelivery.Describe(sealedNow, variable.Name)}");
+                Console.WriteLine($"  {Line(variable.Name)}");
         }
         var exposed = user.Where(v => v.LooksSecret).ToArray();
         if (exposed.Length > 0)
@@ -256,6 +305,14 @@ static class EnvCommand
         var moved = EnvironmentStore.Protect(names, hello);
         var missed = names.Except(moved, StringComparer.OrdinalIgnoreCase).ToArray();
         Console.WriteLine(moved.Count == 0 ? "Nothing was sealed." : $"Sealed {string.Join(", ", moved)}. New programs no longer see them; give them to one with tir run -- <command>.");
+        if (moved.Count > 0 && args.Flag("--config"))
+        {
+            var (sealedNow, version) = EnvironmentStore.Open(hello);
+            EnvironmentStore.Save(moved.Aggregate(sealedNow, (environment, name) => environment.WithConfiguration(name)), version, hello);
+            Console.WriteLine(".NET apps with Tiresias.Extensions.Configuration can ask for them too, after you allow each one.");
+        }
+        else if (moved.Count > 0)
+            Console.WriteLine("Programs started outside a terminal (F5 in an IDE) stop seeing them. Mark one for .NET apps with tir env config add <NAME>.");
         if (moved.Count > 0)
             Console.WriteLine("Programs already running keep their copy until they restart.");
         if (missed.Length > 0)

@@ -32,7 +32,7 @@ public sealed class AgentHost : IAsyncDisposable
         System.IO.Directory.CreateDirectory(KeyringStore.Directory);
         activity = new AuditLog(ActivityPath, TimeProvider.System);
         UserSecrets = new UserSecretsService(UserSecretsFiles.Root, Keys, prompt, TimeProvider.System, activity, new BrokerSecretReferences(Keys),
-            checkProgram ?? AdminProgramBlocks.CheckAsync);
+            checkProgram ?? AdminProgramBlocks.CheckAsync, new EnvironmentFile(EnvironmentStore.FilePath));
         UserSecrets.Log += Say;
         keeper.Log += Say;
         keeper.Locked += reason => Lock(reason);
@@ -211,7 +211,8 @@ public sealed class AgentHost : IAsyncDisposable
     async Task<AgentReply> HandleUserSecretsAsync(AgentRequest request, string? caller, CancellationToken ct)
     {
         var reply = await UserSecrets.HandleAsync(request, caller, ct);
-        _ = Task.Run(() => ProjectIndexStore.LinkFromCaller(caller, request.UserSecretsId), CancellationToken.None);
+        if (request.Op == AgentRequest.LoadUserSecrets)
+            _ = Task.Run(() => ProjectIndexStore.LinkFromCaller(caller, request.UserSecretsId), CancellationToken.None);
         return reply;
     }
 

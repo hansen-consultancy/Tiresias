@@ -42,14 +42,28 @@ sealed class ConsentPresenter(Dispatcher dispatcher) : IUserSecretsConsentPrompt
     public bool Busy => one.CurrentCount == 0;
 
     public Task<ConsentAnswer> AskAsync(UserSecretsConsentRequest request, CancellationToken ct) =>
-        ShowAsync(new ConsentView(
+        ShowAsync(request.IsEnvironment
+            ? new ConsentView(
+                Heading(request.UserSecretsId, request.Executable),
+                request.Executable,
+                Text.Format("Consent_Environment_ListLabel", request.Keys.Count),
+                request.Keys,
+                Text.Format("Consent_Configuration_Note", request.Folder),
+                AllowSession: true)
+            : new ConsentView(
+                Heading(request.UserSecretsId, request.Executable),
+                request.Executable,
+                request.Keys.Count == 1 ? Text.Get("Consent_UserSecrets_KeysLabelOne") : Text.Format("Consent_UserSecrets_KeysLabel", request.Keys.Count),
+                request.Keys,
+                Text.Get("Consent_UserSecrets_Note"),
+                AllowSession: true), new(request.Executable, null), request.Keys, UserSecretsService.ConsentTimeout, ct);
+
+    /// <summary>A .NET app asking for sealed variables, or for a user-secrets file by its id.</summary>
+    static string Heading(string userSecretsId, string? executable) =>
+        userSecretsId == EnvironmentFile.Id
+            ? Text.Format("Consent_Environment_Heading", Path.GetFileName(executable) ?? Text.Get("Consent_UnknownProgram"))
             // A non-breaking hyphen, so an id like my-app-1234 never wraps at its dashes.
-            Text.Format("Consent_UserSecrets_Heading", request.UserSecretsId.Replace('-', '‑')),
-            request.Executable,
-            request.Keys.Count == 1 ? Text.Get("Consent_UserSecrets_KeysLabelOne") : Text.Format("Consent_UserSecrets_KeysLabel", request.Keys.Count),
-            request.Keys,
-            Text.Get("Consent_UserSecrets_Note"),
-            AllowSession: true), new(request.Executable, null), request.Keys, UserSecretsService.ConsentTimeout, ct);
+            : Text.Format("Consent_UserSecrets_Heading", userSecretsId.Replace('-', '‑'));
 
     /// <summary>Locked: the same dialog, naming the program, with "Unlock with Windows Hello" as the way to answer it.</summary>
     public async Task<bool> AskUnlockAsync(string? executable, string userSecretsId, CancellationToken ct)
@@ -57,7 +71,7 @@ sealed class ConsentPresenter(Dispatcher dispatcher) : IUserSecretsConsentPrompt
         if (Unlock is not { } unlock)
             return false;
         var answer = await ShowAsync(new ConsentView(
-            Text.Format("Consent_UserSecrets_Heading", userSecretsId.Replace('-', '\u2011')),
+            Heading(userSecretsId, executable),
             executable,
             Text.Get("Consent_Unlock_Label"),
             [],
