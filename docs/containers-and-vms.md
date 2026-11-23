@@ -317,7 +317,7 @@ Each slice ships alone, with its tests and its line in `CHANGELOG.md`.
    (or daily, once ticked). The app keeps the last look in memory for its lifetime, so Home and
    the background checks keep showing its findings between looks; nothing about contents is
    written to disk. Only Docker is read, over whichever open pipe answers first, with GETs only and
-   at most 200 containers and 200 images inspected. A container's own names are its `Config.Env`
+   at most 200 containers and 200 images inspected; each call has 10 seconds, its body included. A container or image gone or too large to inspect is left out and counted on the passing line, but the two lists must answer whole, or the check says Docker didn't answer rather than that it found nothing. A container's own names are its `Config.Env`
    minus its image's; the image's are reported once, on the image. The fix runs the container with
    `docker run --rm -e NAME`, because a value passed with `-e` still lands in the container's
    config and `--rm` takes it away with the container. A `devcontainer.local_folder` label is

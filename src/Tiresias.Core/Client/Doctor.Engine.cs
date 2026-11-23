@@ -16,7 +16,8 @@ public sealed record EngineContainer(string Name, bool Running, string ImageId, 
 public sealed record EngineImage(string Id, string Tag, IReadOnlyList<ScannedName> Env);
 
 /// <summary>What one engine holds, from read-only API calls through <paramref name="Pipe"/>.</summary>
-public sealed record EngineContents(string Pipe, IReadOnlyList<EngineContainer> Containers, IReadOnlyList<EngineImage> Images);
+/// <param name="LeftOut">Containers and images not looked inside: past the first ones, gone before they were inspected, or too large to read.</param>
+public sealed record EngineContents(string Pipe, IReadOnlyList<EngineContainer> Containers, IReadOnlyList<EngineImage> Images, int LeftOut = 0);
 
 /// <summary>What was found inside, when the user asked to look (<c>tir doctor --reach</c>, or Home's card).</summary>
 /// <param name="Docker"><c>null</c> when no engine answered.</param>
@@ -207,7 +208,7 @@ public static partial class Doctor
         }
         if (contents.Docker is not { } docker)
         {
-            yield return new(DockerContentsCheck, DoctorStatus.Ok, "Docker didn't answer, so nothing was looked inside: start it and check again");
+            yield return new(DockerContentsCheck, DoctorStatus.Ok, "Docker didn't answer, or answered with more than Tiresias reads, so nothing was looked inside: start it and check again");
             yield break;
         }
 
@@ -248,9 +249,12 @@ public static partial class Doctor
                 new InjectAtRunTime([.. baked.Select(n => n.Name)], Image: Word(image.Tag), Baked: true),
                 Now: Position.Plaintext, Kind: "images with secrets baked in");
         }
+        var leftOut = docker.LeftOut == 0 ? "" : $"; {docker.LeftOut} more were left out (past the first ones, removed while looking, or too large to read)";
         if (findings == 0)
             yield return new(DockerContentsCheck, DoctorStatus.Ok,
-                $"looked inside {docker.Containers.Count} containers and {docker.Images.Count} images through {docker.Pipe}: no secret-looking names in their environments, and no credential folder mounted");
+                $"looked inside {docker.Containers.Count} containers and {docker.Images.Count} images through {docker.Pipe}: no secret-looking names in their environments, and no credential folder mounted{leftOut}");
+        else if (docker.LeftOut > 0)
+            yield return new(DockerContentsCheck, DoctorStatus.Ok, $"looked inside {docker.Containers.Count} containers and {docker.Images.Count} images through {docker.Pipe}{leftOut}");
     }
 
     /// <summary>The last segment of a host path (Windows, or the engine's <c>/run/desktop/mnt/host/c/…</c>), as a credential folder.</summary>

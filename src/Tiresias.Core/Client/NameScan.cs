@@ -51,14 +51,19 @@ public static class NameScan
         }
     }
 
-    /// <inheritdoc cref="Read"/>
-    public static async Task<T> ReadAsync<T>(Stream stream, SpanScanner<T> scan, CancellationToken ct)
+    /// <summary>
+    /// Reads at most <paramref name="maxBytes"/> into a pooled buffer, scans it, and clears it. Unlike
+    /// <see cref="Read"/>, a larger stream throws <see cref="InvalidDataException"/> (after clearing
+    /// what was read), so a caller reporting on the whole answer can say it wasn't read rather than
+    /// that it held nothing.
+    /// </summary>
+    public static async Task<T> ReadAsync<T>(Stream stream, SpanScanner<T> scan, int maxBytes, CancellationToken ct)
     {
-        var buffer = ArrayPool<byte>.Shared.Rent(MaxBytes + 1);
+        var buffer = ArrayPool<byte>.Shared.Rent(maxBytes + 1);
         try
         {
-            var read = await stream.ReadAtLeastAsync(buffer.AsMemory(0, MaxBytes + 1), MaxBytes + 1, throwOnEndOfStream: false, ct);
-            return read > MaxBytes ? Consume(buffer.AsSpan(0, read), _ => scan([])) : Consume(buffer.AsSpan(0, read), scan);
+            var read = await stream.ReadAtLeastAsync(buffer.AsMemory(0, maxBytes + 1), maxBytes + 1, throwOnEndOfStream: false, ct);
+            return read > maxBytes ? throw new InvalidDataException($"more than {maxBytes} bytes") : Consume(buffer.AsSpan(0, read), scan);
         }
         finally
         {

@@ -142,6 +142,21 @@ public class EngineTests
     }
 
     [Test]
+    public async Task An_answer_larger_than_asked_for_throws_instead_of_reading_as_empty()
+    {
+        Assert.That(await NameScan.ReadAsync(new MemoryStream(Bytes(ApiInspect)), EngineScan.Env, 4096, CancellationToken.None), Has.Count.EqualTo(5));
+        Assert.ThrowsAsync<InvalidDataException>(() => NameScan.ReadAsync(new MemoryStream(Bytes(ApiInspect)), EngineScan.Env, 16, CancellationToken.None));
+    }
+
+    [Test]
+    public void What_was_left_out_is_said_with_or_without_findings() => Assert.Multiple(() =>
+    {
+        Assert.That(Checks(new(new("docker_engine", [], [], LeftOut: 3))).Single().Detail, Does.EndWith("; 3 more were left out (past the first ones, removed while looking, or too large to read)"));
+        Assert.That(Checks(new(Docker with { LeftOut = 2 })).Single(c => c.Name == Doctor.DockerContentsCheck).Detail, Does.Contain("2 more were left out"));
+        Assert.That(Checks(new(Docker)).Select(c => c.Name), Has.None.EqualTo(Doctor.DockerContentsCheck));
+    });
+
+    [Test]
     public void Not_asked_says_how_to_look_only_while_an_engine_is_open()
     {
         Assert.That(Checks(null).Single().Detail, Does.StartWith("not looked inside: tir doctor --reach"));
