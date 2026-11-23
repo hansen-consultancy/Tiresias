@@ -17,6 +17,13 @@ its section below.
   devcontainer's folder; **Allow for the session** lasts until Tiresias locks. Needs Docker
   Desktop. `tir-remote` isn't published yet ([devcontainers that ask](docs/devcontainers.md)).
 
+### Fixed
+
+- Updates no longer fail without a word. Programs the app starts no longer keep its install folder
+  as their working folder, which blocked Velopack from swapping the files. Before applying an
+  update, the app names any program still using that folder and asks you to close it. If an update
+  still couldn't be applied, the next start says so instead of quietly running the earlier version.
+
 ## [0.3.0] - 2026-11-23
 
 ### Added

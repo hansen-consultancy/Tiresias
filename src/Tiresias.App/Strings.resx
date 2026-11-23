@@ -1496,6 +1496,23 @@ Store them in clear?</value>
   <data name="Update_Later" xml:space="preserve">
     <value>Later</value>
   </data>
+  <data name="Update_FolderInUse" xml:space="preserve">
+    <value>The update can't be applied yet: these programs use Tiresias's folder (they were started from it, or still have it as their working folder):
+
+{0}
+
+Close them, then choose the update in the tray menu again.</value>
+  </data>
+  <data name="Update_NotApplied" xml:space="preserve">
+    <value>The update to {0} couldn't be applied, so this is still the earlier version. A program was using Tiresias's folder. Choose the update in the tray menu again; if it fails again, restarting Windows frees the folder.</value>
+  </data>
+  <data name="Update_NotApplied_Users" xml:space="preserve">
+    <value>The update to {0} couldn't be applied, so this is still the earlier version. These programs use Tiresias's folder:
+
+{1}
+
+Close them, then choose the update in the tray menu again.</value>
+  </data>
   <data name="Update_Busy" xml:space="preserve">
     <value>Finish what's open first (an approval, the secrets editor, the Services page or setup), then choose the update in the tray menu again.</value>
   </data>
