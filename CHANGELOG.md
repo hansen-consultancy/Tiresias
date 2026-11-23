@@ -8,6 +8,8 @@ its section below.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-23
+
 ### Added
 
 - **The app stays simple on a PC that isn't a developer's.** Developer tools (Secrets, Services
@@ -15,11 +17,6 @@ its section below.
   decoy, the broker choice at setup) appear when the app finds something only a developer has,
   such as the .NET SDK, git or an IDE, and Home says once why. **Show developer tools** on About
   sets Auto, On or Off. Findings and warnings always show, and nothing you use is hidden.
-
-## [0.3.0] - 2026-11-23
-
-### Added
-
 - **Sealed variables for .NET apps an IDE starts.** `tir env config add <NAME>` (or
   `tir env protect --config`) lets a .NET app with `Tiresias.Extensions.Configuration` ask for a
   sealed variable itself, so F5 in Visual Studio or Rider gets it again after **Protect**. You
