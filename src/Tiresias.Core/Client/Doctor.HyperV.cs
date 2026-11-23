@@ -54,7 +54,7 @@ public static partial class Doctor
 
         var readable = hyperV.Files.Where(f => f.ReadableFor.Count > 0).ToArray();
         foreach (var file in readable)
-            yield return new($"hyper-v file {Path.GetFileName(file.Path)}", DoctorStatus.Warn,
+            yield return new($"hyper-v file {WindowsFileName(file.Path)}", DoctorStatus.Warn,
                 $"{file.Path}, {Describe(file)}, is readable for {string.Join(" and ", file.ReadableFor)}: any program you run can copy it and read {(file.Kind == HyperVFileKind.Memory ? "the guest's memory" : "the guest's files")} offline, without Hyper-V",
                 new ReachGuide(ReachTopic.HyperVFiles), Kind: "Hyper-V files readable without the group");
 
@@ -66,6 +66,9 @@ public static partial class Doctor
         else if (vms.Length > 0 || leftOut.Length > 0)
             yield return new(HyperVContentsCheck, DoctorStatus.Ok, $"looked at {hyperV.Files.Count} VM files{vms}{leftOut}");
     }
+
+    /// <summary>A Windows path's last segment on any OS: <see cref="Path.GetFileName(string)"/> splits on <c>/</c> only off Windows.</summary>
+    static string WindowsFileName(string path) => path[(path.LastIndexOfAny(['\\', '/']) + 1)..];
 
     static string Describe(HyperVFile file) => file.Kind switch
     {
