@@ -20,6 +20,7 @@
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" />
     <PackageReference Include="Microsoft.Win32.SystemEvents" />
     <PackageReference Include="NSec.Cryptography" />
+    <PackageReference Include="System.Management" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" />
     <PackageReference Include="System.ServiceProcess.ServiceController" />
   </ItemGroup>

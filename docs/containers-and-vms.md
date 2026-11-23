@@ -1,6 +1,6 @@
 # Containers, WSL and VMs: what your account can reach
 
-Status: **phases 1 to 4 built** (account facts: engine pipes, WSL disks, Hyper-V; devcontainer files and forwarding; Docker engine and WSL contents, opt-in); the rest is design. Tracks issue #113. This page designs a doctor check, **Reachable
+Status: **phases 1 to 5 built** (account facts: engine pipes, WSL disks, Hyper-V; devcontainer files and forwarding; Docker engine, WSL and Hyper-V file contents, opt-in); the rest is design. Tracks issue #113. This page designs a doctor check, **Reachable
 from your account**, that tells you which secrets a normal program running as you could read inside
 your containers, WSL distributions and Hyper-V VMs. It extends the [attack surface](attack-surface.md)
 work (#34) and follows the rules of [more checks](more-checks.md#rules-every-check-keeps).
@@ -339,7 +339,16 @@ Each slice ships alone, with its tests and its line in `CHANGELOG.md`.
    and one folder down give their secret-looking names. Shell history is listed beside other
    files but never makes a finding on its own. Stopped distributions are named on the passing
    line as not read.
-5. **Hyper-V detail.** WMI for members, file DACLs for everyone.
+5. **Hyper-V detail.** WMI for members, file DACLs for everyone. **Built**, with these
+   differences: it rides on the same opt-in as phases 3 and 4. Access is judged against the token
+   *without* Hyper-V Administrators, since a member reads everything through the group already and
+   the membership finding covers that; a file is a finding only when another of the token's
+   entries (the user, `Users`, `Authenticated Users`, an owner) grants read. Configuration files
+   (`.vmcx`) hold no guest data and are left out. Members get the VMs' names on the passing line;
+   their disk paths (`Msvm_StorageAllocationSettingData`) and configuration, checkpoint and
+   saved-state folders (`Msvm_VirtualSystemSettingData`) are added to the default folders, each
+   walked at most six levels deep, skipping links; at most 500 files are checked, the rest counted.
+   The finding has no positions: what it opens isn't a secret Tiresias holds.
 6. **Later:** devcontainers that ask (above), after its own design and threat entry.
 
 ## Not in scope

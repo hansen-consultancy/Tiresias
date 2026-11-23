@@ -115,7 +115,7 @@ public static partial class Doctor
     public const string YourAccount = "your account";
 }
 
-public enum ReachTopic { DockerEngine, HyperV, DevcontainerForwarding, ContainerMounts, Wsl }
+public enum ReachTopic { DockerEngine, HyperV, DevcontainerForwarding, ContainerMounts, Wsl, HyperVFiles }
 
 /// <summary>
 /// Steps outside Tiresias to close a path into the user's containers or VMs. Tiresias runs none:
@@ -138,6 +138,8 @@ public sealed record ReachGuide(ReachTopic Topic, bool DirectGrant = false, stri
         ReachTopic.Wsl => "seal each secret with tir env set NAME and delete the file, then hand it in only to the command that needs it: "
             + $"$env:WSLENV = \"NAME/u\"; tir run --only NAME -- wsl -d {Distribution ?? "<distribution>"} <command>. "
             + "SSH keys and cloud logins can stay on Windows instead, used through its ssh-agent or the cloud's CLI",
+        ReachTopic.HyperVFiles => "as an administrator, move the VM's files to a folder only administrators read (Hyper-V gives the VM its own access when it attaches them), "
+            + "or remove the entries that let your account or its groups read the file. Inside the guest, BitLocker with a virtual TPM makes its disk ciphertext to the host",
         ReachTopic.DevcontainerForwarding => "if your containers don't need them, add to VS Code's user settings: "
             + "\"dev.containers.gitCredentialHelperConfigLocation\": \"none\", \"dev.containers.dockerCredentialHelper\": false",
         _ => "if you don't manage VMs, leave the group as an administrator: Remove-LocalGroupMember -SID S-1-5-32-578 -Member \"$env:USERDOMAIN\\$env:USERNAME\". "
