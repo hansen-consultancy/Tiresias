@@ -1,6 +1,6 @@
 # Containers, WSL and VMs: what your account can reach
 
-Status: **phases 1 to 5 built** (account facts: engine pipes, WSL disks, Hyper-V; devcontainer files and forwarding; Docker engine, WSL and Hyper-V file contents, opt-in); the rest is design. Tracks issue #113. This page designs a doctor check, **Reachable
+Status: **phases 1 to 5 built, phase 6 designed** (account facts: engine pipes, WSL disks, Hyper-V; devcontainer files and forwarding; Docker engine, WSL and Hyper-V file contents, opt-in); the rest is design. Tracks issue #113. This page designs a doctor check, **Reachable
 from your account**, that tells you which secrets a normal program running as you could read inside
 your containers, WSL distributions and Hyper-V VMs. It extends the [attack surface](attack-surface.md)
 work (#34) and follows the rules of [more checks](more-checks.md#rules-every-check-keeps).
@@ -268,24 +268,9 @@ Planner cases with fake facts, `NameScan` cases with byte fixtures:
 
 ## Later: devcontainers that ask instead of carrying
 
-Sketch only; its own issue when phase 4 lands.
-
-A devcontainer that gets no secrets at start and asks Tiresias when a tool needs one, with
-consent naming the container:
-
-- A devcontainer **feature** (`ghcr.io/…/tiresias`) installs a small client in the image: a
-  `git-credential-tiresias` helper and a `tir`-compatible `exec`/`run` that speak to the host.
-- The host side is a forwarder listener the container reaches at `host.docker.internal`, bound to
-  the Docker network only, accepting one **per-container capability** that `tir` mints in the
-  devcontainer's `initializeCommand` (which runs on the host, as you) and hands in through
-  `remoteEnv`. The capability names the project folder and expires with the container.
-- Consent reads "*devcontainer for C:\src\shop* wants `github`", since the host can't see which
-  process inside asked; grants are per container, never per image.
-- Placeholders then work from inside the container, which is the E3/C1 answer this page can't give
-  yet.
-
-Open: whether the forwarder may listen beyond loopback at all (a new trust boundary, its own threat
-entry), and how WSL distributions would use the same client.
+Designed on its own page: [devcontainers that ask](devcontainers.md). A devcontainer gets no
+secrets at start; a small client in it asks the agent through Docker Desktop's
+`host.docker.internal` relay, with a per-folder ticket, and consent names the devcontainer.
 
 ## Phases
 
@@ -349,7 +334,7 @@ Each slice ships alone, with its tests and its line in `CHANGELOG.md`.
    saved-state folders (`Msvm_VirtualSystemSettingData`) are added to the default folders, each
    walked at most six levels deep, skipping links; at most 500 files are checked, the rest counted.
    The finding has no positions: what it opens isn't a secret Tiresias holds.
-6. **Later:** devcontainers that ask (above), after its own design and threat entry.
+6. **Devcontainers that ask:** designed ([devcontainers.md](devcontainers.md)), not built.
 
 ## Not in scope
 
