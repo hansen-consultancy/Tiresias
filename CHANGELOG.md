@@ -179,6 +179,8 @@ its section below.
   opening behind the IDE.
 - Microsoft Defender for Endpoint's sensor opening a decoy file during a scan is recorded as a
   routine open, like Defender's own, instead of raising a warning on Home.
+- The left menu is wide enough for "Environment variables" and its count, which it cut short
+  as "Environment variab...".
 
 ## [0.2.1] - 2026-11-20
 
