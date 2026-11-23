@@ -8,8 +8,8 @@ version="$1"
 out="$2"
 mkdir -p "$out"
 for rid in linux-x64 linux-arm64 linux-musl-x64 linux-musl-arm64; do
-  dotnet publish src/Tiresias.Remote -c Release -r "$rid" --self-contained \
-    -p:PublishSingleFile=true -p:PublishTrimmed=true -p:Version="$version" -o "publish/tir-remote/$rid"
+  # Single-file and trimmed: Tiresias.Remote.csproj sets both for a runtime-specific build.
+  dotnet publish src/Tiresias.Remote -c Release -r "$rid" --self-contained -p:Version="$version" -o "publish/tir-remote/$rid"
   cp "publish/tir-remote/$rid/tir-remote" "$out/tir-remote-$rid"
 done
 (cd "$out" && sha256sum tir-remote-* > tir-remote.sha256)
