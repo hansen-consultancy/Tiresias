@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Tiresias.Client;
 
 namespace Tiresias.App.Logic;
 
@@ -31,6 +32,13 @@ public static class ReachLook
         asked || (setting == ReachScan.Daily && (lookedAt is null || now - lookedAt >= Day)) ? ReachStep.Look
         : setting != ReachScan.Off && lookedAt is not null ? ReachStep.Reuse
         : ReachStep.Skip;
+
+    /// <summary>
+    /// Whether a look counts as one: only when an engine answered. One that reached nothing is shown
+    /// for that run (Docker didn't answer) but not remembered, so the card never says it looked, the
+    /// setting stays, and the next run tries again rather than a day later.
+    /// </summary>
+    public static bool Counts(ReachContents contents) => contents.Docker is not null;
 
     /// <summary>The setting once the user has looked: <see cref="ReachScan.Daily"/> stays, anything else is <see cref="ReachScan.Once"/>.</summary>
     public static ReachScan AfterLooking(ReachScan setting) => setting == ReachScan.Daily ? ReachScan.Daily : ReachScan.Once;

@@ -25,6 +25,8 @@ static class ReachMemory
         {
             case ReachStep.Look:
                 var contents = await probe.ReachContentsAsync(ReachScope.Docker, CancellationToken.None);
+                if (!ReachLook.Counts(contents))
+                    return contents;
                 last = new(contents, now);
                 if (ReachLook.AfterLooking(settings.ReachScan) is var after && after != settings.ReachScan)
                     (settings with { ReachScan = after }).Save();

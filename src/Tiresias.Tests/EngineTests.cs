@@ -216,6 +216,8 @@ public class EngineTests
     [Test]
     public void Looking_turns_the_setting_on_once_and_keeps_daily() => Assert.Multiple(() =>
     {
+        Assert.That(ReachLook.Counts(new(null)), Is.False, "no engine answered: not a look");
+        Assert.That(ReachLook.Counts(new(Docker)), Is.True);
         Assert.That(ReachLook.AfterLooking(ReachScan.Off), Is.EqualTo(ReachScan.Once));
         Assert.That(ReachLook.AfterLooking(ReachScan.Daily), Is.EqualTo(ReachScan.Daily));
         Assert.That(JsonSerializer.Serialize(ReachScan.Daily), Is.EqualTo("\"Daily\""));
