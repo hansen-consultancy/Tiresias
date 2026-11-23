@@ -40,6 +40,8 @@ design and issue. A PR that finishes, starts or adds an item edits this page in 
 - [ ] Secrets reachable in containers, WSL and VMs from the user's account
       ([design](containers-and-vms.md), #113). Phases 1 (what your account can open), 2 (devcontainer files, forwarding), 3 (Docker engine contents, opt-in), 4 (WSL contents) and 5 (Hyper-V files) built; phase 6 ([devcontainers that ask](devcontainers.md)) designed, in review
 - [x] `tir ai`: instructions for AI coding agents ([guide](ai-agents.md))
+- [ ] Developer tools appear only on a developer's PC: detected signals and one override, no mode
+      ([design](developer-tools.md), #141). Designed, in review
 - [x] Velopack installer and auto-update from GitHub Releases (`app-release.yml`)
 - [x] Signed with Azure Artifact Signing ([releasing.md](releasing.md))
 - [ ] winget
