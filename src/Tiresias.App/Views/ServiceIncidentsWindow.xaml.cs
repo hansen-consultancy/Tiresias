@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Windows;
 using Tiresias.AdminTier;
 using Tiresias.Agent;
+using Tiresias.App.Logic;
 
 namespace Tiresias.App.Views;
 
@@ -37,16 +38,29 @@ public partial class ServiceIncidentsWindow : Window
             Status.Text = Text.Get("AdminIncidents_Unavailable");
             return;
         }
-        var rows = page.Events.Reverse().Select(e => new
-        {
-            Time = e.Hit.At.ToLocalTime().ToString("g", CultureInfo.CurrentCulture),
-            Program = e.Hit.Program ?? Text.Get("Consent_ProgramUnknown"),
-            Detail = new DecoyTouch(e.Hit, e.Parents, e.Routine, e.Frozen).Record().Reason,
-            Reviewed = e.Id <= page.ReviewedThrough
-        }).ToArray();
+        var rows = page.Events.Reverse().Select(e => new IncidentRow(e, e.Id <= page.ReviewedThrough)).ToArray();
         History.ItemsSource = rows;
         through = page.Events.Count > 0 ? page.Events[^1].Id : 0;
         Review.IsEnabled = through > page.ReviewedThrough;
         Status.Text = Text.Format("AdminIncidents_Count", rows.Length, rows.Count(r => !r.Reviewed));
     }
+}
+
+/// <summary>An admin-tier incident as the window's table and details panel show it.</summary>
+public sealed record IncidentRow(AdminEvent Event, bool Reviewed)
+{
+    public string Time => Event.Hit.At.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
+
+    public string Program => Event.Hit.Program ?? Text.Get("Consent_ProgramUnknown");
+
+    public string? Detail => new DecoyTouch(Event.Hit, Event.Parents, Event.Routine, Event.Frozen).Record().Reason;
+
+    public IReadOnlyList<DetailField> Details =>
+    [
+        new(Text.Get("Activity_ColTime"), Event.Hit.At.ToLocalTime().ToString("G", CultureInfo.CurrentCulture)),
+        new(Text.Get("Activity_ColWho"), new DecoyTouch(Event.Hit, Event.Parents).Process ?? Program),
+        new(Text.Get("AdminIncidents_Where"), Event.Hit.Endpoint),
+        new(Text.Get("Activity_ColDetail"), Detail ?? ""),
+        new(Text.Get("AdminIncidents_Reviewed"), Text.Get(Reviewed ? "Common_Yes" : "Common_No")),
+    ];
 }
