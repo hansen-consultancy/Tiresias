@@ -7,6 +7,7 @@ using Tiresias.App.Logic;
 using Tiresias.App.Views;
 using Tiresias.Decoys;
 using Tiresias.EnvironmentVariables;
+using Tiresias.Protocol;
 using Tiresias.UserSecrets;
 
 namespace Tiresias.App;
@@ -456,6 +457,56 @@ public partial class App : Application
         shells.Clear();
         nugetAllowed.Clear();
         _ = PlaceholderMinter.RevokeAsync(shellPlaceholders.Release((_, _) => false));
+        _ = PlaceholderMinter.RevokeAsync(devcontainerTickets.Clear());
+    }
+
+    /// <summary>Tickets for devcontainers that ask (docs/devcontainers.md); all end when Tiresias locks.</summary>
+    readonly DevcontainerTickets devcontainerTickets = new(TimeProvider.System);
+    DevcontainerEndpoint? devcontainerEndpoint;
+
+    DevcontainerEndpoint Devcontainers => devcontainerEndpoint ??= new(devcontainerTickets, DevcontainerAskAsync,
+        why => AppLog.Info($"devcontainer endpoint refused {why}"));
+
+    /// <summary>
+    /// A devcontainer asking with its ticket for the variables sealed for its folder. Consent names
+    /// the folder, never a program: the host sees only Docker Desktop's backend.
+    /// </summary>
+    async Task<DevcontainerReply> DevcontainerAskAsync(string ticket, DevcontainerTicket devcontainer, DevcontainerRequest request, CancellationToken ct)
+    {
+        _ = PlaceholderMinter.RevokeAsync(devcontainerTickets.Prune());
+        if (host!.Keys.Hello is not { } hello)
+            return new(false, Message: Text.Get("Environment_Locked"));
+        var snapshot = await Task.Run(() => EnvironmentStore.ReadForDelivery(hello), ct);
+        var endpoint = DevcontainerTickets.ForContainer(PlaceholderMinter.Endpoint);
+        var (variables, missing, terms) = snapshot.SelectForCommand(devcontainer.Folder, request.Names, endpoint);
+        if (missing.Count > 0)
+            return new(false, Message: Text.Format("Environment_NotSealed", string.Join(", ", missing)));
+        if (variables.Count == 0)
+            return new(true, new Dictionary<string, string>(), Text.Get("Environment_NoneSealed"));
+        var program = $"devcontainer {devcontainer.Folder}";
+        var accesses = variables.Select(v => EnvironmentVariableAccess.For(snapshot.Environment, v.Name, devcontainer.Folder, endpoint)).ToArray();
+        if (!devcontainerTickets.AllAllowed(ticket, accesses))
+        {
+            var answer = await consent!.AskDevcontainerAsync(devcontainer.Folder, terms, ct);
+            if (answer == ConsentAnswer.Deny)
+            {
+                host.RecordEnvironment(false, program, terms, null);
+                return new(false, Message: "Not approved.");
+            }
+            if (answer == ConsentAnswer.AllowForSession)
+                devcontainerTickets.Allow(ticket, accesses);
+        }
+        var delivery = await snapshot.DeliverAsync(variables, endpoint,
+            (placeholder, _) => PlaceholderMinter.MintAsync(hello, placeholder, $"devcontainer:{Path.GetFileName(devcontainer.Folder)}", "Docker Desktop (devcontainer)"),
+            PlaceholderMinter.RevokeAsync, ct, () => host.Keys.Hello == hello);
+        var placeholders = EnvironmentDelivery.Placeholders(delivery.Variables.Values).ToArray();
+        if (!devcontainerTickets.Hold(ticket, placeholders))
+        {
+            await PlaceholderMinter.RevokeAsync(placeholders);
+            return new(false, Message: Text.Get("Environment_Locked"));
+        }
+        host.RecordEnvironment(true, program, terms, null);
+        return new(true, delivery.Variables, Note(delivery));
     }
 
     async Task<ControlReply> DispatchControlAsync(ControlRequest request, PipeClient caller, CancellationToken ct)
@@ -514,7 +565,11 @@ public partial class App : Application
         var (variables, missing, terms) = snapshot.SelectForCommand(request.Directory, request.Names, endpoint);
         if (missing.Count > 0)
             return new(false, Text.Format("Environment_NotSealed", string.Join(", ", missing)));
-        if (variables.Count == 0)
+        // tir said so, but the app reads the file itself before naming the folder in consent.
+        var devcontainer = request.Devcontainer is { } folder && await Task.Run(() => DevcontainerFolders.AsksForTicket(folder), ct) ? folder : null;
+        if (devcontainer is not null)
+            terms = [.. terms, Text.Format("Environment_DevcontainerTicket", DevcontainerWire.TicketVariable, devcontainer)];
+        else if (variables.Count == 0)
             return new(true, Text.Get("Environment_NoneSealed"), Approved: true, Variables: new Dictionary<string, string>());
         var program = request.Title ?? "tir run";
         var approved = await consent!.AskEnvironmentAsync(program, request.Lines, terms, caller,
@@ -529,7 +584,21 @@ public partial class App : Application
             (placeholder, _) => PlaceholderMinter.MintAsync(hello, placeholder, $"run:{program}", caller), PlaceholderMinter.RevokeAsync, ct,
             () => host.Keys.Hello == hello);
         host.RecordEnvironment(true, program, terms, caller);
-        return new(true, Note(delivery), Approved: true, Variables: delivery.Variables);
+        if (devcontainer is null)
+            return new(true, Note(delivery), Approved: true, Variables: delivery.Variables);
+        try
+        {
+            await Devcontainers.EnsureStartedAsync();
+        }
+        catch (IOException e)
+        {
+            return new(true, string.Join(Environment.NewLine, new[] { Note(delivery), e.Message }.OfType<string>()), Approved: true, Variables: delivery.Variables);
+        }
+        var given = new Dictionary<string, string>(delivery.Variables, StringComparer.OrdinalIgnoreCase)
+        {
+            [DevcontainerWire.TicketVariable] = devcontainerTickets.Mint(devcontainer),
+        };
+        return new(true, Note(delivery), Approved: true, Variables: given);
     }
 
     static string? Note(Delivery delivery) => delivery.Problems.Count > 0 ? string.Join(Environment.NewLine, delivery.Problems) : null;

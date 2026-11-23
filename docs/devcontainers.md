@@ -1,6 +1,6 @@
 # Devcontainers that ask instead of carrying
 
-Status: **design**. Phase 6 of [containers and VMs](containers-and-vms.md), issue #113. Its threat
+Status: **6a and 6b built** (the relay checked; tickets, the endpoint and `tir-remote run`/`env`); 6c is design. Phase 6 of [containers and VMs](containers-and-vms.md), issue #113. Its threat
 entry is [S-devcontainer-ask](threats/S-devcontainer-ask.md).
 
 ## The problem
@@ -117,6 +117,14 @@ allowance.
   reached a listener bound to `127.0.0.1:7799` only, and the TCP table named the connection's
   owner `com.docker.backend.exe`, not anything in the container.
 - **6b. Tickets, the endpoint and `tir-remote run`/`env`.** Placeholders and values on request,
-  with consent naming the devcontainer.
+  with consent naming the devcontainer. **Built**, with these differences: the ticket is asked for
+  in `tir run`'s own consent dialog, as one more line ("`TIRESIAS_TICKET` (lets the devcontainer
+  for C:\src\shop ask for sealed variables until Tiresias locks)"), not a dialog of its own; the
+  app reads the folder's devcontainer file itself before naming it. Only the app hands out
+  tickets: `tir run` without it says so and runs the command without one. The endpoint (in
+  `DevcontainerEndpoint`) starts with the first ticket; its refusals go to the app's log, not the
+  activity log, so a container probing it can't fill that. A placeholder's base URL points at
+  `host.docker.internal` with the forwarder's (or solo broker's) port. `tir-remote` is built
+  (`src/Tiresias.Remote`) but not yet published: until 6c, copy it into the container by hand.
 - **6c. Git credentials and the feature.** `git-credential`, the published feature, and phase 2's
   forwarding finding pointing at it.

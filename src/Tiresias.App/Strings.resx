@@ -170,6 +170,15 @@
   <data name="Consent_UnknownProgram" xml:space="preserve">
     <value>an unknown program</value>
   </data>
+  <data name="Consent_Devcontainer_Heading" xml:space="preserve">
+    <value>Give environment variables to the devcontainer for {0}?</value>
+  </data>
+  <data name="Consent_Devcontainer_Note" xml:space="preserve">
+    <value>A program in this devcontainer asked; Tiresias can't see which one. Allowing it hands over the values; they are never shown here. "For the session" lasts until Tiresias locks or the devcontainer's ticket ends.</value>
+  </data>
+  <data name="Environment_DevcontainerTicket" xml:space="preserve">
+    <value>{0} (lets the devcontainer for {1} ask for sealed variables until Tiresias locks)</value>
+  </data>
   <data name="Consent_NuGet_Heading" xml:space="preserve">
     <value>Give a NuGet feed's token to {0}?</value>
   </data>

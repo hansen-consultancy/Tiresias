@@ -5,6 +5,7 @@ using Tiresias.Agent;
 using Tiresias.Audit;
 using Tiresias.Client;
 using Tiresias.EnvironmentVariables;
+using Tiresias.Protocol;
 using Tiresias.Vault;
 
 namespace Tiresias.Keyring;
@@ -491,7 +492,9 @@ static class EnvCommand
         ControlReply? reply;
         try
         {
-            reply = await ControlClient.TryAsync(new(ControlRequest.Environment, commandLine, program, Directory: directory, Names: only), ConsentWait);
+            var opened = DevcontainerTickets.FolderFor(commandLine, directory, Directory.Exists);
+            reply = await ControlClient.TryAsync(new(ControlRequest.Environment, commandLine, program, Directory: directory, Names: only,
+                Devcontainer: DevcontainerFolders.AsksForTicket(opened) ? opened : null), ConsentWait);
         }
         catch (Exception e) when (e is IOException or OperationCanceledException)
         {
@@ -511,6 +514,8 @@ static class EnvCommand
     static async Task<IReadOnlyDictionary<string, string>> FromTerminalAsync(string program, IReadOnlyList<string> commandLine,
         string directory, IReadOnlyList<string>? only)
     {
+        if (DevcontainerFolders.AsksForTicket(DevcontainerTickets.FolderFor(commandLine, directory, Directory.Exists)))
+            Console.Error.WriteLine($"The devcontainer asks for {DevcontainerWire.TicketVariable}, which only the Tiresias app hands out: start the app, then run this again.");
         Console.WriteLine("Opening the sealed environment with Windows Hello...");
         using var hello = HelloKeyWrapper.Open(create: false);
         var snapshot = EnvironmentStore.ReadForDelivery(hello);

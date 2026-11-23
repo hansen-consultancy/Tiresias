@@ -33,6 +33,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Tiresias.Core\Tiresias.Core.csproj" />
     <ProjectReference Include="..\Tiresias.Broker\Tiresias.Broker.csproj" />
+    <ProjectReference Include="..\Tiresias.Remote\Tiresias.Remote.csproj" />
     <!-- Aliased: the forwarder's top-level Program would otherwise collide with the broker's. -->
     <ProjectReference Include="..\Tiresias.Forwarder\Tiresias.Forwarder.csproj" Aliases="forwarder" />
     <ProjectReference Include="..\Tiresias.Extensions.Configuration\Tiresias.Extensions.Configuration.csproj" />
@@ -65,6 +66,7 @@
     <Compile Include="..\Tiresias.Agent\ServicePipeIdentity.cs" Link="Agent\ServicePipeIdentity.cs" />
     <Compile Include="..\Tiresias.Agent\HelloException.cs" Link="Agent\HelloException.cs" />
     <Compile Include="..\Tiresias.Agent\UnlockActivity.cs" Link="Agent\UnlockActivity.cs" />
+    <Compile Include="..\Tiresias.Agent\DevcontainerEndpoint.cs" Link="Agent\DevcontainerEndpoint.cs" />
   </ItemGroup>
 
   <!-- Likewise tir's usage and agent guide, plain text checked against each other. -->

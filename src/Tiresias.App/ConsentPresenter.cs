@@ -116,6 +116,28 @@ sealed class ConsentPresenter(Dispatcher dispatcher) : IUserSecretsConsentPrompt
         }
     }
 
+    /// <summary>
+    /// A devcontainer asking with its ticket. No program is named: every request comes through
+    /// Docker Desktop, so the host can't see which process in the container asked.
+    /// </summary>
+    public async Task<ConsentAnswer> AskDevcontainerAsync(string folder, IReadOnlyList<string> names, CancellationToken ct)
+    {
+        try
+        {
+            return await ShowAsync(new ConsentView(
+                Text.Format("Consent_Devcontainer_Heading", folder),
+                null,
+                Text.Format("Consent_Environment_ListLabel", names.Count),
+                names,
+                Text.Get("Consent_Devcontainer_Note"),
+                AllowSession: true) { CanReportIncident = false }, new(null, null), names, UserSecretsService.ConsentTimeout, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            return ConsentAnswer.Deny;
+        }
+    }
+
     /// <summary>A NuGet feed's token for one program (<paramref name="program"/> is its image path), allowed once or until the agent locks.</summary>
     public async Task<ConsentAnswer> AskNuGetAsync(string program, int processId, NuGetSource source, CancellationToken ct)
     {
