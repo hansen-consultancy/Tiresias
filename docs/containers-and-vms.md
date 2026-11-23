@@ -1,6 +1,6 @@
 # Containers, WSL and VMs: what your account can reach
 
-Status: **phases 1 to 5 built, phase 6 designed** (account facts: engine pipes, WSL disks, Hyper-V; devcontainer files and forwarding; Docker engine, WSL and Hyper-V file contents, opt-in); the rest is design. Tracks issue #113. This page designs a doctor check, **Reachable
+Status: **phases 1 to 5 built, phase 6 partly built** (account facts: engine pipes, WSL disks, Hyper-V; devcontainer files and forwarding; Docker engine, WSL and Hyper-V file contents, opt-in); the rest is design. Tracks issue #113. This page designs a doctor check, **Reachable
 from your account**, that tells you which secrets a normal program running as you could read inside
 your containers, WSL distributions and Hyper-V VMs. It extends the [attack surface](attack-surface.md)
 work (#34) and follows the rules of [more checks](more-checks.md#rules-every-check-keeps).
@@ -334,7 +334,7 @@ Each slice ships alone, with its tests and its line in `CHANGELOG.md`.
    saved-state folders (`Msvm_VirtualSystemSettingData`) are added to the default folders, each
    walked at most six levels deep, skipping links; at most 500 files are checked, the rest counted.
    The finding has no positions: what it opens isn't a secret Tiresias holds.
-6. **Devcontainers that ask:** designed ([devcontainers.md](devcontainers.md)), not built.
+6. **Devcontainers that ask:** [devcontainers.md](devcontainers.md); tickets, the endpoint and `tir-remote` built, the published feature and git credentials not yet.
 
 ## Not in scope
 

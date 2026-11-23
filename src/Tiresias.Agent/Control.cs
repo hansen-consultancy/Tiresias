@@ -12,8 +12,9 @@ namespace Tiresias.Agent;
 /// <param name="Directory">For <see cref="Environment"/> and <see cref="ShellEnvironment"/>: the working directory, which picks the folder sets.</param>
 /// <param name="Shell">For <see cref="ShellEnvironment"/>: the terminal's shell process id. Believed only when it is an ancestor of the caller.</param>
 /// <param name="AskAgain">For <see cref="ShellEnvironment"/>: ask even though the user said no in this terminal.</param>
+/// <param name="Devcontainer">For <see cref="Environment"/>: the folder whose <c>devcontainer.json</c> asks for a ticket, which the app checks again. An older app ignores it and hands out no ticket.</param>
 public sealed record ControlRequest(string Op, IReadOnlyList<string>? Lines = null, string? Title = null, int V = ControlRequest.Version,
-    string? Directory = null, int? Shell = null, bool AskAgain = false, IReadOnlyList<string>? Names = null)
+    string? Directory = null, int? Shell = null, bool AskAgain = false, IReadOnlyList<string>? Names = null, string? Devcontainer = null)
 {
     public const int Version = 1;
     public const string Ping = "ping";

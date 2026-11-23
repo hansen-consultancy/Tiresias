@@ -8,6 +8,15 @@ its section below.
 
 ## [Unreleased]
 
+### Added
+
+- **Devcontainers can ask instead of carrying secrets.** Put `"TIRESIAS_TICKET":
+  "${localEnv:TIRESIAS_TICKET}"` in `remoteEnv` and start VS Code with `tir run -- code <folder>`:
+  the devcontainer gets a ticket, and `tir-remote run -- <command>` inside it asks the Tiresias
+  app for the folder's sealed variables when a tool needs them. The consent dialog names the
+  devcontainer's folder; **Allow for the session** lasts until Tiresias locks. Needs Docker
+  Desktop. `tir-remote` isn't published yet ([devcontainers that ask](docs/devcontainers.md)).
+
 ## [0.3.0] - 2026-11-23
 
 ### Added
