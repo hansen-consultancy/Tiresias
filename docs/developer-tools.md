@@ -36,7 +36,8 @@ mostly quiet for this user. What is still loud is the developer **checks**, **ne
 **Off** removes the developer discovery listed above. It doesn't remove an area that is in use,
 a finding, or a fix's window: those come from the in-use rules, which Off doesn't touch. A
 developer who chooses Off and seals a variable later sees Environment variables, because it is
-now in use. That way Off can't hide a risk, and it needs no warning.
+now in use. That way Off can't hide a risk, and it needs no warning. An Off that also hid areas in use was
+considered and rejected: it would hide a sealed variable's only editor.
 
 ## Audit
 
@@ -127,7 +128,7 @@ A free-text search that matches a developer need still finds it, with developer 
 - **Solo egress and isolation.** They are Warn lines, but not findings: no fix, no position.
   Someone who isn't a developer can't act on them, and they never chose solo. With developer
   tools off they move to Passed as notes. This is the one place where a Warn line is quieter than
-  today; see the [open question](#open-question).
+  today, chosen over keeping them as Warn for everyone.
 - **First-run Mode.** Broker and Secrets only matter to a developer or a team. Without a signal,
   first run picks Solo and doesn't ask. About keeps the way to change it.
 - **Installed and attack surface.** Tagged **E**. The extension findings are D, but they are
@@ -226,14 +227,9 @@ answer.
 
 No trust boundary changes: nothing new is read beyond names and file existence, nothing listens,
 and no secret moves. The risk the design has to avoid is a security tool hiding a risk, and the
-rule that findings and Warn/Fail lines are never filtered rules that out (except the solo notes in
-the [open question](#open-question)). So there is no threat entry.
-
-## Open question
-
-- **Solo egress and isolation notes.** With developer tools off, they move from Checks to Passed.
-  The alternative is to keep them as Warn for everyone. They can't be acted on, which is why the
-  design moves them.
+rule that findings and Warn/Fail lines are never filtered rules that out. The one exception is
+the solo egress and isolation notes, which can't be acted on and expose nothing. So there is no
+threat entry.
 
 ## Phases
 
