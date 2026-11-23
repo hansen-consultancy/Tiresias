@@ -40,6 +40,18 @@ public class HyperVTests
     }
 
     [Test]
+    public void Dismissing_one_file_leaves_another_of_the_same_name()
+    {
+        var contents = new HyperVContents(null,
+        [
+            new(@"C:\VMs\a\dev.vhdx", HyperVFileKind.Disk, ["Users"]),
+            new(@"C:\VMs\b\dev.vhdx", HyperVFileKind.Disk, ["Users"]),
+        ]);
+        var checks = Checks(HyperVAccess.None, contents);
+        Assert.That(Dismissals.KeyOf(checks[0]), Is.Not.EqualTo(Dismissals.KeyOf(checks[1])));
+    }
+
+    [Test]
     public void Members_see_the_vms_the_group_opens()
     {
         var check = Checks(HyperVAccess.Member, new(["build", "dev"], [new(@"C:\VMs\dev.vhdx", HyperVFileKind.Disk, [], "dev")])).Single();

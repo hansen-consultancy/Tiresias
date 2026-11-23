@@ -56,7 +56,7 @@ public static partial class Doctor
         foreach (var file in readable)
             yield return new($"hyper-v file {WindowsFileName(file.Path)}", DoctorStatus.Warn,
                 $"{file.Path}, {Describe(file)}, is readable for {string.Join(" and ", file.ReadableFor)}: any program you run can copy it and read {(file.Kind == HyperVFileKind.Memory ? "the guest's memory" : "the guest's files")} offline, without Hyper-V",
-                new ReachGuide(ReachTopic.HyperVFiles), Kind: "Hyper-V files readable without the group");
+                new ReachGuide(ReachTopic.HyperVFiles), Kind: "Hyper-V files readable without the group", Subject: file.Path);
 
         var vms = hyperV.Vms is { Count: > 0 } names ? $"; Hyper-V Administrators opens {names.Count} {(names.Count == 1 ? "VM" : "VMs")}: {string.Join(", ", names)}" : "";
         var leftOut = hyperV.LeftOut == 0 ? "" : $"; {hyperV.LeftOut} more were not looked at";
