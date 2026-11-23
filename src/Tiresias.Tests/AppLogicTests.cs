@@ -321,14 +321,20 @@ public class UpdatePlanTests
     public void An_apply_failed_when_the_app_came_back_as_another_version(string? applying, string current, bool expected) =>
         Assert.That(UpdatePlan.ApplyFailed(applying, current), Is.EqualTo(expected));
 
-    [TestCase(@"C:\Users\u\AppData\Local\TiresiasApp\current\", true)]
-    [TestCase(@"C:\Users\u\AppData\Local\TiresiasApp", true)]
-    [TestCase(@"c:\users\u\appdata\local\tiresiasapp\current\Tiresias.exe", true)]
-    [TestCase(@"C:\Users\u\AppData\Local\TiresiasAppOld\current", false)]
-    [TestCase(@"C:\Users\u", false)]
+    [TestCase("TiresiasApp/current/", true)]
+    [TestCase("TiresiasApp", true)]
+    [TestCase("tiresiasapp/current/Tiresias.exe", true)]
+    [TestCase("TiresiasAppOld/current", false)]
+    [TestCase("", false)]
     [TestCase(null, false)]
-    public void A_program_or_working_folder_in_the_install_folder_blocks_an_update(string? path, bool expected) =>
-        Assert.That(UpdatePlan.InInstallFolder(path, @"C:\Users\u\AppData\Local\TiresiasApp\"), Is.EqualTo(expected));
+    public void A_program_or_working_folder_in_the_install_folder_blocks_an_update(string? relative, bool expected)
+    {
+        // Built with the platform's separator: CI also runs on Linux.
+        static string Under(string relative) =>
+            Path.Join(Path.GetTempPath(), "u", relative.Replace('/', Path.DirectorySeparatorChar));
+        var path = relative is null ? null : Under(relative);
+        Assert.That(UpdatePlan.InInstallFolder(path, Under("TiresiasApp/")), Is.EqualTo(expected));
+    }
 }
 
 public class DetailTextTests
