@@ -1,6 +1,6 @@
 # Containers, WSL and VMs: what your account can reach
 
-Status: **phases 1 to 3 built** (account facts: engine pipes, WSL disks, Hyper-V; devcontainer files and forwarding; Docker engine contents, opt-in); the rest is design. Tracks issue #113. This page designs a doctor check, **Reachable
+Status: **phases 1 to 4 built** (account facts: engine pipes, WSL disks, Hyper-V; devcontainer files and forwarding; Docker engine and WSL contents, opt-in); the rest is design. Tracks issue #113. This page designs a doctor check, **Reachable
 from your account**, that tells you which secrets a normal program running as you could read inside
 your containers, WSL distributions and Hyper-V VMs. It extends the [attack surface](attack-surface.md)
 work (#34) and follows the rules of [more checks](more-checks.md#rules-every-check-keeps).
@@ -189,7 +189,7 @@ devcontainers
   C:\src\shop\.devcontainer\devcontainer.json     containerEnv: OPENAI_API_KEY
   forwarding                                      git credentials, docker logins
 wsl
-  Ubuntu (running)     ~/.aws/credentials [default, prod], ~/.ssh/id_ed25519, ~/.bash_history
+  Ubuntu (running)     /home/alice/.aws/credentials [default, prod], /home/alice/.ssh/id_ed25519, /home/alice/.bash_history
   Debian (stopped)     disk is a file you own; contents not read (it would start)
 hyper-v
   not a member; no readable VM files in the default folders
@@ -324,7 +324,21 @@ Each slice ships alone, with its tests and its line in `CHANGELOG.md`.
    followed only when it is a folder on a local drive, never a UNC path in either slash, since
    opening a WSL path would start its distribution. The fix stops and removes the old container.
 4. **WSL contents.** Running distributions only; known credential files and `.env` names; the
-   `WSLENV` fix.
+   `WSLENV` fix. **Built**, with these differences: it rides on phase 3's opt-in (`--reach`,
+   **Check now**, daily), which now looks in Docker and WSL together. Only distributions that
+   `wsl.exe --list --running --quiet` names *and* the registry lists are opened, so a message in
+   its output is never taken for one; a distribution that stops between the list and the read is
+   the one way a look can start one. Every `/home/*` and `/root` is looked in, and paths are shown
+   as Linux paths (`/home/alice/.aws/credentials`), not `~`. Only regular, non-empty files count:
+   links are not followed and a FIFO is never opened. Azure and gcloud are found by their token
+   files (`~/.azure/msal_token_cache.json`, `~/.config/gcloud/credentials.db` and
+   `application_default_credentials.json`) rather than their folders, which stay after a sign-out.
+   AWS names the sections that set `aws_secret_access_key` or `aws_session_token`; Docker names
+   registries with a stored `auth` or `identitytoken`; `.npmrc`, `.pypirc` and `gh`'s `hosts.yml`
+   count only with a literal token line (npm's `${NPM_TOKEN}` doesn't); `.env` files in each home
+   and one folder down give their secret-looking names. Shell history is listed beside other
+   files but never makes a finding on its own. Stopped distributions are named on the passing
+   line as not read.
 5. **Hyper-V detail.** WMI for members, file DACLs for everyone.
 6. **Later:** devcontainers that ask (above), after its own design and threat entry.
 

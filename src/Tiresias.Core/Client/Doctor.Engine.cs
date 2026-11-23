@@ -2,9 +2,9 @@ using System.Text.Json;
 
 namespace Tiresias.Client;
 
-/// <summary>Which environments to look inside (docs/containers-and-vms.md, "Consent"). Only Docker so far.</summary>
+/// <summary>Which environments to look inside (docs/containers-and-vms.md, "Consent").</summary>
 [Flags]
-public enum ReachScope { None = 0, Docker = 1 }
+public enum ReachScope { None = 0, Docker = 1, Wsl = 2, All = Docker | Wsl }
 
 /// <summary>A container, running or stopped, as the engine lists it. Names only: <paramref name="Env"/> holds what <see cref="NameScan"/> kept.</summary>
 /// <param name="ImageId">The image it was made from, to tell its own variables from the image's.</param>
@@ -21,7 +21,8 @@ public sealed record EngineContents(string Pipe, IReadOnlyList<EngineContainer> 
 
 /// <summary>What was found inside, when the user asked to look (<c>tir doctor --reach</c>, or Home's card).</summary>
 /// <param name="Docker"><c>null</c> when no engine answered.</param>
-public sealed record ReachContents(EngineContents? Docker);
+/// <param name="Wsl">The running distributions looked inside; <c>null</c> when WSL didn't answer or wasn't asked.</param>
+public sealed record ReachContents(EngineContents? Docker, IReadOnlyList<WslContents>? Wsl = null);
 
 /// <summary>
 /// The Docker engine API's JSON, read for names: no value in <c>Config.Env</c> becomes a string.

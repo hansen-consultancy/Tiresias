@@ -2432,10 +2432,10 @@ Store them in clear?</value>
     <value>Opens your browser with a web search for this name and version</value>
   </data>
   <data name="Reach_Title" xml:space="preserve">
-    <value>See what your containers expose</value>
+    <value>See what your containers and WSL expose</value>
   </data>
   <data name="Reach_Intro" xml:space="preserve">
-    <value>Every program you run can open your Docker engine. Check now asks it which secret-looking names your containers and images hold, and what they mount. Values are never kept.</value>
+    <value>Every program you run can open your Docker engine and your running WSL distributions. Check now lists the secret-looking names your containers and images hold, what they mount, and the credential files in your distributions' homes. Values are never kept.</value>
   </data>
   <data name="Reach_Looked" xml:space="preserve">
     <value>Looked inside at {0:t}. The findings are with the others; Check now looks again.</value>
