@@ -3,7 +3,8 @@
   <!--
     tir-remote: runs inside a devcontainer and asks the Tiresias app on the host for sealed
     variables, with the devcontainer's ticket (docs/devcontainers.md). Linux in practice; holds no
-    key and stores nothing. Publishing it (and the devcontainer feature) is phase 6c.
+    key and stores nothing. app-release.yml publishes it self-contained and trimmed for Linux,
+    for the devcontainer feature in devcontainer-features/ to install.
   -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -13,6 +14,9 @@
     <IsPackable>false</IsPackable>
     <AssemblyName>tir-remote</AssemblyName>
     <RootNamespace>Tiresias.Remote</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <IsTrimmable>true</IsTrimmable>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
   </PropertyGroup>
 
   <ItemGroup>

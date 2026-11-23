@@ -27,7 +27,9 @@ folder the user didn't open.
   file itself), as a line of `tir run`'s consent dialog naming that folder, and it ends at lock or
   after 10 hours; the endpoint starts with the first ticket;
 - a ticket opens nothing by itself: every variable or git credential goes through consent naming
-  the devcontainer's folder, with **Allow once** the default and allowances ending with the ticket.
+  the devcontainer's folder, with **Allow once** the default and allowances ending with the ticket;
+- git credentials (phase 6c, `POST /devcontainer/git`) come only for an HTTPS host mapped with
+  `tir env git add`, and consent names that host too.
 
 **Closes it.** The residual is accepted: anything inside the devcontainer can read its ticket, and
 consent can't tell a tool from a malicious package next to it, as [I-same-user](I-same-user.md) accepts for the host.

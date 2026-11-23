@@ -30,10 +30,11 @@ static class EnvCommand
         "remove" => Remove(args.Require(2, "name"), Folder(args)),
         "hook" => Hook(args.At(2)),
         "nuget" => NuGet(args),
+        "git" => Git(args),
         "placeholder" => Placeholder(args),
         "config" => Config(args),
         "import" => Import(args.Require(2, "file"), args.Require(3, "entry"), args.Require(4, "NAME")),
-        _ => throw new UsageException("tir env takes list, protect, put-back, set, remove, hook, shell, nuget, placeholder, config or import."),
+        _ => throw new UsageException("tir env takes list, protect, put-back, set, remove, hook, shell, nuget, git, placeholder, config or import."),
     };
 
     /// <summary>
@@ -209,6 +210,49 @@ static class EnvCommand
                 return 0;
             default:
                 throw new UsageException("tir env nuget takes list, import, add or remove.");
+        }
+    }
+
+    /// <summary>
+    /// <c>tir env git add|list|remove</c>: which git hosts a devcontainer's <c>tir-remote git-credential</c>
+    /// gets a token for, and from which sealed variable (docs/devcontainers.md). Sealed with the
+    /// variables, like NuGet sources.
+    /// </summary>
+    static int Git(CommandLine args)
+    {
+        using var hello = HelloKeyWrapper.Open(create: false);
+        var (sealedNow, version) = EnvironmentStore.Open(hello);
+        switch (args.At(2))
+        {
+            case "list":
+                foreach (var mapped in sealedNow.GitHosts)
+                    Console.WriteLine($"  {mapped.Host}  {mapped.Variable} (user name {mapped.Username})");
+                if (sealedNow.GitHosts.Count == 0)
+                    Console.WriteLine("No git hosts use a sealed variable. Add one: tir env git add <host> <NAME>.");
+                return 0;
+            case "add":
+                var host = args.Require(3, "host");
+                var name = args.Require(4, "NAME");
+                if (GitHost.Normalize(host) is not { } normalized)
+                    throw new UsageException(GitHost.HostRequirement + ".");
+                if (!sealedNow.IsSealedAnywhere(name))
+                    throw new UsageException($"{name} is not a sealed variable. Seal the token first: tir env set {name} (or tir env protect {name}).");
+                EnvironmentStore.Save(sealedNow.WithGitHost(new(normalized, name, args.Option("--username") ?? GitHost.DefaultUsername)), version, hello);
+                Console.WriteLine($"git in a devcontainer with the Tiresias feature now asks Tiresias for https://{normalized}, and gets {name} once you allow that devcontainer.");
+                return 0;
+            case "remove":
+                var removing = args.Require(3, "host");
+                var left = sealedNow.WithoutGitHost(removing);
+                if (left.GitHosts.Count == sealedNow.GitHosts.Count)
+                {
+                    Console.Error.WriteLine($"{removing} isn't mapped. See tir env git list.");
+                    return 1;
+                }
+                EnvironmentStore.Save(left, version, hello);
+                Console.WriteLine($"git no longer gets a sealed variable for {removing}. The variable itself stays sealed.");
+                return 0;
+            default:
+                throw new UsageException("tir env git takes list, add or remove.");
         }
     }
 

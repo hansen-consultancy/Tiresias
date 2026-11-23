@@ -15,6 +15,12 @@ public sealed record DevcontainerRequest(IReadOnlyList<string>? Names = null, in
 /// <param name="Message">Why nothing came, or which variables were left out. Never a value.</param>
 public sealed record DevcontainerReply(bool Approved, IReadOnlyDictionary<string, string>? Variables = null, string? Message = null);
 
+/// <summary>git's credential helper protocol asking for a remote's token: what git sent as <c>protocol</c> and <c>host</c>.</summary>
+public sealed record DevcontainerGitRequest(string? Protocol, string? Host, int V = DevcontainerWire.Version);
+
+/// <param name="Message">Why nothing came. Never a value.</param>
+public sealed record DevcontainerGitReply(bool Approved, string? Username = null, string? Password = null, string? Message = null);
+
 public static class DevcontainerWire
 {
     public const int Version = 1;
@@ -26,6 +32,8 @@ public static class DevcontainerWire
     public const string Host = "host.docker.internal";
 
     public const string EnvironmentPath = "/devcontainer/env";
+
+    public const string GitPath = "/devcontainer/git";
 
     /// <summary>The variable <c>remoteEnv</c> hands the ticket in, as <c>"${localEnv:TIRESIAS_TICKET}"</c>.</summary>
     public const string TicketVariable = "TIRESIAS_TICKET";

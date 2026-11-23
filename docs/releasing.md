@@ -6,6 +6,7 @@ Tiresias ships two things, and they version independently:
 |---|---|---|---|
 | NuGet packages (`Tiresias.Core`, `Tiresias.Protocol`, `Tiresias.Extensions.Configuration`) | `v0.1.0-preview.3` | `release.yml` | nuget.org, plus a GitHub release |
 | Desktop app (`Tiresias.exe` and `tir.exe`) | `app-v0.1.0-preview.3` | `app-release.yml` | a GitHub release that installed apps update from |
+| `tir-remote` and the devcontainer feature | with the app | `app-release.yml` | `tir-remote-linux-*` and `tir-remote.sha256` on the app's release; the feature at `ghcr.io/hansen-consultancy/devcontainer-features/tiresias`, stable versions only |
 
 Both take their release notes from `CHANGELOG.md`: the section whose heading is the version
 (`## [0.1.0-preview.3] - 2026-11-17`). The workflow fails if that section is missing or empty.
@@ -35,6 +36,12 @@ restarts.
    architecture is its own Velopack channel, so an install only updates to its own. x64 stays on
    the default `win` channel that installs from before Arm64 builds follow. The first Arm64
    release has no previous package to build a delta from, so it ships the full package only.
+   It also carries `tir-remote-linux-x64`, `-linux-arm64`, `-linux-musl-x64`, `-linux-musl-arm64`
+   and `tir-remote.sha256`, which the devcontainer feature installs from.
+5. **Check the feature.** For a stable version, the **feature** job publishes
+   `ghcr.io/hansen-consultancy/devcontainer-features/tiresias` with the release's version and
+   checksums inside it. The first time, ghcr.io creates the package private: make it public once
+   in the organisation's package settings, or containers can't pull it.
 
 The NuGet workflow needs nuget.org trusted publishing (the `nuget` environment and the
 `NUGET_USER` secret, see `release.yml`). The app workflow needs the one-time Azure setup below.

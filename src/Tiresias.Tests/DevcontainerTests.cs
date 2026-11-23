@@ -162,6 +162,7 @@ public class DevcontainerTests
             Assert.That(on.IsFinding);
             Assert.That(on.Detail, Does.Contain("forwards your git credentials into every container"));
             Assert.That(on.Fix!.Instruction, Does.Contain("\"dev.containers.gitCredentialHelperConfigLocation\": \"none\""));
+            Assert.That(on.Fix!.Instruction, Does.Contain("devcontainer-features/tiresias").And.Contain("tir env git add"));
             Assert.That(FindingView.Button(on.Fix), Is.EqualTo((FixAction.OpenGuide, "Finding_FixReachGuide")));
             Assert.That(off.IsFinding, Is.False);
             Assert.That(Doctor.Devcontainers([], null), Is.Empty, "Dev Containers not installed");

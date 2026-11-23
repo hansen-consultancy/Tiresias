@@ -173,6 +173,15 @@
   <data name="Consent_Devcontainer_Heading" xml:space="preserve">
     <value>Give environment variables to the devcontainer for {0}?</value>
   </data>
+  <data name="Consent_DevcontainerGit_Heading" xml:space="preserve">
+    <value>Give git the token for {0} in the devcontainer for {1}?</value>
+  </data>
+  <data name="Devcontainer_GitUnmapped" xml:space="preserve">
+    <value>No sealed variable for git at {0}://{1}. Map one on the host: tir env git add {1} &lt;NAME&gt;.</value>
+  </data>
+  <data name="Devcontainer_GitPlaceholder" xml:space="preserve">
+    <value>{0} is handed out as a placeholder, which git can't use as the token for {1}. Switch it back to its value: tir env placeholder remove {0}.</value>
+  </data>
   <data name="Consent_Devcontainer_Note" xml:space="preserve">
     <value>A program in this devcontainer asked; Tiresias can't see which one. Allowing it hands over the values; they are never shown here. "For the session" lasts until Tiresias locks or the devcontainer's ticket ends.</value>
   </data>

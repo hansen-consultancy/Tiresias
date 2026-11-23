@@ -140,8 +140,10 @@ public sealed record ReachGuide(ReachTopic Topic, bool DirectGrant = false, stri
             + "SSH keys and cloud logins can stay on Windows instead, used through its ssh-agent or the cloud's CLI",
         ReachTopic.HyperVFiles => "as an administrator, move the VM's files to a folder only administrators read (Hyper-V gives the VM its own access when it attaches them), "
             + "or remove the entries that let your account or its groups read the file. Inside the guest, BitLocker with a virtual TPM makes its disk ciphertext to the host",
-        ReachTopic.DevcontainerForwarding => "if your containers don't need them, add to VS Code's user settings: "
-            + "\"dev.containers.gitCredentialHelperConfigLocation\": \"none\", \"dev.containers.dockerCredentialHelper\": false",
+        ReachTopic.DevcontainerForwarding => "add to VS Code's user settings: "
+            + "\"dev.containers.gitCredentialHelperConfigLocation\": \"none\", \"dev.containers.dockerCredentialHelper\": false. "
+            + "Where a container needs git, let it ask instead: add the feature ghcr.io/hansen-consultancy/devcontainer-features/tiresias:0 to its devcontainer file, "
+            + "map each host to a sealed token with tir env git add <host> <NAME>, and git in the container gets the token after you approve",
         _ => "if you don't manage VMs, leave the group as an administrator: Remove-LocalGroupMember -SID S-1-5-32-578 -Member \"$env:USERDOMAIN\\$env:USERNAME\". "
             + "Inside each guest, turn on BitLocker with a virtual TPM so its disk and checkpoints are ciphertext to the host",
     };
