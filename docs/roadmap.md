@@ -20,6 +20,8 @@ design and issue. A PR that finishes, starts or adds an item edits this page in 
       produce ([design](step-up.md), #23)
 - [x] Trust-chain links that add a key need a Windows Hello signature ([design](trust-links.md), #41)
 - [x] Seal user environment variables and hand them back per shell session ([design](environment-variables.md))
+- [ ] Sealed configuration variables for .NET apps an IDE starts
+      ([design](environment-variables.md#net-configuration))
 - [x] Databases for applications: SQL Server logins per lease, RavenDB through the broker ([design](databases.md))
 - [ ] RavenDB subscriptions through the broker (the TCP relay, [phase 3](databases.md#phases))
 - [x] Guided setup: the strongest option first, findings with one-click fixes, and a "What do you

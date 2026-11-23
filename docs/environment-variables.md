@@ -158,9 +158,58 @@ service's grants, and the activity log records each request.
   - NuGet finds `nuget-plugin-*` on PATH from NuGet 6.13 (.NET SDK 9.0.200, Visual Studio 17.13);
     older ones also wanted plugins Authenticode-signed. Don't set `NUGET_PLUGIN_PATHS`: it
     replaces NuGet's own discovery.
+- **.NET apps** started by an IDE (F5 in Visual Studio or Rider) read `Section__Key` variables
+  through configuration: see [.NET configuration](#net-configuration) (designed, phase 5).
 - Anything else that only reads its environment at start-up stays in the registry, and the status
   page lists it as **unprotected** with the program that needs it, so the gap is visible rather
   than hidden.
+
+## .NET configuration
+
+**Status:** designed, not built (phase 5).
+
+.NET's default host reads environment variables into configuration: `Payments__ApiKey` becomes
+`Payments:ApiKey`. Many apps get a shared signing key or API key that way, with no setup. Once
+**Protect** seals such a variable, an app started from a terminal with the hook, or by `tir run`,
+still gets it. One started by an IDE does not: the IDE's environment never had it, and its debug
+child inherits that. Starting the IDE itself through `tir run` works, but hands every sealed
+variable allowed to the IDE and everything it starts for as long as it runs.
+
+`Tiresias.Extensions.Configuration` already sits in such an app's configuration (its generator
+intercepts `CreateBuilder` and `AddUserSecrets`). It gains a second source: **sealed
+configuration variables**, asked of the app by the app being configured, not by its parent.
+
+- **Which variables:** only those marked for configuration delivery, a third delivery beside value
+  and placeholder, set per variable (`tir env config add <NAME>`, a checkbox in the window).
+  Only a name containing `__` can be marked. Nothing is handed to an app it wasn't marked for,
+  and an app never sees the whole sealed set the way a terminal does.
+- **Folder sets apply** by the app's content root (its working directory when the host doesn't
+  say), so a folder can override a global value for one solution.
+- **Where it sits:** right after the unprefixed environment-variables source the host added,
+  so precedence is exactly what the variable had in `HKCU\Environment`: above appsettings and user
+  secrets, below the command line. A host without that source gets it appended.
+- **Already in the environment wins:** a name the process already has (a terminal with the hook,
+  `tir run`) is not asked for, so there is no second prompt and no surprise override.
+- **Consent:** the dialog names the program (the process on the pipe, by image path), its folder
+  and the variable names. **Allow for this session** is remembered per image path and folder until
+  Tiresias locks, so each F5 doesn't ask again; a rebuilt binary at the same path keeps the answer.
+  Policy (blocked programs, frozen) is checked as for the terminal hook.
+- **No agent:** a 300 ms glance, then the app starts without the variables and says so once on
+  stderr, naming them only if the agent answered before. It never waits 60 seconds as sealed
+  user secrets do: an app on a machine without Tiresias would hang at every start.
+- **Locked:** the request unlocks with Windows Hello as part of asking, as `tir run` does.
+- **Placeholders** are not delivered this way: a variable is either a placeholder or marked for
+  configuration.
+- **Wire:** a new agent pipe op, `environment.load`, carrying the app's folder; the reply's JSON
+  maps the variable names (`Payments__ApiKey`) to values. The provider converts the names exactly
+  as `AddEnvironmentVariables` does, so the keys match.
+- **Protect warns:** a name containing `__` that isn't marked for configuration gets a note in the
+  Protect dialog and in `tir env protect`: ".NET apps started outside a terminal will stop seeing
+  this; mark it for configuration." `tir doctor` lists sealed `__` variables not marked.
+
+What it does not cover: an app that doesn't reference the package (one `PackageReference`, often
+in a shared `Directory.Build.props`), and non-.NET programs started by an IDE. Those keep
+`tir run` around the IDE, or **Put back**.
 
 ## Honest limits
 
@@ -188,3 +237,5 @@ service's grants, and the activity log records each request.
    in the window). Built.
 3. Placeholder delivery through the vault and forwarder (`tir env placeholder`). Built.
 4. The NuGet credential plugin (`tir env nuget`, `nuget-plugin-tiresias.exe`). Built.
+5. Sealed configuration variables for .NET apps started outside a terminal (`environment.load`,
+   `tir env config`, the Protect warning). Designed.
