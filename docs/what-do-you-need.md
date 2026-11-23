@@ -100,7 +100,8 @@ Existing windows keep doing the work. This changes how people get to them, not w
 
 ### Phase 4: what is in use
 
-Home lists an area when any of these holds:
+Home lists an area when any of these holds ([developer tools](developer-tools.md) add User
+secrets, Services and Environment variables on a developer's PC, designed):
 
 | Area | In use when |
 |---|---|
