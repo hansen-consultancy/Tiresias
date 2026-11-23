@@ -22,6 +22,12 @@
   <data name="Common_Cancel" xml:space="preserve">
     <value>Cancel</value>
   </data>
+  <data name="Common_Yes" xml:space="preserve">
+    <value>Yes</value>
+  </data>
+  <data name="Common_No" xml:space="preserve">
+    <value>No</value>
+  </data>
   <data name="Common_TryAgain" xml:space="preserve">
     <value>Try again</value>
   </data>
@@ -196,6 +202,12 @@
   </data>
   <data name="Env_Body" xml:space="preserve">
     <value>Variables in your Windows environment are readable by every program you run. Sealed ones are given only to a program you allow: run it with tir run -- &lt;command&gt;.</value>
+  </data>
+  <data name="Env_ColName" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="Env_ColDetail" xml:space="preserve">
+    <value>Detail</value>
   </data>
   <data name="Env_Detail" xml:space="preserve">
     <value>({0} characters)</value>
@@ -2094,6 +2106,9 @@ Store them in clear?</value>
   <data name="AdminIncidents_Reviewed" xml:space="preserve">
     <value>Reviewed</value>
   </data>
+  <data name="AdminIncidents_Where" xml:space="preserve">
+    <value>Where</value>
+  </data>
   <data name="AdminIncidents_ConfirmReview" xml:space="preserve">
     <value>Mark {0} service incidents through {1} reviewed for the signed-in user? Their history will remain available in Activity.</value>
   </data>
@@ -2569,6 +2584,12 @@ Store them in clear?</value>
   </data>
   <data name="Alerts_Info" xml:space="preserve">
     <value>Everything</value>
+  </data>
+  <data name="Alerts_ColName" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="Alerts_ColDetail" xml:space="preserve">
+    <value>Detail</value>
   </data>
   <data name="Alerts_Test" xml:space="preserve">
     <value>Send a test alert</value>

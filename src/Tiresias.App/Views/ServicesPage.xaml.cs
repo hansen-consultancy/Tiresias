@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Tiresias.Agent;
+using Tiresias.App.Logic;
 using Tiresias.Policy;
 using Tiresias.Vault;
 
@@ -47,7 +48,15 @@ public partial class ServicesPage : UserControl
 
 }
 
-public sealed record ServiceRow(string Slug, string Upstream, string Grants);
+public sealed record ServiceRow(string Slug, string Upstream, string Grants)
+{
+    public IReadOnlyList<DetailField> Details =>
+    [
+        new(Text.Get("Services_ColSlug"), Slug),
+        new(Text.Get("Services_ColUpstream"), Upstream),
+        new(Text.Get("Services_ColGrants"), Grants),
+    ];
+}
 
 public sealed partial class ServicesViewModel : ObservableObject
 {

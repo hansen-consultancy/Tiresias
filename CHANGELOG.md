@@ -16,6 +16,10 @@ its section below.
   allow each program, once or for the session; it reaches configuration with the same key and
   precedence as from your Windows environment.
 
+- Selecting a row on Services, the secrets editor, Environment variables, About's alert sinks or
+  the service incidents window shows it in full below the list, as Activity and Installed
+  already did: values the narrow columns cut short wrap there, can be selected, and **Copy
+  details** copies them. The secrets editor shows the key only, never the value.
 - A critical alert, such as a used decoy credential, takes the LcdHub screen over in red with the
   event and its count, until Home shows your findings or for 24 hours. **Send a test alert** shows
   what it looks like for a minute.

@@ -1,7 +1,8 @@
 <UserControl x:Class="Tiresias.App.Views.AboutPage"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:l="clr-namespace:Tiresias.App">
+        xmlns:l="clr-namespace:Tiresias.App"
+        xmlns:v="clr-namespace:Tiresias.App.Views">
   <Grid Margin="{StaticResource PagePadding}">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
@@ -28,8 +29,8 @@
       <StackPanel>
         <TextBlock Text="{l:S Alerts_Heading}" Style="{StaticResource SubtitleText}" AutomationProperties.HeadingLevel="Level2" />
         <TextBlock x:Name="AlertsText" Style="{StaticResource BodyText}" />
-        <ItemsControl x:Name="AlertSinks" Focusable="False">
-          <ItemsControl.ItemTemplate>
+        <ListBox x:Name="AlertSinks" Style="{StaticResource PickList}" AutomationProperties.Name="{l:S Alerts_Heading}">
+          <ListBox.ItemTemplate>
             <DataTemplate>
               <DockPanel Margin="0,4">
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
@@ -38,13 +39,14 @@
                   <Button Content="{l:S Alerts_Remove}" Padding="10,4" Margin="8,0,0,0" Tag="{Binding Id}" Click="OnAlertRemove" />
                 </StackPanel>
                 <StackPanel VerticalAlignment="Center">
-                  <TextBlock Text="{Binding Id}" FontWeight="SemiBold" />
+                  <TextBlock Text="{Binding Id}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                   <TextBlock Text="{Binding Detail}" Style="{StaticResource CaptionText}" Margin="0" />
                 </StackPanel>
               </DockPanel>
             </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
+          </ListBox.ItemTemplate>
+        </ListBox>
+        <v:DetailsPanel Fields="{Binding SelectedItem.Details, ElementName=AlertSinks}" />
         <TextBlock x:Name="AlertsOutcome" Style="{StaticResource CaptionText}" AutomationProperties.LiveSetting="Polite" />
         <StackPanel Orientation="Horizontal">
           <Button x:Name="AlertsAddNtfy" Content="{l:S Alerts_AddNtfy}" Padding="12,6" Click="OnAlertAdd" />

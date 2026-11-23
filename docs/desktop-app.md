@@ -27,6 +27,11 @@ CI and people who prefer it, and it talks to the same agent.
   today's), and About at the bottom; the whole window is excluded from screen capture (except in a
   Debug build's demo mode, on made-up data: [testing](testing-on-windows.md#demo-mode-made-up-data-for-screenshots-and-visual-testing)). Escape on a
   page goes back Home, and on Home closes the window ([design](app-design.md#10-one-window)).
+- **Lists show the selected row in full.** The window is narrow, so table cells cut long values
+  short. Selecting one row (single selection) on Activity, Installed, Services, the secrets
+  editor (the key only, never the value), Environment variables, About's alert sinks or the
+  service incidents window shows a panel below the list. It holds every column in full, with
+  values that wrap and can be selected, and **Copy details** copies them all.
 - **Home leads with the next step**: the lock state with Lock and Add..., then a heading that
   counts what could be safer over a bar of the checks that pass. The findings are numbered; the
   first is open with its fix; the others are one line each, and clicking one opens it instead

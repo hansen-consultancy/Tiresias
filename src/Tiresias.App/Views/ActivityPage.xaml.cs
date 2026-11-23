@@ -23,25 +23,21 @@ public partial class ActivityPage : UserControl
 
     void OnIncidents(object sender, RoutedEventArgs e) =>
         new ServiceIncidentsWindow { Owner = Window.GetWindow(this) }.ShowDialog();
-
-    void OnCopyDetails(object sender, RoutedEventArgs e)
-    {
-        SelectedDetails.SelectAll();
-        SelectedDetails.Copy();
-    }
 }
 
 public sealed record Choice<T>(string Label, T Value);
 
 public sealed record ActivityRow(ActivityEntry Entry, string Time, string Source, string What, string Service, string Who, string Detail)
 {
-    public string FullText => string.Join(Environment.NewLine,
-        $"{Text.Get("Activity_ColTime")}: {Entry.Time.ToLocalTime().ToString("G", CultureInfo.CurrentCulture)}",
-        $"{Text.Get("Activity_Source")}: {Source}",
-        $"{Text.Get("Activity_ColWhat")}: {What}",
-        $"{Text.Get("Activity_ColService")}: {Service}",
-        $"{Text.Get("Activity_ColWho")}: {Who}",
-        $"{Text.Get("Activity_ColDetail")}: {Detail}");
+    public IReadOnlyList<DetailField> Details =>
+    [
+        new(Text.Get("Activity_ColTime"), Entry.Time.ToLocalTime().ToString("G", CultureInfo.CurrentCulture)),
+        new(Text.Get("Activity_Source"), Source),
+        new(Text.Get("Activity_ColWhat"), What),
+        new(Text.Get("Activity_ColService"), Service),
+        new(Text.Get("Activity_ColWho"), Who),
+        new(Text.Get("Activity_ColDetail"), Detail),
+    ];
 }
 
 public sealed partial class ActivityViewModel : ObservableObject
@@ -73,10 +69,7 @@ public sealed partial class ActivityViewModel : ObservableObject
     public ObservableCollection<ActivityRow> Rows { get; } = [];
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(DetailsVisibility))]
     public partial ActivityRow? Selected { get; set; }
-
-    public Visibility DetailsVisibility => Selected is null ? Visibility.Collapsed : Visibility.Visible;
 
     [ObservableProperty]
     public partial string Search { get; set; } = "";

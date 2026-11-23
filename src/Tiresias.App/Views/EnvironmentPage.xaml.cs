@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Tiresias.Agent;
+using Tiresias.App.Logic;
 using Tiresias.EnvironmentVariables;
 
 namespace Tiresias.App.Views;
@@ -74,6 +75,8 @@ public sealed partial class VariableRow(string name, string detail, bool isCheck
 
     [ObservableProperty]
     public partial bool IsChecked { get; set; } = isChecked;
+
+    public IReadOnlyList<DetailField> Details => [new(Text.Get("Env_ColName"), Name), new(Text.Get("Env_ColDetail"), Detail)];
 }
 
 public sealed partial class EnvironmentViewModel : ObservableObject

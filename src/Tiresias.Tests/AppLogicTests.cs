@@ -315,3 +315,21 @@ public class UpdatePlanTests
     public void A_preview_build_follows_preview_releases(string version, bool expected) =>
         Assert.That(UpdatePlan.FollowsPrereleases(version), Is.EqualTo(expected));
 }
+
+public class DetailTextTests
+{
+    [Test]
+    public void Empty_values_are_left_out() =>
+        Assert.That(DetailText.Shown([new("Name", "alice"), new("Version", ""), new("Folder", "  ")]).Select(f => f.Label),
+            Is.EqualTo(new[] { "Name" }));
+
+    [Test]
+    public void Copy_puts_one_label_and_value_per_line() =>
+        Assert.That(DetailText.Format([new("Name", "alice"), new("Version", ""), new("Upstream", "https://example.com/api")]),
+            Is.EqualTo($"Name: alice{Environment.NewLine}Upstream: https://example.com/api"));
+
+    [Test]
+    public void A_value_of_several_lines_stays_under_its_label() =>
+        Assert.That(DetailText.Format([new("Grants", "read\r\nwrite")]),
+            Is.EqualTo($"Grants: read{Environment.NewLine}  write"));
+}
