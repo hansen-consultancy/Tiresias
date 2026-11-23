@@ -13,14 +13,18 @@ public enum ConsentAnswer
 /// What a user-secrets consent screen shows: who asks and which keys they would get. Never values.
 /// </summary>
 /// <param name="Executable">Image path of the process on the pipe, as the agent saw it; <c>null</c> when it couldn't tell.</param>
-public sealed record UserSecretsConsentRequest(string? Executable, string UserSecretsId, IReadOnlyList<string> Keys)
+/// <param name="Folder">Set when an app asks for sealed environment variables (<see cref="IsEnvironment"/>): the folder it runs in.</param>
+public sealed record UserSecretsConsentRequest(string? Executable, string UserSecretsId, IReadOnlyList<string> Keys, string? Folder = null)
 {
+    /// <summary>An app asking for the sealed variables marked for configuration, not for a user-secrets file.</summary>
+    public bool IsEnvironment => UserSecretsId == EnvironmentVariables.EnvironmentFile.Id;
+
     /// <summary>Plain-text lines, so the dialog, the terminal agent and the log say the same thing.</summary>
     public IReadOnlyList<string> Describe() =>
     [
         $"Program:      {Executable ?? "unknown (the agent could not identify it)"}",
-        $"Secrets id:   {UserSecretsId}",
-        $"Keys ({Keys.Count}):    {(Keys.Count == 0 ? "none" : string.Join(", ", Keys))}",
+        IsEnvironment ? $"Folder:       {Folder}" : $"Secrets id:   {UserSecretsId}",
+        $"{(IsEnvironment ? "Variables" : "Keys")} ({Keys.Count}):    {(Keys.Count == 0 ? "none" : string.Join(", ", Keys))}",
     ];
 }
 

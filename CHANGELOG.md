@@ -10,6 +10,12 @@ its section below.
 
 ### Added
 
+- **Sealed variables for .NET apps an IDE starts.** `tir env config add <NAME>` (or
+  `tir env protect --config`) lets a .NET app with `Tiresias.Extensions.Configuration` ask for a
+  sealed variable itself, so F5 in Visual Studio or Rider gets it again after **Protect**. You
+  allow each program, once or for the session; it reaches configuration with the same key and
+  precedence as from your Windows environment.
+
 - A critical alert, such as a used decoy credential, takes the LcdHub screen over in red with the
   event and its count, until Home shows your findings or for 24 hours. **Send a test alert** shows
   what it looks like for a minute.

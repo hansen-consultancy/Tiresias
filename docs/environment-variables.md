@@ -166,7 +166,8 @@ service's grants, and the activity log records each request.
 
 ## .NET configuration
 
-**Status:** designed, not built (phase 5).
+**Status:** built: `environment.load`, the provider, `tir env config` and `tir env protect --config`.
+Not yet built: the checkbox in the window and in the Protect dialog.
 
 .NET's default host reads every environment variable into configuration, under its own name
 (`Payments__ApiKey` becomes `Payments:ApiKey`, `OPENAI_API_KEY` stays `OPENAI_API_KEY`). Many apps get a shared signing key or API key that way, with no setup. Once
@@ -180,33 +181,35 @@ intercepts `CreateBuilder` and `AddUserSecrets`). It gains a second source: **se
 configuration variables**, asked of the app by the app being configured, not by its parent.
 
 - **Which variables:** only those marked for configuration delivery, a third delivery beside value
-  and placeholder, set per variable (`tir env config add <NAME>`, a checkbox in the window).
+  and placeholder, set per variable (`tir env config add <NAME>`; a checkbox in the window is to come).
   Any sealed variable can be marked: the name says nothing about whether an app reads it, since
   the host injects them all. Nothing is handed to an app it wasn't marked for,
   and an app never sees the whole sealed set the way a terminal does.
-- **Folder sets apply** by the app's content root (its working directory when the host doesn't
-  say), so a folder can override a global value for one solution.
-- **Where it sits:** right after the unprefixed environment-variables source the host added,
-  so precedence is exactly what the variable had in `HKCU\Environment`: above appsettings and user
-  secrets, below the command line. A host without that source gets it appended.
+- **Folder sets apply** by the app's working directory, so a folder can override a global value
+  for one solution.
+- **Where it sits:** just before the unprefixed environment-variables source the host added. It
+  sets the allowed variables in the process environment, and that source reads them: same keys,
+  same precedence as from `HKCU\Environment`, and children the app starts get them too. A builder
+  without that source reads no environment, so it gets nothing, as before. It asks once per
+  process however often the host rebuilds its sources.
 - **Already in the environment wins:** a name the process already has (a terminal with the hook,
   `tir run`) is not asked for, so there is no second prompt and no surprise override.
 - **Consent:** the dialog names the program (the process on the pipe, by image path), its folder
   and the variable names. **Allow for this session** is remembered per image path and folder until
   Tiresias locks, so each F5 doesn't ask again; a rebuilt binary at the same path keeps the answer.
   Policy (blocked programs, frozen) is checked as for the terminal hook.
-- **No agent:** a 300 ms glance, then the app starts without the variables and says so once on
-  stderr, naming them only if the agent answered before. It never waits 60 seconds as sealed
-  user secrets do: an app on a machine without Tiresias would hang at every start.
+- **No agent:** a 300 ms glance, then the app starts without the variables, silently. It never
+  waits 60 seconds as sealed user secrets do: an app on a machine without Tiresias would hang at
+  every start. A refusal is one line on stderr.
 - **Locked:** the request unlocks with Windows Hello as part of asking, as `tir run` does.
 - **Placeholders** are not delivered this way: a variable is either a placeholder or marked for
   configuration.
-- **Wire:** a new agent pipe op, `environment.load`, carrying the app's folder; the reply's JSON
-  maps the variable names (`Payments__ApiKey`) to values. The provider converts the names exactly
-  as `AddEnvironmentVariables` does, so the keys match.
-- **Protect asks:** the Protect dialog has a **Also for .NET apps** checkbox per variable, and
-  `tir env protect` a `--config` flag, with a note that programs started outside a terminal stop
-  seeing a variable that isn't marked.
+- **Wire:** a new agent pipe op, `environment.load`, carrying the app's folder and the names it
+  already has; the reply's JSON maps variable names to values. An older agent answers it with an
+  error, and the app starts without them.
+- **Protect asks:** `tir env protect --config` marks what it seals; without it, it says that
+  programs started outside a terminal stop seeing them. The Protect dialog's **Also for .NET apps**
+  checkbox is to come.
 
 What it does not cover: an app that doesn't reference the package (one `PackageReference`, often
 in a shared `Directory.Build.props`), and non-.NET programs started by an IDE. Those keep
@@ -239,4 +242,4 @@ in a shared `Directory.Build.props`), and non-.NET programs started by an IDE. T
 3. Placeholder delivery through the vault and forwarder (`tir env placeholder`). Built.
 4. The NuGet credential plugin (`tir env nuget`, `nuget-plugin-tiresias.exe`). Built.
 5. Sealed configuration variables for .NET apps started outside a terminal (`environment.load`,
-   `tir env config`, the Protect warning). Designed.
+   `tir env config`, `protect --config`). Built; the window's checkboxes to come.

@@ -67,7 +67,7 @@ static class CliUsage
             Values are typed without echo or piped in; no command prints one.
 
         tir env list
-        tir env protect [<NAME>...] [--yes]
+        tir env protect [<NAME>...] [--yes] [--config]
         tir env put-back <NAME>...
         tir env set <NAME> [--from-stdin] [--folder [<path>]]
         tir env remove <NAME> [--folder [<path>]]
@@ -93,6 +93,12 @@ static class CliUsage
         tir env placeholder remove <NAME>
             Hand a sealed API key out as a placeholder for a vault service instead of its value, with
             the forwarder's address in the tool's base-URL variable (OPENAI_API_KEY: OPENAI_BASE_URL).
+        tir env config add <NAME>
+        tir env config list
+        tir env config remove <NAME>
+            Let .NET apps with Tiresias.Extensions.Configuration ask for a sealed variable themselves,
+            when nothing started them with it (F5 in an IDE). You allow each program, once or for
+            the session. protect --config marks what it seals.
         tir env hook [pwsh]
             Prints the PowerShell profile hook: tir env hook | Out-String | Invoke-Expression. Each
             terminal asks when it needs a new variable or its folder or delivery settings change.

@@ -33,11 +33,17 @@ public sealed record EnvironmentPlaceholder(string Variable, string Service, str
 /// <c>\</c> and <c>/</c> alike. NuGet sources are sealed with the rest, so nobody can point a feed of
 /// theirs at your token by editing a file. So are placeholder deliveries, keyed by variable name
 /// wherever that name resolves, so nothing can quietly switch one back to the real value.
+/// <see cref="Configuration"/> names the variables a .NET app may ask for itself, through
+/// <c>Tiresias.Extensions.Configuration</c>, when nothing started it with them: a delivery beside
+/// value and placeholder, never both a placeholder and this.
 /// </summary>
 public sealed record SealedEnvironment(IReadOnlyList<SealedVariable> Global, IReadOnlyList<FolderSet> Folders, IReadOnlyList<NuGetSource> NuGetSources,
     IReadOnlyList<EnvironmentPlaceholder> Placeholders)
 {
     public static readonly SealedEnvironment Empty = new([], [], [], []);
+
+    /// <summary>The variables marked for configuration delivery, by name wherever that name resolves.</summary>
+    public IReadOnlyList<string> Configuration { get; init; } = [];
 
     /// <summary>Azure Artifacts, GitHub Packages and most token feeds accept any user name with a token as the password.</summary>
     public const string NuGetDefaultUsername = "tiresias";
@@ -119,8 +125,36 @@ public sealed record SealedEnvironment(IReadOnlyList<SealedVariable> Global, IRe
         && string.Equals(left.IdnHost, right.IdnHost, StringComparison.OrdinalIgnoreCase);
 
     /// <summary><paramref name="placeholder"/> replacing any delivery for the same variable.</summary>
+    /// <exception cref="InvalidOperationException">The variable is marked for configuration: a .NET app would get the placeholder in place of its value.</exception>
     public SealedEnvironment WithPlaceholder(EnvironmentPlaceholder placeholder) =>
-        this with { Placeholders = [.. Placeholders.Where(p => !SameName(p.Variable, placeholder.Variable)), placeholder] };
+        IsForConfiguration(placeholder.Variable)
+            ? throw new InvalidOperationException($"{placeholder.Variable} is handed to .NET apps as its value; unmark it for configuration first.")
+            : this with { Placeholders = [.. Placeholders.Where(p => !SameName(p.Variable, placeholder.Variable)), placeholder] };
+
+    /// <summary>Marks <paramref name="variable"/> for configuration delivery; marking it twice changes nothing.</summary>
+    /// <exception cref="InvalidOperationException">It is delivered as a placeholder, which a .NET app's configuration can't use.</exception>
+    public SealedEnvironment WithConfiguration(string variable) =>
+        PlaceholderFor(variable) is not null
+            ? throw new InvalidOperationException($"{variable} is handed out as a placeholder; switch it back to its value first.")
+            : IsForConfiguration(variable) ? this : this with { Configuration = [.. Configuration, variable] };
+
+    public SealedEnvironment WithoutConfiguration(string variable) =>
+        this with { Configuration = [.. Configuration.Where(name => !SameName(name, variable))] };
+
+    public bool IsForConfiguration(string variable) => Configuration.Any(name => SameName(name, variable));
+
+    /// <summary>
+    /// What a .NET app in <paramref name="directory"/> may ask for: the variables resolved there that
+    /// are marked for configuration, less those it already has (<paramref name="present"/>), so a
+    /// process started by <c>tir run</c> or a terminal is not asked again. Each comes with its origin,
+    /// for consent.
+    /// </summary>
+    public IReadOnlyList<(SealedVariable Variable, string? Folder)> ForConfiguration(string directory, IEnumerable<string> present)
+    {
+        var have = present.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return [.. ResolveWithFolders(directory).Where(v => IsForConfiguration(v.Variable.Name) && !have.Contains(v.Variable.Name)
+            && PlaceholderFor(v.Variable.Name) is null)];
+    }
 
     public SealedEnvironment WithoutPlaceholder(string variable) =>
         this with { Placeholders = [.. Placeholders.Where(p => !SameName(p.Variable, variable))] };
@@ -170,6 +204,8 @@ public sealed record SealedEnvironment(IReadOnlyList<SealedVariable> Global, IRe
             placeholders[placeholder.Variable] = new JsonObject { ["service"] = placeholder.Service, ["baseUrl"] = placeholder.BaseUrlVariable };
         if (placeholders.Count > 0)
             document["placeholders"] = placeholders;
+        if (Configuration.Count > 0)
+            document["configuration"] = new JsonArray([.. Configuration.Select(name => (JsonNode)name)]);
         return document;
     }
 
@@ -201,7 +237,14 @@ public sealed record SealedEnvironment(IReadOnlyList<SealedVariable> Global, IRe
                 : throw new InvalidDataException($"The placeholder delivery for {pair.Key} names no service or base-URL variable.")).ToArray(),
             _ => throw new InvalidDataException("The sealed placeholder deliveries are not an object."),
         };
-        return new(SealedVariables.FromDocument(document), folders, nuget, placeholders);
+        var configuration = document["configuration"] switch
+        {
+            null => [],
+            JsonArray names => names.Select(name => name?.GetValueKind() == System.Text.Json.JsonValueKind.String
+                ? (string)name! : throw new InvalidDataException("A name marked for configuration is not a string.")).ToArray(),
+            _ => throw new InvalidDataException("The names marked for configuration are not an array."),
+        };
+        return new(SealedVariables.FromDocument(document), folders, nuget, placeholders) { Configuration = configuration };
     }
 
     static bool Contains(string folder, string directory) =>
