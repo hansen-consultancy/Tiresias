@@ -24,6 +24,20 @@
         <TextBlock x:Name="StartWithWindowsNote" Style="{StaticResource CaptionText}" />
       </StackPanel>
     </Border>
+    <!-- Developer tools appear on a developer's PC; this overrides the detection (docs/developer-tools.md). -->
+    <Border Style="{StaticResource Card}">
+      <StackPanel>
+        <TextBlock Text="{l:S DevTools_Heading}" Style="{StaticResource SubtitleText}" AutomationProperties.HeadingLevel="Level2" />
+        <ComboBox x:Name="DeveloperToolsBox" HorizontalAlignment="Left" MinWidth="280" Margin="0,4,0,0" SelectionChanged="OnDeveloperTools"
+                  AutomationProperties.Name="{l:S DevTools_Heading}">
+          <ComboBoxItem Content="{l:S DevTools_Auto}" />
+          <ComboBoxItem Content="{l:S DevTools_On}" />
+          <ComboBoxItem Content="{l:S DevTools_Off}" />
+        </ComboBox>
+        <TextBlock x:Name="DeveloperToolsReason" Style="{StaticResource BodyText}" Margin="0,6,0,0" />
+        <TextBlock Text="{l:S DevTools_Note}" Style="{StaticResource CaptionText}" />
+      </StackPanel>
+    </Border>
     <!-- Out-of-band alerts (docs/alerts.md): adding a sink is a sealed save behind Windows Hello; muting and removing are not. -->
     <Border Style="{StaticResource Card}">
       <StackPanel>

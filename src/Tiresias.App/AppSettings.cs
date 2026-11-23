@@ -8,7 +8,10 @@ namespace Tiresias.App;
 /// <param name="SetupSkipped">The user finished the first-run wizard without a broker.</param>
 /// <param name="Alerts">Alert sinks narrowed without Windows Hello (muted, removed), by sink id; see <see cref="SinkNarrowing"/>.</param>
 /// <param name="ReachScan">Whether the checks look inside the Docker engine: not yet, when asked, or daily.</param>
-public sealed record AppSettings(bool SetupSkipped = false, DateTimeOffset? LastUpdateCheck = null, IReadOnlyDictionary<string, SinkNarrowing>? Alerts = null, Logic.ReachScan ReachScan = Logic.ReachScan.Off)
+/// <param name="DeveloperTools">Whether developer tools show: when this PC looks like a developer's, always, or never (docs/developer-tools.md).</param>
+/// <param name="DeveloperToolsNoted">The user closed Home's line saying why developer tools appeared.</param>
+public sealed record AppSettings(bool SetupSkipped = false, DateTimeOffset? LastUpdateCheck = null, IReadOnlyDictionary<string, SinkNarrowing>? Alerts = null, Logic.ReachScan ReachScan = Logic.ReachScan.Off,
+    Logic.DeveloperToolsSetting DeveloperTools = Logic.DeveloperToolsSetting.Auto, bool DeveloperToolsNoted = false)
 {
     static string Path => System.IO.Path.Combine(KeyringStore.Directory, "app.json");
 

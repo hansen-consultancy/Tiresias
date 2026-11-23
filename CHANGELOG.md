@@ -8,6 +8,14 @@ its section below.
 
 ## [Unreleased]
 
+### Added
+
+- **The app stays simple on a PC that isn't a developer's.** Developer tools (Secrets, Services
+  and Environment variables on Home, the developer needs, passing developer checks, the project
+  decoy, the broker choice at setup) appear when the app finds something only a developer has,
+  such as the .NET SDK, git or an IDE, and Home says once why. **Show developer tools** on About
+  sets Auto, On or Off. Findings and warnings always show, and nothing you use is hidden.
+
 ## [0.3.0] - 2026-11-23
 
 ### Added

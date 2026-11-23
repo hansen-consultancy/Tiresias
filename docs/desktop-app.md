@@ -41,6 +41,13 @@ CI and people who prefer it, and it talks to the same agent.
 - **Home shows what is in use**: Secrets, Services, Environment variables and Activity appear
   once they have something in them (or a finding leads there); the rest are reached through
   **Add...**.
+- **Developer tools appear on a developer's PC.** Something only a developer has (the .NET SDK,
+  user secrets, git, an IDE, WSL, Docker, sealed variables, vault services, project folders)
+  shows Secrets, Services and Environment variables on Home, the developer needs on **Add...**,
+  the developer checks that passed, the project decoy and the broker choice at setup. Home says
+  once why they appeared. Without them, findings and checks that warn or fail still show, and
+  solo mode's trade-offs count as passed. **Show developer tools** on About (Auto, On, Off)
+  overrides; Off never hides an area in use ([design](developer-tools.md)).
 - **One per user session.** Starting it again brings the running one forward. `tir agent` refuses
   to start while the app runs.
 - **The agent runs in the app:** the user-secrets pipe server, the lease heartbeat, locking on
@@ -216,7 +223,7 @@ The goal is one command or one download, then a first-run wizard:
 1. Create the recovery key: show it once, ask the user to confirm two words from it, then print
    or save it.
 2. Choose a mode: **solo** (the default, nothing else to set up) or **with a broker** (see
-   [Solo mode](#solo-mode)).
+   [Solo mode](#solo-mode)). Without [developer tools](developer-tools.md) the step shows solo only.
 3. Enrol this device: pin the broker key, scan or paste the genesis hash.
 4. Optional: scan the machine for plaintext secrets (the `doctor` checks) and offer to import
    them.

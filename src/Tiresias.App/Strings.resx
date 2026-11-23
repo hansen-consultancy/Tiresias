@@ -2789,4 +2789,67 @@ Store them in clear?</value>
   <data name="Alerts_TestNoHub" xml:space="preserve">
     <value>No LcdHub is running for {0}. The test shows if one starts within a minute.</value>
   </data>
+  <data name="DevTools_Heading" xml:space="preserve">
+    <value>Developer tools</value>
+  </data>
+  <data name="DevTools_Auto" xml:space="preserve">
+    <value>When this PC looks like a developer's</value>
+  </data>
+  <data name="DevTools_On" xml:space="preserve">
+    <value>Always</value>
+  </data>
+  <data name="DevTools_Off" xml:space="preserve">
+    <value>Never</value>
+  </data>
+  <data name="DevTools_Note" xml:space="preserve">
+    <value>User secrets, Services and Environment variables before you use them, the developer needs in Add..., and developer checks that passed. Whatever you already use, and every finding, show either way.</value>
+  </data>
+  <data name="DevTools_Because" xml:space="preserve">
+    <value>Shown because {0}.</value>
+  </data>
+  <data name="DevTools_NotFound" xml:space="preserve">
+    <value>Hidden: nothing on this PC looks like a developer's.</value>
+  </data>
+  <data name="DevTools_HomeLine" xml:space="preserve">
+    <value>Developer tools are shown because {0}.</value>
+  </data>
+  <data name="DevTools_Change" xml:space="preserve">
+    <value>Change...</value>
+  </data>
+  <data name="DevTools_Close" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="DevSignal_DotNetSdk" xml:space="preserve">
+    <value>the .NET SDK is installed</value>
+  </data>
+  <data name="DevSignal_UserSecrets" xml:space="preserve">
+    <value>user secrets exist</value>
+  </data>
+  <data name="DevSignal_Git" xml:space="preserve">
+    <value>git is set up</value>
+  </data>
+  <data name="DevSignal_VisualStudio" xml:space="preserve">
+    <value>Visual Studio is installed</value>
+  </data>
+  <data name="DevSignal_Rider" xml:space="preserve">
+    <value>Rider is installed</value>
+  </data>
+  <data name="DevSignal_VsCode" xml:space="preserve">
+    <value>VS Code or a fork of it is installed</value>
+  </data>
+  <data name="DevSignal_Wsl" xml:space="preserve">
+    <value>WSL has a distribution</value>
+  </data>
+  <data name="DevSignal_Docker" xml:space="preserve">
+    <value>Docker is running</value>
+  </data>
+  <data name="DevSignal_SealedVariables" xml:space="preserve">
+    <value>environment variables are sealed</value>
+  </data>
+  <data name="DevSignal_VaultServices" xml:space="preserve">
+    <value>the vault has services</value>
+  </data>
+  <data name="DevSignal_ProjectFolders" xml:space="preserve">
+    <value>project folders are set</value>
+  </data>
 </root>

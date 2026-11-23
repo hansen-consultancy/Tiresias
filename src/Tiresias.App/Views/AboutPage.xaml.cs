@@ -52,6 +52,8 @@ public partial class AboutPage : UserControl
         Notes.Text = AppBuild.Notes() ?? Text.Get("About_NoNotes");
 
         // A development build never registers itself: its folder goes stale with the next build.
+        DeveloperToolsBox.SelectedIndex = (int)AppSettings.Load().DeveloperTools;
+        ShowDeveloperTools();
         StartWithWindowsBox.IsChecked = StartWithWindows.IsOn;
         StartWithWindowsBox.IsEnabled = build.Installed;
         StartWithWindowsNote.Text = Text.Get(build.Installed ? "Status_StartWithWindowsNote" : "Status_StartWithWindowsDev");
@@ -166,6 +168,23 @@ public partial class AboutPage : UserControl
         {
             AdminTierSetUp.IsEnabled = AdminTierUpdate.IsEnabled = AdminTierRemove.IsEnabled = true;
         }
+    }
+
+    void OnDeveloperTools(object sender, SelectionChangedEventArgs e)
+    {
+        if (!IsLoaded || DeveloperToolsBox.SelectedIndex < 0)
+            return;
+        (AppSettings.Load() with { DeveloperTools = (DeveloperToolsSetting)DeveloperToolsBox.SelectedIndex }).Save();
+        ShowDeveloperTools();
+        (Window.GetWindow(this) as StatusWindow)?.DeveloperToolsChanged();
+    }
+
+    void ShowDeveloperTools()
+    {
+        var view = DeveloperSignals.View();
+        DeveloperToolsReason.Text = view.Because.Count > 0 ? Text.Format("DevTools_Because", DeveloperSignals.Reasons(view))
+            : view.Shown ? "" : AppSettings.Load().DeveloperTools == DeveloperToolsSetting.Auto ? Text.Get("DevTools_NotFound") : "";
+        DeveloperToolsReason.Visibility = DeveloperToolsReason.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     void OnStartWithWindows(object sender, RoutedEventArgs e)

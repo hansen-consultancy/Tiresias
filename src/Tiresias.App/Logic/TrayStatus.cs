@@ -18,9 +18,10 @@ public sealed record TrayView(Phrase Headline, Phrase? Mode, bool CanUnlock, boo
 
 public static class TrayStatus
 {
-    public static TrayView Describe(AgentSnapshot s)
+    /// <param name="developerTools">Developer tools show; without them the solo line, which only a developer can weigh, is left out.</param>
+    public static TrayView Describe(AgentSnapshot s, bool developerTools = true)
     {
-        var mode = s.Solo ? new Phrase("Tray_ModeSolo") : null;
+        var mode = s.Solo && developerTools ? new Phrase("Tray_ModeSolo") : null;
         if (!s.SetUp)
             return new(new("Tray_NotSetUp"), mode, CanUnlock: false, CanLock: false, OfferSetup: true, new("Tooltip_NotSetUp"));
         if (s.Solo && s.BrokerProblem is not null)

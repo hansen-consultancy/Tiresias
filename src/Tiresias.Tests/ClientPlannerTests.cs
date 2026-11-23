@@ -317,6 +317,21 @@ public class DoctorTests
     }
 
     [Test]
+    public async Task Developer_checks_and_solo_notes_are_marked()
+    {
+        var probe = new FakeProbe { Solo = true };
+        probe.Secrets.Add(new(@"C:\u\abc\secrets.json", """{"ApiKey":"sk-live-1"}"""));
+        var checks = await Doctor.RunAsync(probe);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(checks.Single(c => c.Name.StartsWith("user secrets", StringComparison.Ordinal)).ForDevelopers, Is.True);
+            Assert.That(checks.Where(c => c.SoloNote).Select(c => c.Name), Is.EquivalentTo(new[] { "egress", "isolation" }));
+            Assert.That(checks.Where(c => c.Name is "broker pinned" or "mode" or Doctor.VariablesCheck).Any(c => c.ForDevelopers), Is.False);
+        });
+    }
+
+    [Test]
     public async Task A_plaintext_secrets_file_warns_with_its_id_and_key_count_and_never_its_keys_or_values()
     {
         var probe = new FakeProbe();

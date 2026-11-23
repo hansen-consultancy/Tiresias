@@ -89,13 +89,13 @@
               <TextBlock Text="{l:S FirstRun_Mode_SoloBody}" Style="{StaticResource CaptionText}" />
             </StackPanel>
           </RadioButton>
-          <RadioButton GroupName="Mode" IsChecked="{Binding IsBroker}" Margin="0,12,0,0">
+          <RadioButton GroupName="Mode" IsChecked="{Binding IsBroker}" Margin="0,12,0,0" Visibility="{Binding DeveloperTools, Converter={StaticResource Visible}}">
             <StackPanel>
               <TextBlock Text="{l:S FirstRun_Mode_Broker}" Style="{StaticResource SubtitleText}" />
               <TextBlock Text="{l:S FirstRun_Mode_BrokerBody}" Style="{StaticResource CaptionText}" />
             </StackPanel>
           </RadioButton>
-          <RadioButton GroupName="Mode" IsChecked="{Binding IsSecretsOnly}" Margin="0,12,0,0">
+          <RadioButton GroupName="Mode" IsChecked="{Binding IsSecretsOnly}" Margin="0,12,0,0" Visibility="{Binding DeveloperTools, Converter={StaticResource Visible}}">
             <StackPanel>
               <TextBlock Text="{l:S FirstRun_Mode_SecretsOnly}" Style="{StaticResource SubtitleText}" />
               <TextBlock Text="{l:S FirstRun_Mode_SecretsOnlyBody}" Style="{StaticResource CaptionText}" />

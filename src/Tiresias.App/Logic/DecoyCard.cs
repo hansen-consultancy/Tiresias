@@ -14,12 +14,13 @@ public sealed record DecoyCard(IReadOnlyList<PlacedDecoy> Placed, IReadOnlyList<
     public bool Removable => Placed.Count > 0 || Held.Count > 0 || NeedsVerification;
 
     /// <param name="admin">The service's confirmed placements and listener state when it answers.</param>
-    public static DecoyCard Of(DecoySet? set, AdminDecoysStatus? admin = null)
+    /// <param name="developerTools">Developer tools show; without them a project decoy isn't offered, since nobody would look for one (docs/developer-tools.md).</param>
+    public static DecoyCard Of(DecoySet? set, AdminDecoysStatus? admin = null, bool developerTools = true)
     {
         var placed = set?.Placed ?? [];
         if (admin is { Held: true })
             return new([.. placed.OrderBy(p => p.Placed)], [], [.. admin.Kinds], Listening: admin.Listening, CanEnroll: placed.Count > 0);
-        return new([.. placed.OrderBy(p => p.Placed)], [.. Enum.GetValues<DecoyKind>().Where(k => placed.All(p => p.Kind != k))], [],
+        return new([.. placed.OrderBy(p => p.Placed)], [.. Enum.GetValues<DecoyKind>().Where(k => placed.All(p => p.Kind != k) && (developerTools || k != DecoyKind.Project))], [],
             CanEnroll: admin is not null && (placed.Count > 0 || admin.NeedsVerification), NeedsVerification: admin?.NeedsVerification == true);
     }
 
