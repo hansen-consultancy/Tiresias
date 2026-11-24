@@ -18,6 +18,10 @@ static class Program
                 RemoveAdminTier();
             })
             .Run();
+        // Velopack starts the app in its version folder, and everything the app starts inherits the
+        // working folder. A program still running there holds the folder, and the next update can't
+        // move it (#149).
+        Environment.CurrentDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         // Run elevated by AdminTierElevation, after its UAC prompt: no window, just the step and its exit code.
         if (args is [AdminTierElevation.Argument, var verb])
             return (int)AdminTierSetup.Run(verb, AppContext.BaseDirectory);

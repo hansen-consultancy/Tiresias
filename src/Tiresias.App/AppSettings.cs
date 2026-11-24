@@ -10,8 +10,9 @@ namespace Tiresias.App;
 /// <param name="ReachScan">Whether the checks look inside the Docker engine: not yet, when asked, or daily.</param>
 /// <param name="DeveloperTools">Whether developer tools show: when this PC looks like a developer's, always, or never (docs/developer-tools.md).</param>
 /// <param name="DeveloperToolsNoted">The user closed Home's line saying why developer tools appeared.</param>
+/// <param name="ApplyingUpdate">The version the app last quit to apply, until the next start checks it arrived.</param>
 public sealed record AppSettings(bool SetupSkipped = false, DateTimeOffset? LastUpdateCheck = null, IReadOnlyDictionary<string, SinkNarrowing>? Alerts = null, Logic.ReachScan ReachScan = Logic.ReachScan.Off,
-    Logic.DeveloperToolsSetting DeveloperTools = Logic.DeveloperToolsSetting.Auto, bool DeveloperToolsNoted = false)
+    Logic.DeveloperToolsSetting DeveloperTools = Logic.DeveloperToolsSetting.Auto, bool DeveloperToolsNoted = false, string? ApplyingUpdate = null)
 {
     static string Path => System.IO.Path.Combine(KeyringStore.Directory, "app.json");
 

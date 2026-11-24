@@ -314,6 +314,27 @@ public class UpdatePlanTests
     [TestCase("1.2.0", false)]
     public void A_preview_build_follows_preview_releases(string version, bool expected) =>
         Assert.That(UpdatePlan.FollowsPrereleases(version), Is.EqualTo(expected));
+
+    [TestCase(null, "0.3.0", false)]
+    [TestCase("0.3.0", "0.3.0", false)]
+    [TestCase("0.3.0", "0.2.1", true)]
+    public void An_apply_failed_when_the_app_came_back_as_another_version(string? applying, string current, bool expected) =>
+        Assert.That(UpdatePlan.ApplyFailed(applying, current), Is.EqualTo(expected));
+
+    [TestCase("TiresiasApp/current/", true)]
+    [TestCase("TiresiasApp", true)]
+    [TestCase("tiresiasapp/current/Tiresias.exe", true)]
+    [TestCase("TiresiasAppOld/current", false)]
+    [TestCase("", false)]
+    [TestCase(null, false)]
+    public void A_program_or_working_folder_in_the_install_folder_blocks_an_update(string? relative, bool expected)
+    {
+        // Built with the platform's separator: CI also runs on Linux.
+        static string Under(string relative) =>
+            Path.Join(Path.GetTempPath(), "u", relative.Replace('/', Path.DirectorySeparatorChar));
+        var path = relative is null ? null : Under(relative);
+        Assert.That(UpdatePlan.InInstallFolder(path, Under("TiresiasApp/")), Is.EqualTo(expected));
+    }
 }
 
 public class DetailTextTests
