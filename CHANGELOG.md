@@ -10,6 +10,10 @@ its section below.
 
 ### Added
 
+- **Installed** marks unsigned and newly installed programs. Each program file's signature is
+  checked in the background; one without a valid signature gets a caution mark, and one installed
+  in the last 14 days a **New** mark. **Show** can pick either, and the details give the install
+  date.
 - **Devcontainers can ask instead of carrying secrets.** Put `"TIRESIAS_TICKET":
   "${localEnv:TIRESIAS_TICKET}"` in `remoteEnv` and start VS Code with `tir run -- code <folder>`:
   the devcontainer gets a ticket, and `tir-remote run -- <command>` inside it asks the Tiresias
@@ -25,6 +29,11 @@ its section below.
 
 ### Fixed
 
+- The **Environment variables** page no longer ticks the decoy variables Tiresias placed
+  (`ADMIN_API_URL`, `ADMIN_API_TOKEN`) as secrets to seal: they are listed as decoys and sealing
+  passes them over, as do `tir env list` and `tir env protect`. A real variable of the same name, with another value, is still a secret. The
+  page now opens with what is still in Windows, each heading says who can read what it lists, and
+  the summary says what its count is out of.
 - Updates no longer fail without a word. Programs the app starts no longer keep its install folder
   as their working folder, which blocked Velopack from swapping the files. Before applying an
   update, the app names any program still using that folder and asks you to close it. If an update
@@ -34,11 +43,16 @@ its section below.
   **Check daily** sits beside **Check now**. A finding's **Details** toggle stays readable when
   open. The user-secrets editor no longer shows a white grid in dark mode before you pick a project.
   Hovering a count in the side bar says what it counts.
+- Home's trust chain check no longer says **Worth a look** after `tir trust bind-hello` when the
+  broker runs as the Windows service: it asks the broker for its chain instead of reading a copy
+  the service never updates. A check that says to run a `tir` command offers **Copy command**.
+- **How to close it** shows its steps in the app instead of opening a web page: each command names
+  your account, with **Copy**, and **Run as administrator** where it needs one.
 - The user-secrets list marks each project's state (sealed, not sealed yet, settings only, empty)
   so they stand apart, and a line under it counts each. A sealed project with keys added beside it
-  in plain since (`dotnet user-secrets set`) is marked amber until the next run seals them. A project whose secrets file holds only
-  `tiresias:` references counts as settings only instead of "not sealed yet": a reference holds no
-  secret, so `tir doctor` no longer warns about it either.
+  in plain since (`dotnet user-secrets set`) is marked amber until the next run seals them. A
+  project whose secrets file holds only `tiresias:` references counts as settings only instead of
+  "not sealed yet": a reference holds no secret, so `tir doctor` no longer warns about it either.
 
 ## [0.3.0] - 2026-11-23
 

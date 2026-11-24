@@ -134,7 +134,8 @@ public class UnusedApplicationTests
             new(Program("Other", folder: @"D:\Apps\Other"), ProgramUse.NotRecorded, null, []),
         ];
 
-        string[] Names(string search, bool unusedOnly = false) => [.. InstalledFilter.Apply(list, search, unusedOnly).Select(p => p.Entry.Name)];
+        string[] Names(string search, bool unusedOnly = false) =>
+            [.. InstalledFilter.Apply(list, search, unusedOnly ? InstalledView.Unused : InstalledView.All, Today, _ => null).Select(p => p.Entry.Name)];
 
         Assert.That(Names(""), Is.EqualTo(new[] { "Acme Editor", "Zeta Tool", "Other" }));
         Assert.That(Names("GITHUB"), Is.EqualTo(new[] { "Acme Editor" }));
@@ -143,6 +144,48 @@ public class UnusedApplicationTests
         Assert.That(Names("acme zeta"), Is.Empty);
         Assert.That(Names("", unusedOnly: true), Is.EqualTo(new[] { "Zeta Tool" }));
     }
+
+    static readonly DateOnly Today = DateOnly.FromDateTime(Now.UtcDateTime);
+
+    [Test]
+    public void New_is_installed_in_the_last_fourteen_days_and_unsigned_needs_a_checked_file()
+    {
+        InstalledProgram[] list =
+        [
+            new(Program("Fresh") with { InstalledOn = Today.AddDays(-13), Uninstaller = @"C:\Apps\Fresh\uninstall.exe" }, ProgramUse.Recent, Now, []),
+            new(Program("Older") with { InstalledOn = Today.AddDays(-14), Uninstaller = @"C:\Apps\Older\uninstall.exe" }, ProgramUse.Recent, Now, []),
+            new(Program("Undated") with { Uninstaller = @"C:\Apps\Undated\uninstall.exe" }, ProgramUse.Recent, Now, []),
+            new(Program("Fileless") with { InstalledOn = Today }, ProgramUse.Recent, Now, []),
+        ];
+        Dictionary<string, bool?> signed = new(StringComparer.OrdinalIgnoreCase)
+        {
+            [@"C:\Apps\Fresh\uninstall.exe"] = false,
+            [@"C:\Apps\Older\uninstall.exe"] = true,
+            [@"C:\Apps\Undated\uninstall.exe"] = null,
+        };
+
+        string[] Names(InstalledView view) => [.. InstalledFilter.Apply(list, "", view, Today, f => signed.GetValueOrDefault(f)).Select(p => p.Entry.Name)];
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(Names(InstalledView.New), Is.EqualTo(new[] { "Fresh", "Fileless" }));
+            Assert.That(Names(InstalledView.Unsigned), Is.EqualTo(new[] { "Fresh" }), "not checked yet, or nothing to check, is not unsigned");
+            Assert.That(Names(InstalledView.All), Has.Length.EqualTo(4));
+        });
+    }
+
+    [TestCase("20261118", 2026, 11, 18)]
+    [TestCase(" 20250101 ", 2025, 1, 1)]
+    public void An_install_date_is_read_as_installers_write_it(string value, int year, int month, int day) =>
+        Assert.That(UninstallEntry.ParseInstallDate(value), Is.EqualTo(new DateOnly(year, month, day)));
+
+    [TestCase("2026-11-18")]
+    [TestCase("20261340")]
+    [TestCase("18/11/2026")]
+    [TestCase("")]
+    [TestCase(null)]
+    public void Any_other_install_date_is_unknown(string? value) =>
+        Assert.That(UninstallEntry.ParseInstallDate(value), Is.Null);
 
     [TestCase(@"""C:\Program Files\Acme\acme.exe"",0", @"C:\Program Files\Acme\acme.exe", 0)]
     [TestCase(@"C:\Program Files\Acme\acme.exe,-101", @"C:\Program Files\Acme\acme.exe", -101)]

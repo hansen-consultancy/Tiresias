@@ -110,6 +110,7 @@ public class DoctorTests
         public IReadOnlyList<string> ExposedVariables { get; set; } = [];
         public bool Solo { get; set; }
         public bool? HelloBound { get; set; }
+        public Task<bool?> HelloBoundAsync() => Task.FromResult(HelloBound);
         public BrokerServiceState BrokerService { get; set; }
         public DoctorVault? Vault { get; set; } = new(2, [], []);
         public int? BrokerStatus { get; set; } = 401;

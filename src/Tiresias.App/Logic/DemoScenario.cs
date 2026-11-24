@@ -106,13 +106,14 @@ public sealed partial record DemoScenario(
     [GeneratedRegex(@"^[A-Za-z0-9._-]+$")]
     private static partial Regex UserSecretsId();
 
-    static readonly Regex Token = new(@"\{\{(?:profile|now(?:-(?<n>\d+)(?<unit>[mhd]))?)\}\}", RegexOptions.CultureInvariant);
+    static readonly Regex Token = new(@"\{\{(?:profile|(?<kind>now|date)(?:-(?<n>\d+)(?<unit>[mhd]))?)\}\}", RegexOptions.CultureInvariant);
 
     /// <summary>
     /// A file's content with its tokens filled in: <c>{{profile}}</c> is the made-up profile's path,
     /// and <c>{{now}}</c>, <c>{{now-90m}}</c>, <c>{{now-2h}}</c>, <c>{{now-3d}}</c> are times before
     /// <paramref name="now"/> (round-trip format), so activity is always recent. In a <c>.json</c> or
-    /// <c>.jsonl</c> file the path is escaped as a JSON string's content.
+    /// <c>.jsonl</c> file the path is escaped as a JSON string's content. <c>{{date-3d}}</c> is the
+    /// day alone, as an uninstall entry's <c>InstallDate</c> (<c>yyyyMMdd</c>).
     /// </summary>
     public static string Expand(string content, string fileName, string profile, DateTimeOffset now)
     {
@@ -122,8 +123,9 @@ public sealed partial record DemoScenario(
         {
             if (m.Value == "{{profile}}")
                 return path;
+            var format = m.Groups["kind"].Value == "date" ? "yyyyMMdd" : "o";
             if (!m.Groups["n"].Success)
-                return now.ToString("o", CultureInfo.InvariantCulture);
+                return now.ToString(format, CultureInfo.InvariantCulture);
             var n = int.Parse(m.Groups["n"].Value, CultureInfo.InvariantCulture);
             var ago = m.Groups["unit"].Value switch
             {
@@ -131,7 +133,7 @@ public sealed partial record DemoScenario(
                 "h" => TimeSpan.FromHours(n),
                 _ => TimeSpan.FromDays(n),
             };
-            return (now - ago).ToString("o", CultureInfo.InvariantCulture);
+            return (now - ago).ToString(format, CultureInfo.InvariantCulture);
         });
     }
 

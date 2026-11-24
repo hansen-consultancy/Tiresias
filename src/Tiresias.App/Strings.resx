@@ -222,7 +222,7 @@
     <value>Sealed {0}.</value>
   </data>
   <data name="Env_Body" xml:space="preserve">
-    <value>Variables in your Windows environment are readable by every program you run. Sealed ones are given only to a program you allow: run it with tir run -- &lt;command&gt;.</value>
+    <value>Every program you run can read the variables in your Windows environment. A sealed variable is kept by Tiresias and given only to a program you allow: run it with tir run -- &lt;command&gt;.</value>
   </data>
   <data name="Env_ColName" xml:space="preserve">
     <value>Name</value>
@@ -241,6 +241,9 @@
   </data>
   <data name="Env_DetailSecret" xml:space="preserve">
     <value>({0} characters, looks like a secret)</value>
+  </data>
+  <data name="Env_DetailDecoy" xml:space="preserve">
+    <value>(a decoy Tiresias placed: using it raises an alert)</value>
   </data>
   <data name="Env_FolderBrowse" xml:space="preserve">
     <value>Browse...</value>
@@ -270,7 +273,7 @@
     <value>Value of the new variable</value>
   </data>
   <data name="Env_NoneSealed" xml:space="preserve">
-    <value>Nothing sealed yet.</value>
+    <value>Nothing sealed yet: seal a variable from Windows above, or add one below.</value>
   </data>
   <data name="Env_NothingPicked" xml:space="preserve">
     <value>Tick at least one variable first.</value>
@@ -396,16 +399,22 @@
     <value>Seal</value>
   </data>
   <data name="Env_SealedHeading" xml:space="preserve">
-    <value>Sealed</value>
+    <value>Sealed: only programs you allow get these</value>
   </data>
   <data name="Env_SealedSummary" xml:space="preserve">
     <value>{0} sealed. Tick some to put them back in Windows or remove them.</value>
   </data>
   <data name="Env_WindowsHeading" xml:space="preserve">
-    <value>In your Windows environment</value>
+    <value>Still in Windows: every program can read these</value>
   </data>
   <data name="Env_WindowsSummary" xml:space="preserve">
-    <value>{0} look like secrets and are ticked. Sealing removes them from Windows once the sealed copy reads back; programs already running keep their copy until they restart.</value>
+    <value>{0} of these {1} look like secrets and are ticked. Sealing takes them out of Windows once the sealed copy reads back; programs already running keep their copy until they restart.</value>
+  </data>
+  <data name="Env_WindowsNoSecrets" xml:space="preserve">
+    <value>None of these {0} looks like a secret. Tick one to seal it anyway.</value>
+  </data>
+  <data name="Env_WindowsDecoys" xml:space="preserve">
+    <value>Decoys Tiresias placed as bait stay, and can't be sealed: {0}.</value>
   </data>
   <data name="Environment_Locked" xml:space="preserve">
     <value>Tiresias is locked. Unlock it, then run the command again.</value>
@@ -1201,6 +1210,12 @@ Switch to this copy, {2}, from {3}? The other copy quits first, ending its lease
   </data>
   <data name="Status_Review" xml:space="preserve">
     <value>Review...</value>
+  </data>
+  <data name="Status_CopyCommand" xml:space="preserve">
+    <value>Copy command</value>
+  </data>
+  <data name="Status_CopyCommandName" xml:space="preserve">
+    <value>Copy {0}</value>
   </data>
   <data name="Status_ReviewName" xml:space="preserve">
     <value>Review {0} in the secrets editor</value>
@@ -2064,6 +2079,18 @@ Close them, then choose the update in the tray menu again.</value>
   <data name="Installed_ShowUnused" xml:space="preserve">
     <value>Not opened in 90 days</value>
   </data>
+  <data name="Installed_ShowUnsigned" xml:space="preserve">
+    <value>Not signed</value>
+  </data>
+  <data name="Installed_UnsignedTip" xml:space="preserve">
+    <value>Not signed: nothing vouches that it came from its publisher unchanged</value>
+  </data>
+  <data name="Installed_ShowNew" xml:space="preserve">
+    <value>Installed in the last {0} days</value>
+  </data>
+  <data name="Installed_New" xml:space="preserve">
+    <value>New</value>
+  </data>
   <data name="Installed_ListName" xml:space="preserve">
     <value>Installed programs</value>
   </data>
@@ -2075,6 +2102,12 @@ Close them, then choose the update in the tray menu again.</value>
   </data>
   <data name="Installed_ColFor" xml:space="preserve">
     <value>Installed for</value>
+  </data>
+  <data name="Installed_ColInstalledOn" xml:space="preserve">
+    <value>Installed on</value>
+  </data>
+  <data name="Installed_InstalledOnUnknown" xml:space="preserve">
+    <value>Not known: its entry gives no date and its folder is gone</value>
   </data>
   <data name="Installed_ColUse" xml:space="preserve">
     <value>Last opened</value>
@@ -2102,6 +2135,15 @@ Close them, then choose the update in the tray menu again.</value>
   </data>
   <data name="Installed_Summary" xml:space="preserve">
     <value>{0} programs, {1} not opened in 90 days</value>
+  </data>
+  <data name="Installed_SummaryScanning" xml:space="preserve">
+    <value>checking signatures...</value>
+  </data>
+  <data name="Installed_SummaryUnsigned" xml:space="preserve">
+    <value>{0} not signed</value>
+  </data>
+  <data name="Installed_SummaryNew" xml:space="preserve">
+    <value>{0} installed in the last {1} days</value>
   </data>
   <data name="Installed_Loading" xml:space="preserve">
     <value>Reading the installed-apps list...</value>
@@ -2272,6 +2314,33 @@ Close them, then choose the update in the tray menu again.</value>
   </data>
   <data name="Finding_FixReachGuide" xml:space="preserve">
     <value>How to close it</value>
+  </data>
+  <data name="Guide_Intro" xml:space="preserve">
+    <value>Tiresias can't do these for you: each needs Docker quit, an administrator, or a change inside a guest. Commands below already name your account.</value>
+  </data>
+  <data name="Guide_Copy" xml:space="preserve">
+    <value>Copy</value>
+  </data>
+  <data name="Guide_CopyName" xml:space="preserve">
+    <value>Copy step {0}</value>
+  </data>
+  <data name="Guide_RunAdmin" xml:space="preserve">
+    <value>Run as administrator...</value>
+  </data>
+  <data name="Guide_RunAdminTip" xml:space="preserve">
+    <value>Opens PowerShell as administrator with this command; Windows asks first</value>
+  </data>
+  <data name="Guide_Ran" xml:space="preserve">
+    <value>PowerShell opened as administrator. Check what it printed, then close it.</value>
+  </data>
+  <data name="Guide_Declined" xml:space="preserve">
+    <value>Nothing ran: the Windows prompt was declined.</value>
+  </data>
+  <data name="Guide_DemoNoRun" xml:space="preserve">
+    <value>Demo mode: nothing runs.</value>
+  </data>
+  <data name="Guide_ReadMore" xml:space="preserve">
+    <value>Read more on GitHub</value>
   </data>
   <data name="Finding_FixGitHubApp" xml:space="preserve">
     <value>Add a GitHub App...</value>

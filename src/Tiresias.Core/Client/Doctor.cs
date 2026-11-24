@@ -68,7 +68,7 @@ public interface IDoctorProbe
     DoctorVault? Vault { get; }
 
     /// <summary>Whether the trust chain names this device's Windows Hello key (docs/trust-links.md); <c>null</c> when there is no chain to read.</summary>
-    bool? HelloBound => null;
+    Task<bool?> HelloBoundAsync() => Task.FromResult<bool?>(null);
 
     /// <summary>The HTTP status of an unsigned call to the broker (401 means up), or <c>null</c> when unreachable.</summary>
     Task<int?> BrokerStatusAsync();
@@ -189,7 +189,7 @@ public static partial class Doctor
             Vault(probe.Vault),
         };
 
-        if (probe.HelloBound is { } bound)
+        if (await probe.HelloBoundAsync() is { } bound)
             checks.Add(bound
                 ? new("trust chain", DoctorStatus.Ok, "this device's Windows Hello key signs the links that add trust")
                 : new("trust chain", DoctorStatus.Warn, "this device's Windows Hello key isn't in the trust chain yet, so it can't add a device or change trust: run tir trust bind-hello"));

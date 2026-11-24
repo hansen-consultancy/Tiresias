@@ -1,3 +1,4 @@
+using System.Net;
 using System.IO.Enumeration;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -37,19 +38,30 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     public bool HasDeviceKey => KeyringStore.HasDeviceKey;
     public bool RecoveryKeySet => KeyringStore.Settings.RecoveryPublicKey is not null;
 
-    /// <summary>Read from the solo broker's chain file; a remote broker's chain isn't fetched here.</summary>
-    public bool? HelloBound
+    /// <summary>
+    /// The chain the broker serves, which is the one <c>tir trust bind-hello</c> extends. A solo
+    /// broker running as the Windows service keeps it where this account can't read, so the
+    /// per-user chain file is only a fallback for when the broker doesn't answer.
+    /// </summary>
+    public async Task<bool?> HelloBoundAsync()
     {
-        get
-        {
-            if (KeyringStore.Tenant is not { Solo: true, GenesisHash: { } genesis } || !File.Exists(SoloBroker.TrustChainPath))
-                return null;
-            var chain = TrustLinkJson.ParseChain(File.ReadAllBytes(SoloBroker.TrustChainPath));
-            return chain is not null && TrustChainVerifier.Verify(chain, genesis).State is { } state
-                && state.Devices.TryGetValue(KeyringStore.Settings.DeviceId, out var device)
-                    ? device.Hello is not null
-                    : null;
-        }
+        if (KeyringStore.Tenant is not { GenesisHash: { } genesis })
+            return null;
+        var deviceId = KeyringStore.Settings.DeviceId;
+        if (KeyringStore.Broker is { } broker && KeyringStore.HasDeviceKey)
+            try
+            {
+                using var client = BrokerClient.For(broker);
+                var (status, body) = await client.GetAsync("/trust/chain").WaitAsync(TimeSpan.FromSeconds(5));
+                if (status == HttpStatusCode.OK && TrustChainVerifier.HelloBound(body, genesis, deviceId) is { } served)
+                    return served;
+            }
+            catch (Exception e) when (e is HttpRequestException or TimeoutException or TaskCanceledException)
+            {
+            }
+        return KeyringStore.Tenant is { Solo: true } && File.Exists(SoloBroker.TrustChainPath)
+            ? TrustChainVerifier.HelloBound(File.ReadAllBytes(SoloBroker.TrustChainPath), genesis, deviceId)
+            : null;
     }
 
     public DoctorVault? Vault
@@ -108,12 +120,7 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     }
 
     public IReadOnlyList<string> ExposedVariables =>
-        [.. EnvironmentStore.UserVariables().Where(v => v.LooksSecret && !IsDecoyVariable(v.Name)).Select(v => v.Name)];
-
-    /// <summary>The decoy variables, while placed: a decoy is not a secret to seal.</summary>
-    bool IsDecoyVariable(string name) =>
-        DecoyPlan.VariableNames.Contains(name, StringComparer.OrdinalIgnoreCase)
-        && (DecoyStore.Current is { } set ? set.Placed.Any(p => p.Kind == DecoyKind.Variables) : HeldDecoys?.Kinds.Contains(DecoyKind.Variables) == true);
+        [.. EnvironmentStore.UserVariables().Where(v => v.LooksSecret && !v.Decoy).Select(v => v.Name)];
 
     /// <summary>The set the admin tier holds, asked once per doctor run: <c>decoys.json</c> is gone then.</summary>
     AdminDecoysStatus? HeldDecoys => heldDecoys ??= AdminClient.Installed ? AdminDecoys.Status() : null;

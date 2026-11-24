@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
+using Tiresias.Decoys;
 using Tiresias.EnvironmentVariables;
 using Tiresias.UserSecrets;
 using Tiresias.Vault;
@@ -7,7 +8,8 @@ using Tiresias.Vault;
 namespace Tiresias.Agent;
 
 /// <summary>A variable in the user's Windows environment, described without its value.</summary>
-public sealed record UserVariable(string Name, int Length, bool LooksSecret);
+/// <param name="Decoy">A decoy Tiresias placed (<see cref="DecoyPlan.IsDecoyVariable"/>): bait, never a secret to seal.</param>
+public sealed record UserVariable(string Name, int Length, bool LooksSecret, bool Decoy = false);
 
 /// <summary>
 /// The sealed environment: user environment variables moved out of <c>HKCU\Environment</c> into
@@ -47,17 +49,18 @@ public static partial class EnvironmentStore
     /// <summary>Whether <paramref name="hello"/> opens the authenticated environment.</summary>
     public static bool Opens(IKeyWrapper hello) => new EnvironmentFile(FilePath).Opens(hello);
 
-    /// <summary>The user's own variables (not the machine's), by name, each with its length and whether it looks like a secret.</summary>
+    /// <summary>The user's own variables (not the machine's), by name, each with its length, whether it looks like a secret and whether it is a decoy.</summary>
     public static IReadOnlyList<UserVariable> UserVariables()
     {
         using var key = UserMachine.CurrentUser.OpenSubKey(RegistryKey);
         if (key is null)
             return [];
+        var isDecoy = DecoyTest();
         return [.. key.GetValueNames()
             .Where(name => name.Length > 0)
             .Select(name => (Name: name, Value: Raw(key, name)))
             .Where(v => v.Value is not null)
-            .Select(v => new UserVariable(v.Name, v.Value!.Length, SealedVariables.LooksSecret(v.Name, v.Value.Length, SealedVariables.IsPath(v.Value))))
+            .Select(v => new UserVariable(v.Name, v.Value!.Length, SealedVariables.LooksSecret(v.Name, v.Value.Length, SealedVariables.IsPath(v.Value)), isDecoy(v.Name, v.Value)))
             .OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase)];
     }
 
@@ -66,14 +69,15 @@ public static partial class EnvironmentStore
     /// again and compared, and only then deleted from the registry. Programs started afterwards no
     /// longer inherit them; those already running keep their copy.
     /// </summary>
-    /// <returns>The names moved; a name that isn't a user variable is passed over.</returns>
+    /// <returns>The names moved; a name that isn't a user variable, or is a decoy, is passed over.</returns>
     public static IReadOnlyList<string> Protect(IEnumerable<string> names, IKeyWrapper hello)
     {
         using var key = UserMachine.CurrentUser.OpenSubKey(RegistryKey, writable: true)
             ?? throw new InvalidOperationException("This Windows account has no user environment.");
+        var isDecoy = DecoyTest();
         var moving = names.Distinct(StringComparer.OrdinalIgnoreCase)
             .Select(name => (Name: name, Value: Raw(key, name)))
-            .Where(v => !string.IsNullOrEmpty(v.Value))
+            .Where(v => !string.IsNullOrEmpty(v.Value) && !isDecoy(v.Name, v.Value))
             .Select(v => new SealedVariable(v.Name, v.Value!, key.GetValueKind(v.Name) == RegistryValueKind.ExpandString))
             .ToArray();
         if (moving.Length == 0)
@@ -130,6 +134,15 @@ public static partial class EnvironmentStore
         AnnounceChange();
         Save(sealedNow.WithoutGlobal(returning.Select(v => v.Name)), version, hello);
         return [.. returning.Select(v => v.Name)];
+    }
+
+    /// <summary>Tells a decoy variable by name and value; the admin tier is asked at most once, and only for a decoy's name.</summary>
+    static Func<string, string?, bool> DecoyTest()
+    {
+        var set = DecoyStore.Current;
+        bool? held = null;
+        return (name, value) => DecoyPlan.IsDecoyVariable(name, value, set,
+            () => held ??= AdminClient.Installed && AdminDecoys.Status()?.Kinds.Contains(DecoyKind.Variables) == true);
     }
 
     /// <summary>A value as stored: <c>%VAR%</c> references unexpanded, so writing it back changes nothing.</summary>

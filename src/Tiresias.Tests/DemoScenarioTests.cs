@@ -151,6 +151,7 @@ public class DemoScenarioTests
     [TestCase("{{now-90m}}", "2026-11-21T10:30:00.0000000+00:00")]
     [TestCase("{{now-2h}}", "2026-11-21T10:00:00.0000000+00:00")]
     [TestCase("{{now-3d}}", "2026-11-18T12:00:00.0000000+00:00")]
+    [TestCase("{{date-3d}}", "20261118")]
     [TestCase("{{later}}", "{{later}}")]
     public void Time_tokens_are_before_now(string token, string expected) =>
         Assert.That(DemoScenario.Expand(token, "activity.jsonl", Profile, Now), Is.EqualTo(expected));

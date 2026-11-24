@@ -150,6 +150,9 @@
         <Button Grid.Column="2" VerticalAlignment="Center" Margin="12,0,4,0" Padding="12,4"
                 Content="{l:S Status_Review}" AutomationProperties.Name="{Binding ReviewName}"
                 Visibility="{Binding ReviewVisibility}" Click="OnReview" />
+        <Button Grid.Column="2" VerticalAlignment="Center" Margin="12,0,4,0" Padding="12,4"
+                Content="{l:S Status_CopyCommand}" ToolTip="{Binding Command}" AutomationProperties.Name="{Binding CopyName}"
+                Visibility="{Binding CopyVisibility}" Click="OnCopyCommand" />
       </Grid>
     </DataTemplate>
   </Window.Resources>

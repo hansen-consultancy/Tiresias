@@ -76,6 +76,17 @@ public static class TrustChainVerifier
 {
     static readonly SignatureAlgorithm Ed25519 = SignatureAlgorithm.Ed25519;
 
+    /// <summary>
+    /// Whether the chain in <paramref name="chainJson"/> names <paramref name="deviceId"/>'s Windows
+    /// Hello key; <c>null</c> when the bytes aren't a chain from that genesis or the device isn't in it.
+    /// </summary>
+    public static bool? HelloBound(ReadOnlySpan<byte> chainJson, string pinnedGenesisHash, string deviceId) =>
+        TrustLinkJson.ParseChain(chainJson) is { } chain
+        && Verify(chain, pinnedGenesisHash).State is { } state
+        && state.Devices.TryGetValue(deviceId, out var device)
+            ? device.Hello is not null
+            : null;
+
     public static TrustVerification Verify(IReadOnlyList<TrustLink> links, string pinnedGenesisHash, ChainHead? previouslyAcceptedHead = null)
     {
         if (previouslyAcceptedHead is { } head)

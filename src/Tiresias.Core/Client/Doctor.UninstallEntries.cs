@@ -17,9 +17,15 @@ namespace Tiresias.Client;
 /// folder on <c>PATH</c>), which Windows doesn't record, so its last use is unknown.</param>
 /// <param name="Icon">Its <c>DisplayIcon</c>, environment variables expanded: a file and, after a comma, an icon index.</param>
 /// <param name="Publisher">Its <c>Publisher</c>: what the installer wrote, a claim, not a signature.</param>
+/// <param name="InstalledOn">Its <c>InstallDate</c> (<see cref="ParseInstallDate"/>), else when its own folder was created; <c>null</c> when neither says.</param>
 public sealed record UninstallEntry(string Key, string Name, string? Version, string? Uninstaller, bool UninstallerExists, bool FolderExists,
-    string? Command = null, string? Folder = null, bool RunsUnseen = false, string? Icon = null, string? Publisher = null)
+    string? Command = null, string? Folder = null, bool RunsUnseen = false, string? Icon = null, string? Publisher = null, DateOnly? InstalledOn = null)
 {
+    /// <summary>An entry's <c>InstallDate</c>, which installers write as <c>yyyyMMdd</c> (and Windows Installer updates on repair); anything else is <c>null</c>.</summary>
+    public static DateOnly? ParseInstallDate(string? value) =>
+        DateOnly.TryParseExact(value?.Trim(), "yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var date)
+            ? date : null;
+
     /// <summary>
     /// The file whose signature speaks for the program: the program its icon comes from, which is
     /// usually the one it opens, else its uninstaller; <c>null</c> when it names neither.

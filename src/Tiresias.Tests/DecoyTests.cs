@@ -116,6 +116,34 @@ public class DecoyTests
     }
 
     [Test]
+    public void A_decoy_variable_is_told_by_name_and_placed_value()
+    {
+        var bare = Minted();
+        var set = bare.With(new(DecoyKind.Variables, "user environment", Now));
+        var placed = DecoyPlan.Steps(set, DecoyKind.Variables, "", _ => false).OfType<SetDecoyVariable>().ToDictionary(v => v.Name, v => v.Value);
+        static bool Never() => throw new AssertionException("the admin tier is only asked when no set is at hand");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(DecoyPlan.IsDecoyVariable("ADMIN_API_URL", placed["ADMIN_API_URL"], set, Never), Is.True);
+            Assert.That(DecoyPlan.IsDecoyVariable("admin_api_token", placed["ADMIN_API_TOKEN"], set, Never), Is.True, "Windows names are case-insensitive");
+            Assert.That(DecoyPlan.IsDecoyVariable("ADMIN_API_TOKEN", "the user's own token", set, Never), Is.False, "a real variable of the same name stays a secret");
+            Assert.That(DecoyPlan.IsDecoyVariable("ADMIN_API_TOKEN", placed["ADMIN_API_TOKEN"], bare, Never), Is.False, "the set placed no variables");
+            Assert.That(DecoyPlan.IsDecoyVariable("OPENAI_API_KEY", placed["ADMIN_API_TOKEN"], set, Never), Is.False);
+        });
+    }
+
+    [Test]
+    public void Without_a_set_the_admin_tier_decides_a_decoy_s_name_alone()
+    {
+        var asked = 0;
+        Assert.That(DecoyPlan.IsDecoyVariable("ADMIN_API_TOKEN", "anything", null, () => ++asked > 0), Is.True);
+        Assert.That(DecoyPlan.IsDecoyVariable("ADMIN_API_URL", "anything", null, () => false), Is.False);
+        Assert.That(DecoyPlan.IsDecoyVariable("PATH", "anything", null, () => ++asked > 0), Is.False);
+        Assert.That(asked, Is.EqualTo(1), "only a decoy's name asks");
+    }
+
+    [Test]
     public void Removal_takes_what_is_unchanged_and_keeps_what_the_user_changed()
     {
         var root = Path.GetFullPath("decoy-root");

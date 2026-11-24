@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows;
@@ -39,10 +40,19 @@ public partial class InstalledPage : UserControl
 /// <param name="Use">The details panel's line: what is known of its use, in full.</param>
 /// <param name="Icon">The icon its entry names; <c>null</c> shows a generic one.</param>
 /// <param name="ProgramFile">The file whose signature the panel checks when the row is selected.</param>
+/// <param name="InstalledOn">The install date, or why it isn't known.</param>
+/// <param name="IsNew">Installed in the last <see cref="InstalledFilter.NewDays"/> days.</param>
+/// <param name="Unsigned">Its program file was checked and has no valid signature.</param>
 public sealed record InstalledRow(string Name, string Version, string For, string ShortUse, string Use, string Reached, string Folder, ImageSource? Icon,
-    string Publisher, string? ProgramFile)
+    string Publisher, string? ProgramFile, string InstalledOn, bool IsNew, bool Unsigned)
 {
-    public string Spoken => $"{Name}. {Use}";
+    public string Spoken => string.Join(". ", new[] { Name, IsNew ? NewTip : null, Unsigned ? Text.Get("Installed_UnsignedTip") : null, Use }.OfType<string>());
+
+    public static string NewTip => Text.Format("Installed_ShowNew", InstalledFilter.NewDays);
+
+    public Visibility NewVisibility => IsNew ? Visibility.Visible : Visibility.Collapsed;
+
+    public Visibility UnsignedVisibility => Unsigned ? Visibility.Visible : Visibility.Collapsed;
 
     public Visibility IconVisibility => Icon is null ? Visibility.Collapsed : Visibility.Visible;
 
@@ -56,16 +66,18 @@ public sealed partial class InstalledViewModel : ObservableObject
     /// <summary>Icons by the entry's <c>DisplayIcon</c>, read with the list, off the UI thread.</summary>
     IReadOnlyDictionary<string, ImageSource> icons = new Dictionary<string, ImageSource>();
 
-    public IReadOnlyList<Choice<bool>> Filters { get; } =
+    public IReadOnlyList<Choice<InstalledView>> Filters { get; } =
     [
-        new(Text.Get("Installed_ShowAll"), false),
-        new(Text.Get("Installed_ShowUnused"), true),
+        new(Text.Get("Installed_ShowAll"), InstalledView.All),
+        new(Text.Get("Installed_ShowUnused"), InstalledView.Unused),
+        new(Text.Get("Installed_ShowUnsigned"), InstalledView.Unsigned),
+        new(Text.Format("Installed_ShowNew", InstalledFilter.NewDays), InstalledView.New),
     ];
 
     public ObservableCollection<InstalledRow> Rows { get; } = [];
 
     [ObservableProperty]
-    public partial bool UnusedOnly { get; set; }
+    public partial InstalledView View { get; set; }
 
     [ObservableProperty]
     public partial string Search { get; set; } = "";
@@ -76,11 +88,15 @@ public sealed partial class InstalledViewModel : ObservableObject
 
     public Visibility DetailsVisibility => Selected is null ? Visibility.Collapsed : Visibility.Visible;
 
-    /// <summary>Who signed the selected program, checked offline when it is selected: a few files, not the whole list.</summary>
+    /// <summary>Who signed the selected program, checked offline: from the scan of the whole list once it has reached the file, else on its own.</summary>
     [ObservableProperty]
     public partial string Signer { get; set; } = "";
 
-    readonly Dictionary<string, string> signers = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>Each program file's signature, filled by the scan after the list loads (off the UI thread) and by a selection it hasn't reached.</summary>
+    readonly ConcurrentDictionary<string, (bool? Valid, string? Signer)> signatures = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Non-zero while the scan of the list's signatures runs; each load bumps it, so an older scan's end doesn't count.</summary>
+    int scanning;
 
     async partial void OnSelectedChanged(InstalledRow? value)
     {
@@ -89,16 +105,17 @@ public sealed partial class InstalledViewModel : ObservableObject
             Signer = Text.Get("Installed_SignerUnknown");
             return;
         }
-        if (!signers.TryGetValue(file, out var text))
+        if (!signatures.TryGetValue(file, out var signature))
         {
             Signer = Text.Get("Installed_SignerChecking");
-            var (valid, signer) = await Task.Run(() => MachineProbe.Signature(file));
-            var (key, argument) = InstalledDetails.Signer(valid, signer);
-            text = signers[file] = argument is null ? Text.Get(key) : Text.Format(key, argument);
+            signature = signatures[file] = await Task.Run(() => MachineProbe.Signature(file));
         }
+        var (key, argument) = InstalledDetails.Signer(signature.Valid, signature.Signer);
         if (Selected == value)
-            Signer = text;
+            Signer = argument is null ? Text.Get(key) : Text.Format(key, argument);
     }
+
+    bool? Signed(string file) => signatures.TryGetValue(file, out var s) ? s.Valid : null;
 
     [ObservableProperty]
     public partial string Summary { get; set; } = Text.Get("Installed_Loading");
@@ -108,7 +125,7 @@ public sealed partial class InstalledViewModel : ObservableObject
 
     public string EmptyText { get; } = Text.Get("Installed_Empty");
 
-    partial void OnUnusedOnlyChanged(bool value) => Apply();
+    partial void OnViewChanged(InstalledView value) => Apply();
 
     partial void OnSearchChanged(string value) => Apply();
 
@@ -127,6 +144,27 @@ public sealed partial class InstalledViewModel : ObservableObject
                     read[entry.Icon!] = image;
             return (programs, (IReadOnlyDictionary<string, ImageSource>)read);
         });
+        signatures.Clear();
+        var scan = ++generation;
+        scanning = scan;
+        Apply();
+        await ScanSignaturesAsync(scan);
+    }
+
+    int generation;
+
+    /// <summary>
+    /// Checks every program file's signature, a few at a time, so Unsigned can be marked and picked;
+    /// an offline check takes a moment, so the list shows first and the marks follow.
+    /// </summary>
+    async Task ScanSignaturesAsync(int scan)
+    {
+        var files = all.Select(p => p.Entry.ProgramFile).OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        await Task.Run(() => Parallel.ForEach(files, new ParallelOptions { MaxDegreeOfParallelism = 4 },
+            file => signatures.TryAdd(file, MachineProbe.Signature(file))));
+        if (scan != generation)
+            return;
+        scanning = 0;
         Apply();
     }
 
@@ -134,14 +172,17 @@ public sealed partial class InstalledViewModel : ObservableObject
     {
         var selected = Selected?.Name;
         Rows.Clear();
-        foreach (var program in InstalledFilter.Apply(all, Search, UnusedOnly))
-            Rows.Add(Row(program, program.Entry.Icon is { } icon ? icons.GetValueOrDefault(icon) : null));
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        foreach (var program in InstalledFilter.Apply(all, Search, View, today, Signed))
+            Rows.Add(Row(program, program.Entry.Icon is { } icon ? icons.GetValueOrDefault(icon) : null, today));
         Selected = Rows.FirstOrDefault(r => r.Name == selected);
         IsEmpty = Rows.Count == 0;
-        Summary = Text.Format("Installed_Summary", all.Count, all.Count(p => p.Use == ProgramUse.Unused));
+        Summary = Text.Format("Installed_Summary", all.Count, all.Count(p => p.Use == ProgramUse.Unused))
+            + ", " + (scanning != 0 ? Text.Get("Installed_SummaryScanning") : Text.Format("Installed_SummaryUnsigned", all.Count(p => InstalledFilter.IsUnsigned(p.Entry, Signed))))
+            + ", " + Text.Format("Installed_SummaryNew", all.Count(p => InstalledFilter.IsNew(p.Entry, today)), InstalledFilter.NewDays);
     }
 
-    static InstalledRow Row(InstalledProgram program, ImageSource? icon)
+    InstalledRow Row(InstalledProgram program, ImageSource? icon, DateOnly today)
     {
         var date = program.LastOpened?.ToLocalTime().ToString("d", CultureInfo.CurrentCulture);
         var shortUse = program.Use switch
@@ -154,7 +195,9 @@ public sealed partial class InstalledViewModel : ObservableObject
         return new(program.Entry.Name, program.Entry.Version ?? "", Text.Get(program.Entry.Machine ? "Installed_ForEveryone" : "Installed_ForYou"),
             shortUse, UseText(program), program.Reached.Count > 0 ? string.Join(", ", program.Reached) : Text.Get("Installed_ReachedNone"),
             program.Entry.Folder ?? Text.Get("Installed_FolderUnknown"), icon, program.Entry.Publisher ?? Text.Get("Installed_PublisherUnknown"),
-            program.Entry.ProgramFile);
+            program.Entry.ProgramFile,
+            program.Entry.InstalledOn?.ToString("d", CultureInfo.CurrentCulture) ?? Text.Get("Installed_InstalledOnUnknown"),
+            InstalledFilter.IsNew(program.Entry, today), InstalledFilter.IsUnsigned(program.Entry, Signed));
     }
 
     static string UseText(InstalledProgram program)
