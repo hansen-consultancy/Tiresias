@@ -26,6 +26,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Tiresias.App.Tests" />
+    <Compile Remove="RecoveryEnrollmentAuthority.cs" />
     <!-- Solo mode hosts the broker in-process, on loopback. -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>

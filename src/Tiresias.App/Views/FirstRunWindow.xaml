@@ -35,6 +35,16 @@
           <TextBlock Text="{l:S FirstRun_Hello_Note}" Style="{StaticResource CaptionText}" />
         </StackPanel>
 
+        <StackPanel x:Name="RecoveryCreate" Tag="{x:Static logic:FirstRunStep.RecoveryCreate}">
+          <TextBlock Text="{l:S FirstRun_RecoveryCreate_Title}" Style="{StaticResource TitleText}" AutomationProperties.HeadingLevel="Level1" />
+          <TextBlock Text="{l:S FirstRun_RecoveryCreate_Body}" Style="{StaticResource BodyText}" />
+        </StackPanel>
+
+        <StackPanel x:Name="RecoveryUnavailable" Tag="{x:Static logic:FirstRunStep.RecoveryUnavailable}">
+          <TextBlock Text="{l:S FirstRun_RecoveryUnavailable_Title}" Style="{StaticResource TitleText}" AutomationProperties.HeadingLevel="Level1" />
+          <TextBlock Text="{l:S FirstRun_RecoveryUnavailable_Body}" Style="{StaticResource BodyText}" />
+        </StackPanel>
+
         <!-- Recovery key, shown once -->
         <StackPanel x:Name="RecoveryShow" Tag="{x:Static logic:FirstRunStep.RecoveryShow}">
           <TextBlock Text="{l:S FirstRun_RecoveryShow_Title}" Style="{StaticResource TitleText}" AutomationProperties.HeadingLevel="Level1" />
@@ -51,12 +61,13 @@
         <StackPanel x:Name="RecoveryConfirm" Tag="{x:Static logic:FirstRunStep.RecoveryConfirm}">
           <TextBlock Text="{l:S FirstRun_RecoveryConfirm_Title}" Style="{StaticResource TitleText}" AutomationProperties.HeadingLevel="Level1" />
           <TextBlock Text="{l:S FirstRun_RecoveryConfirm_Body}" Style="{StaticResource BodyText}" />
+          <TextBlock Text="{Binding Fingerprint}" Style="{StaticResource CaptionText}" />
           <Label x:Name="FirstGroupLabel" Content="{Binding FirstGroupLabel}" Target="{Binding ElementName=FirstGroup}" Padding="0,8,0,4" />
-          <TextBox x:Name="FirstGroup" Width="160" HorizontalAlignment="Left" CharacterCasing="Upper" MaxLength="6"
+          <TextBox x:Name="FirstGroup" Style="{StaticResource RecoveryPaperInput}" Width="160" HorizontalAlignment="Left" CharacterCasing="Upper" MaxLength="6"
                    Text="{Binding FirstAnswer, UpdateSourceTrigger=PropertyChanged}" FontFamily="Cascadia Mono, Consolas"
                    AutomationProperties.LabeledBy="{Binding ElementName=FirstGroupLabel}" />
           <Label x:Name="SecondGroupLabel" Content="{Binding SecondGroupLabel}" Target="{Binding ElementName=SecondGroup}" Padding="0,8,0,4" />
-          <TextBox x:Name="SecondGroup" Width="160" HorizontalAlignment="Left" CharacterCasing="Upper" MaxLength="6"
+          <TextBox x:Name="SecondGroup" Style="{StaticResource RecoveryPaperInput}" Width="160" HorizontalAlignment="Left" CharacterCasing="Upper" MaxLength="6"
                    Text="{Binding SecondAnswer, UpdateSourceTrigger=PropertyChanged}" FontFamily="Cascadia Mono, Consolas"
                    AutomationProperties.LabeledBy="{Binding ElementName=SecondGroupLabel}" />
           <Button Content="{l:S FirstRun_RecoveryConfirm_ShowAgain}" HorizontalAlignment="Left" Padding="12,6" Margin="0,16,0,0"
@@ -65,17 +76,18 @@
 
         <!-- Sealed secrets here but no recovery key: the one they were sealed with is typed -->
         <StackPanel x:Name="Restore" Tag="{x:Static logic:FirstRunStep.RecoveryRestore}">
-          <TextBlock Text="{l:S FirstRun_RecoveryRestore_Title}" Style="{StaticResource TitleText}" AutomationProperties.HeadingLevel="Level1" />
-          <TextBlock Text="{l:S FirstRun_RecoveryRestore_Body}" Style="{StaticResource BodyText}" />
-          <TextBox x:Name="RestoreKey" Text="{Binding RestoreKey, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="80"
+          <TextBlock Text="{Binding RestoreTitle}" Style="{StaticResource TitleText}" AutomationProperties.HeadingLevel="Level1" />
+          <TextBlock Text="{Binding RestoreBody}" Style="{StaticResource BodyText}" />
+          <TextBox x:Name="RestoreKey" Style="{StaticResource RecoveryPaperInput}" Text="{Binding RestoreKey, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="80"
                    TextWrapping="Wrap" FontFamily="Cascadia Mono, Consolas" CharacterCasing="Upper"
                    AutomationProperties.Name="{l:S FirstRun_RecoveryRestore_KeyName}" />
+          <TextBlock Text="{Binding Fingerprint}" Style="{StaticResource CaptionText}" Margin="0,8,0,0" />
           <TextBlock Text="{Binding RestoreResult}" Style="{StaticResource BodyText}" Margin="0,12,0,0" AutomationProperties.LiveSetting="Polite" />
           <Expander Header="{l:S FirstRun_RecoveryRestore_Lost}" Margin="0,16,0,0" Visibility="{Binding LostVisibility}">
             <StackPanel Margin="0,8,0,0">
-              <TextBlock Text="{l:S FirstRun_RecoveryRestore_LostBody}" Style="{StaticResource BodyText}" />
+              <TextBlock Text="{Binding LostKeyText}" Style="{StaticResource BodyText}" />
               <Button Content="{l:S FirstRun_RecoveryRestore_New}" HorizontalAlignment="Left" Padding="12,6"
-                      Command="{Binding NewRecoveryKeyCommand}" />
+                      Command="{Binding NewRecoveryKeyCommand}" Visibility="{Binding CanReplaceKey, Converter={StaticResource Visible}}" />
             </StackPanel>
           </Expander>
         </StackPanel>
@@ -114,7 +126,7 @@
             <StackPanel Margin="0,8,0,0">
               <TextBlock Text="{Binding LostKeyText}" Style="{StaticResource BodyText}" />
               <Button Content="{l:S FirstRun_RecoveryType_Replace}" HorizontalAlignment="Left" Padding="12,6"
-                      Command="{Binding ReplaceKeyCommand}" Visibility="{Binding CanReplaceKey, Converter={StaticResource Visible}}" />
+                      Command="{Binding NewRecoveryKeyCommand}" Visibility="{Binding CanReplaceKey, Converter={StaticResource Visible}}" />
               <Button Content="{l:S FirstRun_RecoveryType_SkipSolo}" HorizontalAlignment="Left" Padding="12,6" Margin="0,8,0,0"
                       Command="{Binding SkipSoloCommand}" />
             </StackPanel>

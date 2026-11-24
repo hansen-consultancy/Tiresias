@@ -77,6 +77,8 @@ public sealed class AgentHost : IAsyncDisposable
     }
 
     /// <summary>The agent's own decisions (user secrets), beside the broker's audit log.</summary>
+    public static string RecoveryActivityPath => Path.Combine(KeyringStore.Directory, "recovery-activity.jsonl");
+
     public static string ActivityPath => Path.Combine(KeyringStore.Directory, "activity.jsonl");
 
     public AgentKeys Keys { get; } = new();

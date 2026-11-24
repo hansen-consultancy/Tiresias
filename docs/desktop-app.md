@@ -111,7 +111,10 @@ CI and people who prefer it, and it talks to the same agent.
   was shown asks for the key to be typed back. If that key is lost and nothing is sealed to it yet,
   the wizard offers a new one. Where sealed secrets are already here and no recovery key is stored
   (files copied from another PC), it asks for the key they were sealed with instead of making a
-  new one, so one paper keeps covering everything.
+  new one, so one paper keeps covering everything. Which paper key an account uses is kept in a
+  store only an administrator can change: enrolling or replacing it runs the `tiresias-recovery`
+  helper behind UAC, which shows the account and both keys' SHA-256 fingerprints and changes
+  nothing unless the administrator answers Yes. Activity lists each approval and refusal.
 - **Restore with the recovery key.** The Windows Hello key can't be copied or backed up: a new PC,
   a reset TPM or a removed Hello credential gives a new one. Every sealed item also carries a copy
   of its key for the paper recovery key, so the status page notices items this Hello can't open and

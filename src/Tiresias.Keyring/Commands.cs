@@ -40,22 +40,69 @@ static class Commands
         return 0;
     }
 
-    public static int RecoveryInit()
+    public static int RecoveryInit() => ShowNewPaper(RecoveryKey.Create());
+
+    public static int RecoveryRotate()
     {
-        var raw = RecoveryKey.Create();
+        Console.WriteLine("The new paper key will cover future writes. Keep the old paper for existing secrets and any trust chain it signed.");
+        var paper = ReadPaper("Current paper key: ");
         try
         {
-            Console.WriteLine("Recovery key. Write it on paper now; it is shown once and stored nowhere:");
-            Console.WriteLine();
-            Console.WriteLine(PaperKey.Format(raw));
-            Console.WriteLine();
+            return ShowNewPaper(RecoveryKey.Rotate(paper));
         }
         finally
         {
-            Array.Clear(raw);
+            Array.Clear(paper);
+        }
+    }
+
+    static int ShowNewPaper(PendingRecoveryKey pending)
+    {
+        try
+        {
+            BackUpAndEnroll(pending);
+        }
+        finally
+        {
+            Array.Clear(pending.Paper);
         }
         Console.WriteLine("Stored the public half only. Clear this terminal's scrollback.");
         return 0;
+    }
+
+    static void BackUpAndEnroll(PendingRecoveryKey pending)
+    {
+        if (Console.IsInputRedirected || Console.IsOutputRedirected)
+            throw new InvalidOperationException("Open an interactive terminal to write down and confirm your new paper key.");
+        Console.WriteLine("Write this recovery key on paper. The administrator approval follows the paper check.");
+        Console.WriteLine();
+        Console.WriteLine(PaperKey.Format(pending.Paper));
+        Console.WriteLine();
+        ConfirmWrittenDown(PaperKey.Words(pending.Paper));
+        ShowRecipient(pending.Paper);
+        pending.Enroll();
+    }
+
+    static void ShowRecipient(byte[] paper)
+    {
+        Console.WriteLine("If Windows asks to enroll this paper key, compare this public fingerprint with the administrator prompt:");
+        Console.WriteLine(PaperKey.RecipientFingerprint(paper));
+    }
+
+    static byte[] ReadPaper(string prompt)
+    {
+        const string invalid = "The recovery key must contain 13 groups of four letters and digits 2-7.";
+        if (Console.IsInputRedirected)
+            return PaperKey.Parse(Console.ReadLine() ?? "") ?? throw new UsageException(invalid);
+        var input = Terminal.ReadHidden(prompt);
+        try
+        {
+            return PaperKey.Parse(System.Text.Encoding.UTF8.GetString(input)) ?? throw new UsageException(invalid);
+        }
+        finally
+        {
+            Array.Clear(input);
+        }
     }
 
     /// <summary>
@@ -64,12 +111,11 @@ static class Commands
     /// </summary>
     public static int RecoveryRestore()
     {
-        Console.WriteLine("Type your recovery key (13 groups of four; spaces and case don't matter).");
-        var raw = PaperKey.Parse(Console.ReadLine() ?? "")
-            ?? throw new UsageException("That is not a recovery key: it should be 13 groups of four letters and digits 2-7.");
+        var raw = ReadPaper("Type your paper recovery key (13 groups of four): ");
         RestoreSummary summary;
         try
         {
+            ShowRecipient(raw);
             Console.WriteLine("Windows Hello will ask you to confirm it's you.");
             using var hello = HelloKeyWrapper.Open(create: true);
             summary = Agent.RecoveryRestore.Run(raw, hello);
@@ -110,21 +156,15 @@ static class Commands
         byte[]? raw = null;
         try
         {
-            if (KeyringStore.Settings.RecoveryPublicKey is null)
+            if (!RecoveryKey.IsEnrolled)
             {
-                raw = RecoveryKey.Create();
-                Console.WriteLine("Recovery key. Write it on paper now; it is shown once and stored nowhere.");
-                Console.WriteLine("It opens your secrets if Windows Hello or this PC is lost, and it signs this device's trust chain.");
-                Console.WriteLine();
-                Console.WriteLine(PaperKey.Format(raw));
-                Console.WriteLine();
-                ConfirmWrittenDown(PaperKey.Words(raw));
+                var pending = RecoveryKey.Create();
+                raw = pending.Paper;
+                BackUpAndEnroll(pending);
             }
             else
             {
-                Console.WriteLine("This device already has a recovery key. Type it to sign the trust chain (spaces and case don't matter).");
-                raw = PaperKey.Parse(Console.ReadLine() ?? "")
-                    ?? throw new InvalidOperationException("That is not a recovery key: it should be 13 groups of four letters and digits 2-7.");
+                raw = ReadPaper("Type the existing paper recovery key to sign the trust chain: ");
             }
             SoloBroker.Setup(raw);
         }
@@ -183,9 +223,9 @@ static class Commands
         {
             var (first, second) = PaperKey.Challenge(words.Count);
             Console.Write($"To check it is written down, type group {first + 1}: ");
-            var a = Console.ReadLine() ?? "";
+            var a = Console.ReadLine() ?? throw new InvalidOperationException("Recovery key confirmation ended before enrollment.");
             Console.Write($"and group {second + 1}: ");
-            var b = Console.ReadLine() ?? "";
+            var b = Console.ReadLine() ?? throw new InvalidOperationException("Recovery key confirmation ended before enrollment.");
             if (PaperKey.Confirm(words, (first, second), a, b))
             {
                 Console.Clear();
@@ -279,7 +319,10 @@ static class Commands
         Console.WriteLine($"Broker:   {(broker is null ? "not enrolled" : $"{broker.Url} (identity {broker.IdentityKey})")}{(KeyringStore.Tenant is { Solo: true } ? " - Solo, hosted by the app" : "")}");
         Console.WriteLine($"Device:   {settings.DeviceId}");
         Console.WriteLine($"Vault:    {settings.VaultPath}" + (File.Exists(settings.VaultPath) ? $" ({VaultFile.Load(settings.VaultPath).Secrets.Count} secrets)" : " (missing)"));
-        Console.WriteLine($"Recovery: {(settings.RecoveryPublicKey is null ? "NOT SET (run tir recovery init)" : "set")}");
+        var recoveryStatus = RecoveryKey.IsEnrolled ? "set"
+            : RecoveryKey.NeedsVerification ? "needs enrollment (run tir recovery restore with your paper key)"
+            : "NOT SET (run tir recovery init)";
+        Console.WriteLine($"Recovery: {recoveryStatus}");
         var app = await AppLink.PingAsync();
         Console.WriteLine($"App:      {app?.State ?? "not running (start Tiresias, or run tir agent)"}");
         if (app?.Build is { } build)

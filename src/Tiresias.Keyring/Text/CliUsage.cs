@@ -10,9 +10,14 @@ static class CliUsage
         several brokers and the service doesn't settle which.
 
         tir recovery init
+            Creates a new paper key and asks an administrator to enroll its public half for this Windows account.
         tir recovery restore
             Gives sealed secrets back to this PC's Windows Hello with the paper recovery key: after
             moving to a new PC, resetting Windows Hello, or copying secrets from another machine.
+            Also enrolls an existing paper key from an earlier setup, with administrator approval.
+        tir recovery rotate
+            Requires the current paper key and administrator approval. Keep the old paper for
+            earlier versions of your secrets and any trust chain it signed.
         tir solo init
             Solo mode: the broker runs inside the Tiresias app on this PC, no server needed. Creates
             the recovery key if there is none (or asks for it) and a one-device trust chain.

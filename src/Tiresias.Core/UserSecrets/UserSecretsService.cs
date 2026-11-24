@@ -141,7 +141,9 @@ public sealed class UserSecretsService : IDisposable
             if (await Recheck() is { } changedWhileLocked)
                 return Refuse(changedWhileLocked);
         }
-        var plan = UserSecretsPolicy.Decide(kind, additions, wrapper is not null, keys.Recovery is not null,
+        var maySeal = wrapper is not null && (kind == SecretsFileKind.Plain || additions);
+        var recovery = maySeal ? keys.Recovery : null;
+        var plan = UserSecretsPolicy.Decide(kind, additions, wrapper is not null, recovery is not null,
             Memory.IsAllowed(caller, request.UserSecretsId, time.GetUtcNow(), scope: policy.Scope));
 
         switch (plan.Action)
@@ -193,7 +195,7 @@ public sealed class UserSecretsService : IDisposable
 
         if (plan.Reseal)
         {
-            var sealedText = UserSecretsVault.Seal(request.UserSecretsId, load.Version + 1, load.Document, [wrapper!, keys.Recovery!]);
+            var sealedText = UserSecretsVault.Seal(request.UserSecretsId, load.Version + 1, load.Document, [wrapper!, recovery!]);
             lock (writeGate)
             {
                 var temp = path + ".tiresias.tmp";

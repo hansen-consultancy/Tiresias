@@ -47,6 +47,7 @@
   <ItemGroup>
     <Compile Include="..\Tiresias.App\Logic\**\*.cs" Link="AppLogic\%(RecursiveDir)%(Filename)%(Extension)" />
     <Compile Include="..\Tiresias.Admin\PipeCallerIdentity.cs" Link="Admin\PipeCallerIdentity.cs" />
+    <Compile Include="..\Tiresias.Agent\WindowsSessionAccount.cs" Link="Agent\WindowsSessionAccount.cs" />
     <Compile Include="..\Tiresias.Admin\DecoyHold.cs" Link="Admin\DecoyHold.cs" />
     <Compile Include="..\Tiresias.Admin\ReadAudit.cs" Link="Admin\ReadAudit.cs" />
     <Compile Include="..\Tiresias.Admin\AuditRules.cs" Link="Admin\AuditRules.cs" />

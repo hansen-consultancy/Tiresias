@@ -49,6 +49,11 @@ jobs:
           for rid in win-x64 win-arm64; do
             dotnet publish src/Tiresias.App -c Release -r $rid --self-contained -o publish/$rid
             dotnet publish src/Tiresias.Keyring -c Release -r $rid --self-contained -o publish/$rid
+            dotnet publish src/Tiresias.RecoveryHelper -c Release -r $rid -o recovery/$rid
+            cp recovery/$rid/tiresias-recovery.exe publish/$rid/
+            export TIRESIAS_RECOVERY_CLIENTS="$(cygpath -aw "publish/$rid")"
+            export TIRESIAS_NATIVE_RECOVERY_IMAGE="$TIRESIAS_RECOVERY_CLIENTS/tiresias-recovery.exe"
+            dotnet test src/Tiresias.App.Tests/Tiresias.App.Tests.csproj -c Release --no-build --filter 'FullyQualifiedName=Tiresias.App.Tests.RecoveryHelperImageTests.Published_native_helper_carries_the_required_identity_and_loader_flags'
             dotnet publish src/Tiresias.NuGetPlugin -c Release -r $rid --self-contained -o publish/$rid
             dotnet publish src/Tiresias.Admin -c Release -r $rid --self-contained -p:PublishSingleFile=true -o publish/$rid/admin
           done

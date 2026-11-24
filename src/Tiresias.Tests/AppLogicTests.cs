@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Tiresias.App.Logic;
 using Tiresias.Audit;
+using Tiresias.Client;
 
 namespace Tiresias.Tests;
 
@@ -77,7 +78,8 @@ public class FirstRunPlanTests
     {
         Assert.That(FirstRunPlan.Start(Facts()), Is.EqualTo(FirstRunStep.Welcome));
         Assert.That(FirstRunPlan.Next(FirstRunStep.Welcome, Facts()), Is.EqualTo(FirstRunStep.Hello));
-        Assert.That(FirstRunPlan.Next(FirstRunStep.Hello, Facts(hello: true)), Is.EqualTo(FirstRunStep.RecoveryShow));
+        Assert.That(FirstRunPlan.Next(FirstRunStep.Hello, Facts(hello: true)), Is.EqualTo(FirstRunStep.RecoveryCreate));
+        Assert.That(FirstRunPlan.Next(FirstRunStep.RecoveryCreate, Facts(hello: true)), Is.EqualTo(FirstRunStep.RecoveryShow));
         Assert.That(FirstRunPlan.Next(FirstRunStep.RecoveryShow, Facts(hello: true)), Is.EqualTo(FirstRunStep.RecoveryConfirm));
         Assert.That(FirstRunPlan.Next(FirstRunStep.RecoveryConfirm, Facts(hello: true, recovery: true)), Is.EqualTo(FirstRunStep.Mode));
         Assert.That(FirstRunPlan.Next(FirstRunStep.Mode, Facts(hello: true, recovery: true), SetupMode.Solo, haveRecoveryKey: true),
@@ -94,7 +96,7 @@ public class FirstRunPlanTests
         Assert.That(FirstRunPlan.Next(FirstRunStep.RecoveryRestore, copied with { RecoverySet = true, Enrolled = true }), Is.EqualTo(FirstRunStep.Done));
     }
 
-    [TestCase(true, false, false, false, FirstRunStep.RecoveryShow)]
+    [TestCase(true, false, false, false, FirstRunStep.RecoveryCreate)]
     [TestCase(false, true, false, false, FirstRunStep.Hello)]
     [TestCase(true, true, false, false, FirstRunStep.Mode)]
     [TestCase(true, true, true, false, FirstRunStep.Done)]
@@ -104,7 +106,7 @@ public class FirstRunPlanTests
 
     [Test]
     public void Welcome_skips_hello_when_the_credential_already_exists() =>
-        Assert.That(FirstRunPlan.Next(FirstRunStep.Welcome, Facts(hello: true)), Is.EqualTo(FirstRunStep.RecoveryShow));
+        Assert.That(FirstRunPlan.Next(FirstRunStep.Welcome, Facts(hello: true)), Is.EqualTo(FirstRunStep.RecoveryCreate));
 
     [Test]
     public void Resumed_solo_setup_asks_for_the_recovery_key_back_since_it_is_never_shown_twice() =>
@@ -123,11 +125,58 @@ public class FirstRunPlanTests
         Assert.That(FirstRunPlan.Needed(Facts(hello: true, recovery: true, skipped: true)), Is.False);
     }
 
-    [TestCase(0, 0, true)]
-    [TestCase(1, 0, false)]
-    [TestCase(0, 1, false)]
-    public void A_lost_recovery_key_is_replaceable_only_while_nothing_is_sealed_to_it(int vault, int sealedFiles, bool expected) =>
-        Assert.That(FirstRunPlan.CanReplaceRecoveryKey(vault, sealedFiles), Is.EqualTo(expected));
+    [TestCase(true, false, false)]
+    [TestCase(false, true, false)]
+    [TestCase(true, false, true)]
+    [TestCase(false, true, true)]
+    public void An_existing_setup_resumes_verification_until_approved_and_keeps_its_mode(bool broker, bool secretsOnly, bool sealedItems)
+    {
+        var legacy = new SetupFacts(true, false, broker, secretsOnly, sealedItems, AdminTierInstalled: false, RecoveryNeedsVerification: true);
+        Assert.That(FirstRunPlan.Needed(legacy), Is.True);
+        Assert.That(FirstRunPlan.Start(legacy), Is.EqualTo(FirstRunStep.RecoveryMigrate));
+        Assert.That(FirstRunPlan.Next(FirstRunStep.Hello, legacy), Is.EqualTo(FirstRunStep.RecoveryMigrate));
+        Assert.That(FirstRunPlan.Next(FirstRunStep.RecoveryMigrate, legacy), Is.EqualTo(FirstRunStep.RecoveryMigrate));
+
+        var verified = legacy with { RecoverySet = true, RecoveryNeedsVerification = false };
+        Assert.That(FirstRunPlan.Next(FirstRunStep.RecoveryMigrate, verified), Is.EqualTo(FirstRunStep.Done));
+        Assert.That(FirstRunPlan.Needed(verified), Is.False);
+    }
+
+    [Test]
+    public void An_interrupted_setup_with_a_previous_recipient_verifies_before_choosing_a_mode()
+    {
+        var pending = Facts(hello: true) with { RecoveryNeedsVerification = true };
+        Assert.That(FirstRunPlan.Start(pending), Is.EqualTo(FirstRunStep.RecoveryMigrate));
+        Assert.That(FirstRunPlan.Next(FirstRunStep.RecoveryMigrate, pending with { RecoverySet = true }), Is.EqualTo(FirstRunStep.Mode));
+    }
+
+    [Test]
+    public void Unreadable_enrollment_does_not_offer_to_create_or_replace_a_key()
+    {
+        var unreadable = Facts(hello: true) with { RecoveryError = "Unable to read enrollment" };
+        Assert.That(FirstRunPlan.Start(unreadable), Is.EqualTo(FirstRunStep.RecoveryUnavailable));
+        Assert.That(FirstRunPlan.Next(FirstRunStep.Hello, unreadable), Is.EqualTo(FirstRunStep.RecoveryUnavailable));
+        Assert.That(FirstRunPlan.Start(unreadable with { RecoveryError = null, RecoveryNeedsVerification = true }), Is.EqualTo(FirstRunStep.RecoveryMigrate));
+    }
+
+    [Test]
+    public void Enrollment_waits_for_the_paper_challenge_and_can_retry_the_same_paper_after_denial()
+    {
+        byte[] raw = Enumerable.Range(0, 32).Select(i => (byte)i).ToArray();
+        var words = PaperKey.Words(raw);
+        int requests = 0;
+        var paper = new FirstRunPaper(raw, () =>
+        {
+            if (++requests == 1)
+                throw new InvalidOperationException("Declined");
+        });
+        var (first, second) = paper.Challenge;
+        Assert.That(paper.TryEnroll(words[first], ""), Is.False);
+        Assert.That(requests, Is.Zero);
+        Assert.Throws<InvalidOperationException>(() => paper.TryEnroll(words[first], words[second]));
+        Assert.That(paper.TryEnroll(words[first], words[second]), Is.True);
+        Assert.That(requests, Is.EqualTo(2));
+    }
 }
 
 public class ActivityQueryTests

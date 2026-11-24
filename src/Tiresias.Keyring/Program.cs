@@ -9,6 +9,7 @@ try
     {
         ("enroll", _) => Commands.Enroll(line),
         ("recovery", "init") => Commands.RecoveryInit(),
+        ("recovery", "rotate") => Commands.RecoveryRotate(),
         ("recovery", "restore") => Commands.RecoveryRestore(),
         ("solo", "init") => Commands.SoloInit(),
         ("solo", "service") => await Commands.SoloServiceAsync(line),
@@ -40,7 +41,7 @@ catch (UsageException ex)
     Console.Error.WriteLine(CliUsage.Text);
     return 2;
 }
-catch (Exception ex) when (ex is InvalidOperationException or HttpRequestException or IOException or FormatException or System.Security.Cryptography.CryptographicException)
+catch (Exception ex) when (ex is InvalidOperationException or HttpRequestException or IOException or UnauthorizedAccessException or FormatException or System.Security.Cryptography.CryptographicException)
 {
     Console.Error.WriteLine(ex.Message);
     return 1;

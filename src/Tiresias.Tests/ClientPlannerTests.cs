@@ -107,6 +107,7 @@ public class DoctorTests
         public bool Enrolled { get; set; } = true;
         public bool HasDeviceKey { get; set; } = true;
         public bool RecoveryKeySet { get; set; } = true;
+        public bool RecoveryKeyNeedsVerification { get; set; }
         public IReadOnlyList<string> ExposedVariables { get; set; } = [];
         public bool Solo { get; set; }
         public bool? HelloBound { get; set; }
@@ -294,6 +295,14 @@ public class DoctorTests
         Assert.That(vault.Status, Is.EqualTo(DoctorStatus.Fail));
         Assert.That(vault.Detail, Does.Contain("llm-admin"));
         Assert.That((await Check(new FakeProbe { Vault = new(3, ["old"], []) }, "vault")).Status, Is.EqualTo(DoctorStatus.Warn));
+    }
+
+    [Test]
+    public async Task An_existing_paper_key_needs_restore_for_enrollment()
+    {
+        var check = await Check(new FakeProbe { RecoveryKeySet = false, RecoveryKeyNeedsVerification = true }, "recovery key");
+        Assert.That(check.Status, Is.EqualTo(DoctorStatus.Fail));
+        Assert.That(check.Detail, Does.Contain("tir recovery restore"));
     }
 
     [Test]
@@ -615,6 +624,16 @@ public class PaperKeyTests
         var words = PaperKey.Words(Raw);
         Assert.That(PaperKey.Confirm(words, (1, 4), $" {words[1].ToLowerInvariant()}", words[4]), Is.True);
         Assert.That(PaperKey.Confirm(words, (1, 4), words[4], words[1]), Is.False);
+    }
+
+    [Test]
+    public void The_paper_and_the_enrolled_recipient_display_the_same_public_fingerprint()
+    {
+        using var recovery = Key.Import(KeyAgreementAlgorithm.X25519, Raw, KeyBlobFormat.RawPrivateKey);
+        var recipient = recovery.PublicKey.Export(KeyBlobFormat.RawPublicKey);
+        var expected = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(recipient));
+        Assert.That(PaperKey.RecipientFingerprint(Raw), Is.EqualTo(expected));
+        Assert.That(PaperKey.PublicFingerprint(recipient), Is.EqualTo(expected));
     }
 
     [Test]

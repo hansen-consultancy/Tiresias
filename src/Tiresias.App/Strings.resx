@@ -425,11 +425,32 @@
   <data name="Environment_NotSealed" xml:space="preserve">
     <value>Not sealed for this folder: {0}. See tir env list.</value>
   </data>
+  <data name="FirstRun_RecoveryCreate_Title" xml:space="preserve">
+    <value>Create your paper recovery key</value>
+  </data>
+  <data name="FirstRun_RecoveryCreate_Body" xml:space="preserve">
+    <value>Have paper ready to write down your key. After you confirm the paper copy, Windows will ask for administrator approval to enroll it on this PC. This step also applies when you use Tiresias only for user secrets.</value>
+  </data>
+  <data name="FirstRun_RecoveryMigrate_Title" xml:space="preserve">
+    <value>Verify your existing recovery key</value>
+  </data>
+  <data name="FirstRun_RecoveryUnavailable_Title" xml:space="preserve">
+    <value>Recovery setup is unavailable</value>
+  </data>
+  <data name="FirstRun_RecoveryUnavailable_Body" xml:space="preserve">
+    <value>Tiresias could not read the recovery enrollment or sealed stores. Check the problem below, then retry. Setup will resume from the last completed step.</value>
+  </data>
+  <data name="FirstRun_RecoveryMigrate_Body" xml:space="preserve">
+    <value>Enter the paper recovery key from your earlier setup. Windows will ask for administrator approval to enroll it on this PC for future secrets. You can close setup and return with your paper later.</value>
+  </data>
+  <data name="FirstRun_RecoveryMigrate_StillNeeded" xml:space="preserve">
+    <value>Enter the original paper from this PC to finish recovery enrollment.</value>
+  </data>
   <data name="FirstRun_RecoveryRestore_Body" xml:space="preserve">
-    <value>This PC already has sealed secrets: copied from another PC, or left by an earlier setup. Windows Hello here can't open them, but the recovery key they were sealed with can. Type it from your paper copy and they open on this PC as before; this PC then uses the same recovery key, so the paper you have keeps covering everything. Spaces and case don't matter.</value>
+    <value>Enter the paper recovery key for the sealed secrets already here. Tiresias restores the items that key opens and asks for administrator approval to enroll it on this PC. Spaces and case don't matter.</value>
   </data>
   <data name="FirstRun_RecoveryRestore_KeyName" xml:space="preserve">
-    <value>Recovery key the secrets were sealed with</value>
+    <value>Paper recovery key</value>
   </data>
   <data name="FirstRun_RecoveryRestore_Later" xml:space="preserve">
     <value>Continue to finish setup. When you find the key those were sealed with, use Restore on the status page.</value>
@@ -438,7 +459,7 @@
     <value>I don't have that key</value>
   </data>
   <data name="FirstRun_RecoveryRestore_LostBody" xml:space="preserve">
-    <value>You can create a new recovery key and carry on. Secrets you seal from now on are covered by it, but the ones already here stay locked until their own key turns up; the status page offers to restore them whenever it does.</value>
+    <value>You can create a new recovery key with administrator approval. It will cover newly sealed secrets. The items already here will still need their original paper. Use Restore on the status page when you find it.</value>
   </data>
   <data name="FirstRun_RecoveryRestore_New" xml:space="preserve">
     <value>Create a new recovery key</value>
@@ -460,6 +481,11 @@
   </data>
   <data name="Recovery_Heading" xml:space="preserve">
     <value>Restore sealed secrets</value>
+  </data>
+  <data name="Recovery_CompareFingerprint" xml:space="preserve">
+    <value>Check that the administrator prompt shows this SHA-256 fingerprint for the new recipient.
+{0}</value>
+    <comment>{0} = public recovery recipient fingerprint.</comment>
   </data>
   <data name="Recovery_KeyAdopted" xml:space="preserve">
     <value>This PC now uses this recovery key for new secrets too.</value>
@@ -568,6 +594,9 @@
   </data>
   <data name="Status_RestoreButton" xml:space="preserve">
     <value>Restore...</value>
+  </data>
+  <data name="Status_VerifyRecoveryButton" xml:space="preserve">
+    <value>Verify key...</value>
   </data>
   <data name="Status_RestoreTitle" xml:space="preserve">
     <value>Some secrets need your recovery key</value>
@@ -1384,6 +1413,9 @@ Store them in clear?</value>
   <data name="FirstRun_Primary_Continue" xml:space="preserve">
     <value>Continue</value>
   </data>
+  <data name="FirstRun_Primary_Enroll" xml:space="preserve">
+    <value>Enroll recovery key...</value>
+  </data>
   <data name="FirstRun_Primary_Finish" xml:space="preserve">
     <value>Finish</value>
   </data>
@@ -1394,7 +1426,7 @@ Store them in clear?</value>
     <value>Tiresias keeps your API keys and app secrets encrypted on this PC and lets tools and AI agents use them without seeing them. You approve each use, and every decision is logged.</value>
   </data>
   <data name="FirstRun_Welcome_Steps" xml:space="preserve">
-    <value>Setup takes about two minutes: you confirm with Windows Hello, write down a recovery key on paper, and pick how you want to run Tiresias. You can close this window and continue later.</value>
+    <value>Setup uses Windows Hello and asks an administrator to approve your paper recovery key. Have paper ready, or bring your existing key if you've used Tiresias before. You can close this window and continue later.</value>
   </data>
   <data name="FirstRun_Hello_Title" xml:space="preserve">
     <value>Unlock with Windows Hello</value>
@@ -1427,7 +1459,7 @@ Store them in clear?</value>
     <value>Check your copy</value>
   </data>
   <data name="FirstRun_RecoveryConfirm_Body" xml:space="preserve">
-    <value>Type two groups from the key you wrote down. Groups are counted from 1, left to right.</value>
+    <value>Type two groups from your paper copy, counting from 1 on the left. Then approve enrollment as an administrator so this PC can use the key.</value>
   </data>
   <data name="FirstRun_RecoveryConfirm_Group" xml:space="preserve">
     <value>Group {0}</value>
@@ -1476,10 +1508,10 @@ Store them in clear?</value>
     <value>I don't have my recovery key</value>
   </data>
   <data name="FirstRun_RecoveryType_LostCanReplace" xml:space="preserve">
-    <value>Nothing is sealed to it yet, so you can make a new one and write that down instead.</value>
+    <value>No sealed data or broker trust depends on this key. With administrator approval you can replace it and write down a new one.</value>
   </data>
   <data name="FirstRun_RecoveryType_LostKeep" xml:space="preserve">
-    <value>Some secrets are already sealed to that key, so it can't be replaced here: it is their only way back if Hello is lost. You can keep using Tiresias for user secrets and set up solo mode once you find it.</value>
+    <value>Tiresias could not verify that all sealed stores and broker trust are independent of this key. Keep the current enrollment and return with the original paper.</value>
   </data>
   <data name="FirstRun_RecoveryType_Replace" xml:space="preserve">
     <value>Make a new recovery key</value>
@@ -1495,6 +1527,9 @@ Store them in clear?</value>
   </data>
   <data name="FirstRun_Done_Broker" xml:space="preserve">
     <value>To use your broker, run tir enroll with the details from whoever runs it. Until then, Tiresias protects your user secrets.</value>
+  </data>
+  <data name="FirstRun_Done_Enrolled" xml:space="preserve">
+    <value>Your recovery key is enrolled. You can continue using your configured broker.</value>
   </data>
   <data name="FirstRun_Done_SecretsOnly" xml:space="preserve">
     <value>Tiresias protects your .NET user secrets. Set up solo mode or a broker any time from the tray menu.</value>

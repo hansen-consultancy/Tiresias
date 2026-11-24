@@ -1,5 +1,6 @@
+using System.Security.Cryptography;
 using NSec.Cryptography;
-using Tiresias.Client;
+using Tiresias.EnvironmentVariables;
 using Tiresias.Protocol;
 using Tiresias.UserSecrets;
 using Tiresias.Vault;
@@ -27,12 +28,10 @@ public static class RecoveryRestore
     {
         using var key = Key.Import(KeyAgreementAlgorithm.X25519, recoveryKey, KeyBlobFormat.RawPrivateKey);
         var recovery = X25519KeyWrapper.ForKey(RecoveryKey.WrapperId, key);
-        var settings = KeyringStore.Settings;
-        var stored = settings.RecoveryPublicKey is { } s ? Convert.FromBase64String(s) : null;
-        var storedMatches = stored is not null && PaperKey.Matches(recoveryKey, stored);
-
-        var vaults = new List<(string Path, VaultDocument Vault, bool Changed)>();
-        var files = new List<(string Path, string Text)>();
+        var current = RecoveryEnrollment.Current();
+        var legacy = current is null ? KeyringStore.Settings.RecoveryPublicKey : null;
+        var offered = Convert.ToBase64String(key.PublicKey.Export(KeyBlobFormat.RawPublicKey));
+        var changes = new List<(string Path, byte[] Digest, Action Write)>();
         int restored = 0, alreadyOpen = 0, recoveryOpens = 0, items = 0;
         var notOpened = new List<string>();
 
@@ -51,6 +50,7 @@ public static class RecoveryRestore
 
         foreach (var path in VaultPaths())
         {
+            var digest = Digest(path);
             var vault = VaultFile.Load(path);
             var changed = false;
             var secrets = vault.Secrets.Select(secret =>
@@ -60,62 +60,115 @@ public static class RecoveryRestore
                 changed |= outcome == RewrapOutcome.Rewrapped;
                 return result;
             }).ToArray();
-            vaults.Add((path, vault with { Secrets = secrets }, changed));
+            if (changed)
+                changes.Add((path, digest, () => VaultFile.Save(path, vault with { Secrets = secrets })));
         }
 
-        foreach (var folder in UserSecretsFiles.All().Where(f => f.Kind == SecretsFileKind.Sealed))
+        foreach (var folder in Projects())
         {
+            var kind = ProjectKind(folder);
+            if (kind == SecretsFileKind.Invalid)
+                Count(RewrapOutcome.DoesNotOpen, false, $"user secrets: {folder.Id}");
+            if (kind != SecretsFileKind.Sealed)
+                continue;
+            var digest = Digest(folder.FilePath);
             var (outcome, text, opens) = UserSecretsVault.Rewrap(folder.Id, File.ReadAllText(folder.FilePath), hello, recovery);
             Count(outcome, opens, $"user secrets: {folder.Id}");
             if (outcome == RewrapOutcome.Rewrapped)
-                files.Add((folder.FilePath, text));
+                changes.Add((folder.FilePath, digest, () => WriteText(folder.FilePath, text)));
         }
 
         if (EnvironmentStore.Exists)
         {
+            var path = EnvironmentStore.FilePath;
+            var digest = Digest(path);
             var (outcome, text, opens) = EnvironmentStore.Rewrap(hello, recovery);
             Count(outcome, opens, "environment variables");
             if (outcome == RewrapOutcome.Rewrapped)
-                files.Add((EnvironmentStore.FilePath, text));
+                changes.Add((path, digest, () => WriteText(path, text)));
         }
 
         if (AlertsStore.IsSealed)
         {
+            var path = AlertsStore.FilePath;
+            var digest = Digest(path);
             var (outcome, text, opens) = AlertsStore.Rewrap(hello, recovery);
             Count(outcome, opens, "alerts");
             if (outcome == RewrapOutcome.Rewrapped)
-                files.Add((AlertsStore.FilePath, text));
+                changes.Add((path, digest, () => WriteText(path, text)));
         }
 
-        if (!storedMatches && (items > 0 ? recoveryOpens == 0 : stored is not null))
-            throw new InvalidOperationException(items > 0
-                ? "That recovery key opens none of the sealed secrets on this PC. Check the words you wrote down, or look for the paper from the PC that sealed them."
-                : "That is not the recovery key this device stored. Check the words you wrote down.");
-
-        foreach (var (path, vault, changed) in vaults.Where(v => v.Changed))
-            VaultFile.Save(path, vault);
-        foreach (var (path, text) in files)
+        var solo = current is null && recoveryOpens == 0 ? RecoveryKey.VerifySoloPaper(recoveryKey) : SoloPaperProof.NoSolo;
+        var (enroll, otherKeyKept) = PlanEnrollment(current, legacy, offered, items, recoveryOpens, solo);
+        Apply(() =>
         {
-            var temp = path + ".tmp";
+            if (enroll)
+                RecoveryEnrollment.Change(null, offered);
+            else if (RecoveryEnrollment.Current() != current)
+                throw RecoveryEnrollment.Changed();
+        }, changes);
+        return new(restored, alreadyOpen, notOpened, enroll, otherKeyKept);
+    }
+
+    internal static (bool Enroll, bool OtherKeyKept) PlanEnrollment(RecoveryBinding? current, string? legacy,
+        string offered, int items, int recoveryOpens, SoloPaperProof solo)
+    {
+        // The offered recipient comes from the typed private key. A matching legacy hint still needs enrollment.
+        var previous = current?.PublicKey ?? legacy;
+        var matches = previous == offered;
+        var serviceProof = current is null && solo == SoloPaperProof.MatchesServicePin;
+        // A writable hint and a writable solo pin cannot vouch for a paper that opens nothing here.
+        if (items > 0 && recoveryOpens == 0 && !(current is not null && matches) && !serviceProof)
+            throw new InvalidOperationException("That recovery key opens none of the sealed secrets on this PC. Check the words you wrote down, or look for the paper from the PC that sealed them.");
+        if (items == 0 && previous is not null && !matches && !serviceProof)
+            throw new InvalidOperationException("That is not the recovery key this device stored. Check the words you wrote down.");
+
+        var enroll = current is null && (serviceProof || matches || RecoveryRewrap.ShouldAdopt(legacy is not null, matches, items, recoveryOpens));
+        if (enroll && recoveryOpens == 0 && solo == SoloPaperProof.Mismatch)
+            throw new InvalidOperationException("That paper does not match the signing key of this PC's solo trust chain.");
+        return (enroll, previous is not null && !matches && !enroll);
+    }
+
+    internal static void Apply(Action authorize, IReadOnlyList<(string Path, byte[] Digest, Action Write)> changes)
+    {
+        authorize();
+        // A restore may wait for elevation while another process updates a sealed file.
+        if (changes.Any(c => !Digest(c.Path).AsSpan().SequenceEqual(c.Digest)))
+            throw new InvalidOperationException("A sealed file changed during recovery. Run the restore again.");
+        foreach (var change in changes)
+            change.Write();
+    }
+
+    static byte[] Digest(string path)
+    {
+        using var stream = File.OpenRead(path);
+        return SHA256.HashData(stream);
+    }
+
+    static void WriteText(string path, string text)
+    {
+        var temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
             File.WriteAllText(temp, text);
             File.Move(temp, path, overwrite: true);
         }
-
-        var adopt = RecoveryRewrap.ShouldAdopt(stored is not null, storedMatches, items, recoveryOpens);
-        if (adopt)
-            KeyringStore.Settings = KeyringStore.Settings with { RecoveryPublicKey = Convert.ToBase64String(key.PublicKey.Export(KeyBlobFormat.RawPublicKey)) };
-        return new(restored, alreadyOpen, notOpened, adopt, stored is not null && !storedMatches && !adopt);
+        finally
+        {
+            File.Delete(temp);
+        }
     }
 
     /// <summary>
     /// Whether anything sealed is here: a vault secret or a sealed <c>secrets.json</c>. With no
     /// recovery key stored, that means the files came from another PC or an earlier setup. No prompt.
     /// </summary>
-    public static bool AnythingSealed() =>
-        VaultPaths().Any(path => VaultFile.Load(path).Secrets.Count > 0)
-        || UserSecretsFiles.All().Any(f => f.Kind == SecretsFileKind.Sealed)
-        || EnvironmentStore.Exists
-        || AlertsStore.IsSealed;
+    public static bool AnythingSealed() => AnythingSealed(VaultPaths(), Projects(), EnvironmentStore.FilePath) || AlertsStore.IsSealed;
+
+    internal static bool AnythingSealed(IEnumerable<string> vaults, IEnumerable<UserSecretsFolder> projects, string environmentPath) =>
+        vaults.Any(path => VaultFile.Load(path).Secrets.Count > 0)
+        || projects.Any(f => ProjectKind(f) is SecretsFileKind.Sealed or SecretsFileKind.Invalid)
+        || new EnvironmentFile(environmentPath).Exists;
 
     /// <summary>The sealed items this Windows Hello key can't open, by name; empty when nothing needs restoring. No prompt beyond the unlocked wrapper.</summary>
     public static IReadOnlyList<string> Unopened(IKeyWrapper hello)
@@ -125,7 +178,7 @@ public static class RecoveryRestore
             foreach (var secret in VaultFile.Load(path).Secrets)
                 if (!Opens(secret, hello))
                     names.Add($"vault: {secret.Slug}");
-        foreach (var folder in UserSecretsFiles.All().Where(f => f.Kind == SecretsFileKind.Sealed))
+        foreach (var folder in Projects().Where(f => ProjectKind(f) == SecretsFileKind.Sealed))
             if (!UserSecretsVault.Opens(folder.Id, File.ReadAllText(folder.FilePath), hello))
                 names.Add($"user secrets: {folder.Id}");
         if (EnvironmentStore.Exists && !EnvironmentStore.Opens(hello))
@@ -147,8 +200,32 @@ public static class RecoveryRestore
     /// <summary>Every tenant's vault and the device's own, once each, where the file exists.</summary>
     static IEnumerable<string> VaultPaths() =>
         KeyringStore.Tenants.Select(t => t.VaultPath)
-            .Append(KeyringStore.Settings.VaultPath)
+            .Append(KeyringStore.DeviceVaultPath)
+            .Append(KeyringStore.DefaultVaultPath)
             .Select(Path.GetFullPath)
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Where(File.Exists);
+            .Where(Exists);
+
+    static IEnumerable<UserSecretsFolder> Projects()
+    {
+        var root = UserSecretsFiles.Root;
+        return Exists(root) ? Directory.EnumerateDirectories(root).Select(d => new UserSecretsFolder(Path.GetFileName(d), d)) : [];
+    }
+
+    static SecretsFileKind ProjectKind(UserSecretsFolder folder) =>
+        Exists(folder.FilePath) ? SecretsFile.Classify(File.ReadAllText(folder.FilePath)) : SecretsFileKind.None;
+
+    // Recovery decisions must distinguish a missing path from one the desktop account cannot inspect.
+    internal static bool Exists(string path)
+    {
+        try
+        {
+            _ = File.GetAttributes(path);
+            return true;
+        }
+        catch (Exception e) when (e is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return false;
+        }
+    }
 }

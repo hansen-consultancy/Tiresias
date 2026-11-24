@@ -32,6 +32,7 @@
     <!-- The decoys' callers are named as the agent names them: the TCP table, then the processes that started them. -->
     <Compile Include="..\Tiresias.Forwarder\TcpConnectionOwner.cs" Link="TcpConnectionOwner.cs" />
     <Compile Include="..\Tiresias.Agent\ProcessTree.cs" Link="ProcessTree.cs" />
+    <Compile Include="..\Tiresias.Agent\WindowsSessionAccount.cs" Link="WindowsSessionAccount.cs" />
   </ItemGroup>
 
 </Project>

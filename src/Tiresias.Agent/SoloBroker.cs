@@ -226,8 +226,8 @@ public sealed class SoloBroker : IAsyncDisposable
                 ? "Solo mode is already set up on this device."
                 : "This device is already enrolled with a broker; solo mode is for a device without one.");
         var settings = KeyringStore.Settings;
-        if (settings.RecoveryPublicKey is not { } recoveryPublic)
-            throw new InvalidOperationException("Create the recovery key first.");
+        if (RecoveryKey.PublicKey is not { } recoveryPublic)
+            throw new InvalidOperationException("Enroll the recovery key before setting up the solo broker.");
         if (!PaperKey.Matches(recoveryKey, Convert.FromBase64String(recoveryPublic)))
             throw new InvalidOperationException("That is not the recovery key this device stored. Check the words you wrote down.");
 

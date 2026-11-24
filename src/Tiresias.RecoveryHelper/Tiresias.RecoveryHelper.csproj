@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net11.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PublishAot>true</PublishAot>
+    <IlcOptimizationPreference>Size</IlcOptimizationPreference>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <IsPackable>false</IsPackable>
+    <AssemblyName>tiresias-recovery</AssemblyName>
+    <AssemblyTitle>Tiresias recovery enrollment</AssemblyTitle>
+    <Product>Tiresias recovery enrollment</Product>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The elevated image loads only Windows system DLLs, including its startup dependencies. -->
+    <LinkerArg Include="/DEPENDENTLOADFLAG:0x800" />
+    <Compile Include="../Tiresias.Agent/RecoveryChangeGuard.Client.cs" Link="RecoveryChangeGuard.Client.cs" />
+    <Compile Include="../Tiresias.Agent/RecoveryEnrollmentAuthority.cs" Link="RecoveryEnrollmentAuthority.cs" />
+    <Compile Include="../Tiresias.Agent/RecoveryEnrollmentHistory.cs" Link="RecoveryEnrollmentHistory.cs" />
+    <Compile Include="../Tiresias.Agent/RecoveryRecipient.cs" Link="RecoveryRecipient.cs" />
+    <Compile Include="../Tiresias.Agent/WindowsSessionAccount.cs" Link="WindowsSessionAccount.cs" />
+    <Compile Include="../Tiresias.Core/Client/PaperKey.Fingerprint.cs" Link="PaperKey.Fingerprint.cs" />
+  </ItemGroup>
+</Project>

@@ -352,24 +352,38 @@ static partial class SurfaceProbe
         if (windows.Length > 0 && path.StartsWith(windows + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
             || path.Contains(@"\WindowsApps\", StringComparison.OrdinalIgnoreCase))
             return null;
+        return VerifyEmbeddedSignature(path);
+    }
+
+    // The recovery launcher inspects the verified signer before Windows releases its provider state.
+    // The inventory's path-only check keeps its original offline policy.
+    internal static unsafe bool VerifyEmbeddedSignature(string path, nint handle = 0, Func<nint, bool>? acceptSigner = null)
+    {
+        var settings = new SignatureSettings { Size = (uint)sizeof(SignatureSettings), Flags = 1 }; // WSS_VERIFY_SPECIFIC, primary signature
         fixed (char* file = path)
         {
-            var info = new FileInfo { Size = (uint)sizeof(FileInfo), Path = file };
+            var info = new FileInfo { Size = (uint)sizeof(FileInfo), Path = file, Handle = handle };
             var data = new TrustData
             {
                 Size = (uint)sizeof(TrustData),
                 UiChoice = 2, // WTD_UI_NONE
-                RevocationChecks = 0, // WTD_REVOKE_NONE
+                RevocationChecks = acceptSigner is null ? 0u : 1u,
                 UnionChoice = 1, // WTD_CHOICE_FILE
                 File = &info,
                 StateAction = 1, // WTD_STATEACTION_VERIFY
-                ProviderFlags = 0x10 | 0x1000, // WTD_REVOCATION_CHECK_NONE | WTD_CACHE_ONLY_URL_RETRIEVAL
+                ProviderFlags = acceptSigner is null ? 0x10u | 0x1000u : 0x80u | 0x2000u, // offline inventory, or chain revocation excluding the root and no MD2/MD4
+                SignatureSettings = acceptSigner is null ? 0 : (nint)(&settings),
             };
             var action = GenericVerifyV2;
-            var result = WinVerifyTrust(-1, &action, &data);
-            data.StateAction = 2; // WTD_STATEACTION_CLOSE
-            _ = WinVerifyTrust(-1, &action, &data);
-            return result == 0;
+            try
+            {
+                return WinVerifyTrust(-1, &action, &data) == 0 && (acceptSigner is null || acceptSigner(data.StateData));
+            }
+            finally
+            {
+                data.StateAction = 2; // WTD_STATEACTION_CLOSE
+                _ = WinVerifyTrust(-1, &action, &data);
+            }
         }
     }
 
@@ -382,6 +396,13 @@ static partial class SurfaceProbe
         public char* Path;
         public nint Handle;
         public Guid* KnownSubject;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct SignatureSettings
+    {
+        public uint Size, Index, Flags, SecondaryCount, VerifiedIndex;
+        public nint CryptoPolicy;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -403,5 +424,6 @@ static partial class SurfaceProbe
     }
 
     [LibraryImport("wintrust.dll")]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
     private static unsafe partial int WinVerifyTrust(nint window, Guid* action, TrustData* data);
 }

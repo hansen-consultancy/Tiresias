@@ -36,7 +36,8 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     public bool Solo => KeyringStore.Tenant is { Solo: true };
     public BrokerServiceState BrokerService => Solo ? Agent.BrokerService.State() : BrokerServiceState.NotInstalled;
     public bool HasDeviceKey => KeyringStore.HasDeviceKey;
-    public bool RecoveryKeySet => KeyringStore.Settings.RecoveryPublicKey is not null;
+    public bool RecoveryKeySet => RecoveryKey.IsEnrolled;
+    public bool RecoveryKeyNeedsVerification => RecoveryKey.NeedsVerification;
 
     /// <summary>
     /// The chain the broker serves, which is the one <c>tir trust bind-hello</c> extends. A solo

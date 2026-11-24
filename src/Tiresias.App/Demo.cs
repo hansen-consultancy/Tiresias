@@ -102,7 +102,9 @@ static class Demo
 
         // The real default names the device after this machine.
         KeyringStore.Settings = KeyringStore.Settings with { DeviceId = "alice-laptop" };
-        CryptographicOperations.ZeroMemory(RecoveryKey.Create());
+        var pending = RecoveryKey.Create();
+        try { pending.Enroll(); }
+        finally { CryptographicOperations.ZeroMemory(pending.Paper); }
         // Set up without a broker, as the wizard's solo-less finish leaves it.
         if (KeyringStore.Broker is null)
             (AppSettings.Load() with { SetupSkipped = true }).Save();

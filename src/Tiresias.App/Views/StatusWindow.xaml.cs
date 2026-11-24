@@ -264,7 +264,7 @@ public partial class StatusWindow : Window
 
     void OnRestore(object sender, RoutedEventArgs e)
     {
-        var window = App.Current.ShowWindow<RecoveryWindow>();
+        Window window = model.VerifyRecovery ? App.Current.ShowWindow<FirstRunWindow>() : App.Current.ShowWindow<RecoveryWindow>();
         window.Closed -= OnRecoveryClosed;
         window.Closed += OnRecoveryClosed;
     }
@@ -717,6 +717,13 @@ public sealed partial class StatusViewModel : ObservableObject
 
     public Visibility RestoreVisibility => RestoreText.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(RestoreTitle), nameof(RestoreButton))]
+    public partial bool VerifyRecovery { get; set; }
+
+    public string RestoreTitle => Text.Get(VerifyRecovery ? "FirstRun_RecoveryMigrate_Title" : "Status_RestoreTitle");
+    public string RestoreButton => Text.Get(VerifyRecovery ? "Status_VerifyRecoveryButton" : "Status_RestoreButton");
+
     static readonly string Build = Text.Format("Status_Build", Text.Of(AppBuild.Current.Label), AppBuild.Current.Folder);
 
     [ObservableProperty]
@@ -1010,7 +1017,8 @@ public sealed partial class StatusViewModel : ObservableObject
             var walk = probe.Scan is { } scan ? $", {scan.Elapsed.TotalSeconds:0.0}s walking {scan.Folders} folders for {scan.Files} files" : "";
             AppLog.Info($"status checks took {checks.TotalSeconds:0.0}s{walk}; showing {last.Count} lines took {(clock.Elapsed - checks).TotalSeconds:0.0}s more");
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidDataException)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidDataException
+            or InvalidOperationException or System.Security.Cryptography.CryptographicException)
         {
             AppLog.Error(e, "status checks");
             Checks.Add(new(Text.Get("Status_CheckFailed"), Text.Get("Status_Fail"), "\uEA39", Brush("SystemFillColorCriticalBrush"), e.Message));
@@ -1096,11 +1104,17 @@ public sealed partial class StatusViewModel : ObservableObject
         var hello = App.Current.Host.Keys.Hello;
         try
         {
+            VerifyRecovery = RecoveryKey.NeedsVerification;
+            if (VerifyRecovery)
+            {
+                RestoreText = Text.Get("FirstRun_RecoveryMigrate_Body");
+                return;
+            }
             var unopened = hello is null ? [] : await Task.Run(() => RecoveryRestore.Unopened(hello));
             RestoreText = unopened.Count == 0 ? "" : Text.Format("Status_RestoreBody", unopened.Count);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidDataException
-            or ObjectDisposedException or System.Security.Cryptography.CryptographicException)
+            or InvalidOperationException or System.Security.Cryptography.CryptographicException)
         {
             // Locked meanwhile, or a damaged file the checks above already report.
             AppLog.Error(e, "status: sealed secrets this PC can't open");
