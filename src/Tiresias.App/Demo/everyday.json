@@ -1,6 +1,6 @@
 // A developer's laptop a few weeks in: three projects, two of them protected, a vault with two
 // services, recent activity, and the findings a busy machine has (a plain secrets.json, a key in
-// the Windows environment, a NuGet password in clear, a stored git token). Everything is made up.
+// the Windows environment, a NuGet password in clear, a stored git token) and all three decoys placed. Everything is made up.
 {
   "description": "A developer's laptop a few weeks in, with a few findings",
   "setUp": true,
@@ -90,6 +90,7 @@
     "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
     "JAVA_HOME": "C:\\Program Files\\Java\\jdk-21"
   },
+  "decoys": ["passwordsFile", "project", "variables"],
   "sealedVariables": {
     "GITHUB_TOKEN": "ghp_demo1111111111111111111111111111111111"
   }

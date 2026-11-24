@@ -29,6 +29,11 @@ its section below.
   as their working folder, which blocked Velopack from swapping the files. Before applying an
   update, the app names any program still using that folder and asks you to close it. If an update
   still couldn't be applied, the next start says so instead of quietly running the earlier version.
+- About scrolls, and its Developer tools and Admin tier cards are shorter; the Admin tier card says
+  what the tier is for. Home's Decoys card lists one decoy per line, and the reach card's
+  **Check daily** sits beside **Check now**. A finding's **Details** toggle stays readable when
+  open. The user-secrets editor no longer shows a white grid in dark mode before you pick a project.
+  Hovering a count in the side bar says what it counts.
 - The user-secrets list marks each project's state (sealed, not sealed yet, settings only, empty)
   so they stand apart, and a line under it counts each. A sealed project with keys added beside it
   in plain since (`dotnet user-secrets set`) is marked amber until the next run seals them. A project whose secrets file holds only
