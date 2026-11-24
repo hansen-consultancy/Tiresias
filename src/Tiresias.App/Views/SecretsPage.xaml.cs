@@ -63,7 +63,20 @@ public partial class SecretsPage : UserControl
 /// <param name="Detail">Where the project is, or why no project is named: one line however many checkouts use it.</param>
 /// <param name="Paths">Every project file using the id, shown on demand.</param>
 /// <param name="Content">What its file holds, read without unlocking: a sealed file counts as secrets.</param>
-public sealed record ProjectChoice(string Id, string Label, string Group, string Detail, bool Known, IReadOnlyList<string> Paths, SecretsContent Content);
+/// <param name="Name">The label without its state, which the list shows beside a mark of its own.</param>
+/// <param name="PlainAdditions">Plain keys beside a sealed file's envelope, not sealed until the next run.</param>
+public sealed record ProjectChoice(string Id, string Label, string Group, string Detail, bool Known, IReadOnlyList<string> Paths, SecretsContent Content,
+    string Name, ProjectState State, int PlainAdditions)
+{
+    public string StateText => State == ProjectState.PlainAdded ? Text.Format("Secrets_State_PlainAdded", PlainAdditions) : Text.Get(State switch
+    {
+        ProjectState.Sealed => "Secrets_State_Sealed",
+        ProjectState.NotSealed => "Secrets_State_NotSealed",
+        ProjectState.Settings => "Secrets_State_Settings",
+        ProjectState.Empty => "Secrets_State_Empty",
+        _ => "Secrets_State_Invalid",
+    });
+}
 
 public sealed partial class SecretRow : ObservableObject
 {
@@ -165,6 +178,10 @@ public sealed partial class SecretsViewModel : ObservableObject
 
     [ObservableProperty]
     public partial string ScanStatus { get; set; } = "";
+
+    /// <summary>What the side bar's count is made of: how many folders are sealed, not yet, settings only or empty.</summary>
+    [ObservableProperty]
+    public partial string Stats { get; set; } = "";
 
     [ObservableProperty]
     public partial string RecycleUnusedLabel { get; set; } = "";
@@ -514,7 +531,7 @@ public sealed partial class SecretsViewModel : ObservableObject
     void Rebuild()
     {
         var folders = UserSecretsFiles.All();
-        var kinds = folders.ToDictionary(f => f.Id, f => (f.Kind, f.Content), StringComparer.OrdinalIgnoreCase);
+        var kinds = folders.ToDictionary(f => f.Id, f => (f.Kind, f.Content, f.PlainAdditions), StringComparer.OrdinalIgnoreCase);
         var entries = ProjectList.Build(folders.Select(f => f.Id).Concat(extraIds), index);
         unused = scanned ? [.. ProjectList.Unused(entries, index).Where(kinds.ContainsKey)] : [];
         empties = [.. folders.Where(f => kinds[f.Id].Content == SecretsContent.Empty).Select(f => f.Id)];
@@ -525,7 +542,7 @@ public sealed partial class SecretsViewModel : ObservableObject
         {
             Projects.Clear();
             foreach (var entry in listed)
-                Projects.Add(Choice(entry, kinds.GetValueOrDefault(entry.Id, (SecretsFileKind.None, SecretsContent.Empty))));
+                Projects.Add(Choice(entry, kinds.GetValueOrDefault(entry.Id, (SecretsFileKind.None, SecretsContent.Empty, 0))));
             SelectedProject = selectedId is null ? null : Projects.FirstOrDefault(p => string.Equals(p.Id, selectedId, StringComparison.OrdinalIgnoreCase));
         }
         finally
@@ -535,6 +552,7 @@ public sealed partial class SecretsViewModel : ObservableObject
         Folders.Clear();
         foreach (var path in index.Folders)
             Folders.Add(path);
+        Stats = StatsLine(SecretsStats.Of(kinds.Values.Select(k => SecretsStats.StateOf(k.Kind, k.Content, k.PlainAdditions))));
         HasUnused = unused.Count > 0;
         RecycleUnusedLabel = Text.Format("Secrets_RecycleUnused", unused.Count);
         HasEmpty = empties.Count > 0;
@@ -547,14 +565,15 @@ public sealed partial class SecretsViewModel : ObservableObject
         OnPropertyChanged(nameof(CanRecycleSelected));
     }
 
-    ProjectChoice Choice(ProjectEntry entry, (SecretsFileKind Kind, SecretsContent Content) file)
+    ProjectChoice Choice(ProjectEntry entry, (SecretsFileKind Kind, SecretsContent Content, int PlainAdditions) file)
     {
         var paths = ProjectPaths.Of(entry.Paths);
         var name = paths.OnlyCheckouts ? Text.Format("Secrets_ProjectCheckouts", entry.Name, entry.Paths.Count)
             : paths.More > 0 ? Text.Format("Secrets_ProjectMore", entry.Name, paths.More)
             : entry.Name;
-        var label = file switch
+        var label = (file.Kind, file.Content) switch
         {
+            (SecretsFileKind.Sealed, _) when file.PlainAdditions > 0 => Text.Format("Secrets_ProjectPlainAdded", name, file.PlainAdditions),
             (SecretsFileKind.Sealed, _) => Text.Format("Secrets_ProjectSealed", name),
             (_, SecretsContent.Empty) => Text.Format("Secrets_ProjectEmpty", name),
             (_, SecretsContent.Settings) => Text.Format("Secrets_ProjectSettings", name),
@@ -565,7 +584,18 @@ public sealed partial class SecretsViewModel : ObservableObject
             : paths.OnlyCheckouts ? Text.Format("Secrets_DetailCheckouts", paths.First, paths.Copies)
             : paths.More > 0 ? Text.Format("Secrets_DetailMore", paths.First, paths.More)
             : paths.First;
-        return new(entry.Id, label, Text.Get(entry.Known ? "Secrets_GroupProjects" : "Secrets_GroupUnknown"), detail, entry.Known, entry.Paths, file.Content);
+        return new(entry.Id, label, Text.Get(entry.Known ? "Secrets_GroupProjects" : "Secrets_GroupUnknown"), detail, entry.Known, entry.Paths, file.Content,
+            name, SecretsStats.StateOf(file.Kind, file.Content, file.PlainAdditions), file.PlainAdditions);
+    }
+
+    static string StatsLine(SecretsStats stats)
+    {
+        var parts = new (int Count, string Key)[]
+        {
+            (stats.Sealed, "Secrets_Stats_Sealed"), (stats.PlainAdded, "Secrets_Stats_PlainAdded"), (stats.NotSealed, "Secrets_Stats_NotSealed"), (stats.Settings, "Secrets_Stats_Settings"),
+            (stats.Empty, "Secrets_Stats_Empty"), (stats.Invalid, "Secrets_Stats_Invalid"),
+        };
+        return Text.Format("Secrets_Stats", stats.Total, string.Join(", ", parts.Where(p => p.Count > 0).Select(p => Text.Format(p.Key, p.Count))));
     }
 
     IReadOnlyList<KeyValuePair<string, string>> Edited() =>

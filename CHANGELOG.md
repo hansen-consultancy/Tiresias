@@ -52,6 +52,11 @@ its section below.
   the service never updates. A check that says to run a `tir` command offers **Copy command**.
 - **How to close it** shows its steps in the app instead of opening a web page: each command names
   your account, with **Copy**, and **Run as administrator** where it needs one.
+- The user-secrets list marks each project's state (sealed, not sealed yet, settings only, empty)
+  so they stand apart, and a line under it counts each. A sealed project with keys added beside it
+  in plain since (`dotnet user-secrets set`) is marked amber until the next run seals them. A
+  project whose secrets file holds only `tiresias:` references counts as settings only instead of
+  "not sealed yet": a reference holds no secret, so `tir doctor` no longer warns about it either.
 
 ## [0.3.0] - 2026-11-23
 

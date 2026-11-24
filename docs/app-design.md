@@ -177,13 +177,21 @@ pure classifier in `Tiresias.Core` so the two can't disagree:
   keys; that is known only while unlocked, because only opening the file tells.
 - **Settings**: plain, and every value is a shape that can't be a credential: a boolean, a number,
   null or empty, a log level under `Logging`, or an http(s) URL with no user info, query or fragment
-  and no path segment long enough to be a token (a webhook's last segment). A value that
+  and no path segment long enough to be a token (a webhook's last segment), or a `tiresias:`
+  reference the broker resolves (`tiresias:sql/...`): it names a credential without holding one, so
+  a file of references alone has nothing to seal. A malformed reference stays doubtful. A value that
   fits none of these makes the file **Secrets**. A doubtful case falls on the side of Secrets,
   because a hidden key costs more than one warning too many.
 - **Secrets** (plain or sealed) and **Invalid**, as today.
 
 **The editor.** The list leads with folders holding secrets, as now. Settings-only folders follow
-with "(settings only)" in place of "(not sealed yet)". Empty folders are not listed; a line at the
+with "(settings only)" in place of "(not sealed yet)". Each row has a mark beside its state: a
+green lock for sealed, an amber warning for not sealed yet, a grey gear for settings only. A
+sealed file with plain keys written beside it since (`dotnet user-secrets set` on a sealed
+project) keeps its lock but turns amber, "sealed, 2 added in plain": those keys are readable by
+anything until the next run seals them. Under
+the picker, one line says what the side bar's count is made of ("58 user-secrets folders: 12
+sealed, 5 not sealed yet, 9 settings only, 32 empty"). Empty folders are not listed; a line at the
 foot, "*N* empty folders", shows them, and offers **Move *N* empty to Recycle Bin**. This uses the
 same ask-first, recoverable path as **Move unused to Recycle Bin**: `dotnet user-secrets set`
 creates the folder again whenever a project needs it. Opening a sealed file that turns out to be
