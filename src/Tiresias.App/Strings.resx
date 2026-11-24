@@ -219,7 +219,7 @@
     <value>Sealed {0}.</value>
   </data>
   <data name="Env_Body" xml:space="preserve">
-    <value>Variables in your Windows environment are readable by every program you run. Sealed ones are given only to a program you allow: run it with tir run -- &lt;command&gt;.</value>
+    <value>Every program you run can read the variables in your Windows environment. A sealed variable is kept by Tiresias and given only to a program you allow: run it with tir run -- &lt;command&gt;.</value>
   </data>
   <data name="Env_ColName" xml:space="preserve">
     <value>Name</value>
@@ -238,6 +238,9 @@
   </data>
   <data name="Env_DetailSecret" xml:space="preserve">
     <value>({0} characters, looks like a secret)</value>
+  </data>
+  <data name="Env_DetailDecoy" xml:space="preserve">
+    <value>(a decoy Tiresias placed: using it raises an alert)</value>
   </data>
   <data name="Env_FolderBrowse" xml:space="preserve">
     <value>Browse...</value>
@@ -267,7 +270,7 @@
     <value>Value of the new variable</value>
   </data>
   <data name="Env_NoneSealed" xml:space="preserve">
-    <value>Nothing sealed yet.</value>
+    <value>Nothing sealed yet: seal a variable from Windows above, or add one below.</value>
   </data>
   <data name="Env_NothingPicked" xml:space="preserve">
     <value>Tick at least one variable first.</value>
@@ -393,16 +396,22 @@
     <value>Seal</value>
   </data>
   <data name="Env_SealedHeading" xml:space="preserve">
-    <value>Sealed</value>
+    <value>Sealed: only programs you allow get these</value>
   </data>
   <data name="Env_SealedSummary" xml:space="preserve">
     <value>{0} sealed. Tick some to put them back in Windows or remove them.</value>
   </data>
   <data name="Env_WindowsHeading" xml:space="preserve">
-    <value>In your Windows environment</value>
+    <value>Still in Windows: every program can read these</value>
   </data>
   <data name="Env_WindowsSummary" xml:space="preserve">
-    <value>{0} look like secrets and are ticked. Sealing removes them from Windows once the sealed copy reads back; programs already running keep their copy until they restart.</value>
+    <value>{0} of these {1} look like secrets and are ticked. Sealing takes them out of Windows once the sealed copy reads back; programs already running keep their copy until they restart.</value>
+  </data>
+  <data name="Env_WindowsNoSecrets" xml:space="preserve">
+    <value>None of these {0} looks like a secret. Tick one to seal it anyway.</value>
+  </data>
+  <data name="Env_WindowsDecoys" xml:space="preserve">
+    <value>Decoys Tiresias placed as bait stay, and can't be sealed: {0}.</value>
   </data>
   <data name="Environment_Locked" xml:space="preserve">
     <value>Tiresias is locked. Unlock it, then run the command again.</value>

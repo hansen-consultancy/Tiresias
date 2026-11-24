@@ -108,12 +108,7 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     }
 
     public IReadOnlyList<string> ExposedVariables =>
-        [.. EnvironmentStore.UserVariables().Where(v => v.LooksSecret && !IsDecoyVariable(v.Name)).Select(v => v.Name)];
-
-    /// <summary>The decoy variables, while placed: a decoy is not a secret to seal.</summary>
-    bool IsDecoyVariable(string name) =>
-        DecoyPlan.VariableNames.Contains(name, StringComparer.OrdinalIgnoreCase)
-        && (DecoyStore.Current is { } set ? set.Placed.Any(p => p.Kind == DecoyKind.Variables) : HeldDecoys?.Kinds.Contains(DecoyKind.Variables) == true);
+        [.. EnvironmentStore.UserVariables().Where(v => v.LooksSecret && !v.Decoy).Select(v => v.Name)];
 
     /// <summary>The set the admin tier holds, asked once per doctor run: <c>decoys.json</c> is gone then.</summary>
     AdminDecoysStatus? HeldDecoys => heldDecoys ??= AdminClient.Installed ? AdminDecoys.Status() : null;

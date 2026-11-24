@@ -65,7 +65,7 @@ behind the card's **Details** expander, closed by default.
   members together; no full-width bars. Then one line "12 checks passed" that expands to the list. Navigation to
   Secrets, Services, Environment and Activity stays as today's row, only for areas in use.
 - **Services:** left as it is: four buttons on one grid, the setups already reached through Add.
-- **Environment:** each section a card; Sealed and Add new open, the others open when they list something to act on (or when a fix opens them).
+- **Environment:** each section a card, the exposed ones (Still in Windows) first, then Sealed; Sealed and Add new open, the others open when they list something to act on (or when a fix opens them). Each heading says who can read what it lists; the Windows summary counts the variables that look like secrets out of the user's own, and names decoys apart.
 
 ## 4. Ratings in plain language
 
