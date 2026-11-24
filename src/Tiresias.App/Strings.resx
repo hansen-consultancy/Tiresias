@@ -2069,6 +2069,18 @@ Close them, then choose the update in the tray menu again.</value>
   <data name="Installed_ShowUnused" xml:space="preserve">
     <value>Not opened in 90 days</value>
   </data>
+  <data name="Installed_ShowUnsigned" xml:space="preserve">
+    <value>Not signed</value>
+  </data>
+  <data name="Installed_UnsignedTip" xml:space="preserve">
+    <value>Not signed: nothing vouches that it came from its publisher unchanged</value>
+  </data>
+  <data name="Installed_ShowNew" xml:space="preserve">
+    <value>Installed in the last {0} days</value>
+  </data>
+  <data name="Installed_New" xml:space="preserve">
+    <value>New</value>
+  </data>
   <data name="Installed_ListName" xml:space="preserve">
     <value>Installed programs</value>
   </data>
@@ -2080,6 +2092,12 @@ Close them, then choose the update in the tray menu again.</value>
   </data>
   <data name="Installed_ColFor" xml:space="preserve">
     <value>Installed for</value>
+  </data>
+  <data name="Installed_ColInstalledOn" xml:space="preserve">
+    <value>Installed on</value>
+  </data>
+  <data name="Installed_InstalledOnUnknown" xml:space="preserve">
+    <value>Not known: its entry gives no date and its folder is gone</value>
   </data>
   <data name="Installed_ColUse" xml:space="preserve">
     <value>Last opened</value>
@@ -2107,6 +2125,15 @@ Close them, then choose the update in the tray menu again.</value>
   </data>
   <data name="Installed_Summary" xml:space="preserve">
     <value>{0} programs, {1} not opened in 90 days</value>
+  </data>
+  <data name="Installed_SummaryScanning" xml:space="preserve">
+    <value>checking signatures...</value>
+  </data>
+  <data name="Installed_SummaryUnsigned" xml:space="preserve">
+    <value>{0} not signed</value>
+  </data>
+  <data name="Installed_SummaryNew" xml:space="preserve">
+    <value>{0} installed in the last {1} days</value>
   </data>
   <data name="Installed_Loading" xml:space="preserve">
     <value>Reading the installed-apps list...</value>

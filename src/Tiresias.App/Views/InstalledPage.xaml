@@ -1,7 +1,8 @@
 <UserControl x:Class="Tiresias.App.Views.InstalledPage"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:l="clr-namespace:Tiresias.App">
+        xmlns:l="clr-namespace:Tiresias.App"
+        xmlns:v="clr-namespace:Tiresias.App.Views">
   <Grid Margin="{StaticResource PagePadding}">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
@@ -25,7 +26,7 @@
       <StackPanel Margin="0,0,12,8">
         <Label x:Name="ShowLabel" Content="{l:S Installed_ShowLabel}" Target="{Binding ElementName=Show}" Padding="0,0,0,4" />
         <ComboBox x:Name="Show" Width="200" ItemsSource="{Binding Filters}" DisplayMemberPath="Label" SelectedValuePath="Value"
-                  SelectedValue="{Binding UnusedOnly}" AutomationProperties.LabeledBy="{Binding ElementName=ShowLabel}" />
+                  SelectedValue="{Binding View}" AutomationProperties.LabeledBy="{Binding ElementName=ShowLabel}" />
       </StackPanel>
     </WrapPanel>
 
@@ -44,6 +45,15 @@
                     <TextBlock Text="&#xE74C;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14" Visibility="{Binding GenericIconVisibility}"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                   </Grid>
+                  <!-- Quiet marks at the end of the name: New (installed lately) and an unsigned program file; each also a Show choice. -->
+                  <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
+                    <Border Visibility="{Binding NewVisibility}" CornerRadius="4" Padding="5,0" Margin="0,0,6,0" VerticalAlignment="Center"
+                            BorderThickness="1" BorderBrush="{DynamicResource AccentTextFillColorPrimaryBrush}" ToolTip="{x:Static v:InstalledRow.NewTip}">
+                      <TextBlock Text="{l:S Installed_New}" FontSize="11" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+                    </Border>
+                    <TextBlock Text="&#xE7BA;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13" Visibility="{Binding UnsignedVisibility}"
+                               Foreground="{DynamicResource SystemFillColorCautionBrush}" VerticalAlignment="Center" ToolTip="{l:S Installed_UnsignedTip}" />
+                  </StackPanel>
                   <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                 </DockPanel>
               </DataTemplate>
@@ -84,32 +94,39 @@
           <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <TextBlock Grid.ColumnSpan="2" Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,8" />
         <TextBlock Grid.Row="1" Text="{l:S Installed_ColVersion}" Style="{StaticResource CaptionText}" Margin="0,2,16,2" />
         <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Version}" TextWrapping="Wrap" Margin="0,2" />
         <TextBlock Grid.Row="2" Text="{l:S Installed_ColFor}" Style="{StaticResource CaptionText}" Margin="0,2,16,2" />
         <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding For}" TextWrapping="Wrap" Margin="0,2" />
-        <TextBlock Grid.Row="3" Text="{l:S Installed_ColUse}" Style="{StaticResource CaptionText}" Margin="0,2,16,2" />
-        <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding Use}" TextWrapping="Wrap" Margin="0,2" />
-        <TextBlock Grid.Row="4" Text="{l:S Installed_ColReached}" Style="{StaticResource CaptionText}" Margin="0,2,16,2" />
-        <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding Reached}" TextWrapping="Wrap" Margin="0,2" />
-        <TextBlock Grid.Row="5" Text="{l:S Installed_ColFolder}" Style="{StaticResource CaptionText}" Margin="0,2,16,2" />
-        <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding Folder, Mode=OneWay}" Style="{StaticResource SelectableText}" TextWrapping="Wrap"
+        <TextBlock Grid.Row="3" Text="{l:S Installed_ColInstalledOn}" Style="{StaticResource CaptionText}" Margin="0,2,16,2" />
+        <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding InstalledOn}" TextWrapping="Wrap" Margin="0,2" />
+        <TextBlock Grid.Row="4" Text="{l:S Installed_ColUse}" Style="{StaticResource CaptionText}" Margin="0,2,16,2" />
+        <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding Use}" TextWrapping="Wrap" Margin="0,2" />
+        <TextBlock Grid.Row="5" Text="{l:S Installed_ColReached}" Style="{StaticResource CaptionText}" Margin="0,2,16,2" />
+        <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding Reached}" TextWrapping="Wrap" Margin="0,2" />
+        <TextBlock Grid.Row="6" Text="{l:S Installed_ColFolder}" Style="{StaticResource CaptionText}" Margin="0,2,16,2" />
+        <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding Folder, Mode=OneWay}" Style="{StaticResource SelectableText}" TextWrapping="Wrap"
                  AutomationProperties.Name="{l:S Installed_ColFolder}" />
-        <TextBlock Grid.Row="6" Text="{l:S Installed_ColPublisher}" Style="{StaticResource CaptionText}" Margin="0,2,16,2" />
-        <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding Publisher}" TextWrapping="Wrap" Margin="0,2" />
-        <TextBlock Grid.Row="7" Text="{l:S Installed_ColSigner}" Style="{StaticResource CaptionText}" Margin="0,2,16,2" />
-        <TextBlock Grid.Row="7" Grid.Column="1" x:Name="SignerText" Text="{Binding DataContext.Signer, RelativeSource={RelativeSource AncestorType=UserControl}}"
+        <TextBlock Grid.Row="7" Text="{l:S Installed_ColPublisher}" Style="{StaticResource CaptionText}" Margin="0,2,16,2" />
+        <TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding Publisher}" TextWrapping="Wrap" Margin="0,2" />
+        <TextBlock Grid.Row="8" Text="{l:S Installed_ColSigner}" Style="{StaticResource CaptionText}" Margin="0,2,16,2" />
+        <TextBlock Grid.Row="8" Grid.Column="1" x:Name="SignerText" Text="{Binding DataContext.Signer, RelativeSource={RelativeSource AncestorType=UserControl}}"
                    TextWrapping="Wrap" Margin="0,2" />
-        <Button Grid.Row="8" Grid.ColumnSpan="2" Style="{StaticResource RowButton}" Content="{l:S Installed_SearchOnline}" Click="OnSearchOnline"
+        <Button Grid.Row="9" Grid.ColumnSpan="2" Style="{StaticResource RowButton}" Content="{l:S Installed_SearchOnline}" Click="OnSearchOnline"
                 HorizontalAlignment="Left" Margin="0,8,0,0" ToolTip="{l:S Installed_SearchOnlineTip}" />
       </Grid>
     </Border>
 
     <Grid Grid.Row="5" Margin="0,16,0,0">
-      <TextBlock Text="{Binding Summary}" Style="{StaticResource CaptionText}" VerticalAlignment="Center" />
-      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <TextBlock Text="{Binding Summary}" Style="{StaticResource CaptionText}" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0" />
+      <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
         <Button Style="{StaticResource RowButton}" Content="{l:S Installed_Refresh}" Command="{Binding LoadCommand}" Margin="0,0,8,0" />
         <Button Style="{DynamicResource AccentButtonStyle}" Padding="12,4" Content="{l:S Installed_OpenSettings}" Click="OnOpenSettings" />
       </StackPanel>

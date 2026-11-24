@@ -10,6 +10,10 @@ its section below.
 
 ### Added
 
+- **Installed** marks unsigned and newly installed programs. Each program file's signature is
+  checked in the background; one without a valid signature gets a caution mark, and one installed
+  in the last 14 days a **New** mark. **Show** can pick either, and the details give the install
+  date.
 - **Devcontainers can ask instead of carrying secrets.** Put `"TIRESIAS_TICKET":
   "${localEnv:TIRESIAS_TICKET}"` in `remoteEnv` and start VS Code with `tir run -- code <folder>`:
   the devcontainer gets a ticket, and `tir-remote run -- <command>` inside it asks the Tiresias
