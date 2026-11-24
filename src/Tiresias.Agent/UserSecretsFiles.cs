@@ -14,6 +14,12 @@ public sealed record UserSecretsFolder(string Id, string Directory)
 
     /// <summary>What the file holds, judged without unlocking: a sealed file counts as secrets.</summary>
     public SecretsContent Content => SecretsContents.OfFile(File.Exists(FilePath) ? File.ReadAllText(FilePath) : null);
+
+    /// <summary>Plain keys written beside a sealed file's envelope since it was sealed, which the next run seals; 0 for any other file.</summary>
+    public int PlainAdditions =>
+        File.Exists(FilePath) && File.ReadAllText(FilePath) is var text && SecretsFile.Classify(text) == SecretsFileKind.Sealed
+            ? SecretsFile.Read(text).PlainAdditions?.Count ?? 0
+            : 0;
 }
 
 /// <summary>

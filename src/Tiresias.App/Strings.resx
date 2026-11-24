@@ -1238,6 +1238,10 @@ Store them in clear?</value>
     <value>{0} (sealed)</value>
     <comment>{0}: UserSecretsId</comment>
   </data>
+  <data name="Secrets_ProjectPlainAdded" xml:space="preserve">
+    <value>{0} (sealed, {1} added in plain)</value>
+    <comment>{0}: UserSecretsId; {1}: how many keys were added beside the sealed envelope</comment>
+  </data>
   <data name="Secrets_ProjectPlain" xml:space="preserve">
     <value>{0} (not sealed yet)</value>
     <comment>{0}: UserSecretsId</comment>
@@ -2437,6 +2441,10 @@ Close them, then choose the update in the tray menu again.</value>
   <data name="Secrets_State_Sealed" xml:space="preserve">
     <value>sealed</value>
   </data>
+  <data name="Secrets_State_PlainAdded" xml:space="preserve">
+    <value>sealed, {0} added in plain</value>
+    <comment>{0}: how many keys were added beside the sealed envelope; the next run seals them</comment>
+  </data>
   <data name="Secrets_State_NotSealed" xml:space="preserve">
     <value>not sealed yet</value>
   </data>
@@ -2455,6 +2463,9 @@ Close them, then choose the update in the tray menu again.</value>
   </data>
   <data name="Secrets_Stats_Sealed" xml:space="preserve">
     <value>{0} sealed</value>
+  </data>
+  <data name="Secrets_Stats_PlainAdded" xml:space="preserve">
+    <value>{0} sealed with keys added in plain</value>
   </data>
   <data name="Secrets_Stats_NotSealed" xml:space="preserve">
     <value>{0} not sealed yet</value>

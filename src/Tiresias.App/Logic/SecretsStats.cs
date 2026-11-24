@@ -9,6 +9,9 @@ public enum ProjectState
     /// <summary>Sealed by Tiresias.</summary>
     Sealed,
 
+    /// <summary>Sealed, with plain keys written beside it since: readable by anything until the next run seals them.</summary>
+    PlainAdded,
+
     /// <summary>Plain text holding at least one value that may be a credential.</summary>
     NotSealed,
 
@@ -23,12 +26,14 @@ public enum ProjectState
 }
 
 /// <summary>The counts above the secrets editor's list: what the side bar's single number is made of.</summary>
-public sealed record SecretsStats(int Sealed, int NotSealed, int Settings, int Empty, int Invalid)
+public sealed record SecretsStats(int Sealed, int PlainAdded, int NotSealed, int Settings, int Empty, int Invalid)
 {
-    public int Total => Sealed + NotSealed + Settings + Empty + Invalid;
+    public int Total => Sealed + PlainAdded + NotSealed + Settings + Empty + Invalid;
 
-    public static ProjectState StateOf(SecretsFileKind kind, SecretsContent content) => (kind, content) switch
+    /// <param name="plainAdditions">Plain keys beside a sealed file's envelope.</param>
+    public static ProjectState StateOf(SecretsFileKind kind, SecretsContent content, int plainAdditions = 0) => (kind, content) switch
     {
+        (SecretsFileKind.Sealed, _) when plainAdditions > 0 => ProjectState.PlainAdded,
         (SecretsFileKind.Sealed, _) => ProjectState.Sealed,
         (_, SecretsContent.Invalid) or (SecretsFileKind.Invalid, _) => ProjectState.Invalid,
         (_, SecretsContent.Empty) => ProjectState.Empty,
@@ -40,6 +45,6 @@ public sealed record SecretsStats(int Sealed, int NotSealed, int Settings, int E
     {
         var all = states.ToArray();
         int Count(ProjectState state) => all.Count(s => s == state);
-        return new(Count(ProjectState.Sealed), Count(ProjectState.NotSealed), Count(ProjectState.Settings), Count(ProjectState.Empty), Count(ProjectState.Invalid));
+        return new(Count(ProjectState.Sealed), Count(ProjectState.PlainAdded), Count(ProjectState.NotSealed), Count(ProjectState.Settings), Count(ProjectState.Empty), Count(ProjectState.Invalid));
     }
 }

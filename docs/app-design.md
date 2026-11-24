@@ -186,7 +186,10 @@ pure classifier in `Tiresias.Core` so the two can't disagree:
 
 **The editor.** The list leads with folders holding secrets, as now. Settings-only folders follow
 with "(settings only)" in place of "(not sealed yet)". Each row has a mark beside its state: a
-green lock for sealed, an amber warning for not sealed yet, a grey gear for settings only. Under
+green lock for sealed, an amber warning for not sealed yet, a grey gear for settings only. A
+sealed file with plain keys written beside it since (`dotnet user-secrets set` on a sealed
+project) keeps its lock but turns amber, "sealed, 2 added in plain": those keys are readable by
+anything until the next run seals them. Under
 the picker, one line says what the side bar's count is made of ("58 user-secrets folders: 12
 sealed, 5 not sealed yet, 9 settings only, 32 empty"). Empty folders are not listed; a line at the
 foot, "*N* empty folders", shows them, and offers **Move *N* empty to Recycle Bin**. This uses the

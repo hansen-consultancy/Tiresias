@@ -15,12 +15,18 @@ public class SecretsStatsTests
     public void A_folder_s_state_comes_from_its_file(SecretsFileKind kind, SecretsContent content, ProjectState state) =>
         Assert.That(SecretsStats.StateOf(kind, content), Is.EqualTo(state));
 
+    [TestCase(SecretsFileKind.Sealed, 2, ProjectState.PlainAdded)]
+    [TestCase(SecretsFileKind.Sealed, 0, ProjectState.Sealed)]
+    [TestCase(SecretsFileKind.Plain, 2, ProjectState.NotSealed)]
+    public void Plain_keys_beside_a_sealed_envelope_stand_out_until_sealed(SecretsFileKind kind, int additions, ProjectState state) =>
+        Assert.That(SecretsStats.StateOf(kind, SecretsContent.Secrets, additions), Is.EqualTo(state));
+
     [Test]
     public void The_counts_add_up_to_the_side_bar_s_number()
     {
-        var stats = SecretsStats.Of([ProjectState.Sealed, ProjectState.Sealed, ProjectState.NotSealed, ProjectState.Settings, ProjectState.Empty, ProjectState.Empty, ProjectState.Empty]);
+        var stats = SecretsStats.Of([ProjectState.Sealed, ProjectState.Sealed, ProjectState.PlainAdded, ProjectState.NotSealed, ProjectState.Settings, ProjectState.Empty, ProjectState.Empty, ProjectState.Empty]);
 
-        Assert.That(stats, Is.EqualTo(new SecretsStats(Sealed: 2, NotSealed: 1, Settings: 1, Empty: 3, Invalid: 0)));
-        Assert.That(stats.Total, Is.EqualTo(7));
+        Assert.That(stats, Is.EqualTo(new SecretsStats(Sealed: 2, PlainAdded: 1, NotSealed: 1, Settings: 1, Empty: 3, Invalid: 0)));
+        Assert.That(stats.Total, Is.EqualTo(8));
     }
 }
