@@ -21,6 +21,13 @@ its section below.
 - **Dismissing an unused program, a log-on entry or an extension lasts through its updates**, and
   comes back when its signer changes or a new reason appears. Earlier dismissals still apply.
 
+### Fixed
+
+- **0.4.0 stopped at "Recovery setup is unavailable" for anyone who is not an administrator.**
+  Reading the recovery enrollment asked Windows for write access to the local machine registry,
+  which only administrators have, so first run, alerts and Activity all failed with "Attempted to
+  perform an unauthorized operation." It now asks for read access only.
+
 ## [0.4.0] - 2026-11-24
 
 ### Added
