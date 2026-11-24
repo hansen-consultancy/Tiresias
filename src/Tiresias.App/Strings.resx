@@ -1199,6 +1199,12 @@ Switch to this copy, {2}, from {3}? The other copy quits first, ending its lease
   <data name="Status_Review" xml:space="preserve">
     <value>Review...</value>
   </data>
+  <data name="Status_CopyCommand" xml:space="preserve">
+    <value>Copy command</value>
+  </data>
+  <data name="Status_CopyCommandName" xml:space="preserve">
+    <value>Copy {0}</value>
+  </data>
   <data name="Status_ReviewName" xml:space="preserve">
     <value>Review {0} in the secrets editor</value>
     <comment>{0}: UserSecretsId</comment>
@@ -2265,6 +2271,33 @@ Close them, then choose the update in the tray menu again.</value>
   </data>
   <data name="Finding_FixReachGuide" xml:space="preserve">
     <value>How to close it</value>
+  </data>
+  <data name="Guide_Intro" xml:space="preserve">
+    <value>Tiresias can't do these for you: each needs Docker quit, an administrator, or a change inside a guest. Commands below already name your account.</value>
+  </data>
+  <data name="Guide_Copy" xml:space="preserve">
+    <value>Copy</value>
+  </data>
+  <data name="Guide_CopyName" xml:space="preserve">
+    <value>Copy step {0}</value>
+  </data>
+  <data name="Guide_RunAdmin" xml:space="preserve">
+    <value>Run as administrator...</value>
+  </data>
+  <data name="Guide_RunAdminTip" xml:space="preserve">
+    <value>Opens PowerShell as administrator with this command; Windows asks first</value>
+  </data>
+  <data name="Guide_Ran" xml:space="preserve">
+    <value>PowerShell opened as administrator. Check what it printed, then close it.</value>
+  </data>
+  <data name="Guide_Declined" xml:space="preserve">
+    <value>Nothing ran: the Windows prompt was declined.</value>
+  </data>
+  <data name="Guide_DemoNoRun" xml:space="preserve">
+    <value>Demo mode: nothing runs.</value>
+  </data>
+  <data name="Guide_ReadMore" xml:space="preserve">
+    <value>Read more on GitHub</value>
   </data>
   <data name="Finding_FixGitHubApp" xml:space="preserve">
     <value>Add a GitHub App...</value>

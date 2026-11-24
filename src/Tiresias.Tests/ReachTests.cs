@@ -7,6 +7,7 @@ namespace Tiresias.Tests;
 public class ReachTests
 {
     const string User = "S-1-5-21-1-2-3-1001", DockerUsers = "S-1-5-21-1-2-3-1005", Users = "S-1-5-32-545", System = "S-1-5-18", Admins = "S-1-5-32-544";
+    const string Account = @"EXAMPLE\alice";
     const int Read = ReachAccess.ReadData, ReadWrite = ReachAccess.ReadData | ReachAccess.WriteData;
 
     static readonly Dictionary<string, string> Token = new()
@@ -153,5 +154,27 @@ public class ReachTests
     {
         var checks = Doctor.Reach(new([Pipe("docker_engine", EngineKind.Current, "docker-users")], [], HyperVAccess.Member)).Select(c => c.Name);
         Assert.That(checks, Is.EqualTo(new[] { Doctor.DockerEngineCheck, Doctor.HyperVCheck }));
+    }
+    [Test]
+    public void Every_guide_has_steps_and_admin_commands_name_the_account_outright()
+    {
+        foreach (var topic in Enum.GetValues<ReachTopic>())
+            foreach (var guide in new[] { new ReachGuide(topic), new ReachGuide(topic, DirectGrant: true, Distribution: "Ubuntu") })
+            {
+                var steps = guide.Steps(Account);
+                Assert.That(steps, Is.Not.Empty, guide.ToString());
+                Assert.That(steps.Select(s => s.Copy).OfType<string>(), Has.None.Contain("$env:USERNAME"), guide.ToString());
+                foreach (var admin in steps.Where(s => s.Admin))
+                    Assert.That(admin.Copy, Does.Contain($"\"{Account}\""), guide.ToString());
+            }
+    }
+
+    [Test]
+    public void Leaving_docker_users_is_offered_only_when_the_pipe_doesn_t_name_the_account()
+    {
+        Assert.That(new ReachGuide(ReachTopic.DockerEngine).Steps(Account).Single(s => s.Admin).Copy,
+            Is.EqualTo($"Remove-LocalGroupMember -Group docker-users -Member \"{Account}\""));
+        Assert.That(new ReachGuide(ReachTopic.DockerEngine, DirectGrant: true).Steps(Account), Has.None.Matches<GuideStep>(s => s.Admin));
+        Assert.That(new ReachGuide(ReachTopic.Wsl, Distribution: "Ubuntu").Steps(Account)[1].Copy, Does.Contain("wsl -d Ubuntu"));
     }
 }

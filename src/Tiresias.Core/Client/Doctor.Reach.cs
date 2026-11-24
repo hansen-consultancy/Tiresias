@@ -147,4 +147,68 @@ public sealed record ReachGuide(ReachTopic Topic, bool DirectGrant = false, stri
         _ => "if you don't manage VMs, leave the group as an administrator: Remove-LocalGroupMember -SID S-1-5-32-578 -Member \"$env:USERDOMAIN\\$env:USERNAME\". "
             + "Inside each guest, turn on BitLocker with a virtual TPM so its disk and checkpoints are ciphertext to the host",
     };
+
+    /// <summary>
+    /// <see cref="Instruction"/> as steps to follow one at a time. Commands name
+    /// <paramref name="account"/> (<c>DOMAIN\user</c>) outright, because a PowerShell run as
+    /// administrator may run as another account, whose <c>$env:USERNAME</c> isn't yours.
+    /// </summary>
+    public IReadOnlyList<GuideStep> Steps(string account) => Topic switch
+    {
+        ReachTopic.DockerEngine when DirectGrant =>
+        [
+            new("Quit Docker Desktop when you don't use it: its pipe closes with it."),
+            new("The pipe names your account itself, so leaving the docker-users group doesn't close it."),
+        ],
+        ReachTopic.DockerEngine =>
+        [
+            new("Quit Docker Desktop when you don't use it: its pipe closes with it."),
+            new("If you don't use Docker, leave the docker-users group, in a PowerShell run as administrator:",
+                $"Remove-LocalGroupMember -Group docker-users -Member \"{account}\"", Admin: true),
+            LeftGroupAtSignIn,
+        ],
+        ReachTopic.ContainerMounts =>
+        [
+            new("Remove the mount from the devcontainer file's mounts or runArgs, or from the docker run that made the container."),
+            new("Recreate the container, so the mount is gone from it."),
+            new("Hand in the one credential it needs instead, with NAME a sealed variable and <image> the container's image:",
+                "tir run --only NAME -- docker run --rm -e NAME <image>"),
+        ],
+        ReachTopic.Wsl =>
+        [
+            new("Seal each secret the distribution holds, with NAME the variable to keep it in, then delete the file:", "tir env set NAME"),
+            new("Hand it in only to the command that needs it:",
+                $"$env:WSLENV = \"NAME/u\"; tir run --only NAME -- wsl -d {Distribution ?? "<distribution>"} <command>"),
+            new("SSH keys and cloud logins can stay on Windows instead, used through its ssh-agent or the cloud's CLI."),
+        ],
+        ReachTopic.HyperVFiles =>
+        [
+            new("As an administrator, move the VM's files to a folder only administrators read. Hyper-V gives the VM its own access when it attaches them."),
+            new("Or remove the entries that let your account or its groups read the file (its Properties, Security tab)."),
+            new("Inside the guest, turn on BitLocker with a virtual TPM, so its disk is ciphertext to the host."),
+        ],
+        ReachTopic.DevcontainerForwarding =>
+        [
+            new("Open VS Code's user settings as JSON (Ctrl+Shift+P, Preferences: Open User Settings (JSON)) and add:",
+                "\"dev.containers.gitCredentialHelperConfigLocation\": \"none\",\n\"dev.containers.dockerCredentialHelper\": false,"),
+            new("Where a container needs git, let it ask instead: add this to the features of its devcontainer file:",
+                "\"ghcr.io/hansen-consultancy/devcontainer-features/tiresias:0\": {}"),
+            new("Map each host to a sealed token, with NAME the variable that holds it; git in the container gets the token after you approve:",
+                "tir env git add github.com NAME"),
+        ],
+        _ =>
+        [
+            new("If you don't manage VMs, leave the Hyper-V Administrators group, in a PowerShell run as administrator:",
+                $"Remove-LocalGroupMember -SID S-1-5-32-578 -Member \"{account}\"", Admin: true),
+            LeftGroupAtSignIn,
+            new("Inside each guest, turn on BitLocker with a virtual TPM, so its disk and checkpoints are ciphertext to the host."),
+        ],
+    };
+
+    static readonly GuideStep LeftGroupAtSignIn = new("Sign out of Windows and back in: a group you left still counts until then.");
 }
+
+/// <summary>One step of a <see cref="ReachGuide"/>, with the text to paste when there is one.</summary>
+/// <param name="Copy">A command or setting to paste as it stands, or with its placeholders filled in.</param>
+/// <param name="Admin">The command needs a PowerShell run as administrator.</param>
+public sealed record GuideStep(string Text, string? Copy = null, bool Admin = false);
