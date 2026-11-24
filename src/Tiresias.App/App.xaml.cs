@@ -79,7 +79,12 @@ public partial class App : Application
         var unlockAtStart = false;
 #if DEBUG
         if (demo is not null)
+        {
             unlockAtStart = Demo.Start(demo);
+            // Screenshots of both themes without changing the PC's own setting.
+            if (Demo.RequestedTheme(e.Args) is { } theme)
+                ThemeMode = theme;
+        }
 #endif
 
         consent = new ConsentPresenter(Dispatcher);
@@ -159,6 +164,12 @@ public partial class App : Application
         if (unlockAtStart)
             _ = UnlockAsync(interactive: true);
 
+#if DEBUG
+        // --page Secrets: the demo opens on that place, for screenshots.
+        if (DemoMode.On && Array.IndexOf(e.Args, "--page") is var page and >= 0 && page + 1 < e.Args.Length)
+            ShowWindow<StatusWindow>().Go(e.Args[page + 1]);
+        else
+#endif
         if (FirstRunPlan.Needed(SetupFacts()))
             ShowWindow<FirstRunWindow>();
         else if (host.SoloBrokerProblem is not null)

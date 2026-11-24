@@ -330,13 +330,19 @@ window can be captured and shared:
 ```powershell
 dotnet run --project src/Tiresias.App -- --demo
 dotnet run --project src/Tiresias.App -- --demo everyday
+dotnet run --project src/Tiresias.App -- --demo everyday --theme dark --page Secrets
 ```
+
+`--theme light|dark` picks the app's theme without changing Windows' setting, and `--page <place>`
+opens the status window on that place (`Home`, `Secrets`, `Services`, `Environment`, `Activity`,
+`Installed`, `About`), so both themes of a page can be captured in turn.
 
 - The data comes from a scenario, `src/Tiresias.App/Demo/<name>.json` (default `everyday`): files
   in the made-up user's profile (projects, `projects.json`, a vault's services, activity, NuGet and
   git config, installed programs' folders), vault secrets, sealed user secrets, Windows and sealed
   environment variables, `HKCU` keys (`registry`: the Installed page's uninstall entries) and when
-  each program was last opened (`programRuns`), all in plain text. The app seals them at start. `{{profile}}` in a file is the profile's path,
+  each program was last opened (`programRuns`), and which decoys are placed (`decoys`:
+  `passwordsFile`, `project`, `variables`), all in plain text. The app seals them at start. `{{profile}}` in a file is the profile's path,
   `{{now-2h}}` a time two hours ago, `{{date-3d}}` the day three days ago as `yyyyMMdd` (an uninstall entry's `InstallDate`). Add a scenario for any case you want to see or reproduce.
 - The made-up user is `alice`, with her profile in `%PUBLIC%\Tiresias-demo\alice` and her `HKCU`
   in `HKCU\Software\Tiresias\Demo`. Both are emptied at start and when the demo quits, so what you

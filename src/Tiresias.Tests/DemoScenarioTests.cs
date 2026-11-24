@@ -108,6 +108,15 @@ public class DemoScenarioTests
     }
 
     [Test]
+    public void Decoys_are_named_by_kind()
+    {
+        var scenario = DemoScenario.Parse("""{ "decoys": ["passwordsFile", "variables"] }""");
+
+        Assert.That(scenario.Decoys, Is.EqualTo(new[] { Tiresias.Decoys.DecoyKind.PasswordsFile, Tiresias.Decoys.DecoyKind.Variables }));
+        Assert.That(() => DemoScenario.Parse("""{ "decoys": ["nope"] }"""), Throws.InstanceOf<System.Text.Json.JsonException>());
+    }
+
+    [Test]
     public void Registry_values_are_text_or_whole_numbers()
     {
         var scenario = DemoScenario.Parse("""{ "registry": { "Software\\App": { "DisplayName": "App", "NoRepair": 1 } } }""");

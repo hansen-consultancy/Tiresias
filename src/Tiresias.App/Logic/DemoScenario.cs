@@ -30,7 +30,8 @@ public sealed partial record DemoScenario(
     IReadOnlyDictionary<string, string> Variables,
     IReadOnlyDictionary<string, string> SealedVariables,
     IReadOnlyDictionary<string, IReadOnlyDictionary<string, object>> Registry,
-    IReadOnlyDictionary<string, string> ProgramRuns)
+    IReadOnlyDictionary<string, string> ProgramRuns,
+    IReadOnlyList<Tiresias.Decoys.DecoyKind>? Decoys = null)
 {
     static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { ReadCommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true };
 
@@ -44,7 +45,7 @@ public sealed partial record DemoScenario(
             k => (IReadOnlyDictionary<string, object>)k.Value.ToDictionary(v => v.Key, v => RegistryValue(k.Key, v.Key, v.Value)));
         return new(dto.Description ?? "", dto.SetUp ?? true, dto.Unlocked ?? false,
             dto.Files ?? [], dto.Secrets ?? [], dto.UserSecrets ?? [], dto.Variables ?? [], dto.SealedVariables ?? [],
-            registry, dto.ProgramRuns ?? []);
+            registry, dto.ProgramRuns ?? [], dto.Decoys?.Select(DecoyKindOf).ToArray() ?? []);
     }
 
     static object RegistryValue(string key, string name, JsonElement value) => value.ValueKind switch
@@ -146,5 +147,11 @@ public sealed partial record DemoScenario(
         Dictionary<string, string>? Variables,
         Dictionary<string, string>? SealedVariables,
         Dictionary<string, Dictionary<string, JsonElement>>? Registry,
-        Dictionary<string, string>? ProgramRuns);
+        Dictionary<string, string>? ProgramRuns,
+        string[]? Decoys);
+
+    /// <summary>A decoy as a scenario names it: <c>passwordsFile</c>, <c>project</c> or <c>variables</c>.</summary>
+    static Tiresias.Decoys.DecoyKind DecoyKindOf(string name) =>
+        Enum.TryParse<Tiresias.Decoys.DecoyKind>(name, ignoreCase: true, out var kind) && Enum.IsDefined(kind) ? kind
+            : throw new JsonException($"'{name}' is not a decoy; the kinds are passwordsFile, project and variables.");
 }
