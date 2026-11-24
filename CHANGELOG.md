@@ -8,6 +8,8 @@ its section below.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-24
+
 ### Added
 
 - **Installed** marks unsigned and newly installed programs. Each program file's signature is
@@ -523,7 +525,8 @@ were published as 0.2.0 and are unchanged.
   - `Tiresias.Core` is the vault, the trust chain, grants, leases and the audit log.
   - `Tiresias.Protocol` holds the wire formats.
 
-[Unreleased]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.3.0...HEAD
+[Unreleased]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.4.0...HEAD
+[0.4.0]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.3.0...app-v0.4.0
 [0.3.0]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.2.1...app-v0.3.0
 [0.2.1]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.1.0-preview.4...app-v0.2.1
 [0.2.0]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.1.0-preview.4...app-v0.2.0
