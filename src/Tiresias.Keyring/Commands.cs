@@ -361,7 +361,7 @@ static class Commands
         if (args.Flag("--surface"))
         {
             Console.WriteLine();
-            foreach (var line in Tiresias.Client.Doctor.InventoryLines(probe.Inventory(), DateTimeOffset.UtcNow))
+            foreach (var line in Tiresias.Client.Doctor.InventoryLines(probe.Inventory(args.Flag("--refresh")), DateTimeOffset.Now))
                 Console.WriteLine(line);
         }
         return checks.Any(c => c.Status == Tiresias.Client.DoctorStatus.Fail) ? 1 : 0;

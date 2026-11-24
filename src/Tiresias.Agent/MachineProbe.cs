@@ -240,9 +240,9 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public IEnumerable<ProgramRun> ProgramRuns(IReadOnlyCollection<string> of) => [.. SurfaceProbe.ProgramRuns(), .. AdminClient.LastRuns(of)];
 
-    /// <summary>Everything the attack surface checks read, plus the global tools, which take seconds to list.</summary>
-    public SurfaceInventory Inventory() =>
-        new([.. Extensions()], [.. SurfaceProbe.GlobalTools()], [.. StartupEntries()], [.. CredentialUses()], [.. SurfaceProbe.ProgramRuns()]);
+    /// <summary>Everything the attack surface checks read, plus the global tools: today's listing, or a new one with <paramref name="refresh"/>.</summary>
+    public SurfaceInventory Inventory(bool refresh = false) =>
+        new([.. Extensions()], ToolInventory.Current(refresh), [.. StartupEntries()], [.. CredentialUses()], [.. SurfaceProbe.ProgramRuns()]);
 
     public IEnumerable<DecoyUseRecord> DecoyUses() => SurfaceProbe.DecoyUses();
 

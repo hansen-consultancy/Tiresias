@@ -211,8 +211,8 @@ Existing windows remain the places where the work happens; this changes how peop
    they raise; **Update** and `winget`/`dotnet tool`/`npm` uninstalls; global tools and other
    hosts' extensions; scope on a managed
    PC; extensions and global tools on the **Installed** page; trusting a publisher; separate
-   *How credentials are held* and *What can reach them* groups; a daily inventory
-   instead of one per run. `tir doctor --surface` lists the inventory (extensions with their host's
+   *How credentials are held* and *What can reach them* groups. The global tools are listed
+   once a day, not per run (#107). `tir doctor --surface` lists the inventory (extensions with their host's
    reach, global tools, log-on entries with signature and last use).
 6. **Built. More checks**: RavenDB certificate expiry and clearance, sealed keys handed
    out as values, publishing keys, git tokens and a CLI acting as the user (`gh`, `az`), each with

@@ -112,9 +112,10 @@ static partial class SurfaceProbe
 
     /// <summary>
     /// The global tools each package manager on <c>PATH</c> lists, given half a minute each; a manager
-    /// that is missing, slow or fails lists none. Slow, so only <c>tir doctor --surface</c> asks.
+    /// that is missing, slow or fails lists none. Slow, so <see cref="ToolInventory"/> keeps one listing a
+    /// day. A demo lists none: these are the real machine's tools.
     /// </summary>
-    public static IEnumerable<GlobalTool> GlobalTools() =>
+    public static IEnumerable<GlobalTool> GlobalTools() => DemoMode.On ? [] :
         Doctor.ToolManagers.SelectMany(m => Doctor.GlobalTools(m.Manager, Output(m.Manager, m.Arguments)));
 
     /// <summary>What a fixed command prints. <c>npm</c> is a batch file, so it goes through <c>cmd</c>; no argument comes from the machine.</summary>

@@ -8,6 +8,13 @@ its section below.
 
 ## [Unreleased]
 
+### Changed
+
+- **`tir doctor --surface` is quick again.** Listing the global `dotnet`, `npm`, `pipx` and `cargo`
+  tools takes seconds, so it now happens once a day: the app does it in the background and keeps
+  the list in `inventory.json` beside the keyring (names and versions only, on this PC only). The
+  listing says when it was taken; `--refresh` lists the tools again now.
+
 ## [0.4.0] - 2026-11-24
 
 ### Added
