@@ -346,7 +346,8 @@ opens the status window on that place (`Home`, `Secrets`, `Services`, `Environme
   `{{now-2h}}` a time two hours ago, `{{date-3d}}` the day three days ago as `yyyyMMdd` (an uninstall entry's `InstallDate`). Add a scenario for any case you want to see or reproduce.
 - The made-up user is `alice`, with her profile in `%PUBLIC%\Tiresias-demo\alice` and her `HKCU`
   in `HKCU\Software\Tiresias\Demo`. Both are emptied at start and when the demo quits, so what you
-  change lasts until then. Windows Hello is a fixed key and never prompts. A scenario can't write
+  change lasts until then. Windows Hello is a fixed key and never prompts; the card that says why a
+  prompt shows still does, for two seconds, before each Hello "prompt" and admin-tier step. A scenario can't write
   outside the profile, and deleting ("move to the Recycle Bin") works only inside it.
 - Every button works, against that machine. Your vault, profile, environment, Hello credential
   and running app are never touched: the demo runs beside the real app and serves nothing (no

@@ -21,7 +21,8 @@ sealed class ConsentPresenter(Dispatcher dispatcher) : IUserSecretsConsentPrompt
     int waiting;
 
     /// <summary>Unlocks with Windows Hello, explaining any problem; completes with whether it worked. Set once the agent exists.</summary>
-    public Func<Task<bool>>? Unlock { get; set; }
+    /// <remarks>Takes the asking program's path, which the card before the Hello prompt names.</remarks>
+    public Func<string?, Task<bool>>? Unlock { get; set; }
 
     /// <summary>Whether a request may be shown at all; refused requests are answered Deny without a dialog.</summary>
     public Func<string?, GateDecision>? Gate { get; set; }
@@ -79,7 +80,7 @@ sealed class ConsentPresenter(Dispatcher dispatcher) : IUserSecretsConsentPrompt
             AllowSession: false,
             Unlock: true), new(executable, null), null, UserSecretsService.ConsentTimeout, ct);
         // Cancelled (lock, time out) propagates: the service then says why rather than "unlock first".
-        return answer != ConsentAnswer.Deny && await dispatcher.InvokeAsync(unlock).Task.Unwrap();
+        return answer != ConsentAnswer.Deny && await dispatcher.InvokeAsync(() => unlock(executable)).Task.Unwrap();
     }
 
     /// <summary><c>tir run</c> asking for the sealed environment variables for one program; <paramref name="commandLine"/> is the whole command, shown under the heading.</summary>

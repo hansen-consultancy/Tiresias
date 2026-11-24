@@ -2,6 +2,7 @@ using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Tiresias.Agent;
+using Tiresias.App.Logic;
 using Tiresias.Client;
 
 namespace Tiresias.App.Views;
@@ -55,7 +56,7 @@ public sealed partial class RecoveryViewModel : ObservableObject
         IsWorking = true;
         try
         {
-            if (!App.Current.Host.Keys.IsUnlocked && !(await App.Current.UnlockAsync(interactive: true)).Ok)
+            if (!App.Current.Host.Keys.IsUnlocked && !(await App.Current.UnlockAsync(PromptReason.Recovery, interactive: true)).Ok)
                 return;
             var hello = App.Current.Host.Keys.Hello!;
             var summary = await Task.Run(() => RecoveryRestore.Run(typed, hello));

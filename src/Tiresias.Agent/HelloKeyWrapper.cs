@@ -61,7 +61,14 @@ public sealed partial class HelloKeyWrapper : IKeyWrapper, IDisposable
         if (!DemoMode.HelloExists && !create)
             throw new HelloException(HelloProblem.CredentialMissing, $"No Windows Hello credential '{CredentialName}' on this machine. Re-wrap the vault from the recovery key.");
         DemoMode.HelloExists = true;
-        return new(challenge => System.Security.Cryptography.HMACSHA256.HashData(DemoMode.HelloKey, challenge));
+        return new(challenge =>
+        {
+            // No prompt, but the reason card shows as it would, for a moment, so a demo can be looked at and captured.
+            using var why = HelloPrompts.Showing();
+            if (why is not null)
+                Thread.Sleep(DemoMode.PromptPause);
+            return System.Security.Cryptography.HMACSHA256.HashData(DemoMode.HelloKey, challenge);
+        });
     }
 #endif
 
@@ -128,6 +135,8 @@ public sealed partial class HelloKeyWrapper : IKeyWrapper, IDisposable
     /// </summary>
     static T Prompt<T>(Func<IAsyncOperation<T>> start)
     {
+        // The host's reason goes up first: Windows' prompt says only that a sign-in is needed.
+        using var why = HelloPrompts.Showing();
         using var done = new CancellationTokenSource();
         var front = Task.Run(() => KeepPromptInFront(done.Token));
         try

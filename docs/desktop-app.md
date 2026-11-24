@@ -69,6 +69,8 @@ CI and people who prefer it, and it talks to the same agent.
   that arrive together (`tir`, a terminal, NuGet, the tray) share one Hello prompt. A Hello prompt
   answered too late (`WINBIO_E_INVALID_TICKET`, 0x80098044, after minutes out of sight) is
   reported as expired, with a way to try again.
+- **Each prompt says why.** Just before a Windows Hello or UAC prompt, a card above it names what
+  asked ([app design, rule 13](app-design.md#13-a-reason-before-every-windows-prompt)).
 - **"This wasn't me"**, under the answers on every consent dialog, for a prompt you didn't cause (it
   could be malware). It denies the request and locks at once: session consents, terminal and NuGet
   allowances are forgotten, the terminals' placeholders revoked and the broker lease ended. Until

@@ -145,7 +145,7 @@ public sealed partial class EnvironmentViewModel : ObservableObject
     /// <summary>Unlocks if needed (one Windows Hello prompt), then lists both sides.</summary>
     public async Task LoadAsync()
     {
-        if (!App.Current.Host.Keys.IsUnlocked && !(await App.Current.UnlockAsync(interactive: true)).Ok)
+        if (!App.Current.Host.Keys.IsUnlocked && !(await App.Current.UnlockAsync(PromptReason.EnvironmentVariables, interactive: true)).Ok)
         {
             Message = Text.Get("Env_Locked");
             return;

@@ -375,7 +375,7 @@ public partial class StatusWindow : Window
         if (AskWindow.Show(this, Text.Get("Finding_TokenHeading"), Text.Format("Finding_TokenBody", token.File, token.Variable),
                 Text.Get("Finding_TokenSeal"), cancel: Text.Get("Common_Cancel")) != true)
             return;
-        if (!App.Current.Host.Keys.IsUnlocked && !(await App.Current.UnlockAsync(interactive: true)).Ok || App.Current.Host.Keys.Hello is not { } hello)
+        if (!App.Current.Host.Keys.IsUnlocked && !(await App.Current.UnlockAsync(PromptReason.SealToken, interactive: true)).Ok || App.Current.Host.Keys.Hello is not { } hello)
             return;
         try
         {
@@ -733,7 +733,7 @@ public sealed partial class StatusViewModel : ObservableObject
         if (App.Current.Host.Keys.IsUnlocked)
             await App.Current.LockAsync();
         else
-            await App.Current.UnlockAsync(interactive: true);
+            await App.Current.UnlockAsync(PromptReason.Unlock, interactive: true);
     }
 
     /// <summary>Checks that warn or fail; they stay in view.</summary>

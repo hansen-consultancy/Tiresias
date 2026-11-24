@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
 using Tiresias.Agent;
+using Tiresias.App.Logic;
 using Tiresias.Vault;
 
 namespace Tiresias.App.Views;
@@ -249,7 +250,7 @@ public sealed partial class RavenServerViewModel : ObservableObject, IDisposable
         if ((!keep && !Inspect(quiet: false)) || plan is null)
             return;
         if (App.Current.Host.Keys.Hello is null)
-            await App.Current.UnlockAsync(interactive: true);
+            await App.Current.UnlockAsync(PromptReason.DatabaseSetup, interactive: true);
         if (App.Current.Host.Keys.Hello is not { } hello)
         {
             Failure = Text.Get("Raven_Locked");
