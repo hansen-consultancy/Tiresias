@@ -39,6 +39,12 @@ public sealed record DoctorCheck(string Name, DoctorStatus Status, string Detail
 
     /// <summary>A Warn line about solo mode's trade-offs that has no fix: the app shows it as passed to whoever isn't a developer.</summary>
     public bool SoloNote { get; init; }
+
+    /// <summary>
+    /// How the line reads on a PC without developer tools, where leniency meant for a developer
+    /// doesn't apply (docs/developer-tools.md); <c>null</c> when it reads the same.
+    /// </summary>
+    public DoctorCheck? WithoutDeveloperTools { get; init; }
 }
 
 /// <summary>What the vault file says about recoverability: which secrets lack a Hello or a recovery wrap.</summary>

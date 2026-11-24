@@ -35,6 +35,8 @@ public enum FixAction
     AddService,
     /// <summary>The Installed page: the whole list, unused programs first.</summary>
     OpenInstalledList,
+    /// <summary>The Startup page: everything that starts at sign-in.</summary>
+    OpenStartupList,
     /// <summary>The About page, where the Alerts card fixes, tests or removes a sink.</summary>
     OpenAlerts,
     /// <summary>The steps on a page in the repository, in the browser: they need an administrator, or Docker quit, not Tiresias.</summary>
@@ -55,12 +57,14 @@ public static class FindingView
     /// <summary>Findings dismissed together: one kind, one reason, and the keys that bring them back.</summary>
     public sealed record DismissedGroup(string Title, string Reason, IReadOnlyList<string> Keys);
 
-    /// <param name="developerTools">Developer tools show. Without them, a developer check's passing line is left out and
-    /// a solo note shows as passed; findings and Warn/Fail lines show either way (docs/developer-tools.md).</param>
+    /// <param name="developerTools">Developer tools show. Without them, a line reads as its <see cref="DoctorCheck.WithoutDeveloperTools"/>,
+    /// a developer check's passing line is left out and a solo note shows as passed; findings and Warn/Fail lines show either way
+    /// (docs/developer-tools.md).</param>
     public static Split Of(IReadOnlyList<DoctorCheck> checks, Dismissals dismissals, bool developerTools = true)
     {
         if (!developerTools)
             checks = [.. checks
+                .Select(c => c.WithoutDeveloperTools ?? c)
                 .Where(c => c.IsFinding || !c.ForDevelopers || c.Status != DoctorStatus.Ok)
                 .Select(c => c.SoloNote && !c.IsFinding ? c with { Status = DoctorStatus.Ok } : c)];
         var findings = checks.Where(c => c.IsFinding).Select(c => (Check: c, Dismissal: dismissals.For(c))).ToArray();
@@ -111,6 +115,7 @@ public static class FindingView
         RunThroughExec { Setup: not null } => (FixAction.AddService, "Finding_FixGitHubApp"),
         RunThroughExec => (FixAction.CopyCommand, "Finding_FixCopy"),
         UninstallApp => (FixAction.OpenInstalledList, "Finding_FixInstalledList"),
+        ReviewStartup => (FixAction.OpenStartupList, "Finding_FixStartupList"),
         ReviewAlerts => (FixAction.OpenAlerts, "Finding_FixAlerts"),
         ReachGuide => (FixAction.OpenGuide, "Finding_FixReachGuide"),
         InjectAtRunTime => (FixAction.CopyCommand, "Finding_FixCopy"),
@@ -123,7 +128,7 @@ public static class FindingView
     /// </summary>
     public static (FixAction Action, string Label)? GroupButton(IReadOnlyList<DoctorCheck> group) =>
         group.Count == 1 ? Button(group[0].Fix)
-        : group.Select(c => Button(c.Fix)).Distinct().ToArray() is [{ Action: FixAction.OpenInstalledList } shared] ? shared
+        : group.Select(c => Button(c.Fix)).Distinct().ToArray() is [{ Action: FixAction.OpenInstalledList or FixAction.OpenStartupList } shared] ? shared
         : null;
 
     /// <summary>The page a <see cref="ReachGuide"/> opens: its findings, which say how to close each path.</summary>

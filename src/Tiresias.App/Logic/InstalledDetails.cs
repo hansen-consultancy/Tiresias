@@ -7,8 +7,10 @@ public static class InstalledDetails
     /// The string key (and its argument) for a program file's signature. A name from a signature that
     /// doesn't verify is shown only as a claim, since anyone can write any name into one.
     /// </summary>
-    public static (string Key, string? Argument) Signer(bool? valid, string? signer) => (valid, signer) switch
+    /// <param name="mark">The program's mark: an own build says so.</param>
+    public static (string Key, string? Argument) Signer(bool? valid, string? signer, ProgramMark mark = ProgramMark.None) => (valid, signer) switch
     {
+        (false, null) when mark == ProgramMark.BuiltByYou => ("Program_NotSignedBuiltByYou", null),
         (null, _) => ("Installed_SignerUnknown", null),
         (true, { Length: > 0 }) => ("Installed_SignedBy", signer),
         (true, _) => ("Installed_SignedNoName", null),

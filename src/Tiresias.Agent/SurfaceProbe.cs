@@ -29,8 +29,19 @@ static partial class SurfaceProbe
 
     const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
 
-    /// <summary>The log-on entries that are on: those turned off in Task Manager or Settings are left out.</summary>
-    public static IEnumerable<StartupEntry> StartupEntries()
+    /// <summary>
+    /// The log-on entries that are on: the Run keys and the Startup folder. Those turned off in Task
+    /// Manager or Settings are left out.
+    /// </summary>
+    public static IEnumerable<StartupEntry> StartupEntries() => StartupEntries(all: false);
+
+    /// <summary>
+    /// Everything that starts at log-on, for the Startup list: the Run keys and Startup folder, those
+    /// turned off too, and the scheduled tasks with a log-on trigger the user can see.
+    /// </summary>
+    public static IEnumerable<StartupEntry> AllStartupEntries() => [.. StartupEntries(all: true), .. ScheduledTasks.AtLogOn()];
+
+    static List<StartupEntry> StartupEntries(bool all)
     {
         var tray = TrayPrograms();
         List<StartupEntry> entries = [];
@@ -41,9 +52,11 @@ static partial class SurfaceProbe
             if (key is null)
                 continue;
             foreach (var name in key.GetValueNames())
-                if (!Doctor.StartupTurnedOff(approved?.GetValue(name) as byte[])
-                    && key.GetValue(name) is string command && Doctor.ExecutableIn(Environment.ExpandEnvironmentVariables(command)) is { } path)
-                    entries.Add(Entry(name, where, path, name, tray));
+            {
+                var on = !Doctor.StartupTurnedOff(approved?.GetValue(name) as byte[]);
+                if ((on || all) && key.GetValue(name) is string command && Doctor.ExecutableIn(Environment.ExpandEnvironmentVariables(command)) is { } path)
+                    entries.Add(Entry(name, where, path, name, tray, on));
+            }
         }
         var folder = UserMachine.Folder(Environment.SpecialFolder.Startup);
         using var approvedFiles = UserMachine.CurrentUser.OpenSubKey(DisableStartup.ApprovedKey + "StartupFolder");
@@ -51,18 +64,25 @@ static partial class SurfaceProbe
             foreach (var file in Directory.EnumerateFiles(folder))
             {
                 var item = Path.GetFileName(file);
-                if (Doctor.StartupTurnedOff(approvedFiles?.GetValue(item) as byte[]))
+                var on = !Doctor.StartupTurnedOff(approvedFiles?.GetValue(item) as byte[]);
+                if (!on && !all)
                     continue;
                 if (Path.GetExtension(file).Equals(".exe", StringComparison.OrdinalIgnoreCase))
-                    entries.Add(Entry(Path.GetFileNameWithoutExtension(file), StartupEntry.StartupFolder, file, item, tray));
+                    entries.Add(Entry(Path.GetFileNameWithoutExtension(file), StartupEntry.StartupFolder, file, item, tray, on));
                 else if (Path.GetExtension(file).Equals(".lnk", StringComparison.OrdinalIgnoreCase) && ShortcutTarget(file) is { } target)
-                    entries.Add(Entry(Path.GetFileNameWithoutExtension(file), StartupEntry.StartupFolder, target, item, tray));
+                    entries.Add(Entry(Path.GetFileNameWithoutExtension(file), StartupEntry.StartupFolder, target, item, tray, on));
             }
         return entries;
     }
 
-    static StartupEntry Entry(string name, string where, string path, string item, HashSet<string> tray) =>
-        new(name, where, path, File.Exists(path) ? IsSigned(path) : null, item, tray.Contains(path));
+    internal static StartupEntry Entry(string name, string where, string path, string? item, HashSet<string> tray, bool on)
+    {
+        var (valid, signer) = Signature(path);
+        return new(name, where, path, valid, item, tray.Contains(path), on, OwnBuild.Looks(path, valid, signer, BuildDisk.Instance));
+    }
+
+    /// <summary>Programs that have shown an icon in the notification area, from the taskbar's own record of them.</summary>
+    internal static HashSet<string> Tray() => TrayPrograms();
 
     /// <summary>Programs that have shown an icon in the notification area, from the taskbar's own record of them.</summary>
     static HashSet<string> TrayPrograms()

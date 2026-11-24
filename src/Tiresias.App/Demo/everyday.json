@@ -23,13 +23,26 @@
     "AppData/Local/Programs/Azure Data Studio/azuredatastudio.exe": "demo",
     "AppData/Local/Programs/Azure Data Studio/unins000.exe": "demo",
     "AppData/Local/Programs/ShopTools/shoptools.exe": "demo",
-    "AppData/Local/Programs/ShopTools/uninstall.exe": "demo"
+    "AppData/Local/Programs/ShopTools/uninstall.exe": "demo",
+    "source/ShopTray/.git/HEAD": "ref: refs/heads/main\n",
+    "source/ShopTray/ShopTray.csproj": "<Project Sdk=\"Microsoft.NET.Sdk\" />\n",
+    "source/ShopTray/obj/project.assets.json": "{}",
+    "source/ShopTray/bin/Debug/net10.0-windows/ShopTray.exe": "demo",
+    "Tools/sync-agent.exe": "demo",
+    "AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Startup/notes-helper.exe": "demo"
   },
   // The Installed page: per-user programs (a demo has no machine-wide ones). VS Code and Docker are
   // in use, Azure Data Studio hasn't been opened in 140 days, ShopTools has no recorded run, and
   // FtpSync's folder and uninstaller are gone. VS Code and ShopTools were installed in the last few
   // days; FtpSync gives no date.
   "registry": {
+    // Startup: VS Code from its installed app, ShopTray built by alice from her own repo (info on a
+    // developer's PC), and two programs not from an installed app (a Run key and the Startup folder).
+    "Software\\Microsoft\\Windows\\CurrentVersion\\Run": {
+      "ShopTray": "\"{{profile}}\\source\\ShopTray\\bin\\Debug\\net10.0-windows\\ShopTray.exe\" --minimized",
+      "SyncAgent": "{{profile}}\\Tools\\sync-agent.exe",
+      "VSCodeHelper": "\"{{profile}}\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe\" --background"
+    },
     "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{771FD6B0-FA20-440A-A002-3B3BAC16DC50}_is1": {
       "DisplayName": "Microsoft Visual Studio Code (User)",
       "InstallDate": "{{date-3d}}",

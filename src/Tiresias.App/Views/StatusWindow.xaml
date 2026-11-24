@@ -191,6 +191,9 @@
       <ListBoxItem x:Name="NavInstalled" Tag="Installed" DockPanel.Dock="Top">
         <DockPanel><TextBlock Text="&#xE71D;" Style="{StaticResource NavIcon}" /><TextBlock Text="{l:S Nav_Installed}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" /></DockPanel>
       </ListBoxItem>
+      <ListBoxItem x:Name="NavStartup" Tag="Startup" DockPanel.Dock="Top">
+        <DockPanel><TextBlock Text="&#xE7E8;" Style="{StaticResource NavIcon}" /><TextBlock Text="{l:S Nav_Startup}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" /></DockPanel>
+      </ListBoxItem>
       <ListBoxItem x:Name="NavAbout" Tag="About" DockPanel.Dock="Bottom">
         <DockPanel><TextBlock Text="&#xE946;" Style="{StaticResource NavIcon}" /><TextBlock Text="{l:S Status_About}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" /></DockPanel>
       </ListBoxItem>

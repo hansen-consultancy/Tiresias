@@ -8,6 +8,20 @@ its section below.
 
 ## [Unreleased]
 
+### Added
+
+- **Startup** lists everything that starts when you sign in without being opened: the Run keys,
+  the Startup folder and scheduled tasks with a sign-in trigger, those turned off too. Each entry
+  shows the installed app it belongs to, or "Not from an installed app", which is the one worth a
+  look, its signature, when you last opened it, and the services it used through Tiresias in 90
+  days. **Turn off at sign-in...** keeps the program; **Show** picks entries not from an installed
+  app, not signed or turned off.
+- **Programs you built yourself** aren't a warning on a developer's PC. An unsigned program in a git
+  work tree beside the project that builds it (`obj` next to its `bin`, or a project file above
+  it), owned by you, is marked as your own build on Installed and Startup, and Home lists those that
+  start at sign-in on one information line that opens Startup. A signature that doesn't verify, a
+  program in Temp, Downloads or AppData, or a PC without developer tools keeps the warning.
+
 ## [0.4.0] - 2026-11-24
 
 ### Added

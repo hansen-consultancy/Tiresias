@@ -135,7 +135,7 @@ public class UnusedApplicationTests
         ];
 
         string[] Names(string search, bool unusedOnly = false) =>
-            [.. InstalledFilter.Apply(list, search, unusedOnly ? InstalledView.Unused : InstalledView.All, Today, _ => null).Select(p => p.Entry.Name)];
+            [.. InstalledFilter.Apply(list, search, unusedOnly ? InstalledView.Unused : InstalledView.All, Today, _ => ProgramMark.None).Select(p => p.Entry.Name)];
 
         Assert.That(Names(""), Is.EqualTo(new[] { "Acme Editor", "Zeta Tool", "Other" }));
         Assert.That(Names("GITHUB"), Is.EqualTo(new[] { "Acme Editor" }));
@@ -164,7 +164,7 @@ public class UnusedApplicationTests
             [@"C:\Apps\Undated\uninstall.exe"] = null,
         };
 
-        string[] Names(InstalledView view) => [.. InstalledFilter.Apply(list, "", view, Today, f => signed.GetValueOrDefault(f)).Select(p => p.Entry.Name)];
+        string[] Names(InstalledView view) => [.. InstalledFilter.Apply(list, "", view, Today, f => ProgramMarks.Of(signed.GetValueOrDefault(f), false, true)).Select(p => p.Entry.Name)];
 
         Assert.Multiple(() =>
         {

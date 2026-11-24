@@ -12,16 +12,20 @@ public sealed record ExtensionHost(string Name, string Executable, string Cli);
 public sealed record InstalledExtension(ExtensionHost Host, string Id, string? Version, string? Publisher, DateTimeOffset? Updated);
 
 /// <summary>A program Windows starts at log-on.</summary>
-/// <param name="Where">Where the entry is: <c>Run key</c>, <c>machine Run key</c> or <c>Startup folder</c>.</param>
+/// <param name="Where">Where the entry is: <c>Run key</c>, <c>machine Run key</c>, <c>Startup folder</c> or <c>scheduled task</c>.</param>
 /// <param name="Path">The executable it starts, or <c>null</c> when it couldn't be resolved.</param>
 /// <param name="Signed">Whether the file has a valid Authenticode signature; <c>null</c> when it couldn't be checked.</param>
-/// <param name="Item">What Windows calls the entry to turn it off: the Run value's name, or the Startup folder file's name.</param>
+/// <param name="Item">What Windows calls the entry to turn it off: the Run value's name, or the Startup folder file's name; <c>null</c> for a scheduled task.</param>
 /// <param name="InTray">Whether the program has an icon in the notification area: used from there, which Windows doesn't record, so its last use is unknown.</param>
-public sealed record StartupEntry(string Name, string Where, string? Path, bool? Signed, string? Item = null, bool InTray = false)
+/// <param name="On">Whether it starts: <c>false</c> once turned off in Task Manager or Settings, or for a disabled task.</param>
+/// <param name="BuiltByYou">It has no signature and looks like the user's own build (<see cref="OwnBuild.Looks"/>).</param>
+public sealed record StartupEntry(string Name, string Where, string? Path, bool? Signed, string? Item = null, bool InTray = false, bool On = true,
+    bool BuiltByYou = false)
 {
     public const string RunKey = "Run key";
     public const string MachineRunKey = "machine Run key";
     public const string StartupFolder = "Startup folder";
+    public const string ScheduledTask = "scheduled task";
 }
 
 /// <summary>When a program last ran for the user, as Windows records it.</summary>
@@ -44,6 +48,12 @@ public sealed record DisableStartup(string Name, string Where, string Item) : Do
 
     /// <summary>Whether <paramref name="item"/> names one value and nothing else: it comes from the registry or a folder any program can write.</summary>
     public static bool IsSafeItem(string item) => item.Length is > 0 and < 260 && item.IndexOfAny(['\\', '/', '\0']) < 0;
+}
+
+/// <summary>Look over what starts at log-on: the app's Startup list, which also turns entries off.</summary>
+public sealed record ReviewStartup : DoctorFix
+{
+    public override string Instruction => "review it in Tiresias, Startup, or in Settings, Apps, Startup";
 }
 
 /// <summary>A program that asked Tiresias for a credential and got it, from the local activity and audit logs.</summary>
@@ -80,6 +90,7 @@ public static partial class Doctor
 
     public const string ExtensionKind = "extensions with a reason to doubt them, in programs that use credentials";
     public const string UnsignedStartupKind = "unsigned programs that start at log-on";
+    public const string OwnBuildStartupKind = "programs you built yourself that start at log-on";
     public const string BlockedKind = "blocked programs still on this PC";
     public const string IdleStartupKind = "programs that start at log-on but you haven't opened in 90 days";
 
@@ -124,11 +135,17 @@ public static partial class Doctor
         foreach (var entry in startupEntries.Where(e => e is { Signed: false, Path: not null } && !blockedPaths.Any(b => SamePath(b, e.Path))))
         {
             var reached = recent.Where(u => SamePath(u.Program, entry.Path)).Select(u => u.Service).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-            yield return new($"{entry.Name} starts at log-on unsigned", DoctorStatus.Warn,
-                $"{entry.Path}, from the {entry.Where}, has no valid signature, so nothing says who made it"
-                + (reached.Length > 0 ? $"; it used {string.Join(", ", reached)} through Tiresias in the last 90 days" : "")
-                + ". Check where it came from",
+            var used = reached.Length > 0 ? $"; it used {string.Join(", ", reached)} through Tiresias in the last 90 days" : "";
+            DoctorCheck unsigned = new($"{entry.Name} starts at log-on unsigned", DoctorStatus.Warn,
+                $"{entry.Path}, from the {entry.Where}, has no valid signature, so nothing says who made it{used}. Check where it came from",
                 new RevealFile(entry.Path!), Kind: UnsignedStartupKind);
+            // A developer's own tool started from its build folder: information kept in view, not a warning to dismiss at every rebuild.
+            yield return entry.BuiltByYou
+                ? new DoctorCheck($"{entry.Name} starts at log-on, built by you", DoctorStatus.Ok,
+                    $"{entry.Path}, from the {entry.Where}, has no signature, but it sits in a git work tree beside the project that builds it, "
+                    + $"so it looks like your own build{used}",
+                    new ReviewStartup(), Kind: OwnBuildStartupKind) { WithoutDeveloperTools = unsigned }
+                : unsigned;
         }
 
         // Only what the user opened: a program started at log-on runs at every log-on.
