@@ -192,7 +192,8 @@ static partial class SurfaceProbe
                     uninstaller is not null && File.Exists(uninstaller), folder is not null && Directory.Exists(folder), command,
                     own, own is not null && (unseen.Any(p => SameOrUnder(p, own)) || HasDriver(own)),
                     key.GetValue("DisplayIcon") is string { Length: > 0 } icon ? Environment.ExpandEnvironmentVariables(icon) : null,
-                    key.GetValue("Publisher") as string is { Length: > 0 } publisher ? publisher.Trim() : null));
+                    key.GetValue("Publisher") as string is { Length: > 0 } publisher ? publisher.Trim() : null,
+                    UninstallEntry.ParseInstallDate(key.GetValue("InstallDate") as string) ?? CreatedOn(own)));
             }
         }
         return entries;
@@ -200,6 +201,19 @@ static partial class SurfaceProbe
 
     static bool SameOrUnder(string path, string folder) =>
         path.TrimEnd('\\').Equals(folder.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase) || Tiresias.UserSecrets.ProjectIndex.IsUnder(path, folder);
+
+    /// <summary>When a program's own folder was created, for an entry without an <c>InstallDate</c>.</summary>
+    static DateOnly? CreatedOn(string? folder)
+    {
+        try
+        {
+            return folder is not null && Directory.Exists(folder) ? DateOnly.FromDateTime(Directory.GetCreationTime(folder)) : null;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
 
     /// <summary>Whether a folder holds a driver package, which Windows loads without anyone opening it.</summary>
     static bool HasDriver(string folder)

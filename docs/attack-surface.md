@@ -324,8 +324,13 @@ from a local file only, never a network path; selecting one shows
 the rest below the list, and a search box matches every word against name, version, folder and
 services. The selected program's panel also shows the publisher its entry claims and who signed
 its program file (the `.exe` its icon comes from, else its uninstaller), checked offline with
-WinVerifyTrust when it is selected; a name from a signature that doesn't verify is shown as a
-claim only. **Search online...** opens the browser with a web search for the name and version, on
+WinVerifyTrust; a name from a signature that doesn't verify is shown as a
+claim only. After the list shows, every program file's signature is checked in the background, a
+few at a time, and a program whose file has no valid signature gets a quiet caution mark at the end
+of its name; one that couldn't be checked (a part of Windows, a Store app, no file) is never called
+unsigned. A program installed in the last 14 days gets a **New** mark: its entry's `InstallDate`
+(`yyyyMMdd`), else when its own folder was created. **Show** picks all programs, not opened in 90
+days, not signed, or installed in the last 14 days, and the summary counts each. **Search online...** opens the browser with a web search for the name and version, on
 the user's click only; Tiresias itself sends nothing. Uninstalling goes through Settings, Apps, Installed apps
 (`UninstallApp`) until the inventory knows each program's installer command.
 [Guided setup](guided-setup.md#phases) lists what is still design.
