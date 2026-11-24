@@ -63,7 +63,19 @@ public partial class SecretsPage : UserControl
 /// <param name="Detail">Where the project is, or why no project is named: one line however many checkouts use it.</param>
 /// <param name="Paths">Every project file using the id, shown on demand.</param>
 /// <param name="Content">What its file holds, read without unlocking: a sealed file counts as secrets.</param>
-public sealed record ProjectChoice(string Id, string Label, string Group, string Detail, bool Known, IReadOnlyList<string> Paths, SecretsContent Content);
+/// <param name="Name">The label without its state, which the list shows beside a mark of its own.</param>
+public sealed record ProjectChoice(string Id, string Label, string Group, string Detail, bool Known, IReadOnlyList<string> Paths, SecretsContent Content,
+    string Name, ProjectState State)
+{
+    public string StateText => Text.Get(State switch
+    {
+        ProjectState.Sealed => "Secrets_State_Sealed",
+        ProjectState.NotSealed => "Secrets_State_NotSealed",
+        ProjectState.Settings => "Secrets_State_Settings",
+        ProjectState.Empty => "Secrets_State_Empty",
+        _ => "Secrets_State_Invalid",
+    });
+}
 
 public sealed partial class SecretRow : ObservableObject
 {
@@ -165,6 +177,10 @@ public sealed partial class SecretsViewModel : ObservableObject
 
     [ObservableProperty]
     public partial string ScanStatus { get; set; } = "";
+
+    /// <summary>What the side bar's count is made of: how many folders are sealed, not yet, settings only or empty.</summary>
+    [ObservableProperty]
+    public partial string Stats { get; set; } = "";
 
     [ObservableProperty]
     public partial string RecycleUnusedLabel { get; set; } = "";
@@ -535,6 +551,7 @@ public sealed partial class SecretsViewModel : ObservableObject
         Folders.Clear();
         foreach (var path in index.Folders)
             Folders.Add(path);
+        Stats = StatsLine(SecretsStats.Of(folders.Select(f => SecretsStats.StateOf(f.Kind, f.Content))));
         HasUnused = unused.Count > 0;
         RecycleUnusedLabel = Text.Format("Secrets_RecycleUnused", unused.Count);
         HasEmpty = empties.Count > 0;
@@ -565,7 +582,18 @@ public sealed partial class SecretsViewModel : ObservableObject
             : paths.OnlyCheckouts ? Text.Format("Secrets_DetailCheckouts", paths.First, paths.Copies)
             : paths.More > 0 ? Text.Format("Secrets_DetailMore", paths.First, paths.More)
             : paths.First;
-        return new(entry.Id, label, Text.Get(entry.Known ? "Secrets_GroupProjects" : "Secrets_GroupUnknown"), detail, entry.Known, entry.Paths, file.Content);
+        return new(entry.Id, label, Text.Get(entry.Known ? "Secrets_GroupProjects" : "Secrets_GroupUnknown"), detail, entry.Known, entry.Paths, file.Content,
+            name, SecretsStats.StateOf(file.Kind, file.Content));
+    }
+
+    static string StatsLine(SecretsStats stats)
+    {
+        var parts = new (int Count, string Key)[]
+        {
+            (stats.Sealed, "Secrets_Stats_Sealed"), (stats.NotSealed, "Secrets_Stats_NotSealed"), (stats.Settings, "Secrets_Stats_Settings"),
+            (stats.Empty, "Secrets_Stats_Empty"), (stats.Invalid, "Secrets_Stats_Invalid"),
+        };
+        return Text.Format("Secrets_Stats", stats.Total, string.Join(", ", parts.Where(p => p.Count > 0).Select(p => Text.Format(p.Key, p.Count))));
     }
 
     IReadOnlyList<KeyValuePair<string, string>> Edited() =>

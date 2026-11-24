@@ -22,6 +22,7 @@ public class SecretsContentTests
     [TestCase("""{"Logging": {"LogLevel": {"Default": "Debug", "Microsoft": "Warning"}}}""")]
     [TestCase("""{"Api:BaseUrl": "https://api.example.com/v2/"}""")]
     [TestCase("""{"Hosts": ["http://localhost:5000", "https://example.com"], "Port": 443,}""")]
+    [TestCase("""{"ConnectionStrings": {"Db": "tiresias:sql/shop-db/app"}, "Raven": "tiresias:raven/docs"}""")]
     public void A_file_of_values_that_cant_be_credentials_holds_settings(string text) =>
         Assert.That(SecretsContents.OfFile(text), Is.EqualTo(SecretsContent.Settings));
 
@@ -35,6 +36,7 @@ public class SecretsContentTests
     [TestCase("""{"Default": "Debug"}""")]
     [TestCase("""{"Enabled": true, "ApiKey": "sk-1"}""")]
     [TestCase("""{"Name": "anything"}""")]
+    [TestCase("""{"Db": "tiresias:nope/x"}""")]
     public void A_value_that_may_be_a_credential_makes_the_file_hold_secrets(string text) =>
         Assert.That(SecretsContents.OfFile(text), Is.EqualTo(SecretsContent.Secrets));
 

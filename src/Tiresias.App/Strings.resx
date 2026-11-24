@@ -2434,6 +2434,40 @@ Close them, then choose the update in the tray menu again.</value>
   <data name="Secrets_ProjectEmpty" xml:space="preserve">
     <value>{0} (empty)</value>
   </data>
+  <data name="Secrets_State_Sealed" xml:space="preserve">
+    <value>sealed</value>
+  </data>
+  <data name="Secrets_State_NotSealed" xml:space="preserve">
+    <value>not sealed yet</value>
+  </data>
+  <data name="Secrets_State_Settings" xml:space="preserve">
+    <value>settings only</value>
+  </data>
+  <data name="Secrets_State_Empty" xml:space="preserve">
+    <value>empty</value>
+  </data>
+  <data name="Secrets_State_Invalid" xml:space="preserve">
+    <value>not valid JSON</value>
+  </data>
+  <data name="Secrets_Stats" xml:space="preserve">
+    <value>{0} user-secrets folders: {1}</value>
+    <comment>{1}: the counts below, joined</comment>
+  </data>
+  <data name="Secrets_Stats_Sealed" xml:space="preserve">
+    <value>{0} sealed</value>
+  </data>
+  <data name="Secrets_Stats_NotSealed" xml:space="preserve">
+    <value>{0} not sealed yet</value>
+  </data>
+  <data name="Secrets_Stats_Settings" xml:space="preserve">
+    <value>{0} settings only</value>
+  </data>
+  <data name="Secrets_Stats_Empty" xml:space="preserve">
+    <value>{0} empty</value>
+  </data>
+  <data name="Secrets_Stats_Invalid" xml:space="preserve">
+    <value>{0} not valid JSON</value>
+  </data>
   <data name="Secrets_EmptyFolders" xml:space="preserve">
     <value>{0} empty folders: show</value>
   </data>

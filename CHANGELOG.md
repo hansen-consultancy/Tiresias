@@ -29,6 +29,10 @@ its section below.
   as their working folder, which blocked Velopack from swapping the files. Before applying an
   update, the app names any program still using that folder and asks you to close it. If an update
   still couldn't be applied, the next start says so instead of quietly running the earlier version.
+- The user-secrets list marks each project's state (sealed, not sealed yet, settings only, empty)
+  so they stand apart, and a line under it counts each. A project whose secrets file holds only
+  `tiresias:` references counts as settings only instead of "not sealed yet": a reference holds no
+  secret, so `tir doctor` no longer warns about it either.
 
 ## [0.3.0] - 2026-11-23
 
