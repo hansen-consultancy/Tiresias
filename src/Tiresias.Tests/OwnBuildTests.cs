@@ -21,7 +21,7 @@ public class OwnBuildTests
         public bool Exists(string path) => exists.Contains(path);
 
         public IEnumerable<string> FileNames(string folder) =>
-            exists.Where(p => p.StartsWith(folder + @"\", StringComparison.OrdinalIgnoreCase) && !p[(folder.Length + 1)..].Contains('\\'))
+            exists.Where(p => p.StartsWith(folder + @"\", StringComparison.OrdinalIgnoreCase) && !p[(folder.Length + 1)..].Contains('\\', StringComparison.Ordinal))
                 .Select(p => p[(folder.Length + 1)..]);
 
         public bool OwnedByYou(string file) => owned;
