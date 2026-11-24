@@ -31,12 +31,12 @@ design and issue. A PR that finishes, starts or adds an item edits this page in 
 - [ ] Decoys: canary credentials that point home, and tripwires on decoy files
       ([design](decoys.md), #39). Canary credentials, the read tripwire, the Home card and
       decoys held by the admin tier built
-- [ ] Optional admin tier: a privileged service for what the user account can't protect
-      ([design](admin-tier.md), #91). Steps 1-2 built (the service, its pipe, setup; holding the
-      decoys from boot); steps 3-5 in review (decoy read auditing, freezing a program that used a
-      decoy and blocking its network, lastrun from BAM and Prefetch)
-- [ ] Out-of-band alerts: ntfy, LcdHub and a webhook, public by default ([design](alerts.md), #101).
-      The planner, the webhook and ntfy built; LcdHub and the other events in review
+- [x] Optional admin tier: a privileged service for what the user account can't protect
+      ([design](admin-tier.md), #91): the service, its pipe and setup, holding the decoys from
+      boot, decoy read auditing, freezing a program that used a decoy and blocking its network,
+      lastrun from BAM and Prefetch
+- [x] Out-of-band alerts: ntfy, LcdHub and a webhook, public by default ([design](alerts.md), #101),
+      every event wired, failing sinks reported, signed webhooks, a heartbeat and an LcdHub alert frame
 - [x] Secrets reachable in containers, WSL and VMs from the user's account
       ([design](containers-and-vms.md), #113): what your account can open, devcontainer files and
       forwarding, Docker engine, WSL and Hyper-V contents, and [devcontainers that ask](devcontainers.md)
