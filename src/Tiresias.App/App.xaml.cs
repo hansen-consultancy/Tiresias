@@ -262,7 +262,7 @@ public partial class App : Application
                 : facts with { SealedWithoutKey = RecoveryRestore.AnythingSealed() };
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidDataException
-            or InvalidOperationException or System.Security.Cryptography.CryptographicException)
+            or InvalidOperationException or System.Security.Cryptography.CryptographicException or System.Security.SecurityException)
         {
             return facts with { RecoveryError = e.Message };
         }

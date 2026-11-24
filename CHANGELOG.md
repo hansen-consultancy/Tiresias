@@ -33,6 +33,12 @@ its section below.
 
 ### Fixed
 
+- **Enrolling or replacing a recovery key needs an administrator's confirmation.** The paper key
+  that can restore your sealed secrets is now recorded per Windows account in a store only an
+  administrator can change. Setting one up or replacing it starts a small helper, `tiresias-recovery`,
+  behind a UAC prompt; it shows the account and the old and new keys' fingerprints and changes
+  nothing unless you answer Yes. Activity lists each approved or refused enrollment, so a program
+  running as you can no longer swap in a paper key of its own unnoticed.
 - The **Environment variables** page no longer ticks the decoy variables Tiresias placed
   (`ADMIN_API_URL`, `ADMIN_API_TOKEN`) as secrets to seal: they are listed as decoys and sealing
   passes them over, as do `tir env list` and `tir env protect`. A real variable of the same name, with another value, is still a secret. The
