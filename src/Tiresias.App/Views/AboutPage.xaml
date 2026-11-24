@@ -3,20 +3,20 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:l="clr-namespace:Tiresias.App"
         xmlns:v="clr-namespace:Tiresias.App.Views">
+  <!-- One scrolling body and a fixed footer (docs/app-design.md, rule 2): the release notes grow with the page
+       instead of taking whatever height is left, so a short window still reaches every card. -->
   <Grid Margin="{StaticResource PagePadding}">
     <Grid.RowDefinitions>
-      <RowDefinition Height="Auto" />
-      <RowDefinition Height="Auto" />
-      <RowDefinition Height="Auto" />
-      <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
       <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
-    <TextBlock Grid.Row="0" x:Name="Heading" Style="{StaticResource TitleText}" AutomationProperties.HeadingLevel="Level1" />
-    <TextBlock Grid.Row="1" x:Name="Summary" Style="{StaticResource BodyText}" />
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Focusable="False">
+    <StackPanel>
+    <TextBlock x:Name="Heading" Style="{StaticResource TitleText}" AutomationProperties.HeadingLevel="Level1" />
+    <TextBlock x:Name="Summary" Style="{StaticResource BodyText}" />
 
-    <StackPanel Grid.Row="2">
+    <StackPanel>
     <!-- Settings that used to fill Home's banner (docs/app-design.md, rule 5). -->
     <Border Style="{StaticResource Card}">
       <StackPanel>
@@ -26,16 +26,21 @@
     </Border>
     <!-- Developer tools appear on a developer's PC; this overrides the detection (docs/developer-tools.md). -->
     <Border Style="{StaticResource Card}">
+      <!-- The choice beside its heading; why it shows and what it covers in one caption below. -->
       <StackPanel>
-        <TextBlock Text="{l:S DevTools_Heading}" Style="{StaticResource SubtitleText}" AutomationProperties.HeadingLevel="Level2" />
-        <ComboBox x:Name="DeveloperToolsBox" HorizontalAlignment="Left" MinWidth="280" Margin="0,4,0,0" SelectionChanged="OnDeveloperTools"
-                  AutomationProperties.Name="{l:S DevTools_Heading}">
-          <ComboBoxItem Content="{l:S DevTools_Auto}" />
-          <ComboBoxItem Content="{l:S DevTools_On}" />
-          <ComboBoxItem Content="{l:S DevTools_Off}" />
-        </ComboBox>
-        <TextBlock x:Name="DeveloperToolsReason" Style="{StaticResource BodyText}" Margin="0,6,0,0" />
-        <TextBlock Text="{l:S DevTools_Note}" Style="{StaticResource CaptionText}" />
+        <DockPanel>
+          <ComboBox x:Name="DeveloperToolsBox" DockPanel.Dock="Right" MinWidth="260" Margin="12,0,0,0" SelectionChanged="OnDeveloperTools"
+                    VerticalAlignment="Center" AutomationProperties.Name="{l:S DevTools_Heading}">
+            <ComboBoxItem Content="{l:S DevTools_Auto}" />
+            <ComboBoxItem Content="{l:S DevTools_On}" />
+            <ComboBoxItem Content="{l:S DevTools_Off}" />
+          </ComboBox>
+          <TextBlock Text="{l:S DevTools_Heading}" Style="{StaticResource SubtitleText}" Margin="0" VerticalAlignment="Center"
+                     AutomationProperties.HeadingLevel="Level2" />
+        </DockPanel>
+        <TextBlock Style="{StaticResource CaptionText}" Margin="0,6,0,0">
+          <Run x:Name="DeveloperToolsReason" /> <Run Text="{l:S DevTools_Note}" />
+        </TextBlock>
       </StackPanel>
     </Border>
     <!-- Out-of-band alerts (docs/alerts.md): adding a sink is a sealed save behind Windows Hello; muting and removing are not. -->
@@ -71,16 +76,21 @@
     </Border>
     <!-- The optional admin tier (docs/admin-tier.md): its state, and set up, update or remove, each behind a UAC prompt. -->
     <Border Style="{StaticResource Card}">
-      <StackPanel>
-        <TextBlock Text="{l:S About_AdminTier_Heading}" Style="{StaticResource SubtitleText}" AutomationProperties.HeadingLevel="Level2" />
-        <TextBlock x:Name="AdminTierText" Text="{l:S About_AdminTier_Checking}" Style="{StaticResource BodyText}" />
-        <TextBlock x:Name="AdminTierOutcome" Style="{StaticResource CaptionText}" AutomationProperties.LiveSetting="Polite" />
-        <StackPanel Orientation="Horizontal">
-          <Button x:Name="AdminTierSetUp" Content="{l:S About_AdminTier_SetUp}" Padding="12,6" Margin="0,0,8,0" Visibility="Collapsed" Click="OnAdminTierInstall" />
-          <Button x:Name="AdminTierUpdate" Content="{l:S About_AdminTier_Update}" Padding="12,6" Margin="0,0,8,0" Visibility="Collapsed" Click="OnAdminTierInstall" />
-          <Button x:Name="AdminTierRemove" Content="{l:S About_AdminTier_Remove}" Padding="12,6" Visibility="Collapsed" Click="OnAdminTierRemove" />
+      <!-- State and buttons on one row; what it is for, in one caption, whatever the state. -->
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top" Margin="12,0,0,0">
+          <Button x:Name="AdminTierSetUp" Content="{l:S About_AdminTier_SetUp}" Padding="12,6" Margin="8,0,0,0" Visibility="Collapsed" Click="OnAdminTierInstall" />
+          <Button x:Name="AdminTierUpdate" Content="{l:S About_AdminTier_Update}" Padding="12,6" Margin="8,0,0,0" Visibility="Collapsed" Click="OnAdminTierInstall" />
+          <Button x:Name="AdminTierRemove" Content="{l:S About_AdminTier_Remove}" Padding="12,6" Margin="8,0,0,0" Visibility="Collapsed" Click="OnAdminTierRemove" />
         </StackPanel>
-      </StackPanel>
+        <StackPanel>
+          <TextBlock Style="{StaticResource SubtitleText}" AutomationProperties.HeadingLevel="Level2">
+            <Run Text="{l:S About_AdminTier_Heading}" /><Run Text=" - " /><Run x:Name="AdminTierText" Text="{l:S About_AdminTier_Checking}" FontWeight="Normal" />
+          </TextBlock>
+          <TextBlock Text="{l:S About_AdminTier_What}" Style="{StaticResource CaptionText}" />
+          <TextBlock x:Name="AdminTierOutcome" Style="{StaticResource CaptionText}" AutomationProperties.LiveSetting="Polite" />
+        </StackPanel>
+      </DockPanel>
     </Border>
     <Border Style="{StaticResource Card}">
       <ItemsControl x:Name="Facts" Focusable="False">
@@ -102,11 +112,12 @@
     </Border>
     </StackPanel>
 
-    <TextBlock Grid.Row="3" x:Name="NotesHeading" Style="{StaticResource SubtitleText}" />
-    <TextBox Grid.Row="4" x:Name="Notes" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
-             AutomationProperties.Name="{Binding Text, ElementName=NotesHeading}" />
+    <TextBlock x:Name="NotesHeading" Style="{StaticResource SubtitleText}" />
+    <TextBox x:Name="Notes" IsReadOnly="True" TextWrapping="Wrap" AutomationProperties.Name="{Binding Text, ElementName=NotesHeading}" />
+    </StackPanel>
+    </ScrollViewer>
 
-    <Grid Grid.Row="5" Margin="0,16,0,0">
+    <Grid Grid.Row="1" Margin="0,16,0,0">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*" />
         <ColumnDefinition Width="Auto" />
