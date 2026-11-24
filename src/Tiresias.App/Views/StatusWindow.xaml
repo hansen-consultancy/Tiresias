@@ -108,7 +108,7 @@
               <WrapPanel Margin="0,10,0,0" Visibility="{Binding ActionsVisibility}">
                 <Button Style="{DynamicResource AccentButtonStyle}" Padding="12,4" Margin="0,0,8,0" Content="{Binding FixLabel}"
                         AutomationProperties.Name="{Binding FixName}" Visibility="{Binding FixVisibility}" Click="OnReview" />
-                <ToggleButton x:Name="DetailsToggle" Padding="12,4" Margin="0,0,8,0" Background="Transparent" BorderThickness="0"
+                <ToggleButton x:Name="DetailsToggle" Style="{StaticResource DisclosureToggle}" Margin="0,0,8,0"
                               Content="{l:S Finding_Details}" Visibility="{Binding MembersVisibility}" />
                 <Button Padding="12,4" Background="Transparent" BorderThickness="0" Content="{Binding DismissLabel}"
                         AutomationProperties.Name="{Binding DismissName}" Click="OnDismiss" />
@@ -176,17 +176,17 @@
       <ListBoxItem x:Name="NavHome" Tag="Home" DockPanel.Dock="Top">
         <DockPanel><TextBlock Text="&#xE80F;" Style="{StaticResource NavIcon}" /><TextBlock Text="{l:S Nav_Home}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" /></DockPanel>
       </ListBoxItem>
-      <ListBoxItem x:Name="NavSecrets" Tag="Secrets" DockPanel.Dock="Top" Visibility="{Binding SecretsVisibility}">
-        <DockPanel><TextBlock Text="&#xE72E;" Style="{StaticResource NavIcon}" /><TextBlock DockPanel.Dock="Right" Text="{Binding SecretsCount}" Style="{StaticResource NavCount}" /><TextBlock Text="{l:S Nav_Secrets}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" /></DockPanel>
+      <ListBoxItem x:Name="NavSecrets" Tag="Secrets" DockPanel.Dock="Top" Visibility="{Binding SecretsVisibility}" ToolTip="{Binding SecretsCountTip}">
+        <DockPanel><TextBlock Text="&#xE72E;" Style="{StaticResource NavIcon}" /><TextBlock DockPanel.Dock="Right" Text="{Binding SecretsCount}" Style="{StaticResource NavCount}" AutomationProperties.Name="{Binding SecretsCountTip}" /><TextBlock Text="{l:S Nav_Secrets}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" /></DockPanel>
       </ListBoxItem>
-      <ListBoxItem x:Name="NavServices" Tag="Services" DockPanel.Dock="Top" Visibility="{Binding ServicesVisibility}">
-        <DockPanel><TextBlock Text="&#xE968;" Style="{StaticResource NavIcon}" /><TextBlock DockPanel.Dock="Right" Text="{Binding ServicesCount}" Style="{StaticResource NavCount}" /><TextBlock Text="{l:S Nav_Services}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" /></DockPanel>
+      <ListBoxItem x:Name="NavServices" Tag="Services" DockPanel.Dock="Top" Visibility="{Binding ServicesVisibility}" ToolTip="{Binding ServicesCountTip}">
+        <DockPanel><TextBlock Text="&#xE968;" Style="{StaticResource NavIcon}" /><TextBlock DockPanel.Dock="Right" Text="{Binding ServicesCount}" Style="{StaticResource NavCount}" AutomationProperties.Name="{Binding ServicesCountTip}" /><TextBlock Text="{l:S Nav_Services}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" /></DockPanel>
       </ListBoxItem>
-      <ListBoxItem x:Name="NavEnvironment" Tag="Environment" DockPanel.Dock="Top" Visibility="{Binding EnvironmentVisibility}">
-        <DockPanel><TextBlock Text="&#xE8A4;" Style="{StaticResource NavIcon}" /><TextBlock DockPanel.Dock="Right" Text="{Binding VariablesCount}" Style="{StaticResource NavCount}" /><TextBlock Text="{l:S Nav_Environment}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" /></DockPanel>
+      <ListBoxItem x:Name="NavEnvironment" Tag="Environment" DockPanel.Dock="Top" Visibility="{Binding EnvironmentVisibility}" ToolTip="{Binding VariablesCountTip}">
+        <DockPanel><TextBlock Text="&#xE8A4;" Style="{StaticResource NavIcon}" /><TextBlock DockPanel.Dock="Right" Text="{Binding VariablesCount}" Style="{StaticResource NavCount}" AutomationProperties.Name="{Binding VariablesCountTip}" /><TextBlock Text="{l:S Nav_Environment}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" /></DockPanel>
       </ListBoxItem>
-      <ListBoxItem x:Name="NavActivity" Tag="Activity" DockPanel.Dock="Top" Visibility="{Binding ActivityVisibility}">
-        <DockPanel><TextBlock Text="&#xE81C;" Style="{StaticResource NavIcon}" /><TextBlock DockPanel.Dock="Right" Text="{Binding ActivityCount}" Style="{StaticResource NavCount}" /><TextBlock Text="{l:S Nav_Activity}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" /></DockPanel>
+      <ListBoxItem x:Name="NavActivity" Tag="Activity" DockPanel.Dock="Top" Visibility="{Binding ActivityVisibility}" ToolTip="{Binding ActivityCountTip}">
+        <DockPanel><TextBlock Text="&#xE81C;" Style="{StaticResource NavIcon}" /><TextBlock DockPanel.Dock="Right" Text="{Binding ActivityCount}" Style="{StaticResource NavCount}" AutomationProperties.Name="{Binding ActivityCountTip}" /><TextBlock Text="{l:S Nav_Activity}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" /></DockPanel>
       </ListBoxItem>
       <ListBoxItem x:Name="NavInstalled" Tag="Installed" DockPanel.Dock="Top">
         <DockPanel><TextBlock Text="&#xE71D;" Style="{StaticResource NavIcon}" /><TextBlock Text="{l:S Nav_Installed}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" /></DockPanel>
@@ -325,10 +325,13 @@
             <StackPanel>
               <TextBlock Text="{l:S Reach_Title}" Style="{StaticResource SubtitleText}" />
               <TextBlock Text="{Binding ReachText}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
-              <CheckBox Content="{l:S Reach_Daily}" IsChecked="{Binding IsReachDaily}" Visibility="{Binding ReachDailyVisibility}" Margin="0,6,0,0" />
             </StackPanel>
-            <Button Grid.Column="1" VerticalAlignment="Center" Padding="12,6" Margin="12,0,0,0" MinWidth="96"
-                    Content="{l:S Reach_CheckNow}" Click="OnLookInside" />
+            <!-- The daily choice sits beside the button it repeats, so the card stays one row high. -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+              <CheckBox Content="{l:S Reach_Daily}" IsChecked="{Binding IsReachDaily}" Visibility="{Binding ReachDailyVisibility}"
+                        VerticalAlignment="Center" Margin="0,0,12,0" />
+              <Button Padding="12,6" MinWidth="96" Content="{l:S Reach_CheckNow}" Click="OnLookInside" VerticalAlignment="Center" />
+            </StackPanel>
           </Grid>
         </Border>
 
@@ -337,14 +340,22 @@
           <StackPanel>
             <TextBlock x:Name="DecoysTitle" Text="{l:S Decoys_Title}" Style="{StaticResource SubtitleText}" />
             <TextBlock Text="{l:S Decoys_Intro}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
-            <ItemsControl ItemsSource="{Binding Decoys}" Focusable="False" AutomationProperties.LabeledBy="{Binding ElementName=DecoysTitle}">
+            <ItemsControl ItemsSource="{Binding Decoys}" Focusable="False" Grid.IsSharedSizeScope="True" Margin="0,4,0,0"
+                          AutomationProperties.LabeledBy="{Binding ElementName=DecoysTitle}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                  <StackPanel Margin="0,4">
-                    <TextBlock Text="{Binding Name}" Style="{StaticResource BodyText}" />
-                    <TextBox Text="{Binding Where, Mode=OneWay}" Style="{StaticResource SelectableText}" />
-                    <TextBlock Text="{Binding Since}" Style="{StaticResource CaptionText}" />
-                  </StackPanel>
+                  <!-- One line per decoy: what it is, where (selectable), since when. -->
+                  <Grid Margin="0,2">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="Auto" SharedSizeGroup="DecoyName" />
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding Name}" FontSize="14" VerticalAlignment="Center" Margin="0,0,16,0" />
+                    <TextBox Grid.Column="1" Text="{Binding Where, Mode=OneWay}" Style="{StaticResource SelectableText}" FontSize="12"
+                             TextWrapping="NoWrap" VerticalAlignment="Center" ToolTip="{Binding Where}" />
+                    <TextBlock Grid.Column="2" Text="{Binding Since}" Style="{StaticResource CaptionText}" VerticalAlignment="Center" Margin="16,0,0,0" />
+                  </Grid>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>

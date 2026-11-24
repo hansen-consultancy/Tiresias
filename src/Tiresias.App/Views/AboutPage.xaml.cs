@@ -184,7 +184,6 @@ public partial class AboutPage : UserControl
         var view = DeveloperSignals.View();
         DeveloperToolsReason.Text = view.Because.Count > 0 ? Text.Format("DevTools_Because", DeveloperSignals.Reasons(view))
             : view.Shown ? "" : AppSettings.Load().DeveloperTools == DeveloperToolsSetting.Auto ? Text.Get("DevTools_NotFound") : "";
-        DeveloperToolsReason.Visibility = DeveloperToolsReason.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     void OnStartWithWindows(object sender, RoutedEventArgs e)

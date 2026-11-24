@@ -29,6 +29,11 @@ its section below.
   as their working folder, which blocked Velopack from swapping the files. Before applying an
   update, the app names any program still using that folder and asks you to close it. If an update
   still couldn't be applied, the next start says so instead of quietly running the earlier version.
+- About scrolls, and its Developer tools and Admin tier cards are shorter; the Admin tier card says
+  what the tier is for. Home's Decoys card lists one decoy per line, and the reach card's
+  **Check daily** sits beside **Check now**. A finding's **Details** toggle stays readable when
+  open. The user-secrets editor no longer shows a white grid in dark mode before you pick a project.
+  Hovering a count in the side bar says what it counts.
 - Home's trust chain check no longer says **Worth a look** after `tir trust bind-hello` when the
   broker runs as the Windows service: it asks the broker for its chain instead of reading a copy
   the service never updates. A check that says to run a `tir` command offers **Copy command**.

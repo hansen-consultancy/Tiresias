@@ -203,6 +203,10 @@ public partial class StatusWindow : Window
 
     internal bool CanLeavePage() => PageHost.Content is not SecretsPage secrets || secrets.CanLeave();
 
+    /// <summary>Opens the place whose nav item has <paramref name="place"/> as its tag (Home, Secrets, About...).</summary>
+    internal void Go(string place) =>
+        Nav.SelectedItem = Nav.Items.OfType<ListBoxItem>().FirstOrDefault(i => string.Equals((string)i.Tag, place, StringComparison.OrdinalIgnoreCase));
+
     void OnNav(object sender, SelectionChangedEventArgs e)
     {
         if (navigating || Nav.SelectedItem is not ListBoxItem { Tag: string place })
@@ -936,6 +940,19 @@ public sealed partial class StatusViewModel : ObservableObject
     [ObservableProperty]
     public partial string ActivityCount { get; set; } = "";
 
+    /// <summary>What each count beside a place counts, as its tooltip and spoken name: a bare number says nothing.</summary>
+    [ObservableProperty]
+    public partial string SecretsCountTip { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string ServicesCountTip { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string VariablesCountTip { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string ActivityCountTip { get; set; } = "";
+
     /// <summary>The counts beside the places; one that can't be read shows nothing rather than a guess.</summary>
     async Task ShowCountsAsync()
     {
@@ -944,9 +961,15 @@ public sealed partial class StatusViewModel : ObservableObject
         ServicesCount = Count(counts.Services);
         VariablesCount = Count(counts.Variables);
         ActivityCount = counts.ActivityToday is { } today ? Text.Format("Nav_ActivityToday", today) : "";
+        SecretsCountTip = Tip("Nav_SecretsCountTip", counts.Secrets);
+        ServicesCountTip = Tip("Nav_ServicesCountTip", counts.Services);
+        VariablesCountTip = Tip("Nav_VariablesCountTip", counts.Variables);
+        ActivityCountTip = Tip("Nav_ActivityCountTip", counts.ActivityToday);
     }
 
     static string Count(int? count) => count?.ToString(CultureInfo.CurrentCulture) ?? "";
+
+    static string Tip(string key, int? count) => count is { } n ? Text.Format(key, n) : "";
 
     IReadOnlySet<HomeArea> areas = new HashSet<HomeArea>();
 

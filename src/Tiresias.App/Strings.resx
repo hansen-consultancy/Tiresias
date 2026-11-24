@@ -76,11 +76,14 @@
   <data name="About_AdminTier_Heading" xml:space="preserve">
     <value>Admin tier (optional)</value>
   </data>
+  <data name="About_AdminTier_What" xml:space="preserve">
+    <value>A small Windows service for what an ordinary account can't do. It keeps your decoys where programs running as you can't reach them, listens for them from the moment Windows starts, names every program that opens a decoy file, and freezes a program that uses a decoy and cuts it off the network until you look. Undoing any of that needs a Windows admin prompt, which a program running as you can't answer.</value>
+  </data>
   <data name="About_AdminTier_Checking" xml:space="preserve">
     <value>Checking...</value>
   </data>
   <data name="About_AdminTier_NotInstalled" xml:space="preserve">
-    <value>Not set up. With your approval at a Windows admin prompt, a small Tiresias service can do what an ordinary account can't. Tiresias works the same without it.</value>
+    <value>Not set up. Setting it up takes one Windows admin prompt; Tiresias works the same without it.</value>
   </data>
   <data name="About_AdminTier_Running" xml:space="preserve">
     <value>Running, version {0}.</value>
@@ -2445,6 +2448,18 @@ Close them, then choose the update in the tray menu again.</value>
   </data>
   <data name="Nav_ActivityToday" xml:space="preserve">
     <value>{0} today</value>
+  </data>
+  <data name="Nav_SecretsCountTip" xml:space="preserve">
+    <value>{0} user-secrets folders on this PC, empty ones included</value>
+  </data>
+  <data name="Nav_ServicesCountTip" xml:space="preserve">
+    <value>{0} services in your vault</value>
+  </data>
+  <data name="Nav_VariablesCountTip" xml:space="preserve">
+    <value>{0} of your user variables in Windows, not sealed: every program you start can read them</value>
+  </data>
+  <data name="Nav_ActivityCountTip" xml:space="preserve">
+    <value>{0} entries in today's activity</value>
   </data>
   <data name="Flyout_Add" xml:space="preserve">
     <value>Add a credential...</value>
