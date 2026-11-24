@@ -75,6 +75,13 @@
     "{{profile}}\\AppData\\Local\\Programs\\Docker\\Docker\\Docker Desktop.exe": "{{now-1d}}",
     "{{profile}}\\AppData\\Local\\Programs\\Azure Data Studio\\azuredatastudio.exe": "{{now-140d}}"
   },
+  // Valid signatures, by program file; the rest are checked for real and, being made up, are unsigned.
+  // Azure Data Studio's lets its unused finding offer to trust its publisher.
+  "signers": {
+    "{{profile}}\\AppData\\Local\\Programs\\Microsoft VS Code\\unins000.exe": "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
+    "{{profile}}\\AppData\\Local\\Programs\\Azure Data Studio\\unins000.exe": "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
+    "{{profile}}\\AppData\\Local\\Programs\\Docker\\Docker\\Docker Desktop Installer.exe": "CN=Docker Inc, O=Docker Inc, L=Palo Alto, S=California, C=US"
+  },
   "secrets": {
     "llm-key": "sk-demo-0000000000000000000000000000",
     "payments-read": "rk_demo_read_000000000000",
