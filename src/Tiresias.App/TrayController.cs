@@ -40,7 +40,7 @@ sealed class TrayController : IDisposable
     public TrayController(App app)
     {
         this.app = app;
-        unlock.Click += async (_, _) => await app.UnlockAsync(interactive: true);
+        unlock.Click += async (_, _) => await app.UnlockAsync(PromptReason.Unlock, interactive: true);
         lockItem.Click += async (_, _) => await app.LockAsync();
         setup.Click += (_, _) => app.ShowWindow<FirstRunWindow>();
         status = Item("Tray_Status", () => app.ShowWindow<StatusWindow>());

@@ -91,7 +91,7 @@ public partial class AboutPage : UserControl
     async void OnAlertAdd(object sender, RoutedEventArgs e)
     {
         // Adding widens what leaves the machine: it is a sealed save, so it needs Windows Hello.
-        if (!App.Current.Host.Keys.IsUnlocked && !(await App.Current.UnlockAsync(interactive: true)).Ok)
+        if (!App.Current.Host.Keys.IsUnlocked && !(await App.Current.UnlockAsync(PromptReason.Alerts, interactive: true)).Ok)
             return;
         var form = sender == AlertsAddNtfy ? SinkForm.Ntfy : sender == AlertsAddLcdHub ? SinkForm.LcdHub : SinkForm.Webhook;
         var window = new AlertSinkWindow(form) { Owner = Window.GetWindow(this) };

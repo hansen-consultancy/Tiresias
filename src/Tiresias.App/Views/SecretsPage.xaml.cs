@@ -348,7 +348,7 @@ public sealed partial class SecretsViewModel : ObservableObject
     [RelayCommand]
     async Task UnlockAsync()
     {
-        var (ok, _) = await App.Current.UnlockAsync(interactive: true);
+        var (ok, _) = await App.Current.UnlockAsync(PromptReason.Secrets, interactive: true);
         if (ok)
             await OpenAsync();
     }

@@ -81,6 +81,8 @@ public partial class App : Application
         if (demo is not null)
             unlockAtStart = Demo.Start(demo);
 #endif
+        // After the demo seals its made-up secrets, which is no prompt the user should see a reason for.
+        HelloPrompts.Announce = why => PromptCardWindow.Show(why as PromptReason ?? PromptReason.Unnamed, PromptKind.Hello);
 
         consent = new ConsentPresenter(Dispatcher);
         // Before the agent starts: the solo broker audits a trust chain it rejects at startup.
@@ -88,7 +90,7 @@ public partial class App : Application
         var alertCenter = alerts.Center;
         guard = new ProgramGuard();
         host = new AgentHost(consent, guard.CheckAsync);
-        consent.Unlock = async () => (await UnlockAsync(interactive: true)).Ok;
+        consent.Unlock = async program => (await UnlockAsync(PromptReason.ProgramAsked(program), interactive: true)).Ok;
         consent.Gate = guard.Decide;
         consent.SessionLocked = () => sessionLocked;
         consent.Alert = (kind, asker, names) => _ = Task.Run(() => alertCenter.Raise(
@@ -157,12 +159,12 @@ public partial class App : Application
             updates.Start();
         FindingWatch.Start();
         if (unlockAtStart)
-            _ = UnlockAsync(interactive: true);
+            _ = UnlockAsync(PromptReason.UnlockAtStart, interactive: true);
 
         if (FirstRunPlan.Needed(SetupFacts()))
             ShowWindow<FirstRunWindow>();
         else if (host.SoloBrokerProblem is not null)
-            ProblemWindow.Show(ProblemKind.SoloBrokerDown, host.SoloBrokerProblem, retry: () => _ = UnlockAsync(interactive: true));
+            ProblemWindow.Show(ProblemKind.SoloBrokerDown, host.SoloBrokerProblem, retry: () => _ = UnlockAsync(PromptReason.Unlock, interactive: true));
     }
 
     /// <summary>
@@ -316,11 +318,13 @@ public partial class App : Application
 
     /// <summary>The Windows Hello prompt, then the lease. Interactive: problems get a window with a way forward.</summary>
     /// <returns>Whether the agent ended up unlocked, and what to tell <c>tir</c>.</returns>
-    internal async Task<(bool Ok, string Message)> UnlockAsync(bool interactive)
+    internal async Task<(bool Ok, string Message)> UnlockAsync(PromptReason why, bool interactive)
     {
         // After "This wasn't me" only the user, from the app, unlocks: tir, a terminal or NuGet asking can't.
         if (!interactive && guard!.Current.LockedDown)
             return (false, Text.Get("Lockdown_UnlockFromApp"));
+        // A caller joining an unlock under way sees the first caller's reason: there is one prompt.
+        using var because = HelloPrompts.Because(why);
         try
         {
             var result = await unlocking.RunAsync(host!.UnlockAsync);
@@ -330,7 +334,7 @@ public partial class App : Application
                 AppLog.Info($"unlocked, lease not opened: {result.Message}");
                 if (interactive)
                     ProblemWindow.Show(host.SoloBrokerProblem is not null ? ProblemKind.SoloBrokerDown : ProblemKind.BrokerRefused, result.Message,
-                        retry: () => _ = UnlockAsync(true), openStatus: () => ShowWindow<StatusWindow>());
+                        retry: () => _ = UnlockAsync(why, true), openStatus: () => ShowWindow<StatusWindow>());
                 return (true, Text.Format("Unlock_NoLease", result.Message));
             }
             if (interactive)
@@ -342,7 +346,7 @@ public partial class App : Application
         {
             Refresh();
             if (interactive)
-                ProblemWindow.Show(e, "unlock", retry: () => _ = UnlockAsync(true), finishSetup: ShowHome);
+                ProblemWindow.Show(e, "unlock", retry: () => _ = UnlockAsync(why, true), finishSetup: ShowHome);
             else
                 AppLog.Error(e, "unlock from tir");
             return (false, e.Message);
@@ -580,7 +584,7 @@ public partial class App : Application
             case ControlRequest.NuGetCredential:
                 return await NuGetCredentialAsync(request, caller, ct);
             case ControlRequest.Unlock:
-                var (ok, message) = await Dispatcher.InvokeAsync(() => UnlockAsync(interactive: false)).Task.Unwrap();
+                var (ok, message) = await Dispatcher.InvokeAsync(() => UnlockAsync(PromptReason.ProgramAsked(TirCaller(caller).Image), interactive: false)).Task.Unwrap();
                 return new(ok, message);
             case ControlRequest.Lock:
                 await Dispatcher.InvokeAsync(LockAsync).Task.Unwrap();
@@ -596,7 +600,7 @@ public partial class App : Application
         var caller = client.Image;
         if (!host!.Keys.IsUnlocked)
         {
-            var (unlocked, message) = await Dispatcher.InvokeAsync(() => UnlockAsync(interactive: false)).Task.Unwrap();
+            var (unlocked, message) = await Dispatcher.InvokeAsync(() => UnlockAsync(PromptReason.ProgramAsked(TirCaller(client).Image), interactive: false)).Task.Unwrap();
             if (!unlocked)
                 return new(false, message);
         }
@@ -674,7 +678,7 @@ public partial class App : Application
             return new(true, Approved: false);
         if (!host.Keys.IsUnlocked)
         {
-            var (unlocked, message) = await Dispatcher.InvokeAsync(() => UnlockAsync(interactive: false)).Task.Unwrap();
+            var (unlocked, message) = await Dispatcher.InvokeAsync(() => UnlockAsync(PromptReason.ProgramAsked(shell.Program), interactive: false)).Task.Unwrap();
             if (!unlocked)
             {
                 shells.Refuse(shell, policy.Scope);
@@ -771,7 +775,7 @@ public partial class App : Application
             return Refuse(refused);
         if (!host!.Keys.IsUnlocked)
         {
-            var (unlocked, message) = await Dispatcher.InvokeAsync(() => UnlockAsync(interactive: false)).Task.Unwrap();
+            var (unlocked, message) = await Dispatcher.InvokeAsync(() => UnlockAsync(PromptReason.ProgramAsked(program.Program), interactive: false)).Task.Unwrap();
             if (!unlocked)
                 return new(false, message);
         }

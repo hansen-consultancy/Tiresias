@@ -1,5 +1,6 @@
 using System.Windows;
 using Tiresias.Agent;
+using Tiresias.App.Logic;
 using Tiresias.App.Views;
 using Tiresias.Policy;
 using Tiresias.Vault;
@@ -35,6 +36,7 @@ static class PolicyApproval
         if (ask is var (title, body) && !AskWindow.Confirm(owner, Text.Get(title), Text.Format(body, string.Join(Environment.NewLine, change.Lines)),
                 Text.Get("Policy_Approve")))
             return false;
+        using var because = HelloPrompts.Because(PromptReason.ApproveChange);
         await Task.Run(() =>
         {
             using var fresh = HelloKeyWrapper.Open(create: false);

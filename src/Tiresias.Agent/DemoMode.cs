@@ -13,6 +13,9 @@ namespace Tiresias.Agent;
 /// </summary>
 public static class DemoMode
 {
+    /// <summary>How long a demo's Hello or UAC "prompt" takes, so the reason card shown before it can be seen.</summary>
+    public static readonly TimeSpan PromptPause = TimeSpan.FromSeconds(2);
+
 #if DEBUG
     /// <summary>The made-up user's profile folder, while demo mode is on. No real user name in it, so it can be shown.</summary>
     public static string? Profile { get; private set; }

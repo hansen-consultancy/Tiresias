@@ -211,6 +211,49 @@ finding again; today a dismissal outlives any change to the file.
 `ClientPlannerTests` (the Ok line, and a dismissal lapsing when a key is added); and
 `ProjectScanTests` (the picker's order and what it hides).
 
+## 13. A reason before every Windows prompt
+
+**Problem.** Windows Hello's prompt says only that Windows needs to make sure it's you, and UAC
+names the program and its publisher. Neither says what the prompt is for, so a prompt from
+Tiresias unlocking at start, from a program asking for secrets or from an admin-tier step all look
+alike, and a prompt the user didn't expect gives them nothing to judge it by. Windows takes no
+words of ours: `KeyCredential.RequestSignAsync` has no message, `UserConsentVerifier` shows one
+but is not bound to the Tiresias key (its yes proves nothing to the vault), and UAC has no free
+text.
+
+**The card.** Just before the prompt shows, a small card names the reason: "Tiresias is asking
+for Windows Hello" (or "for administrator rights") over one sentence, such as "*app.exe* asked
+for secrets while Tiresias is locked" or "To install the admin tier, which runs as a Windows
+service". It sits centred just above the middle of the screen, over the prompt Windows centres
+there, and closes when the prompt is answered. It takes no focus and has nothing to click, so the
+prompt keeps the keyboard and the card can't be mistaken for the prompt. It is on screen before
+the prompt starts: the call waits (at most a second) for it to be drawn, and UAC's dimmed
+backdrop then shows it too.
+
+**One place.** Every Hello prompt goes through `HelloKeyWrapper.Prompt`, which asks
+`HelloPrompts.Announce` for the card first. The reason is ambient (`HelloPrompts.Because`), so it
+reaches the prompt through `Task.Run` and the agent's unlock without each signature carrying it.
+`App.UnlockAsync` takes the reason as a parameter, so no unlock can be written without one; a
+prompt nobody named still gets a card, worded for an unnamed reason. UAC launches all go through
+`AdminTierElevation.Run`, which shows the card around `Process.Start`, the call that returns once
+UAC is answered. Requests that share one unlock share its card: the first caller's reason shows.
+The words come from one pure mapping, `PromptWhy`, pinned by `PromptWhyTests`.
+
+**Outside the app** there is no card: `tir` prompts from its own terminal, which says what it is
+doing, and removing the admin tier while uninstalling runs before any app window can show.
+
+**In demo mode** Hello and UAC never prompt, but the card shows for two seconds where the prompt
+would have been, so it can be seen and captured.
+
+**Considered and not chosen.**
+
+- *`UserConsentVerifier` before the key prompt.* Two prompts for one unlock, and the first proves
+  nothing.
+- *Tiresias's own dialog first, then the real prompt.* A second click for every prompt; the card
+  says the same without one.
+- *The reason as the owning window's status text.* Many prompts have no window of ours (the tray,
+  `tir`, a terminal hook), and the prompt covers the window when there is one.
+
 ## Slices
 
 1. `WindowFit` and the size rule applied to every window; "(dev)" in titles; compact Home banner.

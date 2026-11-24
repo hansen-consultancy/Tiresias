@@ -22,6 +22,10 @@ its section below.
   it git's credential helper, so `git push` in the container asks the Tiresias app, which shows the
   host and the devcontainer's folder before handing the token over. `tir doctor`'s finding about
   VS Code forwarding your git credentials now points at it.
+- **The app says why Windows is asking.** Just before each Windows Hello prompt, and before the UAC
+  prompt for the admin tier, a small card above it names the reason: unlocking at start, the
+  program that asked for secrets, the page you opened, the change you approved, the admin-tier
+  step. Windows takes no text of ours in either prompt, so the card is where the reason goes.
 
 ### Fixed
 

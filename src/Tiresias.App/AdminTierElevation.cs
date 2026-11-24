@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using Tiresias.AdminTier;
+using Tiresias.App.Logic;
+using Tiresias.App.Views;
 
 namespace Tiresias.App;
 
@@ -18,6 +20,9 @@ static class AdminTierElevation
         if (Tiresias.Agent.DemoMode.On)
         {
             AppLog.Info($"admin tier: {verb} left alone in demo mode");
+            // No UAC prompt, but its reason card shows as it would.
+            using (PromptCardWindow.Show(PromptWhy.ForAdminStep(verb, argument), PromptKind.Uac))
+                await Task.Delay(Tiresias.Agent.DemoMode.PromptPause);
             return null;
         }
         AppLog.Info($"admin tier: {verb} asked for (UAC)");
@@ -38,7 +43,11 @@ static class AdminTierElevation
             };
             if (argument is not null)
                 start.ArgumentList.Add(argument);
-            using var process = Process.Start(start);
+            // UAC shows only the program's name; the card says which step it is for, until UAC is answered.
+            Process? started;
+            using (PromptCardWindow.Show(PromptWhy.ForAdminStep(verb, argument), PromptKind.Uac))
+                started = Process.Start(start);
+            using var process = started;
             if (process is null)
                 return AdminSetupResult.Failed;
             if (!process.WaitForExit(wait))

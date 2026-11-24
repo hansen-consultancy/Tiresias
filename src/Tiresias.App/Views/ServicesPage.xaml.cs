@@ -166,7 +166,7 @@ public sealed partial class ServicesViewModel : ObservableObject
     [RelayCommand]
     async Task UnlockAsync()
     {
-        await App.Current.UnlockAsync(interactive: true);
+        await App.Current.UnlockAsync(PromptReason.Services, interactive: true);
         RefreshLockState();
     }
 
