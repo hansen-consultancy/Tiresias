@@ -54,29 +54,43 @@ public partial class PromptCardWindow : Window
             here.Show();
             // The caller is about to block this thread on the prompt: draw the card first.
             dispatcher.Invoke(static () => { }, DispatcherPriority.ContextIdle);
-            return new Closer(dispatcher, here);
+            return new Closer(dispatcher) { Card = here };
         }
-        using var drawn = new ManualResetEventSlim();
-        var card = dispatcher.Invoke(() =>
+        // Posted, not invoked: a UI thread blocked on something else (a pipe call) must not hold the
+        // prompt back. The wait for the first paint is the only wait, and it is capped; past it the
+        // prompt goes ahead and the card shows a moment late, or not at all if the prompt is answered first.
+        var drawn = new TaskCompletionSource();
+        var closer = new Closer(dispatcher);
+        dispatcher.BeginInvoke(() =>
         {
+            if (closer.Closed)
+                return;
             var opened = new PromptCardWindow(view);
-            opened.ContentRendered += (_, _) => drawn.Set();
+            opened.ContentRendered += (_, _) => drawn.TrySetResult();
+            closer.Card = opened;
             opened.Show();
-            return opened;
         });
-        // A busy UI thread must not hold the prompt back for long; the card then shows a moment late.
-        drawn.Wait(TimeSpan.FromSeconds(1));
-        return new Closer(dispatcher, card);
+        drawn.Task.Wait(TimeSpan.FromSeconds(1));
+        return closer;
     }
 
-    sealed class Closer(Dispatcher dispatcher, Window card) : IDisposable
+    /// <summary>Closes the card; its fields are touched on the dispatcher's thread only, so an open still queued is skipped.</summary>
+    sealed class Closer(Dispatcher dispatcher) : IDisposable
     {
-        int closed;
+        int disposed;
+
+        public Window? Card { get; set; }
+
+        public bool Closed { get; private set; }
 
         public void Dispose()
         {
-            if (Interlocked.Exchange(ref closed, 1) == 0)
-                dispatcher.BeginInvoke(card.Close);
+            if (Interlocked.Exchange(ref disposed, 1) == 0)
+                dispatcher.BeginInvoke(() =>
+                {
+                    Closed = true;
+                    Card?.Close();
+                });
         }
     }
 
