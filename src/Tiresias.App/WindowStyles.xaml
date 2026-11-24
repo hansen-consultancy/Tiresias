@@ -100,16 +100,6 @@
     <Setter Property="MinWidth" Value="96" />
     <Setter Property="Padding" Value="12,6" />
   </Style>
-  <!-- Fluent draws a disabled grid on a white fill, which glares in dark mode: a grid waiting for
-       something to be picked keeps the page's own background. -->
-  <Style TargetType="DataGrid" BasedOn="{StaticResource {x:Type DataGrid}}">
-    <Style.Triggers>
-      <Trigger Property="IsEnabled" Value="False">
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="RowBackground" Value="Transparent" />
-      </Trigger>
-    </Style.Triggers>
-  </Style>
   <!-- A show/hide switch for the part below it: a chevron and its label in the text colour, with no
        fill when on, so it reads the same in light and dark (Fluent's checked fill is a pale grey). -->
   <Style x:Key="DisclosureToggle" TargetType="ToggleButton">
