@@ -39,7 +39,7 @@ static class Home
         return new(
             Read(() => UserSecretsFiles.All().Count, "user secrets folders"),
             Read(() => VaultEditor.Load().Services.Count, "vault services"),
-            Read(() => EnvironmentStore.UserVariables().Count, "user variables"),
+            Read(() => EnvironmentStore.UserVariables().Count(v => !v.Decoy), "user variables"),
             today?.Records,
             today?.Approvals);
     }
