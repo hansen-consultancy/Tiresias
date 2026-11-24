@@ -15,7 +15,13 @@ its section below.
   the devcontainer gets a ticket, and `tir-remote run -- <command>` inside it asks the Tiresias
   app for the folder's sealed variables when a tool needs them. The consent dialog names the
   devcontainer's folder; **Allow for the session** lasts until Tiresias locks. Needs Docker
-  Desktop. `tir-remote` isn't published yet ([devcontainers that ask](docs/devcontainers.md)).
+  Desktop ([devcontainers that ask](docs/devcontainers.md)).
+- **Git in a devcontainer asks for its token.** Map a host to a sealed token with
+  `tir env git add github.com GH_TOKEN`, and add the feature
+  `ghcr.io/hansen-consultancy/devcontainer-features/tiresias:0`: it installs `tir-remote` and makes
+  it git's credential helper, so `git push` in the container asks the Tiresias app, which shows the
+  host and the devcontainer's folder before handing the token over. `tir doctor`'s finding about
+  VS Code forwarding your git credentials now points at it.
 
 ## [0.3.0] - 2026-11-23
 

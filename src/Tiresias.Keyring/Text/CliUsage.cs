@@ -85,6 +85,12 @@ static class CliUsage
             a program for that URL, username and variable, once or for the session. import finds
             the sources NuGet.Config gives a token (as %NAME% or in plain text), seals it and
             takes it out of the file.
+        tir env git add <host> <NAME> [--username <name>]
+        tir env git list
+        tir env git remove <host>
+            Git hosts whose HTTPS remotes take a sealed variable as the token, for the credential
+            helper the Tiresias devcontainer feature installs. You approve each devcontainer, once
+            or until Tiresias locks.
         tir env import <file> <entry> <NAME>
             Seal the token an .npmrc (entry: its key, //registry.npmjs.org/:_authToken) or a .pypirc
             (entry: its section) holds in plain text as NAME, and take it out of the file. An .npmrc

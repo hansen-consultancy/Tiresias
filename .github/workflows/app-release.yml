@@ -17,6 +17,8 @@ jobs:
     timeout-minutes: 30
     # The Azure federated credential trusts this environment, not a tag name (it takes no wildcards).
     environment: app-release
+    outputs:
+      prerelease: ${{ steps.meta.outputs.prerelease }}
     steps:
       # Everything signing needs comes from variables (repository or environment); no values live in
       # this file. docs/releasing.md has the one-time Azure setup that produces them.
@@ -78,6 +80,8 @@ jobs:
             dotnet publish src/Tiresias.NuGetPlugin -c Release -r $rid --self-contained -p:Version="$v" -o publish/$rid
             dotnet publish src/Tiresias.Admin -c Release -r $rid --self-contained -p:PublishSingleFile=true -p:Version="$v" -o publish/$rid/admin
           done
+          # tir-remote for devcontainers (docs/devcontainers.md): release assets, not part of the app's package.
+          sh .github/scripts/publish-tir-remote.sh "$v" tir-remote-assets
 
       - name: Azure sign-in (OIDC)
         uses: azure/login@v2
@@ -158,6 +162,41 @@ jobs:
           pre=""; [ "${{ steps.meta.outputs.prerelease }}" = "true" ] && pre="--prerelease"
           # Only this version's files: the downloaded previous package is already on its own release.
           mapfile -d '' files < <(find Releases -maxdepth 1 -type f \( -name "*$v*" -o -name "*-Setup.exe" -o -name "*-Portable.zip" -o -name "releases.*.json" -o -name "RELEASES*" -o -name "assets.*.json" \) -print0)
+          files+=(tir-remote-assets/*)
           # One call: gh creates a draft, uploads the files, then publishes. Releases here are immutable,
           # so nothing can be added once a release is published, and its tag can never be reused.
           gh release create "$GITHUB_REF_NAME" --verify-tag --title "Tiresias app $v" --notes-file "$RUNNER_TEMP/notes.md" $pre "${files[@]}"
+
+  # The devcontainer feature (devcontainer-features/src/tiresias) at ghcr.io, versioned with the app.
+  # It carries this release's tir-remote checksums, so install.sh only installs what this release
+  # built. Prereleases don't publish it: the feature's tags are major, major.minor and full version.
+  feature:
+    needs: release
+    if: needs.release.outputs.prerelease == 'false'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write # push the feature to ghcr.io
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pin the version and checksums
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          v="${GITHUB_REF_NAME#app-v}"
+          dir=devcontainer-features/src/tiresias
+          gh release download "$GITHUB_REF_NAME" --pattern tir-remote.sha256 --dir "$dir"
+          printf '%s
+' "$v" > "$dir/tir-remote.version"
+          jq --arg v "$v" '.version = $v' "$dir/devcontainer-feature.json" > "$RUNNER_TEMP/feature.json"
+          mv "$RUNNER_TEMP/feature.json" "$dir/devcontainer-feature.json"
+          cat "$dir/tir-remote.sha256"
+      - uses: devcontainers/action@v1
+        with:
+          publish-features: "true"
+          base-path-to-features: ./devcontainer-features/src
+          features-namespace: hansen-consultancy/devcontainer-features
+          generate-docs: "false"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

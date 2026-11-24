@@ -11,7 +11,7 @@ using Tiresias.Protocol;
 namespace Tiresias.Agent;
 
 /// <summary>
-/// Where <c>tir-remote</c> in a devcontainer asks for sealed variables: <c>127.0.0.1:7782</c>, which
+/// Where <c>tir-remote</c> in a devcontainer asks for sealed variables and git tokens: <c>127.0.0.1:7782</c>, which
 /// Docker Desktop relays <c>host.docker.internal</c> to (docs/devcontainers.md). Started with the
 /// first ticket, never before. Every connection comes from Docker Desktop's backend, so only the
 /// ticket says who asks: a request without a live one is refused before its body is read, and no
@@ -19,6 +19,7 @@ namespace Tiresias.Agent;
 /// </summary>
 public sealed class DevcontainerEndpoint(DevcontainerTickets tickets,
     Func<string, DevcontainerTicket, DevcontainerRequest, CancellationToken, Task<DevcontainerReply>> ask,
+    Func<string, DevcontainerTicket, DevcontainerGitRequest, CancellationToken, Task<DevcontainerGitReply>> askGit,
     Action<string> refused) : IAsyncDisposable
 {
     public static readonly Uri Url = new($"http://127.0.0.1:{DevcontainerWire.Port}");
@@ -43,7 +44,8 @@ public sealed class DevcontainerEndpoint(DevcontainerTickets tickets,
                 k.AddServerHeader = false;
             });
             var built = builder.Build();
-            built.MapPost(DevcontainerWire.EnvironmentPath, (Delegate)HandleAsync);
+            built.MapPost(DevcontainerWire.EnvironmentPath, (Delegate)(Func<HttpContext, Task<IResult>>)(context => HandleAsync(context, ask, r => r.V, m => new DevcontainerReply(false, Message: m))));
+            built.MapPost(DevcontainerWire.GitPath, (Delegate)(Func<HttpContext, Task<IResult>>)(context => HandleAsync(context, askGit, r => r.V, m => new DevcontainerGitReply(false, Message: m))));
             try
             {
                 await built.StartAsync();
@@ -61,30 +63,31 @@ public sealed class DevcontainerEndpoint(DevcontainerTickets tickets,
         }
     }
 
-    async Task<IResult> HandleAsync(HttpContext context)
+    /// <param name="refuse">A refusal with its message, in the reply's own shape.</param>
+    async Task<IResult> HandleAsync<TRequest, TReply>(HttpContext context, Func<string, DevcontainerTicket, TRequest, CancellationToken, Task<TReply>> answer,
+        Func<TRequest, int> version, Func<string, TReply> refuse) where TRequest : class
     {
         var ticket = DevcontainerWire.Ticket(context.Request.Headers.Authorization);
         if (tickets.Find(ticket) is not { } devcontainer)
         {
             refused(ticket is null ? "a devcontainer request without a ticket" : "a devcontainer request with an unknown or ended ticket");
-            return Results.Json(new DevcontainerReply(false, Message: "No live Tiresias ticket: start VS Code with tir run -- code <folder>."),
+            return Results.Json(refuse("No live Tiresias ticket: start VS Code with tir run -- code <folder>."),
                 DevcontainerWire.Json, statusCode: StatusCodes.Status401Unauthorized);
         }
-        DevcontainerRequest? request;
+        TRequest? request;
         try
         {
-            request = await JsonSerializer.DeserializeAsync<DevcontainerRequest>(context.Request.Body, DevcontainerWire.Json, context.RequestAborted);
+            request = await JsonSerializer.DeserializeAsync<TRequest>(context.Request.Body, DevcontainerWire.Json, context.RequestAborted);
         }
         catch (Exception e) when (e is JsonException or BadHttpRequestException)
         {
             request = null;
         }
         if (request is null)
-            return Results.Json(new DevcontainerReply(false, Message: "Not a Tiresias request."), DevcontainerWire.Json, statusCode: StatusCodes.Status400BadRequest);
-        if (request.V > DevcontainerWire.Version)
-            return Results.Json(new DevcontainerReply(false, Message: "This tir-remote is newer than the Tiresias app: update the app."),
-                DevcontainerWire.Json, statusCode: StatusCodes.Status400BadRequest);
-        return Results.Json(await ask(ticket!, devcontainer, request, context.RequestAborted), DevcontainerWire.Json);
+            return Results.Json(refuse("Not a Tiresias request."), DevcontainerWire.Json, statusCode: StatusCodes.Status400BadRequest);
+        if (version(request) > DevcontainerWire.Version)
+            return Results.Json(refuse("This tir-remote is newer than the Tiresias app: update the app."), DevcontainerWire.Json, statusCode: StatusCodes.Status400BadRequest);
+        return Results.Json(await answer(ticket!, devcontainer, request, context.RequestAborted), DevcontainerWire.Json);
     }
 
     public async ValueTask DisposeAsync()

@@ -1,6 +1,6 @@
 # Devcontainers that ask instead of carrying
 
-Status: **6a and 6b built** (the relay checked; tickets, the endpoint and `tir-remote run`/`env`); 6c is design. Phase 6 of [containers and VMs](containers-and-vms.md), issue #113. Its threat
+Status: **built** (6a the relay checked; 6b tickets, the endpoint and `tir-remote run`/`env`; 6c git credentials and the feature). Phase 6 of [containers and VMs](containers-and-vms.md), issue #113. Its threat
 entry is [S-devcontainer-ask](threats/S-devcontainer-ask.md).
 
 ## The problem
@@ -125,6 +125,21 @@ allowance.
   `DevcontainerEndpoint`) starts with the first ticket; its refusals go to the app's log, not the
   activity log, so a container probing it can't fill that. A placeholder's base URL points at
   `host.docker.internal` with the forwarder's (or solo broker's) port. `tir-remote` is built
-  (`src/Tiresias.Remote`) but not yet published: until 6c, copy it into the container by hand.
+  (`src/Tiresias.Remote`); 6c publishes it.
 - **6c. Git credentials and the feature.** `git-credential`, the published feature, and phase 2's
-  forwarding finding pointing at it.
+  forwarding finding pointing at it. **Built**, with these differences: a host is mapped with
+  `tir env git add <host> <NAME> [--username <name>]` (sealed with the variables, HTTPS only, the
+  variable resolved for the devcontainer's folder); a variable delivered as a placeholder is
+  refused, since git needs the value. Consent's heading names the host ("Give git the token for
+  github.com in the devcontainer for C:\src\shop?"). `tir-remote` is self-contained and trimmed
+  rather than static, built for glibc and musl on x64 and Arm64 as assets of each app release. The
+  feature pins that release's checksums inside itself at publish, rather than fetching them at
+  install, and sets git's `credential.helper` system-wide (option `gitCredentialHelper`). It is
+  published for stable app versions only. Use it as:
+
+  ```jsonc
+  "features": { "ghcr.io/hansen-consultancy/devcontainer-features/tiresias:0": {} },
+  "remoteEnv": { "TIRESIAS_TICKET": "${localEnv:TIRESIAS_TICKET}" }
+  ```
+
+  Its threat entry is [T-devcontainer-feature](threats/T-devcontainer-feature.md).

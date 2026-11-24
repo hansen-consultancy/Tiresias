@@ -120,12 +120,13 @@ sealed class ConsentPresenter(Dispatcher dispatcher) : IUserSecretsConsentPrompt
     /// A devcontainer asking with its ticket. No program is named: every request comes through
     /// Docker Desktop, so the host can't see which process in the container asked.
     /// </summary>
-    public async Task<ConsentAnswer> AskDevcontainerAsync(string folder, IReadOnlyList<string> names, CancellationToken ct)
+    /// <param name="gitHost">For git's credential helper: the host the token is for, which the heading names.</param>
+    public async Task<ConsentAnswer> AskDevcontainerAsync(string folder, IReadOnlyList<string> names, CancellationToken ct, string? gitHost = null)
     {
         try
         {
             return await ShowAsync(new ConsentView(
-                Text.Format("Consent_Devcontainer_Heading", folder),
+                gitHost is null ? Text.Format("Consent_Devcontainer_Heading", folder) : Text.Format("Consent_DevcontainerGit_Heading", gitHost, folder),
                 null,
                 Text.Format("Consent_Environment_ListLabel", names.Count),
                 names,

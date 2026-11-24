@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
+using System.Text.Json;
 using Tiresias.Access;
 using Tiresias.Agent;
 using Tiresias.EnvironmentVariables;
@@ -97,11 +98,13 @@ public class DevcontainerTicketTests
     public void Ticket_header(string? header, string? ticket) => Assert.That(DevcontainerWire.Ticket(header), Is.EqualTo(ticket));
 
     static string Show(RemoteCommand? command) =>
-        command is null ? "none" : $"{(command.Names is null ? "all" : string.Join(",", command.Names))} | {string.Join(" ", command.Command)}";
+        command is null ? "none" : command.Git is { } git ? $"git {git}" : $"{(command.Names is null ? "all" : string.Join(",", command.Names))} | {string.Join(" ", command.Command)}";
 
     [TestCase(new[] { "run", "--", "npm", "test" }, "all | npm test")]
     [TestCase(new[] { "run", "--only", "A, B", "--", "x" }, "A,B | x")]
     [TestCase(new[] { "env", "OPENAI_API_KEY" }, "OPENAI_API_KEY | ")]
+    [TestCase(new[] { "git-credential", "get" }, "git get")]
+    [TestCase(new[] { "git-credential" }, "none")]
     [TestCase(new[] { "run", "npm" }, "none")]
     [TestCase(new[] { "run", "--" }, "none")]
     [TestCase(new[] { "run", "--bogus", "--", "x" }, "none")]
@@ -114,19 +117,26 @@ public class DevcontainerTicketTests
         var tickets = new DevcontainerTickets(TimeProvider.System);
         List<string> refusals = [];
         DevcontainerTicket? asked = null;
+        DevcontainerGitRequest? askedGit = null;
         await using var endpoint = new DevcontainerEndpoint(tickets, (_, devcontainer, _, _) =>
         {
             asked = devcontainer;
             return Task.FromResult(new DevcontainerReply(true, new Dictionary<string, string> { ["A"] = "b" }));
+        }, (_, _, git, _) =>
+        {
+            askedGit = git;
+            return Task.FromResult(new DevcontainerGitReply(true, "tiresias", "t"));
         }, refusals.Add);
         await endpoint.EnsureStartedAsync();
         using var http = new HttpClient { BaseAddress = DevcontainerEndpoint.Url };
 
-        Task<HttpResponseMessage> Post(string? ticket)
+        Task<HttpResponseMessage> Post(string? ticket, bool git = false)
         {
-            var request = new HttpRequestMessage(HttpMethod.Post, DevcontainerWire.EnvironmentPath)
+            var request = new HttpRequestMessage(HttpMethod.Post, git ? DevcontainerWire.GitPath : DevcontainerWire.EnvironmentPath)
             {
-                Content = JsonContent.Create(new DevcontainerRequest(["A"]), options: DevcontainerWire.Json),
+                Content = git
+                    ? JsonContent.Create(new DevcontainerGitRequest("https", "github.com"), options: DevcontainerWire.Json)
+                    : JsonContent.Create(new DevcontainerRequest(["A"]), options: DevcontainerWire.Json),
             };
             if (ticket is not null)
                 request.Headers.TryAddWithoutValidation("Authorization", $"Tiresias {ticket}");
@@ -135,14 +145,69 @@ public class DevcontainerTicketTests
 
         Assert.That((await Post(null)).StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
         Assert.That((await Post("guess")).StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+        Assert.That((await Post("guess", git: true)).StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
         Assert.That(asked, Is.Null);
-        Assert.That(refusals, Has.Count.EqualTo(2).And.None.Contains("guess"));
+        Assert.That(askedGit, Is.Null);
+        Assert.That(refusals, Has.Count.EqualTo(3).And.None.Contains("guess"));
 
         var ticket = tickets.Mint(@"C:\src\shop");
         var reply = await (await Post(ticket)).Content.ReadFromJsonAsync<DevcontainerReply>(DevcontainerWire.Json);
         Assert.That(reply!.Approved && reply.Variables!["A"] == "b");
         Assert.That(asked!.Folder, Is.EqualTo(@"C:\src\shop"));
+        var credential = await (await Post(ticket, git: true)).Content.ReadFromJsonAsync<DevcontainerGitReply>(DevcontainerWire.Json);
+        Assert.That(credential, Is.EqualTo(new DevcontainerGitReply(true, "tiresias", "t")));
+        Assert.That(askedGit, Is.EqualTo(new DevcontainerGitRequest("https", "github.com")));
         tickets.Clear();
         Assert.That((await Post(ticket)).StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+    }
+
+    [TestCase("github.com", "github.com")]
+    [TestCase("GitHub.com", "github.com")]
+    [TestCase("github.com:443", "github.com")]
+    [TestCase("git.example.com:8443", "git.example.com:8443")]
+    [TestCase("https://github.com", null)]
+    [TestCase("github.com/org", null)]
+    [TestCase("alice@github.com", null)]
+    [TestCase("", null)]
+    public void A_git_host_is_what_git_sends(string host, string? normalized) => Assert.That(GitHost.Normalize(host), Is.EqualTo(normalized));
+
+    [Test]
+    public void Git_hosts_are_sealed_with_the_rest_and_match_https_only()
+    {
+        var environment = SealedEnvironment.Empty.WithGitHost(new("GitHub.com", "GH_TOKEN", GitHost.DefaultUsername))
+            .WithGitHost(new("git.example.com:8443", "CORP_TOKEN", "alice"));
+        var read = SealedEnvironment.FromDocument(environment.ToDocument());
+        Assert.That(read.GitHosts, Is.EqualTo(environment.GitHosts));
+        Assert.That(read.GitHostFor("https", "github.com")!.Variable, Is.EqualTo("GH_TOKEN"));
+        Assert.That(read.GitHostFor("https", "git.example.com:8443")!.Username, Is.EqualTo("alice"));
+        Assert.That(read.GitHostFor("http", "github.com"), Is.Null, "never over plain http");
+        Assert.That(read.GitHostFor("https", "git.example.com"), Is.Null, "another port is another host");
+        Assert.That(read.GitHostFor("https", null), Is.Null);
+        Assert.That(read.WithGitHost(new("github.com", "OTHER", "x")).GitHosts, Has.Count.EqualTo(2), "replaces the mapping for the same host");
+        Assert.That(read.WithoutGitHost("GITHUB.COM").GitHosts.Select(h => h.Host), Is.EqualTo(new[] { "git.example.com:8443" }));
+        Assert.Throws<ArgumentException>(() => read.WithGitHost(new("https://github.com", "GH_TOKEN", "x")));
+    }
+
+    [Test]
+    public void The_credential_helper_reads_until_a_blank_line_and_answers_in_kind()
+    {
+        Assert.That(GitCredential.Read(["protocol=https", "host=github.com", "host=example.com", "path", "", "username=ignored"]),
+            Is.EqualTo(new Dictionary<string, string> { ["protocol"] = "https", ["host"] = "example.com" }));
+        Assert.That(GitCredential.Answer("tiresias", "t0k"), Is.EqualTo("username=tiresias\npassword=t0k\n"));
+        Assert.That(GitCredential.Answer("tiresias", "a\nprotocol=http"), Is.Null, "a line break would let a value add attributes");
+    }
+
+    [Test]
+    public void Tir_remote_writes_the_wire_as_the_app_reads_it()
+    {
+        var request = new DevcontainerGitRequest("https", "github.com");
+        Assert.That(JsonSerializer.Serialize(request, RemoteJson.Default.DevcontainerGitRequest), Is.EqualTo(JsonSerializer.Serialize(request, DevcontainerWire.Json)));
+        var names = new DevcontainerRequest(["A"]);
+        Assert.That(JsonSerializer.Serialize(names, RemoteJson.Default.DevcontainerRequest), Is.EqualTo(JsonSerializer.Serialize(names, DevcontainerWire.Json)));
+        var reply = new DevcontainerReply(true, new Dictionary<string, string> { ["A"] = "b" }, "note");
+        var back = JsonSerializer.Deserialize(JsonSerializer.Serialize(reply, DevcontainerWire.Json), RemoteJson.Default.DevcontainerReply)!;
+        Assert.That((back.Approved, back.Variables!["A"], back.Message), Is.EqualTo((true, "b", "note")));
+        var git = new DevcontainerGitReply(true, "tiresias", "t");
+        Assert.That(JsonSerializer.Deserialize(JsonSerializer.Serialize(git, DevcontainerWire.Json), RemoteJson.Default.DevcontainerGitReply), Is.EqualTo(git));
     }
 }

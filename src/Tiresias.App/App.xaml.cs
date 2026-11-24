@@ -464,7 +464,7 @@ public partial class App : Application
     readonly DevcontainerTickets devcontainerTickets = new(TimeProvider.System);
     DevcontainerEndpoint? devcontainerEndpoint;
 
-    DevcontainerEndpoint Devcontainers => devcontainerEndpoint ??= new(devcontainerTickets, DevcontainerAskAsync,
+    DevcontainerEndpoint Devcontainers => devcontainerEndpoint ??= new(devcontainerTickets, DevcontainerAskAsync, DevcontainerGitAsync,
         why => AppLog.Info($"devcontainer endpoint refused {why}"));
 
     /// <summary>
@@ -507,6 +507,48 @@ public partial class App : Application
         }
         host.RecordEnvironment(true, program, terms, null);
         return new(true, delivery.Variables, Note(delivery));
+    }
+
+    /// <summary>
+    /// <c>tir-remote git-credential</c> in a devcontainer asking for a git host's token: the sealed
+    /// variable <c>tir env git add</c> mapped to that host, as resolved for the devcontainer's folder.
+    /// Asked like a variable, with the host in the heading; a placeholder is no use to git, so a
+    /// variable delivered as one is refused.
+    /// </summary>
+    async Task<DevcontainerGitReply> DevcontainerGitAsync(string ticket, DevcontainerTicket devcontainer, DevcontainerGitRequest request, CancellationToken ct)
+    {
+        _ = PlaceholderMinter.RevokeAsync(devcontainerTickets.Prune());
+        if (host!.Keys.Hello is not { } hello)
+            return new(false, Message: Text.Get("Environment_Locked"));
+        var snapshot = await Task.Run(() => EnvironmentStore.ReadForDelivery(hello), ct);
+        if (snapshot.Environment.GitHostFor(request.Protocol, request.Host) is not { } git)
+            return new(false, Message: Text.Format("Devcontainer_GitUnmapped", request.Protocol ?? "", request.Host ?? ""));
+        if (snapshot.Environment.PlaceholderFor(git.Variable) is not null)
+            return new(false, Message: Text.Format("Devcontainer_GitPlaceholder", git.Variable, git.Host));
+        var endpoint = DevcontainerTickets.ForContainer(PlaceholderMinter.Endpoint);
+        var (variables, missing, terms) = snapshot.SelectForCommand(devcontainer.Folder, [git.Variable], endpoint);
+        if (missing.Count > 0)
+            return new(false, Message: Text.Format("Environment_NotSealed", string.Join(", ", missing)));
+        var program = $"devcontainer {devcontainer.Folder} (git {git.Host})";
+        var access = EnvironmentVariableAccess.For(snapshot.Environment, git.Variable, devcontainer.Folder, endpoint);
+        if (!devcontainerTickets.AllAllowed(ticket, [access]))
+        {
+            var answer = await consent!.AskDevcontainerAsync(devcontainer.Folder, terms, ct, gitHost: git.Host);
+            if (answer == ConsentAnswer.Deny)
+            {
+                host.RecordEnvironment(false, program, terms, null);
+                return new(false, Message: "Not approved.");
+            }
+            if (answer == ConsentAnswer.AllowForSession)
+                devcontainerTickets.Allow(ticket, [access]);
+        }
+        var delivery = await snapshot.DeliverAsync(variables, endpoint,
+            (_, _) => throw new InvalidOperationException("A git token is never a placeholder."),
+            PlaceholderMinter.RevokeAsync, ct, () => host.Keys.Hello == hello);
+        if (devcontainerTickets.Find(ticket) is null)
+            return new(false, Message: Text.Get("Environment_Locked"));
+        host.RecordEnvironment(true, program, terms, null);
+        return new(true, git.Username, delivery.Variables[git.Variable]);
     }
 
     async Task<ControlReply> DispatchControlAsync(ControlRequest request, PipeClient caller, CancellationToken ct)

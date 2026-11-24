@@ -1,0 +1,19 @@
+{
+  "id": "tiresias",
+  "version": "0.0.0",
+  "name": "Tiresias",
+  "description": "Installs tir-remote, which asks the Tiresias app on the host for sealed variables and git tokens, each after you approve.",
+  "documentationURL": "https://github.com/hansen-consultancy/Tiresias/blob/main/docs/devcontainers.md",
+  "licenseURL": "https://github.com/hansen-consultancy/Tiresias/blob/main/LICENSE",
+  "options": {
+    "gitCredentialHelper": {
+      "type": "boolean",
+      "default": true,
+      "description": "Make tir-remote git's credential helper for every user in the container."
+    }
+  },
+  "installsAfter": [
+    "ghcr.io/devcontainers/features/common-utils",
+    "ghcr.io/devcontainers/features/git"
+  ]
+}

@@ -1,6 +1,6 @@
 # Containers, WSL and VMs: what your account can reach
 
-Status: **phases 1 to 5 built, phase 6 partly built** (account facts: engine pipes, WSL disks, Hyper-V; devcontainer files and forwarding; Docker engine, WSL and Hyper-V file contents, opt-in); the rest is design. Tracks issue #113. This page designs a doctor check, **Reachable
+Status: **phases 1 to 6 built** (account facts: engine pipes, WSL disks, Hyper-V; devcontainer files and forwarding; Docker engine, WSL and Hyper-V file contents, opt-in); the rest is design. Tracks issue #113. This page designs a doctor check, **Reachable
 from your account**, that tells you which secrets a normal program running as you could read inside
 your containers, WSL distributions and Hyper-V VMs. It extends the [attack surface](attack-surface.md)
 work (#34) and follows the rules of [more checks](more-checks.md#rules-every-check-keeps).
@@ -147,7 +147,7 @@ Each is a `DoctorCheck` with a `Kind`, so one kind is one line on Home with its 
 | Secret baked into an image | An image's `Config.Env` has a secret-looking name | E5/C3 | The same, plus rebuild without the `ENV` line; a value in an image layer outlives every container |
 | Host credential folder mounted into a container | A mount source is one of the folders above | none | `ReachGuide("Container mounts")`: remove the mount from `devcontainer.json`'s `mounts` or `runArgs` |
 | Secrets in a devcontainer file | `containerEnv`, `remoteEnv` or a named `.env` holds a secret-looking name with a literal value | E5/C3 → E4/C1 | `InjectAtRunTime(folder)`, as above: the file keeps `${localEnv:NAME}` |
-| Credential forwarding you may not use | Dev Containers is installed and `dev.containers.gitCredentialHelperConfigLocation` isn't `none`, or `dev.containers.dockerCredentialHelper` isn't `false`; or the host `ssh-agent` service is running with keys | none | `ReachGuide("Devcontainer forwarding")`: set the setting in VS Code user settings, or stop the agent (`Stop-Service ssh-agent`, which a user can't always do; then remove keys with `ssh-add -D`) |
+| Credential forwarding you may not use | Dev Containers is installed and `dev.containers.gitCredentialHelperConfigLocation` isn't `none`, or `dev.containers.dockerCredentialHelper` isn't `false`; or the host `ssh-agent` service is running with keys | none | `ReachGuide("Devcontainer forwarding")`: set the setting in VS Code user settings, and where a container needs git, add the Tiresias feature and `tir env git add` (phase 6); or stop the agent (`Stop-Service ssh-agent`, which a user can't always do; then remove keys with `ssh-add -D`) |
 | Secrets in a running WSL distribution | A known credential file exists, or a `.env` has secret-looking names | E5/C3 → E4/C1 | `ReachGuide("WSL")`: seal it on Windows with `tir env set NAME`, and pass it in for one command with `tir run --only NAME -- wsl -d <distro> <command>`, adding `NAME` to `WSLENV` (`WSLENV=NAME/u`) so WSL forwards it. Delete the file afterwards |
 | WSL disk readable offline | A distribution's `ext4.vhdx` is owned by or readable for you, and it is stopped or its contents weren't checked | none | None: Windows gives the owner this file. So it is a passing check that informs, not a finding: it says the distribution's secrets are as exposed while it is stopped, and points at the row above |
 | Hyper-V guests readable | `S-1-5-32-578` is enabled in your token | none | `ReachGuide("Hyper-V")`: leave Hyper-V Administrators if you don't manage VMs (needs an administrator); inside the guest, turn on BitLocker with a virtual TPM so its disk and checkpoints are ciphertext to the host |
@@ -334,7 +334,7 @@ Each slice ships alone, with its tests and its line in `CHANGELOG.md`.
    saved-state folders (`Msvm_VirtualSystemSettingData`) are added to the default folders, each
    walked at most six levels deep, skipping links; at most 500 files are checked, the rest counted.
    The finding has no positions: what it opens isn't a secret Tiresias holds.
-6. **Devcontainers that ask:** [devcontainers.md](devcontainers.md); tickets, the endpoint and `tir-remote` built, the published feature and git credentials not yet.
+6. **Devcontainers that ask:** [devcontainers.md](devcontainers.md); built: tickets, the endpoint, `tir-remote`, git credentials and the published feature.
 
 ## Not in scope
 
