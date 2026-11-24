@@ -345,7 +345,9 @@ static class Commands
         if (projects is not null && !Directory.Exists(projects))
             throw new UsageException($"No folder {projects}.");
         var probe = new MachineProbe(projects);
-        var checks = await Tiresias.Client.Doctor.RunAsync(probe);
+        // Typing --reach is the consent to look inside (docs/containers-and-vms.md, "Consent").
+        var contents = args.Flag("--reach") ? await probe.ReachContentsAsync(Tiresias.Client.ReachScope.All, CancellationToken.None) : null;
+        var checks = await Tiresias.Client.Doctor.RunAsync(probe, contents);
         var dismissals = DismissalStore.Load();
         foreach (var check in checks)
         {

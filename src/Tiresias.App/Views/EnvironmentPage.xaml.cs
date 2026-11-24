@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Tiresias.Agent;
+using Tiresias.App.Logic;
 using Tiresias.EnvironmentVariables;
 
 namespace Tiresias.App.Views;
@@ -74,6 +75,8 @@ public sealed partial class VariableRow(string name, string detail, bool isCheck
 
     [ObservableProperty]
     public partial bool IsChecked { get; set; } = isChecked;
+
+    public IReadOnlyList<DetailField> Details => [new(Text.Get("Env_ColName"), Name), new(Text.Get("Env_ColDetail"), Detail)];
 }
 
 public sealed partial class EnvironmentViewModel : ObservableObject
@@ -142,7 +145,7 @@ public sealed partial class EnvironmentViewModel : ObservableObject
     /// <summary>Unlocks if needed (one Windows Hello prompt), then lists both sides.</summary>
     public async Task LoadAsync()
     {
-        if (!App.Current.Host.Keys.IsUnlocked && !(await App.Current.UnlockAsync(interactive: true)).Ok)
+        if (!App.Current.Host.Keys.IsUnlocked && !(await App.Current.UnlockAsync(PromptReason.EnvironmentVariables, interactive: true)).Ok)
         {
             Message = Text.Get("Env_Locked");
             return;
@@ -167,12 +170,17 @@ public sealed partial class EnvironmentViewModel : ObservableObject
             foreach (var variable in set.Variables)
                 Sealed.Add(new(variable.Name, Text.Format("Env_DetailFolder", set.Folder), false, set.Folder));
         InWindows.Clear();
-        foreach (var variable in user.OrderByDescending(v => v.LooksSecret))
-            InWindows.Add(new(variable.Name,
-                Text.Format(variable.LooksSecret ? "Env_DetailSecret" : "Env_Detail", variable.Length), variable.LooksSecret));
+        // A decoy is bait left for whatever reads the environment: listed, so it isn't a mystery, but never ticked or sealed.
+        var secrets = user.Count(v => v.LooksSecret && !v.Decoy);
+        foreach (var variable in user.OrderBy(v => v.Decoy).ThenByDescending(v => v.LooksSecret))
+            InWindows.Add(variable.Decoy
+                ? new(variable.Name, Text.Get("Env_DetailDecoy"), false, canPick: false)
+                : new(variable.Name, Text.Format(variable.LooksSecret ? "Env_DetailSecret" : "Env_Detail", variable.Length), variable.LooksSecret));
         SealedSummary = Sealed.Count == 0 ? Text.Get("Env_NoneSealed") : Text.Format("Env_SealedSummary", Sealed.Count);
-        WindowsSummary = Text.Format("Env_WindowsSummary", user.Count(v => v.LooksSecret));
-        WindowsHasSecrets = user.Any(v => v.LooksSecret);
+        var decoys = user.Where(v => v.Decoy).Select(v => v.Name).ToArray();
+        WindowsSummary = (secrets > 0 ? Text.Format("Env_WindowsSummary", secrets, user.Count - decoys.Length) : Text.Format("Env_WindowsNoSecrets", user.Count - decoys.Length))
+            + (decoys.Length > 0 ? " " + Text.Format("Env_WindowsDecoys", string.Join(", ", decoys)) : "");
+        WindowsHasSecrets = secrets > 0;
         RefreshNuGet(sealedNow);
         RefreshPlaceholders();
         CanEdit = true;

@@ -82,6 +82,50 @@ it with Windows Hello: the secret is then bound to that service's settings, and 
 it if anything else edits them. `tir service list` and `tir service remove` do the rest. The solo broker picks vault changes up at its next request, without a lock and
 unlock.
 
+## Alerts when you're away
+
+The tray app can push serious events to your phone through [ntfy](https://ntfy.sh), post them
+to a webhook of your choice, or show them on an [LcdHub](https://github.com/stevehansen/LcdHub)
+screen beside the PC, so a used decoy reaches you when you aren't looking. In
+**About**, **Alerts**, the first one you add asks for a name for this PC (it goes with every alert,
+so pick one that says nothing more).
+
+- **Add ntfy...** asks for the server (`https://ntfy.sh` or your own), the topic your phone's ntfy
+  app subscribes to, and an optional access token. Use a long random topic name, and a token that
+  can only write to it, so a stolen one can't read your alerts back. Each alert is a notification
+  with the event as its title, its severity as the priority, and a line such as "Critical on desk,
+  ×1. Open Tiresias."
+- **Add a webhook...** asks for the URL (HTTPS, or plain HTTP to localhost) and an optional header
+  such as `Authorization`. Each alert is one `tiresias.alert/v1` JSON POST: the event, its severity
+  and time, and the PC's name. Optionally it signs every POST the
+  [Standard Webhooks](https://www.standardwebhooks.com/) way (`webhook-id`, `webhook-timestamp`,
+  `webhook-signature`), so the receiver can check it came from this PC with any Standard Webhooks
+  library; paste a `whsec_` secret or make one in the form. And it can send a **heartbeat**,
+  "Tiresias is running" with the PC's name and the time only, every 5 to 60 minutes, so a receiver
+  that expects it (a dead man's switch such as a cron monitor) notices when alerts stop.
+- **Add LcdHub...** puts a line such as "Decoy credential used ×1" in the status strip of the LcdHub
+  running on this PC, warnings and worse by default. It goes when Home shows your findings, or after
+  24 hours. A critical event, such as a used decoy, also takes the screen over in red with the
+  event and its count until then. LcdHub shows nothing while the PC is locked and keeps both for when
+  you unlock; if LcdHub isn't running, they wait for it. It never shows more than the event and how
+  often.
+
+Topics, tokens, URLs and headers are sealed like your secrets and saving needs Windows Hello;
+muting or removing one doesn't. **Send a test alert** checks it arrives. One you mark trusted also
+gets program paths and names (ntfy: the program's file name only); nothing ever gets a value or a
+token. Alerts open at the first unlock after the app starts, then keep working while the session is
+locked. What raises one: a decoy credential used (including one the admin service holds) or a decoy file read; a blocked program asking
+again, a request refused in lockdown, "This wasn't me", and a program asking for a secret while
+the PC is locked; the solo broker (in the app or the Windows service) rejecting the trust chain, a paper key used, the vault rolled back
+or changed without your approval, and an unapproved broker request; and new findings the background
+checks turn up that Home hasn't shown. A program asking while you're at the PC doesn't: you are at
+the dialog (see [docs/alerts.md](docs/alerts.md)).
+
+When alerts stop arriving somewhere, because the receiver refused them or nothing has gone through
+for 15 minutes, Home shows "alerts to `phone` aren't arriving" with a button to the Alerts card, and
+your other alerts get an "Alerts to a sink are failing" (naming the one failing only if trusted). The
+finding goes once that sink delivers again (a test alert counts), or when you fix or remove it.
+
 ## AI coding agents
 
 `tir ai --install` writes a few lines into `~/.claude/CLAUDE.md` (`--install <file>`: your agent's

@@ -27,7 +27,8 @@ public static class BrokerHost
         builder.Services.Configure<BrokerOptions>(builder.Configuration.GetSection("Broker"));
         builder.Services.TryAddSingleton(TimeProvider.System);
         // One instance: two writers on the same file would each keep their own prevHash and break the chain.
-        builder.Services.AddSingleton(sp => new AuditLog(
+        // A host may register its own first, to subscribe before the startup trust check writes to it.
+        builder.Services.TryAddSingleton(sp => new AuditLog(
             sp.GetRequiredService<IOptions<BrokerOptions>>().Value.AuditPath, sp.GetRequiredService<TimeProvider>()));
         builder.Services.AddSingleton(sp =>
         {

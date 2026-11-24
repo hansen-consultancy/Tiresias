@@ -29,6 +29,16 @@ public enum DoctorStatus
 public sealed record DoctorCheck(string Name, DoctorStatus Status, string Detail, DoctorFix? Fix = null, Position? Now = null, Position? Better = null, string? Kind = null, string? Subject = null)
 {
     public bool IsFinding => Fix is not null || Now is not null;
+
+    /// <summary>
+    /// About something only a developer has (user secrets, git, containers...). The app leaves such a
+    /// line out of Passed on a PC without developer tools (docs/developer-tools.md); a finding or a
+    /// Warn/Fail line always shows.
+    /// </summary>
+    public bool ForDevelopers { get; init; }
+
+    /// <summary>A Warn line about solo mode's trade-offs that has no fix: the app shows it as passed to whoever isn't a developer.</summary>
+    public bool SoloNote { get; init; }
 }
 
 /// <summary>What the vault file says about recoverability: which secrets lack a Hello or a recovery wrap.</summary>
@@ -59,7 +69,7 @@ public interface IDoctorProbe
     DoctorVault? Vault { get; }
 
     /// <summary>Whether the trust chain names this device's Windows Hello key (docs/trust-links.md); <c>null</c> when there is no chain to read.</summary>
-    bool? HelloBound => null;
+    Task<bool?> HelloBoundAsync() => Task.FromResult<bool?>(null);
 
     /// <summary>The HTTP status of an unsigned call to the broker (401 means up), or <c>null</c> when unreachable.</summary>
     Task<int?> BrokerStatusAsync();
@@ -115,8 +125,12 @@ public interface IDoctorProbe
     /// <summary>Paths of blocked programs whose file still exists.</summary>
     IEnumerable<string> BlockedPrograms() => [];
 
-    /// <summary>When the user last started each program themselves, where Windows records it (UserAssist).</summary>
-    IEnumerable<ProgramRun> ProgramRuns() => [];
+    /// <summary>
+    /// When programs last ran for the user, where Windows records it: every program the user started
+    /// themselves (UserAssist), and, with the admin tier installed, how any program or one under a
+    /// folder of <paramref name="of"/> last ran (its <c>lastrun</c>).
+    /// </summary>
+    IEnumerable<ProgramRun> ProgramRuns(IReadOnlyCollection<string> of) => [];
 
     /// <summary>The uninstall registry entries, machine and user, each with whether its uninstaller and folder are on disk.</summary>
     IEnumerable<UninstallEntry> UninstallEntries() => [];
@@ -136,8 +150,22 @@ public interface IDoctorProbe
     /// <summary>The optional admin tier (docs/admin-tier.md); <c>null</c> when it isn't installed.</summary>
     AdminTierFacts? AdminTier => null;
 
+    /// <summary>Alert sinks whose alerts aren't arriving, from the app's sender; empty outside the app.</summary>
+    IReadOnlyList<Alerts.FailingSink> FailingAlertSinks => [];
     /// <summary>What the user's account can open of their containers, WSL and VMs (docs/containers-and-vms.md). No contents.</summary>
     ReachFacts Reach => ReachFacts.None;
+
+    /// <summary>Names inside the environments in <paramref name="scope"/>, through read-only calls; only when the user asked. Never a value.</summary>
+    Task<ReachContents> ReachContentsAsync(ReachScope scope, CancellationToken ct) => Task.FromResult(new ReachContents(null));
+
+    /// <summary>
+    /// The devcontainer files in the project folders and in <paramref name="workspaces"/> (the folders
+    /// running containers were started for), with the names in them and their env files. Never a value.
+    /// </summary>
+    IEnumerable<DevcontainerFile> Devcontainers(IReadOnlyCollection<string> workspaces) => [];
+
+    /// <summary>What VS Code's Dev Containers forwards into containers; <c>null</c> when it isn't installed.</summary>
+    DevcontainerForwarding? DevcontainerForwarding => null;
 }
 
 /// <summary>How many decoys are placed, and whether something listens on their endpoints (checked without connecting, which would be a hit).</summary>
@@ -151,7 +179,8 @@ public sealed record DoctorDecoys(int Placed, bool Listening, bool Held = false)
 /// </summary>
 public static partial class Doctor
 {
-    public static async Task<IReadOnlyList<DoctorCheck>> RunAsync(IDoctorProbe probe)
+    /// <param name="contents">What <see cref="IDoctorProbe.ReachContentsAsync"/> found, when the user asked to look inside; <c>null</c> otherwise.</param>
+    public static async Task<IReadOnlyList<DoctorCheck>> RunAsync(IDoctorProbe probe, ReachContents? contents = null)
     {
         var checks = new List<DoctorCheck>
         {
@@ -164,7 +193,7 @@ public static partial class Doctor
             Vault(probe.Vault),
         };
 
-        if (probe.HelloBound is { } bound)
+        if (await probe.HelloBoundAsync() is { } bound)
             checks.Add(bound
                 ? new("trust chain", DoctorStatus.Ok, "this device's Windows Hello key signs the links that add trust")
                 : new("trust chain", DoctorStatus.Warn, "this device's Windows Hello key isn't in the trust chain yet, so it can't add a device or change trust: run tir trust bind-hello"));
@@ -194,8 +223,11 @@ public static partial class Doctor
             checks.Add(DecoysLine(decoys));
         if (probe.AdminTier is { Installed: true } adminTier)
             checks.Add(AdminTierLine(adminTier));
+        checks.AddRange(FailingAlerts(probe.FailingAlertSinks));
+        var developer = checks.Count;
         checks.AddRange(probe.UserSecretsFiles().Select(UserSecretsFile).OfType<DoctorCheck>());
         checks.AddRange(probe.Projects().Select(Project).OfType<DoctorCheck>());
+        ForDevelopers(checks, developer);
         checks.Add(probe.ExposedVariables switch
         {
             [] => new(VariablesCheck, DoctorStatus.Ok, "none of your user environment variables look like secrets"),
@@ -203,6 +235,7 @@ public static partial class Doctor
                 $"{names.Count} look like secrets and every program you run can read them: {string.Join(", ", names)}. Seal them in the app's Environment variables window, or with tir env protect",
                 new ProtectVariables(names), Position.Plaintext, Position.SealedApproved),
         });
+        developer = checks.Count;
         checks.AddRange(ConfigChecks(probe.UserSecretsFiles(), probe.ConfigFiles(), probe.KeyFiles()));
         checks.AddRange(GitTokens(probe.GitConfigs(), probe.GitCredentials));
         checks.AddRange(PublishingKeys(probe.ToolFiles(), probe.UserVariableNames));
@@ -213,26 +246,50 @@ public static partial class Doctor
             clearances.Add((certificate, brokerStatus is null ? null : await probe.RavenClearanceAsync(certificate.Service)));
         checks.AddRange(RavenClearance(clearances));
         checks.AddRange(KeysAsValues(probe.SealedEnvironment));
+        ForDevelopers(checks, developer);
         // A program blocked for using a decoy is that finding, not "This wasn't me"'s.
-        string[] otherBlocks = [];
+        var (startup, installed) = (probe.StartupEntries().ToArray(), probe.UninstallEntries().ToArray());
+        DecoyUseRecord[]? decoyUses = null;
+        string[] blocked = [], otherBlocks = [];
         try
         {
-            var decoyUses = probe.DecoyUses().ToArray();
-            var blocked = probe.BlockedPrograms().ToArray();
-            checks.AddRange(Decoys(decoyUses, blocked, DateTimeOffset.UtcNow));
-            otherBlocks = [.. blocked.Where(b => !decoyUses.Any(u => !u.IsRead && SamePath(u.Program, b)))];
+            decoyUses = [.. probe.DecoyUses()];
+            blocked = [.. probe.BlockedPrograms()];
         }
         catch (IOException)
         {
-            checks.Add(new("decoy incidents and program blocks", DoctorStatus.Warn, "The admin service could not supply its incident history and block list."));
+            decoyUses = null;
         }
+        var runs = probe.ProgramRuns(RunsAsked(startup, installed, blocked)).ToArray();
+        if (decoyUses is null)
+            checks.Add(new("decoy incidents and program blocks", DoctorStatus.Warn, "The admin service could not supply its incident history and block list."));
+        else
+        {
+            checks.AddRange(Decoys(decoyUses, blocked, DateTimeOffset.UtcNow, runs));
+            otherBlocks = [.. blocked.Where(b => !decoyUses.Any(u => !u.IsRead && SamePath(u.Program, b)))];
+        }
+        developer = checks.Count;
         checks.AddRange(CliSignIns(probe.CliConfigs, probe.GitHubAppService));
-        checks.AddRange(Reach(probe.Reach));
-        var (uses, runs, installed, now) = (probe.CredentialUses().ToArray(), probe.ProgramRuns().ToArray(), probe.UninstallEntries().ToArray(), DateTimeOffset.UtcNow);
-        checks.AddRange(AttackSurface(probe.Extensions(), probe.StartupEntries(), uses, otherBlocks, now, runs));
+        var reach = probe.Reach;
+        checks.AddRange(Reach(reach));
+        checks.AddRange(Contents(reach, contents));
+        checks.AddRange(WslContents(reach, contents));
+        checks.AddRange(HyperVContents(reach, contents));
+        string[] workspaces = [.. contents?.Docker?.Containers.Select(c => PastableFolder(c.Workspace)).OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase) ?? []];
+        checks.AddRange(Devcontainers(probe.Devcontainers(workspaces), probe.DevcontainerForwarding));
+        ForDevelopers(checks, developer);
+        var (uses, now) = (probe.CredentialUses().ToArray(), DateTimeOffset.UtcNow);
+        checks.AddRange(AttackSurface(probe.Extensions(), startup, uses, otherBlocks, now, runs));
         checks.AddRange(UninstallEntries(installed));
         checks.AddRange(UnusedApplications(installed, runs, uses, now));
         return checks;
+    }
+
+    /// <summary>Marks the lines from <paramref name="from"/> on as about something only a developer has.</summary>
+    static void ForDevelopers(List<DoctorCheck> checks, int from)
+    {
+        for (var i = from; i < checks.Count; i++)
+            checks[i] = checks[i] with { ForDevelopers = true };
     }
 
     /// <summary>The name of the environment variables check.</summary>
@@ -242,8 +299,8 @@ public static partial class Doctor
     static readonly DoctorCheck[] SoloTradeOffs =
     [
         new("mode", DoctorStatus.Ok, "Solo: the broker runs on this device; encryption, leases, placeholders, consent and audit all apply"),
-        new("egress", DoctorStatus.Warn, "Solo: requests leave from your own connection, so there is no fixed IP for upstreams to allow-list"),
-        new("isolation", DoctorStatus.Warn, "Solo: secrets live on the same machine as your agents and are not protected from code running as admin"),
+        new("egress", DoctorStatus.Warn, "Solo: requests leave from your own connection, so there is no fixed IP for upstreams to allow-list") { SoloNote = true },
+        new("isolation", DoctorStatus.Warn, "Solo: secrets live on the same machine as your agents and are not protected from code running as admin") { SoloNote = true },
     ];
 
     /// <summary>Where solo mode's broker runs (docs/broker-service.md).</summary>

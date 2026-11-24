@@ -18,6 +18,26 @@ public sealed record NuGetSource(string Source, string Variable, string Username
 }
 
 /// <summary>
+/// A git host whose HTTPS remotes authenticate with a sealed variable as the password, for
+/// <c>tir-remote git-credential</c> in a devcontainer. <paramref name="Host"/> is what git's credential
+/// protocol sends: the host name, lower case, with <c>:port</c> when it isn't 443.
+/// </summary>
+public sealed record GitHost(string Host, string Variable, string Username)
+{
+    public const string HostRequirement = "Use a host name such as github.com, with :port only when it isn't 443; no scheme, user or path";
+
+    /// <summary>GitHub, GitLab, Azure Repos and Bitbucket take any user name with a token as the password.</summary>
+    public const string DefaultUsername = "tiresias";
+
+    /// <summary>The host as git sends it, or <c>null</c> when <paramref name="host"/> isn't just a host and port.</summary>
+    public static string? Normalize(string? host) =>
+        host is { Length: > 0 } && !host.Contains('/', StringComparison.Ordinal) && !host.Contains('@', StringComparison.Ordinal)
+            && Uri.TryCreate($"https://{host}/", UriKind.Absolute, out var uri) && uri.AbsolutePath == "/" && uri.Query.Length == 0 && uri.Fragment.Length == 0
+            ? (uri.IsDefaultPort ? uri.IdnHost : $"{uri.IdnHost}:{uri.Port}").ToLowerInvariant()
+            : null;
+}
+
+/// <summary>
 /// A variable delivered as a broker placeholder instead of its value: the process gets a
 /// <c>tirph_</c> placeholder in <paramref name="Variable"/> and the forwarder's URL for
 /// <paramref name="Service"/> (a vault service, which holds the real key) in
@@ -33,11 +53,20 @@ public sealed record EnvironmentPlaceholder(string Variable, string Service, str
 /// <c>\</c> and <c>/</c> alike. NuGet sources are sealed with the rest, so nobody can point a feed of
 /// theirs at your token by editing a file. So are placeholder deliveries, keyed by variable name
 /// wherever that name resolves, so nothing can quietly switch one back to the real value.
+/// <see cref="Configuration"/> names the variables a .NET app may ask for itself, through
+/// <c>Tiresias.Extensions.Configuration</c>, when nothing started it with them: a delivery beside
+/// value and placeholder, never both a placeholder and this.
 /// </summary>
 public sealed record SealedEnvironment(IReadOnlyList<SealedVariable> Global, IReadOnlyList<FolderSet> Folders, IReadOnlyList<NuGetSource> NuGetSources,
     IReadOnlyList<EnvironmentPlaceholder> Placeholders)
 {
     public static readonly SealedEnvironment Empty = new([], [], [], []);
+
+    /// <summary>The variables marked for configuration delivery, by name wherever that name resolves.</summary>
+    public IReadOnlyList<string> Configuration { get; init; } = [];
+
+    /// <summary>Git hosts a devcontainer's credential helper may ask a token for, sealed so no file can point one elsewhere.</summary>
+    public IReadOnlyList<GitHost> GitHosts { get; init; } = [];
 
     /// <summary>Azure Artifacts, GitHub Packages and most token feeds accept any user name with a token as the password.</summary>
     public const string NuGetDefaultUsername = "tiresias";
@@ -118,9 +147,50 @@ public sealed record SealedEnvironment(IReadOnlyList<SealedVariable> Global, IRe
     static bool SameEndpoint(Uri left, Uri right) => left.Port == right.Port && left.AbsolutePath == right.AbsolutePath
         && string.Equals(left.IdnHost, right.IdnHost, StringComparison.OrdinalIgnoreCase);
 
+    /// <exception cref="ArgumentException">The host isn't one <see cref="GitHost.Normalize"/> takes.</exception>
+    public SealedEnvironment WithGitHost(GitHost host) =>
+        GitHost.Normalize(host.Host) is not { } normalized
+            ? throw new ArgumentException(GitHost.HostRequirement, nameof(host))
+            : this with { GitHosts = [.. GitHosts.Where(h => h.Host != normalized), host with { Host = normalized }] };
+
+    public SealedEnvironment WithoutGitHost(string host) =>
+        this with { GitHosts = [.. GitHosts.Where(h => h.Host != (GitHost.Normalize(host) ?? host))] };
+
+    /// <summary>The mapping for the host git asks about over HTTPS; <c>null</c> for another protocol or an unmapped host.</summary>
+    public GitHost? GitHostFor(string? protocol, string? host) =>
+        protocol == "https" && GitHost.Normalize(host) is { } normalized ? GitHosts.FirstOrDefault(h => h.Host == normalized) : null;
+
     /// <summary><paramref name="placeholder"/> replacing any delivery for the same variable.</summary>
+    /// <exception cref="InvalidOperationException">The variable is marked for configuration: a .NET app would get the placeholder in place of its value.</exception>
     public SealedEnvironment WithPlaceholder(EnvironmentPlaceholder placeholder) =>
-        this with { Placeholders = [.. Placeholders.Where(p => !SameName(p.Variable, placeholder.Variable)), placeholder] };
+        IsForConfiguration(placeholder.Variable)
+            ? throw new InvalidOperationException($"{placeholder.Variable} is handed to .NET apps as its value; unmark it for configuration first.")
+            : this with { Placeholders = [.. Placeholders.Where(p => !SameName(p.Variable, placeholder.Variable)), placeholder] };
+
+    /// <summary>Marks <paramref name="variable"/> for configuration delivery; marking it twice changes nothing.</summary>
+    /// <exception cref="InvalidOperationException">It is delivered as a placeholder, which a .NET app's configuration can't use.</exception>
+    public SealedEnvironment WithConfiguration(string variable) =>
+        PlaceholderFor(variable) is not null
+            ? throw new InvalidOperationException($"{variable} is handed out as a placeholder; switch it back to its value first.")
+            : IsForConfiguration(variable) ? this : this with { Configuration = [.. Configuration, variable] };
+
+    public SealedEnvironment WithoutConfiguration(string variable) =>
+        this with { Configuration = [.. Configuration.Where(name => !SameName(name, variable))] };
+
+    public bool IsForConfiguration(string variable) => Configuration.Any(name => SameName(name, variable));
+
+    /// <summary>
+    /// What a .NET app in <paramref name="directory"/> may ask for: the variables resolved there that
+    /// are marked for configuration, less those it already has (<paramref name="present"/>), so a
+    /// process started by <c>tir run</c> or a terminal is not asked again. Each comes with its origin,
+    /// for consent.
+    /// </summary>
+    public IReadOnlyList<(SealedVariable Variable, string? Folder)> ForConfiguration(string directory, IEnumerable<string> present)
+    {
+        var have = present.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return [.. ResolveWithFolders(directory).Where(v => IsForConfiguration(v.Variable.Name) && !have.Contains(v.Variable.Name)
+            && PlaceholderFor(v.Variable.Name) is null)];
+    }
 
     public SealedEnvironment WithoutPlaceholder(string variable) =>
         this with { Placeholders = [.. Placeholders.Where(p => !SameName(p.Variable, variable))] };
@@ -170,6 +240,13 @@ public sealed record SealedEnvironment(IReadOnlyList<SealedVariable> Global, IRe
             placeholders[placeholder.Variable] = new JsonObject { ["service"] = placeholder.Service, ["baseUrl"] = placeholder.BaseUrlVariable };
         if (placeholders.Count > 0)
             document["placeholders"] = placeholders;
+        var git = new JsonObject();
+        foreach (var host in GitHosts)
+            git[host.Host] = new JsonObject { ["variable"] = host.Variable, ["username"] = host.Username };
+        if (git.Count > 0)
+            document["git"] = git;
+        if (Configuration.Count > 0)
+            document["configuration"] = new JsonArray([.. Configuration.Select(name => (JsonNode)name)]);
         return document;
     }
 
@@ -201,7 +278,22 @@ public sealed record SealedEnvironment(IReadOnlyList<SealedVariable> Global, IRe
                 : throw new InvalidDataException($"The placeholder delivery for {pair.Key} names no service or base-URL variable.")).ToArray(),
             _ => throw new InvalidDataException("The sealed placeholder deliveries are not an object."),
         };
-        return new(SealedVariables.FromDocument(document), folders, nuget, placeholders);
+        var configuration = document["configuration"] switch
+        {
+            null => [],
+            JsonArray names => names.Select(name => name?.GetValueKind() == System.Text.Json.JsonValueKind.String
+                ? (string)name! : throw new InvalidDataException("A name marked for configuration is not a string.")).ToArray(),
+            _ => throw new InvalidDataException("The names marked for configuration are not an array."),
+        };
+        var git = document["git"] switch
+        {
+            null => [],
+            JsonObject hosts => hosts.Select(pair => pair.Value is JsonObject map && (string?)map["variable"] is { } variable
+                ? new GitHost(pair.Key, variable, (string?)map["username"] ?? GitHost.DefaultUsername)
+                : throw new InvalidDataException($"The sealed git host {pair.Key} names no variable.")).ToArray(),
+            _ => throw new InvalidDataException("The sealed git hosts are not an object."),
+        };
+        return new(SealedVariables.FromDocument(document), folders, nuget, placeholders) { Configuration = configuration, GitHosts = git };
     }
 
     static bool Contains(string folder, string directory) =>

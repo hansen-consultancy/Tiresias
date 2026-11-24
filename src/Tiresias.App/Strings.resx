@@ -22,6 +22,12 @@
   <data name="Common_Cancel" xml:space="preserve">
     <value>Cancel</value>
   </data>
+  <data name="Common_Yes" xml:space="preserve">
+    <value>Yes</value>
+  </data>
+  <data name="Common_No" xml:space="preserve">
+    <value>No</value>
+  </data>
   <data name="Common_TryAgain" xml:space="preserve">
     <value>Try again</value>
   </data>
@@ -70,11 +76,14 @@
   <data name="About_AdminTier_Heading" xml:space="preserve">
     <value>Admin tier (optional)</value>
   </data>
+  <data name="About_AdminTier_What" xml:space="preserve">
+    <value>A small Windows service for what an ordinary account can't do. It keeps your decoys where programs running as you can't reach them, listens for them from the moment Windows starts, names every program that opens a decoy file, and freezes a program that uses a decoy and cuts it off the network until you look. Undoing any of that needs a Windows admin prompt, which a program running as you can't answer.</value>
+  </data>
   <data name="About_AdminTier_Checking" xml:space="preserve">
     <value>Checking...</value>
   </data>
   <data name="About_AdminTier_NotInstalled" xml:space="preserve">
-    <value>Not set up. With your approval at a Windows admin prompt, a small Tiresias service can do what an ordinary account can't. Tiresias works the same without it.</value>
+    <value>Not set up. Setting it up takes one Windows admin prompt; Tiresias works the same without it.</value>
   </data>
   <data name="About_AdminTier_Running" xml:space="preserve">
     <value>Running, version {0}.</value>
@@ -157,6 +166,31 @@
   <data name="Consent_Environment_Note" xml:space="preserve">
     <value>They go into this one program's environment, and whatever it starts. Allowing it hands over the values; they are never shown here.</value>
   </data>
+  <data name="Consent_Configuration_Note" xml:space="preserve">
+    <value>A .NET app running in {0} asks for the variables marked for .NET apps, for its configuration. Allow for this session lasts until you lock Tiresias or for 12 hours, whichever comes first.</value>
+    <comment>{0}: the folder the app runs in</comment>
+  </data>
+  <data name="Consent_UnknownProgram" xml:space="preserve">
+    <value>an unknown program</value>
+  </data>
+  <data name="Consent_Devcontainer_Heading" xml:space="preserve">
+    <value>Give environment variables to the devcontainer for {0}?</value>
+  </data>
+  <data name="Consent_DevcontainerGit_Heading" xml:space="preserve">
+    <value>Give git the token for {0} in the devcontainer for {1}?</value>
+  </data>
+  <data name="Devcontainer_GitUnmapped" xml:space="preserve">
+    <value>No sealed variable for git at {0}://{1}. Map one on the host: tir env git add {1} &lt;NAME&gt;.</value>
+  </data>
+  <data name="Devcontainer_GitPlaceholder" xml:space="preserve">
+    <value>{0} is handed out as a placeholder, which git can't use as the token for {1}. Switch it back to its value: tir env placeholder remove {0}.</value>
+  </data>
+  <data name="Consent_Devcontainer_Note" xml:space="preserve">
+    <value>A program in this devcontainer asked; Tiresias can't see which one. Allowing it hands over the values; they are never shown here. "For the session" lasts until Tiresias locks or the devcontainer's ticket ends.</value>
+  </data>
+  <data name="Environment_DevcontainerTicket" xml:space="preserve">
+    <value>{0} (lets the devcontainer for {1} ask for sealed variables until Tiresias locks)</value>
+  </data>
   <data name="Consent_NuGet_Heading" xml:space="preserve">
     <value>Give a NuGet feed's token to {0}?</value>
   </data>
@@ -188,7 +222,13 @@
     <value>Sealed {0}.</value>
   </data>
   <data name="Env_Body" xml:space="preserve">
-    <value>Variables in your Windows environment are readable by every program you run. Sealed ones are given only to a program you allow: run it with tir run -- &lt;command&gt;.</value>
+    <value>Every program you run can read the variables in your Windows environment. A sealed variable is kept by Tiresias and given only to a program you allow: run it with tir run -- &lt;command&gt;.</value>
+  </data>
+  <data name="Env_ColName" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="Env_ColDetail" xml:space="preserve">
+    <value>Detail</value>
   </data>
   <data name="Env_Detail" xml:space="preserve">
     <value>({0} characters)</value>
@@ -201,6 +241,9 @@
   </data>
   <data name="Env_DetailSecret" xml:space="preserve">
     <value>({0} characters, looks like a secret)</value>
+  </data>
+  <data name="Env_DetailDecoy" xml:space="preserve">
+    <value>(a decoy Tiresias placed: using it raises an alert)</value>
   </data>
   <data name="Env_FolderBrowse" xml:space="preserve">
     <value>Browse...</value>
@@ -230,7 +273,7 @@
     <value>Value of the new variable</value>
   </data>
   <data name="Env_NoneSealed" xml:space="preserve">
-    <value>Nothing sealed yet.</value>
+    <value>Nothing sealed yet: seal a variable from Windows above, or add one below.</value>
   </data>
   <data name="Env_NothingPicked" xml:space="preserve">
     <value>Tick at least one variable first.</value>
@@ -356,16 +399,22 @@
     <value>Seal</value>
   </data>
   <data name="Env_SealedHeading" xml:space="preserve">
-    <value>Sealed</value>
+    <value>Sealed: only programs you allow get these</value>
   </data>
   <data name="Env_SealedSummary" xml:space="preserve">
     <value>{0} sealed. Tick some to put them back in Windows or remove them.</value>
   </data>
   <data name="Env_WindowsHeading" xml:space="preserve">
-    <value>In your Windows environment</value>
+    <value>Still in Windows: every program can read these</value>
   </data>
   <data name="Env_WindowsSummary" xml:space="preserve">
-    <value>{0} look like secrets and are ticked. Sealing removes them from Windows once the sealed copy reads back; programs already running keep their copy until they restart.</value>
+    <value>{0} of these {1} look like secrets and are ticked. Sealing takes them out of Windows once the sealed copy reads back; programs already running keep their copy until they restart.</value>
+  </data>
+  <data name="Env_WindowsNoSecrets" xml:space="preserve">
+    <value>None of these {0} looks like a secret. Tick one to seal it anyway.</value>
+  </data>
+  <data name="Env_WindowsDecoys" xml:space="preserve">
+    <value>Decoys Tiresias placed as bait stay, and can't be sealed: {0}.</value>
   </data>
   <data name="Environment_Locked" xml:space="preserve">
     <value>Tiresias is locked. Unlock it, then run the command again.</value>
@@ -786,6 +835,10 @@ Switch to this copy, {2}, from {3}? The other copy quits first, ending its lease
     <value>Still running as process {0}.</value>
     <comment>{0}: process id</comment>
   </data>
+  <data name="Incident_ProcessFrozen" xml:space="preserve">
+    <value>Process {0} is frozen, with the processes it started, and its program can't use the network: the admin tier stopped it. End it here, or thaw it from Home if it was you after all.</value>
+    <comment>{0}: process id</comment>
+  </data>
   <data name="Incident_ProcessEnded" xml:space="preserve">
     <value>Process {0} is no longer running.</value>
     <comment>{0}: process id</comment>
@@ -1187,6 +1240,12 @@ Switch to this copy, {2}, from {3}? The other copy quits first, ending its lease
   <data name="Status_Review" xml:space="preserve">
     <value>Review...</value>
   </data>
+  <data name="Status_CopyCommand" xml:space="preserve">
+    <value>Copy command</value>
+  </data>
+  <data name="Status_CopyCommandName" xml:space="preserve">
+    <value>Copy {0}</value>
+  </data>
   <data name="Status_ReviewName" xml:space="preserve">
     <value>Review {0} in the secrets editor</value>
     <comment>{0}: UserSecretsId</comment>
@@ -1225,6 +1284,10 @@ Store them in clear?</value>
   <data name="Secrets_ProjectSealed" xml:space="preserve">
     <value>{0} (sealed)</value>
     <comment>{0}: UserSecretsId</comment>
+  </data>
+  <data name="Secrets_ProjectPlainAdded" xml:space="preserve">
+    <value>{0} (sealed, {1} added in plain)</value>
+    <comment>{0}: UserSecretsId; {1}: how many keys were added beside the sealed envelope</comment>
   </data>
   <data name="Secrets_ProjectPlain" xml:space="preserve">
     <value>{0} (not sealed yet)</value>
@@ -1333,7 +1396,7 @@ Store them in clear?</value>
 • It can stop a program that used one until you say otherwise.</value>
   </data>
   <data name="FirstRun_AdminTier_Note" xml:space="preserve">
-    <value>This version holds the decoys and listens for them from boot; the rest arrives in the next updates. Not now changes nothing, and About offers it again any time.</value>
+    <value>Not now changes nothing, and About offers it again any time.</value>
   </data>
   <data name="FirstRun_Primary_AdminTier" xml:space="preserve">
     <value>Set up...</value>
@@ -1498,6 +1561,23 @@ Store them in clear?</value>
   </data>
   <data name="Update_Later" xml:space="preserve">
     <value>Later</value>
+  </data>
+  <data name="Update_FolderInUse" xml:space="preserve">
+    <value>The update can't be applied yet: these programs use Tiresias's folder (they were started from it, or still have it as their working folder):
+
+{0}
+
+Close them, then choose the update in the tray menu again.</value>
+  </data>
+  <data name="Update_NotApplied" xml:space="preserve">
+    <value>The update to {0} couldn't be applied, so this is still the earlier version. A program was using Tiresias's folder. Choose the update in the tray menu again; if it fails again, restarting Windows frees the folder.</value>
+  </data>
+  <data name="Update_NotApplied_Users" xml:space="preserve">
+    <value>The update to {0} couldn't be applied, so this is still the earlier version. These programs use Tiresias's folder:
+
+{1}
+
+Close them, then choose the update in the tray menu again.</value>
   </data>
   <data name="Update_Busy" xml:space="preserve">
     <value>Finish what's open first (an approval, the secrets editor, the Services page or setup), then choose the update in the tray menu again.</value>
@@ -2034,6 +2114,18 @@ Store them in clear?</value>
   <data name="Installed_ShowUnused" xml:space="preserve">
     <value>Not opened in 90 days</value>
   </data>
+  <data name="Installed_ShowUnsigned" xml:space="preserve">
+    <value>Not signed</value>
+  </data>
+  <data name="Installed_UnsignedTip" xml:space="preserve">
+    <value>Not signed: nothing vouches that it came from its publisher unchanged</value>
+  </data>
+  <data name="Installed_ShowNew" xml:space="preserve">
+    <value>Installed in the last {0} days</value>
+  </data>
+  <data name="Installed_New" xml:space="preserve">
+    <value>New</value>
+  </data>
   <data name="Installed_ListName" xml:space="preserve">
     <value>Installed programs</value>
   </data>
@@ -2045,6 +2137,12 @@ Store them in clear?</value>
   </data>
   <data name="Installed_ColFor" xml:space="preserve">
     <value>Installed for</value>
+  </data>
+  <data name="Installed_ColInstalledOn" xml:space="preserve">
+    <value>Installed on</value>
+  </data>
+  <data name="Installed_InstalledOnUnknown" xml:space="preserve">
+    <value>Not known: its entry gives no date and its folder is gone</value>
   </data>
   <data name="Installed_ColUse" xml:space="preserve">
     <value>Last opened</value>
@@ -2073,6 +2171,15 @@ Store them in clear?</value>
   <data name="Installed_Summary" xml:space="preserve">
     <value>{0} programs, {1} not opened in 90 days</value>
   </data>
+  <data name="Installed_SummaryScanning" xml:space="preserve">
+    <value>checking signatures...</value>
+  </data>
+  <data name="Installed_SummaryUnsigned" xml:space="preserve">
+    <value>{0} not signed</value>
+  </data>
+  <data name="Installed_SummaryNew" xml:space="preserve">
+    <value>{0} installed in the last {1} days</value>
+  </data>
   <data name="Installed_Loading" xml:space="preserve">
     <value>Reading the installed-apps list...</value>
   </data>
@@ -2100,6 +2207,12 @@ Store them in clear?</value>
   <data name="Finding_FixUnblock" xml:space="preserve">
     <value>Unblock (that was me)</value>
   </data>
+  <data name="Finding_FixThaw" xml:space="preserve">
+    <value>Thaw and unblock (that was me)</value>
+  </data>
+  <data name="Finding_FixAlerts" xml:space="preserve">
+    <value>Open Alerts</value>
+  </data>
   <data name="Notify_AdminIncidents" xml:space="preserve">
     <value>Decoy activity is awaiting review. Open Service incidents in Activity.</value>
   </data>
@@ -2112,11 +2225,14 @@ Store them in clear?</value>
   <data name="AdminIncidents_Reviewed" xml:space="preserve">
     <value>Reviewed</value>
   </data>
+  <data name="AdminIncidents_Where" xml:space="preserve">
+    <value>Where</value>
+  </data>
   <data name="AdminIncidents_ConfirmReview" xml:space="preserve">
     <value>Mark {0} service incidents through {1} reviewed for the signed-in user? Their history will remain available in Activity.</value>
   </data>
   <data name="AdminIncidents_ConfirmUnblock" xml:space="preserve">
-    <value>Unblock this program for the signed-in user and allow it to request credentials again?
+    <value>Unblock this program for the signed-in user and allow it to request credentials again? If the admin tier froze it, it is thawed and its network unblocked too.
 
 {0}</value>
   </data>
@@ -2233,6 +2349,33 @@ Store them in clear?</value>
   </data>
   <data name="Finding_FixReachGuide" xml:space="preserve">
     <value>How to close it</value>
+  </data>
+  <data name="Guide_Intro" xml:space="preserve">
+    <value>Tiresias can't do these for you: each needs Docker quit, an administrator, or a change inside a guest. Commands below already name your account.</value>
+  </data>
+  <data name="Guide_Copy" xml:space="preserve">
+    <value>Copy</value>
+  </data>
+  <data name="Guide_CopyName" xml:space="preserve">
+    <value>Copy step {0}</value>
+  </data>
+  <data name="Guide_RunAdmin" xml:space="preserve">
+    <value>Run as administrator...</value>
+  </data>
+  <data name="Guide_RunAdminTip" xml:space="preserve">
+    <value>Opens PowerShell as administrator with this command; Windows asks first</value>
+  </data>
+  <data name="Guide_Ran" xml:space="preserve">
+    <value>PowerShell opened as administrator. Check what it printed, then close it.</value>
+  </data>
+  <data name="Guide_Declined" xml:space="preserve">
+    <value>Nothing ran: the Windows prompt was declined.</value>
+  </data>
+  <data name="Guide_DemoNoRun" xml:space="preserve">
+    <value>Demo mode: nothing runs.</value>
+  </data>
+  <data name="Guide_ReadMore" xml:space="preserve">
+    <value>Read more on GitHub</value>
   </data>
   <data name="Finding_FixGitHubApp" xml:space="preserve">
     <value>Add a GitHub App...</value>
@@ -2381,6 +2524,18 @@ Store them in clear?</value>
   <data name="Nav_ActivityToday" xml:space="preserve">
     <value>{0} today</value>
   </data>
+  <data name="Nav_SecretsCountTip" xml:space="preserve">
+    <value>{0} user-secrets folders on this PC, empty ones included</value>
+  </data>
+  <data name="Nav_ServicesCountTip" xml:space="preserve">
+    <value>{0} services in your vault</value>
+  </data>
+  <data name="Nav_VariablesCountTip" xml:space="preserve">
+    <value>{0} of your user variables in Windows, not sealed: every program you start can read them</value>
+  </data>
+  <data name="Nav_ActivityCountTip" xml:space="preserve">
+    <value>{0} entries in today's activity</value>
+  </data>
   <data name="Flyout_Add" xml:space="preserve">
     <value>Add a credential...</value>
   </data>
@@ -2401,6 +2556,47 @@ Store them in clear?</value>
   </data>
   <data name="Secrets_ProjectEmpty" xml:space="preserve">
     <value>{0} (empty)</value>
+  </data>
+  <data name="Secrets_State_Sealed" xml:space="preserve">
+    <value>sealed</value>
+  </data>
+  <data name="Secrets_State_PlainAdded" xml:space="preserve">
+    <value>sealed, {0} added in plain</value>
+    <comment>{0}: how many keys were added beside the sealed envelope; the next run seals them</comment>
+  </data>
+  <data name="Secrets_State_NotSealed" xml:space="preserve">
+    <value>not sealed yet</value>
+  </data>
+  <data name="Secrets_State_Settings" xml:space="preserve">
+    <value>settings only</value>
+  </data>
+  <data name="Secrets_State_Empty" xml:space="preserve">
+    <value>empty</value>
+  </data>
+  <data name="Secrets_State_Invalid" xml:space="preserve">
+    <value>not valid JSON</value>
+  </data>
+  <data name="Secrets_Stats" xml:space="preserve">
+    <value>{0} user-secrets folders: {1}</value>
+    <comment>{1}: the counts below, joined</comment>
+  </data>
+  <data name="Secrets_Stats_Sealed" xml:space="preserve">
+    <value>{0} sealed</value>
+  </data>
+  <data name="Secrets_Stats_PlainAdded" xml:space="preserve">
+    <value>{0} sealed with keys added in plain</value>
+  </data>
+  <data name="Secrets_Stats_NotSealed" xml:space="preserve">
+    <value>{0} not sealed yet</value>
+  </data>
+  <data name="Secrets_Stats_Settings" xml:space="preserve">
+    <value>{0} settings only</value>
+  </data>
+  <data name="Secrets_Stats_Empty" xml:space="preserve">
+    <value>{0} empty</value>
+  </data>
+  <data name="Secrets_Stats_Invalid" xml:space="preserve">
+    <value>{0} not valid JSON</value>
   </data>
   <data name="Secrets_EmptyFolders" xml:space="preserve">
     <value>{0} empty folders: show</value>
@@ -2455,6 +2651,21 @@ Store them in clear?</value>
   </data>
   <data name="Installed_SearchOnlineTip" xml:space="preserve">
     <value>Opens your browser with a web search for this name and version</value>
+  </data>
+  <data name="Reach_Title" xml:space="preserve">
+    <value>See what your containers, WSL and VMs expose</value>
+  </data>
+  <data name="Reach_Intro" xml:space="preserve">
+    <value>Every program you run can open your Docker engine and your running WSL distributions. Check now lists the secret-looking names your containers and images hold, what they mount, the credential files in your distributions' homes, and which VM files you can read. Values are never kept.</value>
+  </data>
+  <data name="Reach_Looked" xml:space="preserve">
+    <value>Looked inside at {0:t}. The findings are with the others; Check now looks again.</value>
+  </data>
+  <data name="Reach_CheckNow" xml:space="preserve">
+    <value>Check now</value>
+  </data>
+  <data name="Reach_Daily" xml:space="preserve">
+    <value>Check daily</value>
   </data>
   <data name="Decoys_Title" xml:space="preserve">
     <value>Decoys</value>
@@ -2536,5 +2747,382 @@ Store them in clear?</value>
   <data name="Decoys_RemoveKept" xml:space="preserve">
     <value>Kept {0}: changed since Tiresias placed it, so it is yours now.</value>
     <comment>{0}: paths or variable names</comment>
+  </data>
+  <data name="Alerts_Heading" xml:space="preserve">
+    <value>Alerts</value>
+  </data>
+  <data name="Alerts_Locked" xml:space="preserve">
+    <value>Unlock to see and change alerts. They open at the first unlock after the app starts, then keep working while locked.</value>
+  </data>
+  <data name="Alerts_None" xml:space="preserve">
+    <value>Tiresias can push serious events, such as a decoy credential used, to your phone through ntfy, to a webhook of your choice or to an LcdHub screen beside this PC, so you hear about them when you aren't looking. Nothing is set up.</value>
+  </data>
+  <data name="Alerts_Summary" xml:space="preserve">
+    <value>Serious events on “{0}” are posted to:</value>
+  </data>
+  <data name="Alerts_RowPublic" xml:space="preserve">
+    <value>{0} and above. Event, severity and time only.</value>
+  </data>
+  <data name="Alerts_RowTrusted" xml:space="preserve">
+    <value>{0} and above. Trusted: also program paths and names, never a value.</value>
+  </data>
+  <data name="Alerts_RowMuted" xml:space="preserve">
+    <value>Muted. Nothing is sent until you unmute it.</value>
+  </data>
+  <data name="Alerts_RowStopped" xml:space="preserve">
+    <value>Stopped: the receiver refused an alert, so nothing more is sent. Fix it on the receiving side and send a test alert, or remove it and add it again.</value>
+  </data>
+  <data name="Alerts_Critical" xml:space="preserve">
+    <value>Critical</value>
+  </data>
+  <data name="Alerts_High" xml:space="preserve">
+    <value>High</value>
+  </data>
+  <data name="Alerts_Warning" xml:space="preserve">
+    <value>Warning</value>
+  </data>
+  <data name="Alerts_Info" xml:space="preserve">
+    <value>Everything</value>
+  </data>
+  <data name="Alerts_ColName" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="Alerts_ColDetail" xml:space="preserve">
+    <value>Detail</value>
+  </data>
+  <data name="Alerts_Test" xml:space="preserve">
+    <value>Send a test alert</value>
+  </data>
+  <data name="Alerts_Mute" xml:space="preserve">
+    <value>Mute</value>
+  </data>
+  <data name="Alerts_Unmute" xml:space="preserve">
+    <value>Unmute</value>
+  </data>
+  <data name="Alerts_Remove" xml:space="preserve">
+    <value>Remove</value>
+  </data>
+  <data name="Alerts_AddWebhook" xml:space="preserve">
+    <value>Add a webhook…</value>
+  </data>
+  <data name="Alerts_Added" xml:space="preserve">
+    <value>{0} added. Send a test alert to check it arrives.</value>
+  </data>
+  <data name="Alerts_Testing" xml:space="preserve">
+    <value>Sending a test alert to {0}…</value>
+  </data>
+  <data name="Alerts_TestDelivered" xml:space="preserve">
+    <value>{0} accepted the test alert.</value>
+  </data>
+  <data name="Alerts_TestRefused" xml:space="preserve">
+    <value>{0} answered {1}. Check its address and credentials.</value>
+  </data>
+  <data name="Alerts_TestTimeout" xml:space="preserve">
+    <value>{0} didn't answer within 10 seconds.</value>
+  </data>
+  <data name="Alerts_TestUnreachable" xml:space="preserve">
+    <value>Couldn't reach {0} ({1}).</value>
+  </data>
+  <data name="Alerts_TestGone" xml:space="preserve">
+    <value>{0} is no longer set up.</value>
+  </data>
+  <data name="Alerts_RemoveHeading" xml:space="preserve">
+    <value>Remove this alert destination?</value>
+  </data>
+  <data name="Alerts_RemoveBody" xml:space="preserve">
+    <value>{0} gets no more alerts, starting now. To use it again you add it again, with Windows Hello.</value>
+  </data>
+  <data name="Alerts_Removed" xml:space="preserve">
+    <value>{0} removed.</value>
+  </data>
+  <data name="Alerts_RemoveFailed" xml:space="preserve">
+    <value>Couldn't save that. The details are in the app log.</value>
+  </data>
+  <data name="Alerts_WindowTitle" xml:space="preserve">
+    <value>Add a webhook</value>
+  </data>
+  <data name="Alerts_WindowIntro" xml:space="preserve">
+    <value>Tiresias posts each alert as JSON (tiresias.alert/v1). The URL and header are sealed like your secrets, for Windows Hello and the recovery key.</value>
+  </data>
+  <data name="Alerts_Machine" xml:space="preserve">
+    <value>Name for this PC</value>
+  </data>
+  <data name="Alerts_MachineHint" xml:space="preserve">
+    <value>Every alert carries it, so you know which machine it came from. Pick one that tells you nothing more, such as “desk” or “build box”: it leaves this PC with each alert.</value>
+  </data>
+  <data name="Alerts_Id" xml:space="preserve">
+    <value>Name for this destination</value>
+  </data>
+  <data name="Alerts_IdHint" xml:space="preserve">
+    <value>Lowercase letters, digits and dashes, such as “phone” or “siem”. The app log uses it; it never leaves this PC.</value>
+  </data>
+  <data name="Alerts_Url" xml:space="preserve">
+    <value>URL</value>
+  </data>
+  <data name="Alerts_UrlHint" xml:space="preserve">
+    <value>HTTPS. Plain HTTP only to this PC (localhost), for a local relay. Redirects aren't followed.</value>
+  </data>
+  <data name="Alerts_HeaderNameLabel" xml:space="preserve">
+    <value>Header (optional)</value>
+  </data>
+  <data name="Alerts_HeaderValueLabel" xml:space="preserve">
+    <value>Header value</value>
+  </data>
+  <data name="Alerts_HeaderHint" xml:space="preserve">
+    <value>For example Authorization with Bearer and a token. Sent with every alert, to this URL only.</value>
+  </data>
+  <data name="Alerts_Signing" xml:space="preserve">
+    <value>Signing secret (optional)</value>
+  </data>
+  <data name="Alerts_SigningNew" xml:space="preserve">
+    <value>New secret</value>
+  </data>
+  <data name="Alerts_SigningHint" xml:space="preserve">
+    <value>Signs every alert the Standard Webhooks way (webhook-signature header), so the receiver can prove it came from this PC. Paste a whsec_ secret from the receiver, or make one here and copy it there. Sealed like the header.</value>
+  </data>
+  <data name="Alerts_Heartbeat" xml:space="preserve">
+    <value>Heartbeat</value>
+  </data>
+  <data name="Alerts_HeartbeatOff" xml:space="preserve">
+    <value>Off</value>
+  </data>
+  <data name="Alerts_HeartbeatEvery" xml:space="preserve">
+    <value>Every {0} minutes</value>
+  </data>
+  <data name="Alerts_HeartbeatHint" xml:space="preserve">
+    <value>Sends “Tiresias is running”, with this PC’s name and the time only, so a receiver that expects it notices when alerts stop. Not before the first unlock after a restart.</value>
+  </data>
+  <data name="Alerts_SigningBad" xml:space="preserve">
+    <value>The signing secret is whsec_ followed by base64 of 24 to 64 bytes. Use New secret to make one.</value>
+  </data>
+  <data name="Alerts_HeartbeatBad" xml:space="preserve">
+    <value>Pick a heartbeat from the list.</value>
+  </data>
+  <data name="Alerts_Threshold" xml:space="preserve">
+    <value>Send alerts that are at least</value>
+  </data>
+  <data name="Alerts_Trusted" xml:space="preserve">
+    <value>Trusted: also send program paths and secret names</value>
+  </data>
+  <data name="Alerts_TrustedHint" xml:space="preserve">
+    <value>Only for a receiver you run yourself. Without it the receiver learns what happened and when, never where. Nothing ever gets a value or a token.</value>
+  </data>
+  <data name="Alerts_Save" xml:space="preserve">
+    <value>Save with Windows Hello</value>
+  </data>
+  <data name="Alerts_SaveFailed" xml:space="preserve">
+    <value>Couldn't save: {0}</value>
+  </data>
+  <data name="Alerts_NeedMachine" xml:space="preserve">
+    <value>Give this PC a name first.</value>
+  </data>
+  <data name="Alerts_BadId" xml:space="preserve">
+    <value>Use 1 to 32 lowercase letters, digits or dashes for the name.</value>
+  </data>
+  <data name="Alerts_IdTaken" xml:space="preserve">
+    <value>{0} is already set up. Pick another name, or remove that one first.</value>
+  </data>
+  <data name="Alerts_UrlNotHttps" xml:space="preserve">
+    <value>Enter a full HTTPS URL, such as https://hooks.example.com/tiresias. Plain HTTP works only to localhost.</value>
+  </data>
+  <data name="Alerts_UrlUserInfo" xml:space="preserve">
+    <value>Leave the user name and password out of the URL; put them in the header instead.</value>
+  </data>
+  <data name="Alerts_HeaderName" xml:space="preserve">
+    <value>A header name is letters, digits and - only, such as Authorization.</value>
+  </data>
+  <data name="Alerts_HeaderReserved" xml:space="preserve">
+    <value>Tiresias sets {0} itself; pick another header.</value>
+  </data>
+  <data name="Alerts_HeaderValue" xml:space="preserve">
+    <value>The header value can't hold line breaks.</value>
+  </data>
+  <data name="Alerts_AddNtfy" xml:space="preserve">
+    <value>Add ntfy…</value>
+  </data>
+  <data name="Alerts_NtfyWindowTitle" xml:space="preserve">
+    <value>Add ntfy</value>
+  </data>
+  <data name="Alerts_NtfyWindowIntro" xml:space="preserve">
+    <value>Tiresias pushes each alert to an ntfy topic, which the ntfy app on your phone can subscribe to. The topic and token are sealed like your secrets, for Windows Hello and the recovery key.</value>
+  </data>
+  <data name="Alerts_NtfyServer" xml:space="preserve">
+    <value>Server</value>
+  </data>
+  <data name="Alerts_NtfyServerHint" xml:space="preserve">
+    <value>https://ntfy.sh, or your own ntfy server. HTTPS; plain HTTP only to this PC (localhost). Redirects aren't followed.</value>
+  </data>
+  <data name="Alerts_NtfyTopic" xml:space="preserve">
+    <value>Topic</value>
+  </data>
+  <data name="Alerts_NtfyTopicHint" xml:space="preserve">
+    <value>Use a long random name, such as one from a password generator: on a shared server, anyone who knows the topic can read it.</value>
+  </data>
+  <data name="Alerts_NtfyToken" xml:space="preserve">
+    <value>Access token (optional)</value>
+  </data>
+  <data name="Alerts_NtfyTokenHint" xml:space="preserve">
+    <value>Use a token that can only write to this topic, so a stolen one can't read your alerts back. Sent to this server only.</value>
+  </data>
+  <data name="Alerts_NtfyTopicBad" xml:space="preserve">
+    <value>A topic is 1 to 64 letters, digits, - or _, and the server address has no ? or #.</value>
+  </data>
+  <data name="Alerts_NtfyTrusted" xml:space="preserve">
+    <value>Trusted: also send the program's file name</value>
+  </data>
+  <data name="Alerts_NtfyTokenBad" xml:space="preserve">
+    <value>The token can't hold spaces or line breaks.</value>
+  </data>
+  <data name="Alerts_AddLcdHub" xml:space="preserve">
+    <value>Add LcdHub…</value>
+  </data>
+  <data name="Alerts_LcdHubWindowTitle" xml:space="preserve">
+    <value>Add LcdHub</value>
+  </data>
+  <data name="Alerts_LcdHubWindowIntro" xml:space="preserve">
+    <value>Tiresias puts a line such as “Decoy credential used ×1” in the status strip of the LcdHub running on this PC, for you to see when you're back. It goes when Home shows your findings, or after 24 hours. LcdHub shows nothing while this PC is locked, and keeps the line for when you unlock. Only the event and how often it happened are shown, never a program or a name.</value>
+  </data>
+  <data name="Alerts_LcdHubTaken" xml:space="preserve">
+    <value>LcdHub is already set up.</value>
+  </data>
+  <data name="Alerts_TestNoHub" xml:space="preserve">
+    <value>No LcdHub is running for {0}. The test shows if one starts within a minute.</value>
+  </data>
+  <data name="DevTools_Heading" xml:space="preserve">
+    <value>Developer tools</value>
+  </data>
+  <data name="DevTools_Auto" xml:space="preserve">
+    <value>When this PC looks like a developer's</value>
+  </data>
+  <data name="DevTools_On" xml:space="preserve">
+    <value>Always</value>
+  </data>
+  <data name="DevTools_Off" xml:space="preserve">
+    <value>Never</value>
+  </data>
+  <data name="DevTools_Note" xml:space="preserve">
+    <value>User secrets, Services and Environment variables before you use them, the developer needs in Add..., and developer checks that passed. Whatever you already use, and every finding, show either way.</value>
+  </data>
+  <data name="DevTools_Because" xml:space="preserve">
+    <value>Shown because {0}.</value>
+  </data>
+  <data name="DevTools_NotFound" xml:space="preserve">
+    <value>Hidden: nothing on this PC looks like a developer's.</value>
+  </data>
+  <data name="DevTools_HomeLine" xml:space="preserve">
+    <value>Developer tools are shown because {0}.</value>
+  </data>
+  <data name="DevTools_Change" xml:space="preserve">
+    <value>Change...</value>
+  </data>
+  <data name="DevTools_Close" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="DevSignal_DotNetSdk" xml:space="preserve">
+    <value>the .NET SDK is installed</value>
+  </data>
+  <data name="DevSignal_UserSecrets" xml:space="preserve">
+    <value>user secrets exist</value>
+  </data>
+  <data name="DevSignal_Git" xml:space="preserve">
+    <value>git is set up</value>
+  </data>
+  <data name="DevSignal_VisualStudio" xml:space="preserve">
+    <value>Visual Studio is installed</value>
+  </data>
+  <data name="DevSignal_Rider" xml:space="preserve">
+    <value>Rider is installed</value>
+  </data>
+  <data name="DevSignal_VsCode" xml:space="preserve">
+    <value>VS Code or a fork of it is installed</value>
+  </data>
+  <data name="DevSignal_Wsl" xml:space="preserve">
+    <value>WSL has a distribution</value>
+  </data>
+  <data name="DevSignal_Docker" xml:space="preserve">
+    <value>Docker is running</value>
+  </data>
+  <data name="DevSignal_SealedVariables" xml:space="preserve">
+    <value>environment variables are sealed</value>
+  </data>
+  <data name="DevSignal_VaultServices" xml:space="preserve">
+    <value>the vault has services</value>
+  </data>
+  <data name="DevSignal_ProjectFolders" xml:space="preserve">
+    <value>project folders are set</value>
+  </data>
+  <data name="Prompt_WindowTitle" xml:space="preserve">
+    <value>Why Windows is asking</value>
+  </data>
+  <data name="Prompt_HeadingHello" xml:space="preserve">
+    <value>Tiresias is asking for Windows Hello</value>
+  </data>
+  <data name="Prompt_HeadingUac" xml:space="preserve">
+    <value>Tiresias is asking for administrator rights</value>
+  </data>
+  <data name="Prompt_Unnamed" xml:space="preserve">
+    <value>Tiresias needs your Windows Hello sign-in to go on.</value>
+  </data>
+  <data name="Prompt_Unlock" xml:space="preserve">
+    <value>You asked to unlock. Your secrets open for this session.</value>
+  </data>
+  <data name="Prompt_UnlockAtStart" xml:space="preserve">
+    <value>Tiresias has just started and is locked. Unlocking opens your secrets for this session.</value>
+  </data>
+  <data name="Prompt_ProgramAsked" xml:space="preserve">
+    <value>{0} asked for secrets while Tiresias is locked. Unlock to answer it.</value>
+    <comment>{0}: the asking program&apos;s file name</comment>
+  </data>
+  <data name="Prompt_ProgramAskedUnknown" xml:space="preserve">
+    <value>A program asked for secrets while Tiresias is locked. Unlock to answer it.</value>
+  </data>
+  <data name="Prompt_Secrets" xml:space="preserve">
+    <value>To open your user secrets, Tiresias unlocks first.</value>
+  </data>
+  <data name="Prompt_Services" xml:space="preserve">
+    <value>To show and change your services, Tiresias unlocks first.</value>
+  </data>
+  <data name="Prompt_EnvironmentVariables" xml:space="preserve">
+    <value>To list and seal your environment variables, Tiresias unlocks first.</value>
+  </data>
+  <data name="Prompt_Alerts" xml:space="preserve">
+    <value>Adding an alert is a sealed save, so Tiresias unlocks first.</value>
+  </data>
+  <data name="Prompt_SealToken" xml:space="preserve">
+    <value>To seal the token you picked, Tiresias unlocks first.</value>
+  </data>
+  <data name="Prompt_Recovery" xml:space="preserve">
+    <value>To restore secrets with your recovery key, Tiresias unlocks first.</value>
+  </data>
+  <data name="Prompt_SetUp" xml:space="preserve">
+    <value>Setting up Tiresias: Windows Hello becomes the key to your vault.</value>
+  </data>
+  <data name="Prompt_DatabaseSetup" xml:space="preserve">
+    <value>To seal the database password, Tiresias unlocks first.</value>
+  </data>
+  <data name="Prompt_ApproveChange" xml:space="preserve">
+    <value>To approve the change to your services you just confirmed.</value>
+  </data>
+  <data name="Prompt_AdminInstall" xml:space="preserve">
+    <value>To install the admin tier, which runs as a Windows service.</value>
+  </data>
+  <data name="Prompt_AdminRemove" xml:space="preserve">
+    <value>To remove the admin tier and its Windows service.</value>
+  </data>
+  <data name="Prompt_AdminReleaseDecoys" xml:space="preserve">
+    <value>To take back the decoys from the admin tier.</value>
+  </data>
+  <data name="Prompt_AdminAdoptDecoys" xml:space="preserve">
+    <value>To hand the decoys to the admin tier, which watches them.</value>
+  </data>
+  <data name="Prompt_AdminUnblock" xml:space="preserve">
+    <value>To unblock {0}, which you said was you.</value>
+    <comment>{0}: the blocked program&apos;s file name</comment>
+  </data>
+  <data name="Prompt_AdminUnblockUnknown" xml:space="preserve">
+    <value>To unblock the program you said was you.</value>
+  </data>
+  <data name="Prompt_AdminReviewIncidents" xml:space="preserve">
+    <value>To mark the admin tier&apos;s incidents as reviewed.</value>
   </data>
 </root>

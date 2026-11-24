@@ -98,6 +98,9 @@ public sealed class AuditLog : IDisposable
     /// <summary>Short reference to a placeholder for audit records: the first 8 hex digits of its hash.</summary>
     public static string TokenRef(byte[] tokenHash) => Convert.ToHexStringLower(tokenHash)[..8];
 
+    /// <summary>Raised after a record is written, outside the log's lock, on the writer's thread. The app alerts on some (docs/alerts.md).</summary>
+    public event Action<AuditRecord, DateTimeOffset>? Appended;
+
     /// <summary>Captures the last complete record boundary. Later appends can proceed while a client reads this prefix.</summary>
     public (FileStream File, long Length) OpenSnapshot()
     {
@@ -110,14 +113,17 @@ public sealed class AuditLog : IDisposable
 
     public void Append(AuditRecord record)
     {
+        DateTimeOffset at;
         lock (gate)
         {
             ObjectDisposedException.ThrowIf(disposed, this);
-            var line = JsonSerializer.Serialize(new Line(lastHash, time.GetUtcNow(), record.Kind, record.LeaseId, record.Consumer,
+            at = time.GetUtcNow();
+            var line = JsonSerializer.Serialize(new Line(lastHash, at, record.Kind, record.LeaseId, record.Consumer,
                 record.Service, record.Grant, record.Method, record.Path, record.Status, record.Reason, record.Token, record.Process, record.Evidence), Json);
             File.AppendAllText(path, line + "\n");
             lastHash = Hash(line);
         }
+        Appended?.Invoke(record, at);
     }
 
     /// <summary>Waits for a line in progress; every later <see cref="Append"/> throws.</summary>
@@ -152,6 +158,21 @@ public sealed class AuditLog : IDisposable
             expected = Hash(line);
         }
         return null;
+    }
+
+    /// <summary>A line's record and when it was written, or <c>null</c> when it isn't a record this version reads.</summary>
+    public static (AuditRecord Record, DateTimeOffset At)? Parse(string line)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<Line>(line, Json) is { } r
+                ? (new(r.Kind, r.LeaseId, r.Consumer, r.Service, r.Grant, r.Method, r.Path, r.Status, r.Reason, r.Token, r.Process, r.Evidence), r.Time)
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     internal static string Hash(string line) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(line)));

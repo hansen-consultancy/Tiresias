@@ -139,6 +139,8 @@ device key gains nothing from such a genesis. `tir solo init` always writes the 
    made before keep their bytes and hashes; an older verifier drops them and fails closed.
 2. **Built.** `tir solo init` and the app's first run write the Hello key into genesis (one more
    Hello prompt); `tir trust bind-hello` for existing chains (with the app running, in solo mode);
-   `tir doctor` warns when this device's Hello key isn't in the solo chain. A remote broker's chain
-   isn't fetched by the doctor.
+   `tir doctor` warns when this device's Hello key isn't in the chain. It asks the broker for the
+   chain it serves (`GET /trust/chain`), the one `bind-hello` extends, and reads the solo chain file
+   only when the broker doesn't answer: a broker running as the Windows service keeps its chain
+   where the user can't read it, so the file alone went stale after `bind-hello`.
 3. The Add a device and Move to a broker flows, built on this rule.

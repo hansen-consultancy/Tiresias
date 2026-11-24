@@ -36,16 +36,18 @@ public static class ProtectedUserSecretsExtensions
     }
 
     public static IConfigurationBuilder AddProtectedUserSecrets(this IConfigurationBuilder builder, string userSecretsId) =>
-        builder.AddProtectedUserSecrets(userSecretsId, DirectoryOf(userSecretsId), optional: true, new NamedPipeUserSecretsAgent());
+        builder.AddSealedEnvironment().AddProtectedUserSecrets(userSecretsId, DirectoryOf(userSecretsId), optional: true, new NamedPipeUserSecretsAgent());
 
     /// <summary>
     /// Swaps the stock user-secrets source a host builder added for itself (Development only) for the
     /// protected one, in place. A no-op when there is none. Interceptors call this right after
     /// <c>WebApplication.CreateBuilder</c> and its host equivalents, the one place user secrets are
-    /// added by framework code an interceptor cannot reach.
+    /// added by framework code an interceptor cannot reach. Also adds the sealed environment
+    /// (<see cref="SealedEnvironmentExtensions.AddSealedEnvironment(IConfigurationBuilder)"/>).
     /// </summary>
     public static void ProtectUserSecrets(this IConfigurationBuilder builder)
     {
+        builder.AddSealedEnvironment();
         for (var i = 0; i < builder.Sources.Count; i++)
         {
             if (PlainUserSecretsDirectory(builder.Sources[i]) is { } directory)

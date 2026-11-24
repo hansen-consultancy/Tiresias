@@ -4,9 +4,26 @@ using System.Text.Json.Serialization;
 namespace Tiresias.Protocol;
 
 /// <summary>What the app asks the agent for. The agent identifies the caller itself, from the pipe.</summary>
-public sealed record AgentRequest(string Op, string UserSecretsId, string SecretsDirectory)
+/// <param name="SecretsDirectory">
+/// For <see cref="LoadUserSecrets"/>, the project's user-secrets folder. For
+/// <see cref="LoadEnvironment"/>, the folder the app runs in, which picks the folder sets.
+/// </param>
+/// <param name="Present">
+/// For <see cref="LoadEnvironment"/>: the variable names the process already has, which it is not
+/// given again (and the user is not asked about). An agent that predates the op ignores it.
+/// </param>
+public sealed record AgentRequest(string Op, string UserSecretsId, string SecretsDirectory, IReadOnlyList<string>? Present = null)
 {
     public const string LoadUserSecrets = "usersecrets.load";
+
+    /// <summary>
+    /// The sealed environment variables marked for configuration, for the app asking. The reply's
+    /// <see cref="AgentReply.Json"/> is an object of variable names to values.
+    /// </summary>
+    public const string LoadEnvironment = "environment.load";
+
+    public static AgentRequest ForEnvironment(string directory, IReadOnlyList<string> present) =>
+        new(LoadEnvironment, "", directory, present);
 }
 
 public enum AgentStatus

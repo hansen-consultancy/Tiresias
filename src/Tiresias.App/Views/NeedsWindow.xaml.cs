@@ -15,7 +15,7 @@ namespace Tiresias.App.Views;
 /// </summary>
 public partial class NeedsWindow : Window
 {
-    readonly NeedsViewModel model = new(new NeedFacts(HasBroker: KeyringStore.Broker is not null));
+    readonly NeedsViewModel model = new(new NeedFacts(HasBroker: KeyringStore.Broker is not null), DeveloperSignals.View().Shown);
 
     public NeedsWindow()
     {
@@ -85,9 +85,9 @@ public partial class NeedsWindow : Window
     }
 }
 
-public sealed partial class NeedsViewModel(NeedFacts facts) : ObservableObject
+public sealed partial class NeedsViewModel(NeedFacts facts, bool developerTools) : ObservableObject
 {
-    public ObservableCollection<NeedRow> Needs { get; } = [.. Rows(NeedMatcher.Match(""), facts)];
+    public ObservableCollection<NeedRow> Needs { get; } = [.. Rows(NeedView.Listed(NeedMatcher.Match(""), "", developerTools), facts)];
 
     [ObservableProperty]
     public partial string Search { get; set; } = "";
@@ -95,7 +95,7 @@ public sealed partial class NeedsViewModel(NeedFacts facts) : ObservableObject
     partial void OnSearchChanged(string value)
     {
         Needs.Clear();
-        foreach (var row in Rows(NeedMatcher.Match(value), facts))
+        foreach (var row in Rows(NeedView.Listed(NeedMatcher.Match(value), value, developerTools), facts))
             Needs.Add(row);
     }
 

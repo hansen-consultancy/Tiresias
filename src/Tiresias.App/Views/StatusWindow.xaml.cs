@@ -37,11 +37,13 @@ public partial class StatusWindow : Window
         App.Current.Host.StateChanged += OnAgentStateChanged;
         App.Current.Guard.Changed += OnGuardChanged;
         App.Current.Host.DecoyTouched += OnDecoyTouched;
+        App.Current.Alerts.Center.FailingChanged += OnAlertsFailingChanged;
         Closed += (_, _) =>
         {
             App.Current.Host.StateChanged -= OnAgentStateChanged;
             App.Current.Guard.Changed -= OnGuardChanged;
             App.Current.Host.DecoyTouched -= OnDecoyTouched;
+            App.Current.Alerts.Center.FailingChanged -= OnAlertsFailingChanged;
         };
     }
 
@@ -50,12 +52,16 @@ public partial class StatusWindow : Window
     /// <summary>A decoy use is a new finding: run the checks again.</summary>
     void OnDecoyTouched(DecoyTouch _) => Dispatcher.BeginInvoke(model.Refresh);
 
+    /// <summary>A sink started or stopped failing: its finding comes or goes.</summary>
+    void OnAlertsFailingChanged() => Dispatcher.BeginInvoke(model.Refresh);
+
     async void OnUnblock(object sender, RoutedEventArgs e)
     {
         if (((FrameworkElement)sender).DataContext is BlockedRow row)
             await UnblockAsync(row.Path);
     }
 
+    /// <summary>With the admin tier, one UAC prompt thaws a program it froze, lifts its network block and unblocks it.</summary>
     async Task UnblockAsync(string program)
     {
         try
@@ -197,6 +203,10 @@ public partial class StatusWindow : Window
 
     internal bool CanLeavePage() => PageHost.Content is not SecretsPage secrets || secrets.CanLeave();
 
+    /// <summary>Opens the place whose nav item has <paramref name="place"/> as its tag (Home, Secrets, About...).</summary>
+    internal void Go(string place) =>
+        Nav.SelectedItem = Nav.Items.OfType<ListBoxItem>().FirstOrDefault(i => string.Equals((string)i.Tag, place, StringComparison.OrdinalIgnoreCase));
+
     void OnNav(object sender, SelectionChangedEventArgs e)
     {
         if (navigating || Nav.SelectedItem is not ListBoxItem { Tag: string place })
@@ -245,6 +255,13 @@ public partial class StatusWindow : Window
 
     void OnAdd(object sender, RoutedEventArgs e) => App.Current.ShowWindow<NeedsWindow>();
 
+    /// <summary>The developer tools setting changed: the nav follows at once, the checks' lists on the next run.</summary>
+    public void DeveloperToolsChanged() => model.ShowAreas();
+
+    void OnDeveloperChange(object sender, RoutedEventArgs e) => Navigate<AboutPage>();
+
+    void OnDeveloperClose(object sender, RoutedEventArgs e) => model.CloseDeveloperLine();
+
     void OnRestore(object sender, RoutedEventArgs e)
     {
         Window window = model.VerifyRecovery ? App.Current.ShowWindow<FirstRunWindow>() : App.Current.ShowWindow<RecoveryWindow>();
@@ -254,7 +271,15 @@ public partial class StatusWindow : Window
 
     void OnRecoveryClosed(object? sender, EventArgs e) => model.Refresh();
 
+    async void OnLookInside(object sender, RoutedEventArgs e) => await model.LookInsideAsync();
+
     /// <summary>Opens the window that fixes the row's finding, filled in from it.</summary>
+    void OnCopyCommand(object sender, RoutedEventArgs e)
+    {
+        if (((FrameworkElement)sender).DataContext is CheckRow { Command: { } command })
+            model.CopyFix(command);
+    }
+
     void OnReview(object sender, RoutedEventArgs e)
     {
         var fix = ((FrameworkElement)sender).DataContext switch
@@ -319,8 +344,14 @@ public partial class StatusWindow : Window
             case UninstallApp:
                 Navigate<InstalledPage>();
                 break;
+            case ReviewAlerts:
+                Navigate<AboutPage>();
+                break;
             case UnblockProgram { Path: var program }:
                 _ = UnblockAsync(program);
+                break;
+            case ThawProgram { Path: var frozen }:
+                _ = UnblockAsync(frozen);
                 break;
             case RunThroughExec { Setup: { } setup }:
                 Navigate<ServicesPage>()?.Add(setup.Upstream);
@@ -328,8 +359,12 @@ public partial class StatusWindow : Window
             case RunThroughExec exec:
                 model.CopyFix(exec.Instruction);
                 break;
-            case ReachGuide:
-                Desktop.Open(FindingView.ReachGuideUrl(AppBuild.Repository));
+            case InjectAtRunTime inject:
+                model.CopyFix(inject.Commands);
+                break;
+            case ReachGuide guide:
+                var title = ((FrameworkElement)sender).DataContext is FindingRow finding ? FindingView.Title(finding.Checks) : guide.Topic.ToString();
+                new GuideWindow(title, guide.Steps(UserMachine.Account), FindingView.ReachGuideUrl(AppBuild.Repository)) { Owner = this }.ShowDialog();
                 break;
         }
     }
@@ -340,7 +375,7 @@ public partial class StatusWindow : Window
         if (AskWindow.Show(this, Text.Get("Finding_TokenHeading"), Text.Format("Finding_TokenBody", token.File, token.Variable),
                 Text.Get("Finding_TokenSeal"), cancel: Text.Get("Common_Cancel")) != true)
             return;
-        if (!App.Current.Host.Keys.IsUnlocked && !(await App.Current.UnlockAsync(interactive: true)).Ok || App.Current.Host.Keys.Hello is not { } hello)
+        if (!App.Current.Host.Keys.IsUnlocked && !(await App.Current.UnlockAsync(PromptReason.SealToken, interactive: true)).Ok || App.Current.Host.Keys.Hello is not { } hello)
             return;
         try
         {
@@ -560,6 +595,13 @@ public sealed record CheckRow(string Name, string StatusText, string Glyph, Brus
         ProtectVariables => Text.Get("Status_ReviewEnvironment"),
         _ => "",
     };
+
+    /// <summary>A <c>tir</c> command the detail says to run, offered to copy when there is no Review to open.</summary>
+    public string? Command => ReviewName.Length == 0 ? CheckCommand.Of(Detail) : null;
+
+    public Visibility CopyVisibility => Command is null ? Visibility.Collapsed : Visibility.Visible;
+
+    public string CopyName => Command is null ? "" : Text.Format("Status_CopyCommandName", Command);
 }
 
 /// <summary>A decoy placed, as Home's decoys card lists it.</summary>
@@ -645,7 +687,7 @@ public sealed partial class StatusViewModel : ObservableObject
         {
             set = null;
         }
-        var card = DecoyCard.Of(set, AdminClient.Installed ? AdminDecoys.Status() : null);
+        var card = DecoyCard.Of(set, AdminClient.Installed ? AdminDecoys.Status() : null, DeveloperSignals.View().Shown);
         Decoys.Clear();
         foreach (var placed in card.Placed)
             Decoys.Add(new(Text.Get(DecoyCard.Keys(placed.Kind).Name), placed.Where, Text.Format("Decoys_Since", placed.Placed.ToLocalTime())));
@@ -698,7 +740,7 @@ public sealed partial class StatusViewModel : ObservableObject
         if (App.Current.Host.Keys.IsUnlocked)
             await App.Current.LockAsync();
         else
-            await App.Current.UnlockAsync(interactive: true);
+            await App.Current.UnlockAsync(PromptReason.Unlock, interactive: true);
     }
 
     /// <summary>Checks that warn or fail; they stay in view.</summary>
@@ -795,6 +837,55 @@ public sealed partial class StatusViewModel : ObservableObject
 
     bool rerun;
 
+    /// <summary>Check now was pressed: the next run looks inside the Docker engine.</summary>
+    bool lookInside;
+
+    /// <summary>Looks inside the containers now, as part of a full run of the checks.</summary>
+    public async Task LookInsideAsync()
+    {
+        lookInside = true;
+        if (IsRunning)
+            rerun = true;
+        else
+            await RunAsync();
+    }
+
+    /// <summary>The containers card: while an engine is open to every program, the way to look inside it.</summary>
+    void ShowReach()
+    {
+        var setting = AppSettings.Load().ReachScan;
+        ReachVisibility = last.Any(c => c.Name is Doctor.DockerEngineCheck or Doctor.WslDisksCheck or Doctor.WslContentsCheck or Doctor.HyperVContentsCheck) ? Visibility.Visible : Visibility.Collapsed;
+        ReachText = ReachMemory.LookedAt is { } at ? Text.Format("Reach_Looked", at.ToLocalTime()) : Text.Get("Reach_Intro");
+        ReachDailyVisibility = setting == ReachScan.Off ? Visibility.Collapsed : Visibility.Visible;
+        isReachDaily = setting == ReachScan.Daily;
+        OnPropertyChanged(nameof(IsReachDaily));
+    }
+
+    [ObservableProperty]
+    public partial Visibility ReachVisibility { get; set; } = Visibility.Collapsed;
+
+    [ObservableProperty]
+    public partial string ReachText { get; set; } = "";
+
+    [ObservableProperty]
+    public partial Visibility ReachDailyVisibility { get; set; } = Visibility.Collapsed;
+
+    bool isReachDaily;
+
+    /// <summary>The Check daily switch, saved as it changes.</summary>
+    public bool IsReachDaily
+    {
+        get => isReachDaily;
+        set
+        {
+            if (isReachDaily == value)
+                return;
+            isReachDaily = value;
+            (AppSettings.Load() with { ReachScan = value ? ReachScan.Daily : ReachScan.Once }).Save();
+            OnPropertyChanged();
+        }
+    }
+
     /// <summary>The state line now, then the checks; a change during a run queues one more run rather than overlapping it.</summary>
     public void Refresh()
     {
@@ -825,7 +916,23 @@ public sealed partial class StatusViewModel : ObservableObject
         OnPropertyChanged(nameof(ServicesVisibility));
         OnPropertyChanged(nameof(EnvironmentVisibility));
         OnPropertyChanged(nameof(ActivityVisibility));
+        var developer = DeveloperSignals.View();
+        DeveloperLine = DeveloperTools.ShowHomeLine(developer, AppSettings.Load().DeveloperToolsNoted)
+            ? Text.Format("DevTools_HomeLine", DeveloperSignals.Reasons(developer)) : "";
         _ = ShowCountsAsync();
+    }
+
+    /// <summary>Why developer tools appeared, until the user closes it (docs/developer-tools.md); empty otherwise.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DeveloperLineVisibility))]
+    public partial string DeveloperLine { get; set; } = "";
+
+    public Visibility DeveloperLineVisibility => DeveloperLine.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+
+    public void CloseDeveloperLine()
+    {
+        (AppSettings.Load() with { DeveloperToolsNoted = true }).Save();
+        DeveloperLine = "";
     }
 
     [ObservableProperty]
@@ -840,6 +947,19 @@ public sealed partial class StatusViewModel : ObservableObject
     [ObservableProperty]
     public partial string ActivityCount { get; set; } = "";
 
+    /// <summary>What each count beside a place counts, as its tooltip and spoken name: a bare number says nothing.</summary>
+    [ObservableProperty]
+    public partial string SecretsCountTip { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string ServicesCountTip { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string VariablesCountTip { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string ActivityCountTip { get; set; } = "";
+
     /// <summary>The counts beside the places; one that can't be read shows nothing rather than a guess.</summary>
     async Task ShowCountsAsync()
     {
@@ -848,9 +968,15 @@ public sealed partial class StatusViewModel : ObservableObject
         ServicesCount = Count(counts.Services);
         VariablesCount = Count(counts.Variables);
         ActivityCount = counts.ActivityToday is { } today ? Text.Format("Nav_ActivityToday", today) : "";
+        SecretsCountTip = Tip("Nav_SecretsCountTip", counts.Secrets);
+        ServicesCountTip = Tip("Nav_ServicesCountTip", counts.Services);
+        VariablesCountTip = Tip("Nav_VariablesCountTip", counts.Variables);
+        ActivityCountTip = Tip("Nav_ActivityCountTip", counts.ActivityToday);
     }
 
     static string Count(int? count) => count?.ToString(CultureInfo.CurrentCulture) ?? "";
+
+    static string Tip(string key, int? count) => count is { } n ? Text.Format(key, n) : "";
 
     IReadOnlySet<HomeArea> areas = new HashSet<HomeArea>();
 
@@ -875,8 +1001,15 @@ public sealed partial class StatusViewModel : ObservableObject
         {
             // The project folders the secrets editor scans are where appsettings and certificates live.
             var clock = System.Diagnostics.Stopwatch.StartNew();
-            var probe = new MachineProbe(ProjectIndexStore.Load().Folders) { Hello = App.Current.Host.Keys.Hello };
-            last = await Task.Run(() => Doctor.RunAsync(probe));
+            var probe = new MachineProbe(ProjectIndexStore.Load().Folders)
+            {
+                Hello = App.Current.Host.Keys.Hello,
+                FailingAlertSinks = App.Current.Alerts.Center.Failing,
+            };
+            var asked = lookInside;
+            lookInside = false;
+            last = await Task.Run(async () => await Doctor.RunAsync(probe, await ReachMemory.ForRunAsync(probe, asked)));
+            ShowReach();
             var checks = clock.Elapsed;
             Show();
             // Measured until the page has been laid out and drawn, which is what the wait looks like.
@@ -905,7 +1038,7 @@ public sealed partial class StatusViewModel : ObservableObject
     /// <summary>Sorts the last run's lines into findings, dismissed findings and the other checks.</summary>
     void Show()
     {
-        var split = FindingView.Of(last, DismissalStore.Load());
+        var split = FindingView.Of(last, DismissalStore.Load(), DeveloperSignals.View().Shown);
         allFindings = [.. split.Open.Select((group, i) => new FindingRow(group) { IsOpen = i == 0, Number = i + 1 })];
         if (last.Count > 0)
         {

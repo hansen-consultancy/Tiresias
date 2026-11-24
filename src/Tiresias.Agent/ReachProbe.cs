@@ -22,7 +22,8 @@ static class ReachProbe
         ("docker_engine_windows", EngineKind.Windows),
     ];
 
-    const string HyperVAdministrators = "S-1-5-32-578", Administrators = "S-1-5-32-544";
+    internal const string HyperVAdministrators = "S-1-5-32-578";
+    const string Administrators = "S-1-5-32-544";
 
     public static ReachFacts Read()
     {
@@ -35,7 +36,7 @@ static class ReachProbe
     }
 
     /// <summary>The token's enabled SIDs with a name to show: the user as <see cref="Doctor.YourAccount"/>, groups by their name.</summary>
-    static Dictionary<string, string> Token(WindowsIdentity identity)
+    internal static Dictionary<string, string> Token(WindowsIdentity identity)
     {
         var token = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { [identity.User!.Value] = Doctor.YourAccount };
         // Groups leaves out deny-only SIDs, which grant nothing.
@@ -111,7 +112,7 @@ static class ReachProbe
     }
 
     /// <summary>The owner and DACL, read with <c>READ_CONTROL</c>; <c>null</c> when even that is refused.</summary>
-    static AccessFacts? Acl(string path, bool directory)
+    internal static AccessFacts? Acl(string path, bool directory)
     {
         try
         {

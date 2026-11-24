@@ -18,6 +18,13 @@ public enum NeedStep
 /// <summary>How <i>What do you need?</i> shows the catalogue's options.</summary>
 public static class NeedView
 {
+    /// <summary>
+    /// The needs listed: a developer's only on a PC with developer tools, unless the user searched,
+    /// since typing "nuget" asks for it (docs/developer-tools.md).
+    /// </summary>
+    public static IReadOnlyList<NeedMatch> Listed(IReadOnlyList<NeedMatch> matches, string search, bool developerTools) =>
+        developerTools || !string.IsNullOrWhiteSpace(search) ? matches : [.. matches.Where(m => !m.Need.ForDevelopers)];
+
     /// <summary>The step an option's action starts, and the string key of its button.</summary>
     public static (NeedStep Step, string Label) Button(DoctorFix action) => action switch
     {

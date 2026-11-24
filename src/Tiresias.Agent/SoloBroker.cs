@@ -10,6 +10,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSec.Cryptography;
+using Tiresias.Audit;
 using Tiresias.Broker;
 using Tiresias.Client;
 using Tiresias.Trust;
@@ -43,6 +44,9 @@ public sealed class SoloBroker : IAsyncDisposable
 
     /// <summary>One line per vault reload, or why one failed. Never a value.</summary>
     public event Action<string>? Log;
+
+    /// <summary>Every record the broker writes to its audit log, with when, after it is written, on the writer's thread.</summary>
+    public event Action<AuditRecord, DateTimeOffset>? Audited;
 
     /// <summary>
     /// Called with the open lease's secrets that have no DEK after a reload (a secret just added or
@@ -101,6 +105,13 @@ public sealed class SoloBroker : IAsyncDisposable
                 builder.Services.AddHostedService(sp => new BrokerJournal(sp.GetRequiredService<Tiresias.Audit.AuditLog>(), journalReaderSid));
         }
 
+        // Subscribed as it is made: Build resolves the trust chain, which audits a chain rejected at startup.
+        builder.Services.AddSingleton(sp =>
+        {
+            var log = new AuditLog(sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<BrokerOptions>>().Value.AuditPath, sp.GetRequiredService<TimeProvider>());
+            log.Appended += (record, at) => Audited?.Invoke(record, at);
+            return log;
+        });
         var built = BrokerHost.Build(builder);
         var state = built.Services.GetRequiredService<BrokerState>();
         built.Use(async (context, next) =>

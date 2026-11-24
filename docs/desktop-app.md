@@ -27,6 +27,11 @@ CI and people who prefer it, and it talks to the same agent.
   today's), and About at the bottom; the whole window is excluded from screen capture (except in a
   Debug build's demo mode, on made-up data: [testing](testing-on-windows.md#demo-mode-made-up-data-for-screenshots-and-visual-testing)). Escape on a
   page goes back Home, and on Home closes the window ([design](app-design.md#10-one-window)).
+- **Lists show the selected row in full.** The window is narrow, so table cells cut long values
+  short. Selecting one row (single selection) on Activity, Installed, Services, the secrets
+  editor (the key only, never the value), Environment variables, About's alert sinks or the
+  service incidents window shows a panel below the list. It holds every column in full, with
+  values that wrap and can be selected, and **Copy details** copies them all.
 - **Home leads with the next step**: the lock state with Lock and Add..., then a heading that
   counts what could be safer over a bar of the checks that pass. The findings are numbered; the
   first is open with its fix; the others are one line each, and clicking one opens it instead
@@ -36,6 +41,13 @@ CI and people who prefer it, and it talks to the same agent.
 - **Home shows what is in use**: Secrets, Services, Environment variables and Activity appear
   once they have something in them (or a finding leads there); the rest are reached through
   **Add...**.
+- **Developer tools appear on a developer's PC.** Something only a developer has (the .NET SDK,
+  user secrets, git, an IDE, WSL, Docker, sealed variables, vault services, project folders)
+  shows Secrets, Services and Environment variables on Home, the developer needs on **Add...**,
+  the developer checks that passed, the project decoy and the broker choice at setup. Home says
+  once why they appeared. Without them, findings and checks that warn or fail still show, and
+  solo mode's trade-offs count as passed. **Show developer tools** on About (Auto, On, Off)
+  overrides; Off never hides an area in use ([design](developer-tools.md)).
 - **One per user session.** Starting it again brings the running one forward. `tir agent` refuses
   to start while the app runs.
 - **The agent runs in the app:** the user-secrets pipe server, the lease heartbeat, locking on
@@ -57,6 +69,8 @@ CI and people who prefer it, and it talks to the same agent.
   that arrive together (`tir`, a terminal, NuGet, the tray) share one Hello prompt. A Hello prompt
   answered too late (`WINBIO_E_INVALID_TICKET`, 0x80098044, after minutes out of sight) is
   reported as expired, with a way to try again.
+- **Each prompt says why.** Just before a Windows Hello or UAC prompt, a card above it names what
+  asked ([app design, rule 13](app-design.md#13-a-reason-before-every-windows-prompt)).
 - **"This wasn't me"**, under the answers on every consent dialog, for a prompt you didn't cause (it
   could be malware). It denies the request and locks at once: session consents, terminal and NuGet
   allowances are forgotten, the terminals' placeholders revoked and the broker lease ended. Until
@@ -203,6 +217,13 @@ The goal is one command or one download, then a first-run wizard:
   after it has exited, then starts the new version. If applying fails, the version that was
   running stays installed. Settings and the vault live in `%LOCALAPPDATA%\Tiresias`, outside the
   install folder, so an update never touches them.
+- **Nothing left holding the folder:** Velopack moves the version folder to swap it, which fails
+  while any program runs from it *or has it as its working folder*. Velopack only checks for the
+  first kind, and Restart Manager sees neither. So the app changes its working folder to the user
+  profile at start, and nothing it starts inherits the install folder. Before quitting to apply, it
+  names any program still in the folder (its program or its working folder, read from the PEB) and
+  waits for you to close it. It records the version it quit for: if the next start is another
+  version, the apply failed, and it says so rather than running the old one in silence (#149).
 - **A build run from source** (`dotnet run`, `dotnet publish`) doesn't update itself, and says so
   in its log.
 
@@ -211,7 +232,7 @@ The goal is one command or one download, then a first-run wizard:
 1. Create the recovery key: show it once, ask the user to confirm two words from it, then print
    or save it.
 2. Choose a mode: **solo** (the default, nothing else to set up) or **with a broker** (see
-   [Solo mode](#solo-mode)).
+   [Solo mode](#solo-mode)). Without [developer tools](developer-tools.md) the step shows solo only.
 3. Enrol this device: pin the broker key, scan or paste the genesis hash.
 4. Optional: scan the machine for plaintext secrets (the `doctor` checks) and offer to import
    them.

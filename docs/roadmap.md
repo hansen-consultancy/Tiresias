@@ -20,6 +20,8 @@ design and issue. A PR that finishes, starts or adds an item edits this page in 
       produce ([design](step-up.md), #23)
 - [x] Trust-chain links that add a key need a Windows Hello signature ([design](trust-links.md), #41)
 - [x] Seal user environment variables and hand them back per shell session ([design](environment-variables.md))
+- [x] Sealed configuration variables for .NET apps an IDE starts
+      ([design](environment-variables.md#net-configuration))
 - [x] Databases for applications: SQL Server logins per lease, RavenDB through the broker ([design](databases.md))
 - [ ] RavenDB subscriptions through the broker (the TCP relay, [phase 3](databases.md#phases))
 - [x] Guided setup: the strongest option first, findings with one-click fixes, and a "What do you
@@ -27,15 +29,21 @@ design and issue. A PR that finishes, starts or adds an item edits this page in 
 - [x] Attack surface: installed software, extensions and global tools, ranked by what uses
       credentials ([design](attack-surface.md), #34)
 - [ ] Decoys: canary credentials that point home, and tripwires on decoy files
-      ([design](decoys.md), #39). Canary credentials, the read tripwire and the Home card built;
-      decoys held by the admin tier in review
-- [ ] Optional admin tier: a privileged service for what the user account can't protect
-      ([design](admin-tier.md), #91). Step 1 built (the service, its pipe, setup)
-- [ ] Out-of-band alerts: ntfy, LcdHub and a webhook, public by default ([design](alerts.md), #101).
-      Slice 1 in review
-- [ ] Secrets reachable in containers, WSL and VMs from the user's account
-      ([design](containers-and-vms.md), #113). Phase 1 (what your account can open) built
+      ([design](decoys.md), #39). Canary credentials, the read tripwire, the Home card and
+      decoys held by the admin tier built
+- [x] Optional admin tier: a privileged service for what the user account can't protect
+      ([design](admin-tier.md), #91): the service, its pipe and setup, holding the decoys from
+      boot, decoy read auditing, freezing a program that used a decoy and blocking its network,
+      lastrun from BAM and Prefetch
+- [x] Out-of-band alerts: ntfy, LcdHub and a webhook, public by default ([design](alerts.md), #101),
+      every event wired, failing sinks reported, signed webhooks, a heartbeat and an LcdHub alert frame
+- [x] Secrets reachable in containers, WSL and VMs from the user's account
+      ([design](containers-and-vms.md), #113): what your account can open, devcontainer files and
+      forwarding, Docker engine, WSL and Hyper-V contents, and [devcontainers that ask](devcontainers.md)
+      with git credentials and a published feature
 - [x] `tir ai`: instructions for AI coding agents ([guide](ai-agents.md))
+- [x] Developer tools appear only on a developer's PC: detected signals and one override, no mode
+      ([design](developer-tools.md), #141)
 - [x] Velopack installer and auto-update from GitHub Releases (`app-release.yml`)
 - [x] Signed with Azure Artifact Signing ([releasing.md](releasing.md))
 - [ ] winget

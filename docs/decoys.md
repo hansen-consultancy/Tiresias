@@ -61,7 +61,8 @@ connections can't bury the first in the log or the notifications. Tiresias then:
   so it gets no lease, placeholder or consent dialog until the user reviews it;
 - shows a notification;
 - raises a finding on Home (`tir doctor` too) naming the program and the decoy it used, with
-  **Unblock (that was me)**; dismissing it keeps the program blocked. A process that couldn't be
+  **Unblock (that was me)**, or **Thaw and unblock** when the admin tier froze it; dismissing it
+  keeps the program blocked. A process that couldn't be
   named can't be blocked: its uses in the last 30 days are one warning. The program's signature and parents are
   in the activity record, not yet in the finding.
 
@@ -182,7 +183,12 @@ listens on its ports from boot and queues each use until the app (or `tir agent`
 then blocks, notifies, records and raises the finding as for a use it saw itself. Home and
 `tir decoys list` show the kinds held, not the places. `tir decoys remove` and **Remove decoys**
 take the set back through a UAC prompt, then remove the decoys as always. While a set is held, no
-other is placed beside it. Auditing reads and stopping the program are later steps.
+other is placed beside it. **Step 3**: the service puts an audit rule on each held decoy file and
+reads every read of one from the Security log, including reads while the app or the service was
+stopped; each is a service incident, never blocking, and one by a routine opener raises nothing.
+**Step 4**: a use by a process the service can name freezes it, with what it started, and blocks
+its program's network until the user thaws it from Home (a UAC prompt); **This wasn't me** asks the
+service to do the same.
 
 **The cost.** A privileged service is the most valuable thing on the machine to attack: a bug in it
 is a privilege escalation. It stays small, takes requests only from the app, does only the
@@ -226,7 +232,11 @@ sets audit rules; Tiresias watches use and needs no admin rights. What fits Tire
   gave the secrets editor, where an agent working on code is most likely to look.
 - **Bookkeeping:** Tiresias records each decoy's path, the values and the two ports in
   `decoys.json` beside the keyring. The doctor's own checks skip them, so a decoy never shows up as
-  a plaintext secret to seal.
+  a plaintext secret to seal. The decoy variables are told by name and, while `decoys.json` is at
+  hand, by value too, so a real `ADMIN_API_TOKEN` of the user's is still a secret; once the admin
+  tier holds the set, the name alone decides. The **Environment variables** page lists them under
+  **Still in Windows** as decoys, never ticked, and sealing passes them over; `tir env list` and
+  `tir env protect` leave them out too, and naming one says it is a decoy.
 - **Removal:** one action (`tir decoys remove`) removes every decoy and stops every listener. A
   decoy folder is deleted only when nothing else is in it, and a decoy file or variable changed since
   it was placed is kept: it is the user's now. A placement that fails partway takes back what it

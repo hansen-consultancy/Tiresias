@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    tir-remote: runs inside a devcontainer and asks the Tiresias app on the host for sealed
+    variables, with the devcontainer's ticket (docs/devcontainers.md). Linux in practice; holds no
+    key and stores nothing. app-release.yml publishes it self-contained and trimmed for Linux,
+    for the devcontainer feature in devcontainer-features/ to install.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <AssemblyName>tir-remote</AssemblyName>
+    <RootNamespace>Tiresias.Remote</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+  </PropertyGroup>
+
+  <!-- Here, not on the command line: a global PublishTrimmed reaches Protocol too, whose other
+       wire types use reflection JSON that tir-remote never calls, and the trimmer drops them. -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
+    <PublishTrimmed>true</PublishTrimmed>
+    <PublishSingleFile>true</PublishSingleFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Tiresias.Protocol\Tiresias.Protocol.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Tiresias.Tests" />
+  </ItemGroup>
+
+</Project>

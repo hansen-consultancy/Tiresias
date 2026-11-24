@@ -1,6 +1,6 @@
 # Containers, WSL and VMs: what your account can reach
 
-Status: **phase 1 built** (account facts: engine pipes, WSL disks, Hyper-V); the rest is design. Tracks issue #113. This page designs a doctor check, **Reachable
+Status: **phases 1 to 6 built** (account facts: engine pipes, WSL disks, Hyper-V; devcontainer files and forwarding; Docker engine, WSL and Hyper-V file contents, opt-in); the rest is design. Tracks issue #113. This page designs a doctor check, **Reachable
 from your account**, that tells you which secrets a normal program running as you could read inside
 your containers, WSL distributions and Hyper-V VMs. It extends the [attack surface](attack-surface.md)
 work (#34) and follows the rules of [more checks](more-checks.md#rules-every-check-keeps).
@@ -67,7 +67,7 @@ All read-only. The left column runs on every doctor run; the right only after op
 | Environment | Account facts (default) | Contents (opt-in) |
 |---|---|---|
 | Docker engine | Which engine pipes exist (`\\.\pipe\docker_engine`, `dockerDesktopLinuxEngine`, `dockerDesktopWindowsEngine`), and whether each one's DACL grants your token, by `AccessCheck` on its security descriptor (read with `READ_CONTROL` only, no connection) | `GET /_ping`, then `/containers/json?all=1`, `/containers/{id}/json`, `/images/json` and `/images/{id}/json`, each with a 10-second timeout. Env names, mount sources, the `devcontainer.local_folder` label. Nothing that writes, execs or pulls |
-| Devcontainers | none | `devcontainer.json`, `.devcontainer/devcontainer.json` and `.devcontainer/*/devcontainer.json` under the project folders (`--projects`, or the secrets editor's folders), the `.env` and Compose files they name, and VS Code's user `settings.json` for the three forwarding settings. Folders from running containers' `devcontainer.local_folder` labels are added |
+| Devcontainers | none | `.devcontainer.json`, `.devcontainer/devcontainer.json` and `.devcontainer/*/devcontainer.json` under the project folders (`--projects`, or the secrets editor's folders), the `.env` and Compose files they name, and VS Code's user `settings.json` for the three forwarding settings. Folders from running containers' `devcontainer.local_folder` labels are added |
 | WSL | Distributions from `HKCU\Software\Microsoft\Windows\CurrentVersion\Lxss` (name, version, `BasePath`), and whether each `ext4.vhdx` is owned by or readable for you (security descriptor only) | For **running** distributions only (`wsl.exe --list --running --quiet`, which starts nothing): known credential paths under each home in `\\wsl.localhost\<distro>\home\*` and `\root`, by name and existence. `docker-desktop*` distributions are skipped: the engine row covers them |
 | Hyper-V | Whether `S-1-5-32-578` is in your token and enabled, and whether Administrators is deny-only | Members only: VM names and their disk, checkpoint and saved-state paths from WMI (`root\virtualization\v2`, read-only queries). Everyone: the DACLs of disk files under the default folders (`%PUBLIC%\Documents\Hyper-V\Virtual Hard Disks`, `%ProgramData%\Microsoft\Windows\Hyper-V`) and the VM paths found, by `AccessCheck` |
 
@@ -143,11 +143,11 @@ Each is a `DoctorCheck` with a `Kind`, so one kind is one line on Home with its 
 | Finding | Raised when | Position | Fix |
 |---|---|---|---|
 | Docker engine open to every program you run | A pipe exists and grants your token | none | `ReachGuide("Docker engine")`: quit Docker Desktop when you don't use it (the pipe goes with it); if you don't use Docker, leave the group with `Remove-LocalGroupMember -Group docker-users -Member <you>`, which needs an administrator, so it is printed, not run |
-| Secrets in a container's environment | A container (running or stopped) or image has secret-looking env names | E5/C3 → E4/C1 | `InjectAtRunTime(container)`: for a devcontainer, move the name from `containerEnv` to `remoteEnv` as `"${localEnv:NAME}"`, seal it with `tir env set NAME --folder <project>`, and start VS Code with `tir run -- code <project>`. `remoteEnv` isn't in the container's config, so the engine no longer shows it. Otherwise `tir run --only NAME -- docker run -e NAME …`, which keeps it off disk and out of the image. Then `docker rm` the old container |
+| Secrets in a container's environment | A container (running or stopped) or image has secret-looking env names | E5/C3 → E4/C1 | `InjectAtRunTime(container)`: for a devcontainer, move the name from `containerEnv` to `remoteEnv` as `"${localEnv:NAME}"`, seal it with `tir env set NAME --folder <project>`, and start VS Code with `tir run -- code <project>`. `remoteEnv` isn't in the container's config, so the engine no longer shows it. Otherwise `tir run --only NAME -- docker run -e NAME …`, which keeps it off disk and out of the image. Then `docker stop` and `docker rm` the old container |
 | Secret baked into an image | An image's `Config.Env` has a secret-looking name | E5/C3 | The same, plus rebuild without the `ENV` line; a value in an image layer outlives every container |
 | Host credential folder mounted into a container | A mount source is one of the folders above | none | `ReachGuide("Container mounts")`: remove the mount from `devcontainer.json`'s `mounts` or `runArgs` |
 | Secrets in a devcontainer file | `containerEnv`, `remoteEnv` or a named `.env` holds a secret-looking name with a literal value | E5/C3 → E4/C1 | `InjectAtRunTime(folder)`, as above: the file keeps `${localEnv:NAME}` |
-| Credential forwarding you may not use | Dev Containers is installed and `dev.containers.gitCredentialHelperConfigLocation` isn't `none`, or `dev.containers.dockerCredentialHelper` isn't `false`; or the host `ssh-agent` service is running with keys | none | `ReachGuide("Devcontainer forwarding")`: set the setting in VS Code user settings, or stop the agent (`Stop-Service ssh-agent`, which a user can't always do; then remove keys with `ssh-add -D`) |
+| Credential forwarding you may not use | Dev Containers is installed and `dev.containers.gitCredentialHelperConfigLocation` isn't `none`, or `dev.containers.dockerCredentialHelper` isn't `false`; or the host `ssh-agent` service is running with keys | none | `ReachGuide("Devcontainer forwarding")`: set the setting in VS Code user settings, and where a container needs git, add the Tiresias feature and `tir env git add` (phase 6); or stop the agent (`Stop-Service ssh-agent`, which a user can't always do; then remove keys with `ssh-add -D`) |
 | Secrets in a running WSL distribution | A known credential file exists, or a `.env` has secret-looking names | E5/C3 → E4/C1 | `ReachGuide("WSL")`: seal it on Windows with `tir env set NAME`, and pass it in for one command with `tir run --only NAME -- wsl -d <distro> <command>`, adding `NAME` to `WSLENV` (`WSLENV=NAME/u`) so WSL forwards it. Delete the file afterwards |
 | WSL disk readable offline | A distribution's `ext4.vhdx` is owned by or readable for you, and it is stopped or its contents weren't checked | none | None: Windows gives the owner this file. So it is a passing check that informs, not a finding: it says the distribution's secrets are as exposed while it is stopped, and points at the row above |
 | Hyper-V guests readable | `S-1-5-32-578` is enabled in your token | none | `ReachGuide("Hyper-V")`: leave Hyper-V Administrators if you don't manage VMs (needs an administrator); inside the guest, turn on BitLocker with a virtual TPM so its disk and checkpoints are ciphertext to the host |
@@ -189,7 +189,7 @@ devcontainers
   C:\src\shop\.devcontainer\devcontainer.json     containerEnv: OPENAI_API_KEY
   forwarding                                      git credentials, docker logins
 wsl
-  Ubuntu (running)     ~/.aws/credentials [default, prod], ~/.ssh/id_ed25519, ~/.bash_history
+  Ubuntu (running)     /home/alice/.aws/credentials [default, prod], /home/alice/.ssh/id_ed25519, /home/alice/.bash_history
   Debian (stopped)     disk is a file you own; contents not read (it would start)
 hyper-v
   not a member; no readable VM files in the default folders
@@ -268,24 +268,9 @@ Planner cases with fake facts, `NameScan` cases with byte fixtures:
 
 ## Later: devcontainers that ask instead of carrying
 
-Sketch only; its own issue when phase 4 lands.
-
-A devcontainer that gets no secrets at start and asks Tiresias when a tool needs one, with
-consent naming the container:
-
-- A devcontainer **feature** (`ghcr.io/…/tiresias`) installs a small client in the image: a
-  `git-credential-tiresias` helper and a `tir`-compatible `exec`/`run` that speak to the host.
-- The host side is a forwarder listener the container reaches at `host.docker.internal`, bound to
-  the Docker network only, accepting one **per-container capability** that `tir` mints in the
-  devcontainer's `initializeCommand` (which runs on the host, as you) and hands in through
-  `remoteEnv`. The capability names the project folder and expires with the container.
-- Consent reads "*devcontainer for C:\src\shop* wants `github`", since the host can't see which
-  process inside asked; grants are per container, never per image.
-- Placeholders then work from inside the container, which is the E3/C1 answer this page can't give
-  yet.
-
-Open: whether the forwarder may listen beyond loopback at all (a new trust boundary, its own threat
-entry), and how WSL distributions would use the same client.
+Designed on its own page: [devcontainers that ask](devcontainers.md). A devcontainer gets no
+secrets at start; a small client in it asks the agent through Docker Desktop's
+`host.docker.internal` relay, with a per-folder ticket, and consent names the devcontainer.
 
 ## Phases
 
@@ -297,16 +282,62 @@ Each slice ships alone, with its tests and its line in `CHANGELOG.md`.
    `ReachAccess` decides who it grants (a deny wins; an owner can read a disk); Hyper-V counts as
    installed when the `vmms` service exists. Docker Desktop keeps `dockerDesktopWindowsEngine` open
    in Linux mode too, so the finding says that pipe is administrator *when Windows containers are
-   on*. **How to close it** opens this page's *Findings*.
+   on*. **How to close it** shows the steps in the app (`ReachGuide.Steps`): each command names
+   the account as `DOMAIN\user`, because a PowerShell run as administrator may run as another
+   account, with **Copy** and, for a group change, **Run as administrator**. **Read more** opens
+   this page's *Findings*.
 2. **`NameScan` and devcontainer files.** The pure scanner with the canary tests; `devcontainer.json`
    and its `.env`/Compose files under the project folders; VS Code's forwarding settings;
-   `InjectAtRunTime`. Still no engine.
+   `InjectAtRunTime`. Still no engine. **Built**, with these differences: devcontainer files are
+   read with the project walk (`--projects`, or the secrets editor's folders) like `appsettings`,
+   not behind the opt-in, since they are the user's own files in folders they pointed at. Read are
+   `containerEnv`, `remoteEnv`, `runArgs`' `-e`/`--env` and the `--env-file` files (looked for
+   against the workspace, then the file's folder); Compose files are not read yet. A URL value is
+   reported only with a password in it (`DATABASE_URL (password in URL)`), not for a user name
+   alone. Forwarding reads the two VS Code settings when the Dev Containers extension is installed;
+   the host `ssh-agent` is left to phase 4. **Copy command** copies the `tir env set` and
+   `tir run -- code .` lines; VS Code must be quit first, or `code` hands the folder to the running
+   window, which never sees the values.
 3. **Docker engine contents, opt-in.** `tir doctor --reach`, the app's card and setting, containers,
-   images and mounts, the `devcontainer.local_folder` link to phase 2's folders.
+   images and mounts, the `devcontainer.local_folder` link to phase 2's folders. **Built**, with
+   these differences: the probe never looks on its own; the caller passes what it read into
+   `Doctor.RunAsync`, so `tir doctor` looks only with `--reach` and the app only after **Check now**
+   (or daily, once ticked). The app keeps the last look in memory for its lifetime, so Home and
+   the background checks keep showing its findings between looks; nothing about contents is
+   written to disk. Only Docker is read, over whichever open pipe answers first, with GETs only and
+   at most 200 containers and 200 images inspected; each call has 10 seconds, its body included. A container or image gone or too large to inspect is left out and counted on the passing line, but the two lists must answer whole, or the check says Docker didn't answer rather than that it found nothing. A container's own names are its `Config.Env`
+   minus the names its image reports as secret; those are reported once, on the image. The fix runs the container with
+   `docker run --rm -e NAME`, because a value passed with `-e` still lands in the container's
+   config and `--rm` takes it away with the container. A `devcontainer.local_folder` label is
+   followed only when it is a folder on a local drive, never a UNC path in either slash, since
+   opening a WSL path would start its distribution. The fix stops and removes the old container.
 4. **WSL contents.** Running distributions only; known credential files and `.env` names; the
-   `WSLENV` fix.
-5. **Hyper-V detail.** WMI for members, file DACLs for everyone.
-6. **Later:** devcontainers that ask (above), after its own design and threat entry.
+   `WSLENV` fix. **Built**, with these differences: it rides on phase 3's opt-in (`--reach`,
+   **Check now**, daily), which now looks in Docker and WSL together. Only distributions that
+   `wsl.exe --list --running --quiet` names *and* the registry lists are opened, so a message in
+   its output is never taken for one; a distribution that stops between the list and the read is
+   the one way a look can start one. Every `/home/*` and `/root` is looked in, and paths are shown
+   as Linux paths (`/home/alice/.aws/credentials`), not `~`. Only regular, non-empty files count:
+   links are not followed and a FIFO is never opened. Azure and gcloud are found by their token
+   files (`~/.azure/msal_token_cache.json`, `~/.config/gcloud/credentials.db` and
+   `application_default_credentials.json`) rather than their folders, which stay after a sign-out.
+   AWS names the sections that set `aws_secret_access_key` or `aws_session_token`; Docker names
+   registries with a stored `auth` or `identitytoken`; `.npmrc`, `.pypirc` and `gh`'s `hosts.yml`
+   count only with a literal token line (npm's `${NPM_TOKEN}` doesn't); `.env` files in each home
+   and one folder down give their secret-looking names. Shell history is listed beside other
+   files but never makes a finding on its own. Stopped distributions are named on the passing
+   line as not read.
+5. **Hyper-V detail.** WMI for members, file DACLs for everyone. **Built**, with these
+   differences: it rides on the same opt-in as phases 3 and 4. Access is judged against the token
+   *without* Hyper-V Administrators, since a member reads everything through the group already and
+   the membership finding covers that; a file is a finding only when another of the token's
+   entries (the user, `Users`, `Authenticated Users`, an owner) grants read. Configuration files
+   (`.vmcx`) hold no guest data and are left out. Members get the VMs' names on the passing line;
+   their disk paths (`Msvm_StorageAllocationSettingData`) and configuration, checkpoint and
+   saved-state folders (`Msvm_VirtualSystemSettingData`) are added to the default folders, each
+   walked at most six levels deep, skipping links; at most 500 files are checked, the rest counted.
+   The finding has no positions: what it opens isn't a secret Tiresias holds.
+6. **Devcontainers that ask:** [devcontainers.md](devcontainers.md); built: tickets, the endpoint, `tir-remote`, git credentials and the published feature.
 
 ## Not in scope
 

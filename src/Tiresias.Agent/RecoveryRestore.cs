@@ -17,7 +17,7 @@ public sealed record RestoreSummary(int Restored, int AlreadyOpen, IReadOnlyList
 
 /// <summary>
 /// Restoring from the paper recovery key: every sealed item on this device (each vault's secrets and
-/// every sealed <c>secrets.json</c>, and the sealed environment) that this Windows Hello key can't open is given back to it, as
+/// every sealed <c>secrets.json</c>, the sealed environment and the alerts file) that this Windows Hello key can't open is given back to it, as
 /// <see cref="RecoveryRewrap"/> describes. For a new PC, a reset Windows Hello, or files copied from
 /// another machine. Everything is worked out before anything is written.
 /// </summary>
@@ -88,6 +88,16 @@ public static class RecoveryRestore
                 changes.Add((path, digest, () => WriteText(path, text)));
         }
 
+        if (AlertsStore.IsSealed)
+        {
+            var path = AlertsStore.FilePath;
+            var digest = Digest(path);
+            var (outcome, text, opens) = AlertsStore.Rewrap(hello, recovery);
+            Count(outcome, opens, "alerts");
+            if (outcome == RewrapOutcome.Rewrapped)
+                changes.Add((path, digest, () => WriteText(path, text)));
+        }
+
         var solo = current is null && recoveryOpens == 0 ? RecoveryKey.VerifySoloPaper(recoveryKey) : SoloPaperProof.NoSolo;
         var (enroll, otherKeyKept) = PlanEnrollment(current, legacy, offered, items, recoveryOpens, solo);
         Apply(() =>
@@ -153,7 +163,7 @@ public static class RecoveryRestore
     /// Whether anything sealed is here: a vault secret or a sealed <c>secrets.json</c>. With no
     /// recovery key stored, that means the files came from another PC or an earlier setup. No prompt.
     /// </summary>
-    public static bool AnythingSealed() => AnythingSealed(VaultPaths(), Projects(), EnvironmentStore.FilePath);
+    public static bool AnythingSealed() => AnythingSealed(VaultPaths(), Projects(), EnvironmentStore.FilePath) || AlertsStore.IsSealed;
 
     internal static bool AnythingSealed(IEnumerable<string> vaults, IEnumerable<UserSecretsFolder> projects, string environmentPath) =>
         vaults.Any(path => VaultFile.Load(path).Secrets.Count > 0)
@@ -173,6 +183,8 @@ public static class RecoveryRestore
                 names.Add($"user secrets: {folder.Id}");
         if (EnvironmentStore.Exists && !EnvironmentStore.Opens(hello))
             names.Add("environment variables");
+        if (AlertsStore.IsSealed && !AlertsStore.Opens(hello))
+            names.Add("alerts");
         return names;
     }
 

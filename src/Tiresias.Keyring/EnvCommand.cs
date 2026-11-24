@@ -5,6 +5,7 @@ using Tiresias.Agent;
 using Tiresias.Audit;
 using Tiresias.Client;
 using Tiresias.EnvironmentVariables;
+using Tiresias.Protocol;
 using Tiresias.Vault;
 
 namespace Tiresias.Keyring;
@@ -29,10 +30,59 @@ static class EnvCommand
         "remove" => Remove(args.Require(2, "name"), Folder(args)),
         "hook" => Hook(args.At(2)),
         "nuget" => NuGet(args),
+        "git" => Git(args),
         "placeholder" => Placeholder(args),
+        "config" => Config(args),
         "import" => Import(args.Require(2, "file"), args.Require(3, "entry"), args.Require(4, "NAME")),
-        _ => throw new UsageException("tir env takes list, protect, put-back, set, remove, hook, shell, nuget, placeholder or import."),
+        _ => throw new UsageException("tir env takes list, protect, put-back, set, remove, hook, shell, nuget, git, placeholder, config or import."),
     };
+
+    /// <summary>
+    /// <c>tir env config add|list|remove</c>: the sealed variables a .NET app with
+    /// Tiresias.Extensions.Configuration may ask for itself, when nothing started it with them (F5 in
+    /// an IDE). Marked, not copied: the value stays the sealed one.
+    /// </summary>
+    static int Config(CommandLine args)
+    {
+        using var hello = HelloKeyWrapper.Open(create: false);
+        var (sealedNow, version) = EnvironmentStore.Open(hello);
+        switch (args.At(2))
+        {
+            case "list":
+                if (sealedNow.Configuration.Count == 0)
+                    Console.WriteLine("No sealed variable is marked for .NET apps. Mark one: tir env config add <NAME>.");
+                foreach (var name in sealedNow.Configuration)
+                    Console.WriteLine($"  {name}");
+                return 0;
+            case "add":
+                var adding = args.Require(3, "NAME");
+                if (!sealedNow.IsSealedAnywhere(adding))
+                    throw new UsageException($"{adding} is not a sealed variable. Seal it first: tir env set {adding} (or tir env protect {adding}).");
+                try
+                {
+                    EnvironmentStore.Save(sealedNow.WithConfiguration(adding), version, hello);
+                }
+                catch (InvalidOperationException e)
+                {
+                    Console.Error.WriteLine(e.Message);
+                    return 1;
+                }
+                Console.WriteLine($"{adding} is now handed to .NET apps that ask for it through Tiresias.Extensions.Configuration, after you allow each one.");
+                return 0;
+            case "remove":
+                var removing = args.Require(3, "NAME");
+                if (!sealedNow.IsForConfiguration(removing))
+                {
+                    Console.Error.WriteLine($"{removing} is not marked for .NET apps. See tir env config list.");
+                    return 1;
+                }
+                EnvironmentStore.Save(sealedNow.WithoutConfiguration(removing), version, hello);
+                Console.WriteLine($"{removing} is no longer handed to .NET apps that ask. It stays sealed.");
+                return 0;
+            default:
+                throw new UsageException("tir env config takes add, list or remove.");
+        }
+    }
 
     /// <summary><c>tir env import</c>: a registry token in an <c>.npmrc</c> or <c>.pypirc</c> sealed, and taken out of the file.</summary>
     static int Import(string file, string entry, string name)
@@ -164,6 +214,49 @@ static class EnvCommand
     }
 
     /// <summary>
+    /// <c>tir env git add|list|remove</c>: which git hosts a devcontainer's <c>tir-remote git-credential</c>
+    /// gets a token for, and from which sealed variable (docs/devcontainers.md). Sealed with the
+    /// variables, like NuGet sources.
+    /// </summary>
+    static int Git(CommandLine args)
+    {
+        using var hello = HelloKeyWrapper.Open(create: false);
+        var (sealedNow, version) = EnvironmentStore.Open(hello);
+        switch (args.At(2))
+        {
+            case "list":
+                foreach (var mapped in sealedNow.GitHosts)
+                    Console.WriteLine($"  {mapped.Host}  {mapped.Variable} (user name {mapped.Username})");
+                if (sealedNow.GitHosts.Count == 0)
+                    Console.WriteLine("No git hosts use a sealed variable. Add one: tir env git add <host> <NAME>.");
+                return 0;
+            case "add":
+                var host = args.Require(3, "host");
+                var name = args.Require(4, "NAME");
+                if (GitHost.Normalize(host) is not { } normalized)
+                    throw new UsageException(GitHost.HostRequirement + ".");
+                if (!sealedNow.IsSealedAnywhere(name))
+                    throw new UsageException($"{name} is not a sealed variable. Seal the token first: tir env set {name} (or tir env protect {name}).");
+                EnvironmentStore.Save(sealedNow.WithGitHost(new(normalized, name, args.Option("--username") ?? GitHost.DefaultUsername)), version, hello);
+                Console.WriteLine($"git in a devcontainer with the Tiresias feature now asks Tiresias for https://{normalized}, and gets {name} once you allow that devcontainer.");
+                return 0;
+            case "remove":
+                var removing = args.Require(3, "host");
+                var left = sealedNow.WithoutGitHost(removing);
+                if (left.GitHosts.Count == sealedNow.GitHosts.Count)
+                {
+                    Console.Error.WriteLine($"{removing} isn't mapped. See tir env git list.");
+                    return 1;
+                }
+                EnvironmentStore.Save(left, version, hello);
+                Console.WriteLine($"git no longer gets a sealed variable for {removing}. The variable itself stays sealed.");
+                return 0;
+            default:
+                throw new UsageException("tir env git takes list, add or remove.");
+        }
+    }
+
+    /// <summary>
     /// <c>tir env nuget import</c>: every source whose NuGet.Config credentials name an environment
     /// variable, or hold the token in plain text, is mapped to a sealed variable (sealing it first if
     /// needed), and its credentials are taken out of the file so NuGet asks Tiresias instead.
@@ -217,15 +310,16 @@ static class EnvCommand
         using var hello = HelloKeyWrapper.Open(create: false);
         var (sealedNow, _) = EnvironmentStore.Open(hello);
         Console.WriteLine($"Sealed ({sealedNow.Global.Count}):");
+        string Line(string name) => EnvironmentDelivery.Describe(sealedNow, name) + (sealedNow.IsForConfiguration(name) ? " (also for .NET apps)" : "");
         foreach (var variable in sealedNow.Global)
-            Console.WriteLine($"  {EnvironmentDelivery.Describe(sealedNow, variable.Name)}");
+            Console.WriteLine($"  {Line(variable.Name)}");
         foreach (var set in sealedNow.Folders.OrderBy(f => f.Folder, StringComparer.OrdinalIgnoreCase))
         {
             Console.WriteLine($"For commands in {set.Folder} ({set.Variables.Count}):");
             foreach (var variable in set.Variables)
-                Console.WriteLine($"  {EnvironmentDelivery.Describe(sealedNow, variable.Name)}");
+                Console.WriteLine($"  {Line(variable.Name)}");
         }
-        var exposed = user.Where(v => v.LooksSecret).ToArray();
+        var exposed = user.Where(v => v.LooksSecret && !v.Decoy).ToArray();
         if (exposed.Length > 0)
         {
             Console.WriteLine($"Still in your Windows environment and look like secrets ({exposed.Length}):");
@@ -240,9 +334,10 @@ static class EnvCommand
     static int Protect(CommandLine args)
     {
         var names = args.Positional.Skip(2).ToArray();
+        var user = EnvironmentStore.UserVariables();
         if (names.Length == 0)
         {
-            names = [.. EnvironmentStore.UserVariables().Where(v => v.LooksSecret).Select(v => v.Name)];
+            names = [.. user.Where(v => v.LooksSecret && !v.Decoy).Select(v => v.Name)];
             if (names.Length == 0)
             {
                 Console.WriteLine("None of your user environment variables look like secrets. Name one to seal it anyway: tir env protect NAME.");
@@ -254,10 +349,21 @@ static class EnvCommand
         }
         using var hello = HelloKeyWrapper.Open(create: false);
         var moved = EnvironmentStore.Protect(names, hello);
-        var missed = names.Except(moved, StringComparer.OrdinalIgnoreCase).ToArray();
+        var decoys = names.Where(n => user.Any(v => v.Decoy && string.Equals(v.Name, n, StringComparison.OrdinalIgnoreCase))).ToArray();
+        var missed = names.Except(moved, StringComparer.OrdinalIgnoreCase).Except(decoys, StringComparer.OrdinalIgnoreCase).ToArray();
         Console.WriteLine(moved.Count == 0 ? "Nothing was sealed." : $"Sealed {string.Join(", ", moved)}. New programs no longer see them; give them to one with tir run -- <command>.");
+        if (moved.Count > 0 && args.Flag("--config"))
+        {
+            var (sealedNow, version) = EnvironmentStore.Open(hello);
+            EnvironmentStore.Save(moved.Aggregate(sealedNow, (environment, name) => environment.WithConfiguration(name)), version, hello);
+            Console.WriteLine(".NET apps with Tiresias.Extensions.Configuration can ask for them too, after you allow each one.");
+        }
+        else if (moved.Count > 0)
+            Console.WriteLine("Programs started outside a terminal (F5 in an IDE) stop seeing them. Mark one for .NET apps with tir env config add <NAME>.");
         if (moved.Count > 0)
             Console.WriteLine("Programs already running keep their copy until they restart.");
+        if (decoys.Length > 0)
+            Console.WriteLine($"A decoy Tiresias placed, so left as bait: {string.Join(", ", decoys)}");
         if (missed.Length > 0)
             Console.WriteLine($"Not a user environment variable, so not moved: {string.Join(", ", missed)}");
         return missed.Length > 0 ? 1 : 0;
@@ -434,7 +540,9 @@ static class EnvCommand
         ControlReply? reply;
         try
         {
-            reply = await ControlClient.TryAsync(new(ControlRequest.Environment, commandLine, program, Directory: directory, Names: only), ConsentWait);
+            var opened = DevcontainerTickets.FolderFor(commandLine, directory, Directory.Exists);
+            reply = await ControlClient.TryAsync(new(ControlRequest.Environment, commandLine, program, Directory: directory, Names: only,
+                Devcontainer: DevcontainerFolders.AsksForTicket(opened) ? opened : null), ConsentWait);
         }
         catch (Exception e) when (e is IOException or OperationCanceledException)
         {
@@ -454,6 +562,8 @@ static class EnvCommand
     static async Task<IReadOnlyDictionary<string, string>> FromTerminalAsync(string program, IReadOnlyList<string> commandLine,
         string directory, IReadOnlyList<string>? only)
     {
+        if (DevcontainerFolders.AsksForTicket(DevcontainerTickets.FolderFor(commandLine, directory, Directory.Exists)))
+            Console.Error.WriteLine($"The devcontainer asks for {DevcontainerWire.TicketVariable}, which only the Tiresias app hands out: start the app, then run this again.");
         Console.WriteLine("Opening the sealed environment with Windows Hello...");
         using var hello = HelloKeyWrapper.Open(create: false);
         var snapshot = EnvironmentStore.ReadForDelivery(hello);

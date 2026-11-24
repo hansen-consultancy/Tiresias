@@ -87,7 +87,7 @@ public partial class TrayFlyout : UserControl
         if (locks)
             await App.Current.LockAsync();
         else
-            await App.Current.UnlockAsync(interactive: true);
+            await App.Current.UnlockAsync(PromptReason.Unlock, interactive: true);
     }
 
     void OnHome(object sender, RoutedEventArgs e) => Act(App.Current.ShowHome);

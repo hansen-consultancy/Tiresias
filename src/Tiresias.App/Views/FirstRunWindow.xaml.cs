@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -135,6 +135,9 @@ public sealed partial class FirstRunViewModel : ObservableObject
     [ObservableProperty]
     public partial bool IsSolo { get; set; } = true;
 
+    /// <summary>A broker or secrets only matter to a developer or a team: elsewhere the Mode step offers solo alone (docs/developer-tools.md).</summary>
+    public bool DeveloperTools { get; } = DeveloperSignals.View().Shown;
+
     [ObservableProperty]
     public partial bool IsBroker { get; set; }
 
@@ -195,7 +198,7 @@ public sealed partial class FirstRunViewModel : ObservableObject
                     MoveFrom(App.SetupFacts(), resume: true);
                     break;
                 case FirstRunStep.Hello:
-                    await Task.Run(() => App.Current.Host.Keys.Unlock(create: true));
+                    await SetUpAsync(() => App.Current.Host.Keys.Unlock(create: true));
                     App.Current.Refresh();
                     MoveFrom(App.SetupFacts());
                     break;
@@ -347,7 +350,7 @@ public sealed partial class FirstRunViewModel : ObservableObject
         RestoreSummary summary;
         try
         {
-            await Task.Run(() => App.Current.Host.Keys.Unlock(create: true));
+            await SetUpAsync(() => App.Current.Host.Keys.Unlock(create: true));
             var hello = App.Current.Host.Keys.Hello!;
             summary = await Task.Run(() => RecoveryRestore.Run(paper, hello));
             Forget();
@@ -403,11 +406,18 @@ public sealed partial class FirstRunViewModel : ObservableObject
     async Task SetUpSoloAsync()
     {
         // Signing genesis shows a Hello prompt: keep the window responsive meanwhile.
-        await Task.Run(() => SoloBroker.Setup(recoveryKey!));
+        await SetUpAsync(() => SoloBroker.Setup(recoveryKey!));
         Forget();
         // Starts the in-app broker and opens the first lease; already unlocked, so no second Hello prompt.
-        await App.Current.UnlockAsync(interactive: true);
+        await App.Current.UnlockAsync(PromptReason.SetUp, interactive: true);
         Finish(SetupMode.Solo);
+    }
+
+    /// <summary>A setup step that shows a Hello prompt, off the UI thread, with setup named as its reason.</summary>
+    static async Task SetUpAsync(Action step)
+    {
+        using var because = HelloPrompts.Because(PromptReason.SetUp);
+        await Task.Run(step);
     }
 
     void Finish(SetupMode mode)

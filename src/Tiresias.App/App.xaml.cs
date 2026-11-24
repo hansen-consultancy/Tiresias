@@ -7,6 +7,7 @@ using Tiresias.App.Logic;
 using Tiresias.App.Views;
 using Tiresias.Decoys;
 using Tiresias.EnvironmentVariables;
+using Tiresias.Protocol;
 using Tiresias.UserSecrets;
 
 namespace Tiresias.App;
@@ -29,11 +30,17 @@ public partial class App : Application
     AgentHost? host;
     TrayController? tray;
     AppUpdates? updates;
+    AppAlerts? alerts;
+    /// <summary>Whether the Windows session is locked or disconnected, as the last session switch said; assumed not at start.</summary>
+    volatile bool sessionLocked;
     readonly Dictionary<Type, Window> windows = [];
     /// <summary>tir, a terminal, NuGet and the tray asking at once share one Windows Hello prompt.</summary>
     readonly SingleFlight<UnlockResult?> unlocking = new();
 
     internal AgentHost Host => host!;
+
+    /// <summary>Out-of-band alerts (docs/alerts.md): opened at unlock, kept while locked.</summary>
+    internal AppAlerts Alerts => alerts!;
 
     internal ConsentPresenter Consent => consent!;
 
@@ -72,21 +79,48 @@ public partial class App : Application
         var unlockAtStart = false;
 #if DEBUG
         if (demo is not null)
+        {
             unlockAtStart = Demo.Start(demo);
+            // Screenshots of both themes without changing the PC's own setting.
+            if (Demo.RequestedTheme(e.Args) is { } theme)
+                ThemeMode = theme;
+        }
 #endif
+        // After the demo seals its made-up secrets, which is no prompt the user should see a reason for.
+        HelloPrompts.Announce = why => PromptCardWindow.Show(why as PromptReason ?? PromptReason.Unnamed, PromptKind.Hello);
 
         consent = new ConsentPresenter(Dispatcher);
+        // Before the agent starts: the solo broker audits a trust chain it rejects at startup.
+        alerts = new AppAlerts();
+        var alertCenter = alerts.Center;
         guard = new ProgramGuard();
         host = new AgentHost(consent, guard.CheckAsync);
-        consent.Unlock = async () => (await UnlockAsync(interactive: true)).Ok;
+        consent.Unlock = async program => (await UnlockAsync(PromptReason.ProgramAsked(program), interactive: true)).Ok;
         consent.Gate = guard.Decide;
-        consent.NotMe = (asker, asked) =>
+        consent.SessionLocked = () => sessionLocked;
+        consent.Alert = (kind, asker, names) => _ = Task.Run(() => alertCenter.Raise(
+            Tiresias.Alerts.AlertSources.Asked(kind, asker.Image, asker.ProcessId, names, ParentsOf(asker.ProcessId), DateTimeOffset.UtcNow)));
+        consent.NotMe = (asker, asked, names) =>
         {
             // Before the next waiting request is looked at: from here on everything is refused.
             guard.LockDown();
-            _ = Dispatcher.InvokeAsync(() => NotMeAsync(asker, asked)).Task.Unwrap();
+            _ = Dispatcher.InvokeAsync(() => NotMeAsync(asker, asked, names)).Task.Unwrap();
         };
         host.Log += AppLog.Info;
+        // Before the broker starts: a trust chain it rejects at startup is audited, and so alerts, then.
+        host.BrokerAudited += (record, at) =>
+        {
+            if (Tiresias.Alerts.AlertSources.Audited(record, at) is { } alert)
+                alertCenter.Raise(alert);
+        };
+        host.ServiceIncidentsReceived += incidents =>
+        {
+            // A routine opener's read is evidence only, as in AgentHost.
+            foreach (var incident in incidents.Where(i => i.Routine is null))
+                if (AlertFor(new DecoyTouch(incident.Hit, incident.Parents, null, incident.Frozen)) is { } alert)
+                    alertCenter.Raise(alert);
+            Dispatcher.BeginInvoke(() => tray?.Notify(Text.Get("Notify_Decoy_Title"), Text.Get("Notify_AdminIncidents")));
+        };
         // A demo serves nothing: no user-secrets pipe, broker or control pipe for tir, whose names the real app's use.
         if (!DemoMode.On)
         {
@@ -110,14 +144,15 @@ public partial class App : Application
         tray = new TrayController(this);
         host.StateChanged += () =>
         {
+            // The first unlock opens alerts.json; from then on alerts work while locked too.
+            if (host.Keys.Hello is { } hello)
+                _ = Task.Run(() => alerts.Unlocked(hello));
             // Locked: every terminal asks again, as it would after a restart.
             if (!host.Keys.IsUnlocked)
                 ClearEnvironmentConsent();
             Dispatcher.BeginInvoke(Refresh);
         };
         host.DecoyTouched += OnDecoyTouched;
-        host.ServiceIncidentsReceived += () => Dispatcher.BeginInvoke(() =>
-            tray?.Notify(Text.Get("Notify_Decoy_Title"), Text.Get("Notify_AdminIncidents")));
         host.UserSecrets.FirstSealed += id => Dispatcher.BeginInvoke(() =>
             tray?.Notify(Text.Get("Notify_FirstSealed_Title"), Text.Format("Notify_FirstSealed_Body", id)));
         SystemEvents.SessionSwitch += OnSessionSwitch;
@@ -129,12 +164,18 @@ public partial class App : Application
             updates.Start();
         FindingWatch.Start();
         if (unlockAtStart)
-            _ = UnlockAsync(interactive: true);
+            _ = UnlockAsync(PromptReason.UnlockAtStart, interactive: true);
 
+#if DEBUG
+        // --page Secrets: the demo opens on that place, for screenshots.
+        if (DemoMode.On && Array.IndexOf(e.Args, "--page") is var page and >= 0 && page + 1 < e.Args.Length)
+            ShowWindow<StatusWindow>().Go(e.Args[page + 1]);
+        else
+#endif
         if (FirstRunPlan.Needed(SetupFacts()))
             ShowWindow<FirstRunWindow>();
         else if (host.SoloBrokerProblem is not null)
-            ProblemWindow.Show(ProblemKind.SoloBrokerDown, host.SoloBrokerProblem, retry: () => _ = UnlockAsync(interactive: true));
+            ProblemWindow.Show(ProblemKind.SoloBrokerDown, host.SoloBrokerProblem, retry: () => _ = UnlockAsync(PromptReason.Unlock, interactive: true));
     }
 
     /// <summary>
@@ -286,11 +327,13 @@ public partial class App : Application
 
     /// <summary>The Windows Hello prompt, then the lease. Interactive: problems get a window with a way forward.</summary>
     /// <returns>Whether the agent ended up unlocked, and what to tell <c>tir</c>.</returns>
-    internal async Task<(bool Ok, string Message)> UnlockAsync(bool interactive)
+    internal async Task<(bool Ok, string Message)> UnlockAsync(PromptReason why, bool interactive)
     {
         // After "This wasn't me" only the user, from the app, unlocks: tir, a terminal or NuGet asking can't.
         if (!interactive && guard!.Current.LockedDown)
             return (false, Text.Get("Lockdown_UnlockFromApp"));
+        // A caller joining an unlock under way sees the first caller's reason: there is one prompt.
+        using var because = HelloPrompts.Because(why);
         try
         {
             var result = await unlocking.RunAsync(host!.UnlockAsync);
@@ -300,7 +343,7 @@ public partial class App : Application
                 AppLog.Info($"unlocked, lease not opened: {result.Message}");
                 if (interactive)
                     ProblemWindow.Show(host.SoloBrokerProblem is not null ? ProblemKind.SoloBrokerDown : ProblemKind.BrokerRefused, result.Message,
-                        retry: () => _ = UnlockAsync(true), openStatus: () => ShowWindow<StatusWindow>());
+                        retry: () => _ = UnlockAsync(why, true), openStatus: () => ShowWindow<StatusWindow>());
                 return (true, Text.Format("Unlock_NoLease", result.Message));
             }
             if (interactive)
@@ -312,7 +355,7 @@ public partial class App : Application
         {
             Refresh();
             if (interactive)
-                ProblemWindow.Show(e, "unlock", retry: () => _ = UnlockAsync(true), finishSetup: ShowHome);
+                ProblemWindow.Show(e, "unlock", retry: () => _ = UnlockAsync(why, true), finishSetup: ShowHome);
             else
                 AppLog.Error(e, "unlock from tir");
             return (false, e.Message);
@@ -335,9 +378,10 @@ public partial class App : Application
     /// <summary>
     /// "This wasn't me", after the lockdown is already in place: lock (which forgets every session
     /// consent, terminal and NuGet allowance, revokes the terminals' placeholders and ends the lease),
-    /// find the process and what started it, block the program, record it and show what to do next.
+    /// find the process and what started it, block the program, have the admin tier (when installed)
+    /// freeze the process and block its network, record it and show what to do next.
     /// </summary>
-    async Task NotMeAsync(Asker asker, string asked)
+    async Task NotMeAsync(Asker asker, string asked, IReadOnlyList<string>? names)
     {
         AppLog.Info($"this wasn't me: {asker.Image ?? "unknown program"} asked for {asked}");
         await LockAsync();
@@ -345,16 +389,24 @@ public partial class App : Application
         {
             var found = asker.ProcessId is { } pid ? (ProcessTree.Ancestry(pid, 0) is [var self] ? self : null)
                 : asker.Image is { } path && System.IO.Path.IsPathFullyQualified(path) ? ProcessTree.Newest(path) : null;
-            var parents = found is null ? Array.Empty<string>()
-                : [.. ProcessTree.Ancestry(found.ProcessId).Skip(1).Select(p => $"{p.Program} ({p.ProcessId})")];
+            var parents = ParentsOf(found?.ProcessId);
             return (found, parents, asker.Image is { } program ? guard!.Sha256(program) : null);
         });
         guard!.Block(asker.Image, sha);
         var blocked = asker.Image is { } image && guard.Current.Programs.Any(p => string.Equals(p.Path, image, StringComparison.OrdinalIgnoreCase));
-        host!.RecordIncident(asked, process is null ? asker.Image : $"{process.Program} ({process.ProcessId})", chain, blocked);
-        IncidentView view = new(asked, asker.Image, process, chain, blocked);
+        var frozen = process is not null && await AdminDecoys.FreezeAsync(process.ProcessId) is { Processes: > 0 } or { NetworkBlocked: true };
+        if (frozen)
+            AppLog.Info($"this wasn't me: the admin tier froze {process!.Program} ({process.ProcessId})");
+        host!.RecordIncident(asked, process is null ? asker.Image : $"{process.Program} ({process.ProcessId})", chain, blocked, frozen);
+        alerts!.Center.Raise(Tiresias.Alerts.AlertSources.Asked(Tiresias.Alerts.AlertKind.IncidentReported,
+            process?.Program ?? asker.Image, process?.ProcessId ?? asker.ProcessId, names, chain, DateTimeOffset.UtcNow));
+        IncidentView view = new(asked, asker.Image, process, chain, blocked, frozen);
         IncidentWindow.Show(view);
     }
+
+    static Tiresias.Alerts.AlertEvent? AlertFor(DecoyTouch touch) =>
+        Tiresias.Alerts.AlertSources.DecoyUsed(touch.Hit, touch.Parents, touch.What)
+            ?? Tiresias.Alerts.AlertSources.DecoyRead(touch.Hit, touch.Parents, touch.What, touch.Routine);
 
     /// <summary>
     /// A decoy credential was used (docs/decoys.md): block the program, say so, and let Home raise
@@ -364,6 +416,8 @@ public partial class App : Application
     /// </summary>
     void OnDecoyTouched(DecoyTouch touch)
     {
+        if (AlertFor(touch) is { } alert)
+            alerts?.Center.Raise(alert);
         var program = touch.Hit.Program;
         if (touch.Hit.Use == DecoyUse.Read)
         {
@@ -378,6 +432,10 @@ public partial class App : Application
                 ? Text.Format("Notify_Decoy_Unknown", touch.What)
                 : Text.Format("Notify_Decoy_Body", System.IO.Path.GetFileName(program), touch.What)));
     }
+
+    /// <summary>The processes that started <paramref name="processId"/>, nearest first, as the incident record names them.</summary>
+    static string[] ParentsOf(int? processId) =>
+        processId is { } pid ? [.. ProcessTree.Ancestry(pid).Skip(1).Select(p => $"{p.Program} ({p.ProcessId})")] : [];
 
     /// <summary>A request that came through <c>tir</c>: the program that ran it is the one asking, not <c>tir</c> itself.</summary>
     static Asker TirCaller(PipeClient caller) =>
@@ -412,6 +470,98 @@ public partial class App : Application
         shells.Clear();
         nugetAllowed.Clear();
         _ = PlaceholderMinter.RevokeAsync(shellPlaceholders.Release((_, _) => false));
+        _ = PlaceholderMinter.RevokeAsync(devcontainerTickets.Clear());
+    }
+
+    /// <summary>Tickets for devcontainers that ask (docs/devcontainers.md); all end when Tiresias locks.</summary>
+    readonly DevcontainerTickets devcontainerTickets = new(TimeProvider.System);
+    DevcontainerEndpoint? devcontainerEndpoint;
+
+    DevcontainerEndpoint Devcontainers => devcontainerEndpoint ??= new(devcontainerTickets, DevcontainerAskAsync, DevcontainerGitAsync,
+        why => AppLog.Info($"devcontainer endpoint refused {why}"));
+
+    /// <summary>
+    /// A devcontainer asking with its ticket for the variables sealed for its folder. Consent names
+    /// the folder, never a program: the host sees only Docker Desktop's backend.
+    /// </summary>
+    async Task<DevcontainerReply> DevcontainerAskAsync(string ticket, DevcontainerTicket devcontainer, DevcontainerRequest request, CancellationToken ct)
+    {
+        _ = PlaceholderMinter.RevokeAsync(devcontainerTickets.Prune());
+        if (host!.Keys.Hello is not { } hello)
+            return new(false, Message: Text.Get("Environment_Locked"));
+        var snapshot = await Task.Run(() => EnvironmentStore.ReadForDelivery(hello), ct);
+        var endpoint = DevcontainerTickets.ForContainer(PlaceholderMinter.Endpoint);
+        var (variables, missing, terms) = snapshot.SelectForCommand(devcontainer.Folder, request.Names, endpoint);
+        if (missing.Count > 0)
+            return new(false, Message: Text.Format("Environment_NotSealed", string.Join(", ", missing)));
+        if (variables.Count == 0)
+            return new(true, new Dictionary<string, string>(), Text.Get("Environment_NoneSealed"));
+        var program = $"devcontainer {devcontainer.Folder}";
+        var accesses = variables.Select(v => EnvironmentVariableAccess.For(snapshot.Environment, v.Name, devcontainer.Folder, endpoint)).ToArray();
+        if (!devcontainerTickets.AllAllowed(ticket, accesses))
+        {
+            var answer = await consent!.AskDevcontainerAsync(devcontainer.Folder, terms, ct);
+            if (answer == ConsentAnswer.Deny)
+            {
+                host.RecordEnvironment(false, program, terms, null);
+                return new(false, Message: "Not approved.");
+            }
+            if (answer == ConsentAnswer.AllowForSession)
+                devcontainerTickets.Allow(ticket, accesses);
+        }
+        var delivery = await snapshot.DeliverAsync(variables, endpoint,
+            (placeholder, _) => PlaceholderMinter.MintAsync(hello, placeholder, $"devcontainer:{Path.GetFileName(devcontainer.Folder)}", "Docker Desktop (devcontainer)"),
+            PlaceholderMinter.RevokeAsync, ct, () => host.Keys.Hello == hello);
+        var placeholders = EnvironmentDelivery.Placeholders(delivery.Variables.Values).ToArray();
+        if (!devcontainerTickets.Hold(ticket, placeholders))
+        {
+            await PlaceholderMinter.RevokeAsync(placeholders);
+            return new(false, Message: Text.Get("Environment_Locked"));
+        }
+        host.RecordEnvironment(true, program, terms, null);
+        return new(true, delivery.Variables, Note(delivery));
+    }
+
+    /// <summary>
+    /// <c>tir-remote git-credential</c> in a devcontainer asking for a git host's token: the sealed
+    /// variable <c>tir env git add</c> mapped to that host, as resolved for the devcontainer's folder.
+    /// Asked like a variable, with the host in the heading; a placeholder is no use to git, so a
+    /// variable delivered as one is refused.
+    /// </summary>
+    async Task<DevcontainerGitReply> DevcontainerGitAsync(string ticket, DevcontainerTicket devcontainer, DevcontainerGitRequest request, CancellationToken ct)
+    {
+        _ = PlaceholderMinter.RevokeAsync(devcontainerTickets.Prune());
+        if (host!.Keys.Hello is not { } hello)
+            return new(false, Message: Text.Get("Environment_Locked"));
+        var snapshot = await Task.Run(() => EnvironmentStore.ReadForDelivery(hello), ct);
+        if (snapshot.Environment.GitHostFor(request.Protocol, request.Host) is not { } git)
+            return new(false, Message: Text.Format("Devcontainer_GitUnmapped", request.Protocol ?? "", request.Host ?? ""));
+        if (snapshot.Environment.PlaceholderFor(git.Variable) is not null)
+            return new(false, Message: Text.Format("Devcontainer_GitPlaceholder", git.Variable, git.Host));
+        var endpoint = DevcontainerTickets.ForContainer(PlaceholderMinter.Endpoint);
+        var (variables, missing, terms) = snapshot.SelectForCommand(devcontainer.Folder, [git.Variable], endpoint);
+        if (missing.Count > 0)
+            return new(false, Message: Text.Format("Environment_NotSealed", string.Join(", ", missing)));
+        var program = $"devcontainer {devcontainer.Folder} (git {git.Host})";
+        var access = EnvironmentVariableAccess.For(snapshot.Environment, git.Variable, devcontainer.Folder, endpoint);
+        if (!devcontainerTickets.AllAllowed(ticket, [access]))
+        {
+            var answer = await consent!.AskDevcontainerAsync(devcontainer.Folder, terms, ct, gitHost: git.Host);
+            if (answer == ConsentAnswer.Deny)
+            {
+                host.RecordEnvironment(false, program, terms, null);
+                return new(false, Message: "Not approved.");
+            }
+            if (answer == ConsentAnswer.AllowForSession)
+                devcontainerTickets.Allow(ticket, [access]);
+        }
+        var delivery = await snapshot.DeliverAsync(variables, endpoint,
+            (_, _) => throw new InvalidOperationException("A git token is never a placeholder."),
+            PlaceholderMinter.RevokeAsync, ct, () => host.Keys.Hello == hello);
+        if (devcontainerTickets.Find(ticket) is null)
+            return new(false, Message: Text.Get("Environment_Locked"));
+        host.RecordEnvironment(true, program, terms, null);
+        return new(true, git.Username, delivery.Variables[git.Variable]);
     }
 
     async Task<ControlReply> DispatchControlAsync(ControlRequest request, PipeClient caller, CancellationToken ct)
@@ -443,7 +593,7 @@ public partial class App : Application
             case ControlRequest.NuGetCredential:
                 return await NuGetCredentialAsync(request, caller, ct);
             case ControlRequest.Unlock:
-                var (ok, message) = await Dispatcher.InvokeAsync(() => UnlockAsync(interactive: false)).Task.Unwrap();
+                var (ok, message) = await Dispatcher.InvokeAsync(() => UnlockAsync(PromptReason.ProgramAsked(TirCaller(caller).Image), interactive: false)).Task.Unwrap();
                 return new(ok, message);
             case ControlRequest.Lock:
                 await Dispatcher.InvokeAsync(LockAsync).Task.Unwrap();
@@ -459,7 +609,7 @@ public partial class App : Application
         var caller = client.Image;
         if (!host!.Keys.IsUnlocked)
         {
-            var (unlocked, message) = await Dispatcher.InvokeAsync(() => UnlockAsync(interactive: false)).Task.Unwrap();
+            var (unlocked, message) = await Dispatcher.InvokeAsync(() => UnlockAsync(PromptReason.ProgramAsked(TirCaller(client).Image), interactive: false)).Task.Unwrap();
             if (!unlocked)
                 return new(false, message);
         }
@@ -470,7 +620,11 @@ public partial class App : Application
         var (variables, missing, terms) = snapshot.SelectForCommand(request.Directory, request.Names, endpoint);
         if (missing.Count > 0)
             return new(false, Text.Format("Environment_NotSealed", string.Join(", ", missing)));
-        if (variables.Count == 0)
+        // tir said so, but the app reads the file itself before naming the folder in consent.
+        var devcontainer = request.Devcontainer is { } folder && await Task.Run(() => DevcontainerFolders.AsksForTicket(folder), ct) ? folder : null;
+        if (devcontainer is not null)
+            terms = [.. terms, Text.Format("Environment_DevcontainerTicket", DevcontainerWire.TicketVariable, devcontainer)];
+        else if (variables.Count == 0)
             return new(true, Text.Get("Environment_NoneSealed"), Approved: true, Variables: new Dictionary<string, string>());
         var program = request.Title ?? "tir run";
         var approved = await consent!.AskEnvironmentAsync(program, request.Lines, terms, caller,
@@ -485,7 +639,21 @@ public partial class App : Application
             (placeholder, _) => PlaceholderMinter.MintAsync(hello, placeholder, $"run:{program}", caller), PlaceholderMinter.RevokeAsync, ct,
             () => host.Keys.Hello == hello);
         host.RecordEnvironment(true, program, terms, caller);
-        return new(true, Note(delivery), Approved: true, Variables: delivery.Variables);
+        if (devcontainer is null)
+            return new(true, Note(delivery), Approved: true, Variables: delivery.Variables);
+        try
+        {
+            await Devcontainers.EnsureStartedAsync();
+        }
+        catch (IOException e)
+        {
+            return new(true, string.Join(Environment.NewLine, new[] { Note(delivery), e.Message }.OfType<string>()), Approved: true, Variables: delivery.Variables);
+        }
+        var given = new Dictionary<string, string>(delivery.Variables, StringComparer.OrdinalIgnoreCase)
+        {
+            [DevcontainerWire.TicketVariable] = devcontainerTickets.Mint(devcontainer),
+        };
+        return new(true, Note(delivery), Approved: true, Variables: given);
     }
 
     static string? Note(Delivery delivery) => delivery.Problems.Count > 0 ? string.Join(Environment.NewLine, delivery.Problems) : null;
@@ -519,7 +687,7 @@ public partial class App : Application
             return new(true, Approved: false);
         if (!host.Keys.IsUnlocked)
         {
-            var (unlocked, message) = await Dispatcher.InvokeAsync(() => UnlockAsync(interactive: false)).Task.Unwrap();
+            var (unlocked, message) = await Dispatcher.InvokeAsync(() => UnlockAsync(PromptReason.ProgramAsked(shell.Program), interactive: false)).Task.Unwrap();
             if (!unlocked)
             {
                 shells.Refuse(shell, policy.Scope);
@@ -616,7 +784,7 @@ public partial class App : Application
             return Refuse(refused);
         if (!host!.Keys.IsUnlocked)
         {
-            var (unlocked, message) = await Dispatcher.InvokeAsync(() => UnlockAsync(interactive: false)).Task.Unwrap();
+            var (unlocked, message) = await Dispatcher.InvokeAsync(() => UnlockAsync(PromptReason.ProgramAsked(program.Program), interactive: false)).Task.Unwrap();
             if (!unlocked)
                 return new(false, message);
         }
@@ -655,6 +823,7 @@ public partial class App : Application
 
     void OnSessionSwitch(object? sender, SessionSwitchEventArgs e)
     {
+        sessionLocked = AlertTriggers.SessionLocked(sessionLocked, e.Reason.ToString());
         // The agent locks its keys itself; open consent dialogs are answered Deny here so none waits behind the lock screen.
         if (e.Reason is SessionSwitchReason.SessionLock or SessionSwitchReason.SessionLogoff or SessionSwitchReason.ConsoleDisconnect)
             consent?.DenyAll();
@@ -687,6 +856,8 @@ public partial class App : Application
         await stop.CancelAsync();
         if (host is not null)
             await host.DisposeAsync();
+        if (alerts is not null)
+            await alerts.DisposeAsync();
         consent?.Dispose();
         instance?.ReleaseMutex();
         instance?.Dispose();

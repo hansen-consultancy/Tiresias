@@ -31,7 +31,7 @@ public static class DecoyPlan
                 new WriteDecoyFile(Path.Combine(where, "appsettings.Production.json"), AppSettings(set)),
                 new WriteDecoyFile(Path.Combine(where, ".env"), DotEnv(set)),
             ],
-            DecoyKind.Variables => [new SetDecoyVariable(VariableNames[0], set.HttpUrl + "/admin"), new SetDecoyVariable(VariableNames[1], set.Values.AdminToken)],
+            DecoyKind.Variables => [.. VariableNames.Select(name => new SetDecoyVariable(name, VariableValue(set, name)!))],
             _ => throw new ArgumentOutOfRangeException(nameof(kind)),
         };
         var taken = kind == DecoyKind.Project && exists(where) ? where
@@ -39,6 +39,28 @@ public static class DecoyPlan
         if (taken is not null)
             throw new InvalidOperationException($"{taken} already exists. Decoys are only placed where nothing is, so no real program reads one.");
         return steps;
+    }
+
+    /// <summary>The value a decoy variable is set to; <c>null</c> for a name that isn't one.</summary>
+    static string? VariableValue(DecoySet set, string name) =>
+        string.Equals(name, VariableNames[0], StringComparison.OrdinalIgnoreCase) ? set.HttpUrl + "/admin"
+        : string.Equals(name, VariableNames[1], StringComparison.OrdinalIgnoreCase) ? set.Values.AdminToken
+        : null;
+
+    /// <summary>
+    /// Whether a user variable is a decoy of this install, so it is bait to leave in place, not a
+    /// secret to seal. With the set at hand the value must be the decoy's too: a real
+    /// <c>ADMIN_API_TOKEN</c> of the user's stays a secret. Once the admin tier holds the set,
+    /// <c>decoys.json</c> is gone and only the name can tell.
+    /// </summary>
+    /// <param name="heldVariables">Whether the admin tier holds a variables decoy; asked only when the name matches and no set is at hand.</param>
+    public static bool IsDecoyVariable(string name, string? value, DecoySet? set, Func<bool> heldVariables)
+    {
+        if (!VariableNames.Contains(name, StringComparer.OrdinalIgnoreCase))
+            return false;
+        if (set is null)
+            return heldVariables();
+        return set.Placed.Any(p => p.Kind == DecoyKind.Variables) && value == VariableValue(set, name);
     }
 
     /// <summary>Every decoy file placed (a variable has none): what the read tripwire watches.</summary>

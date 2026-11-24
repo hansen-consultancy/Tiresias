@@ -26,6 +26,19 @@ static class Demo
         return at < 0 ? null : at + 1 < args.Length && !args[at + 1].StartsWith('-', StringComparison.Ordinal) ? args[at + 1] : DefaultScenario;
     }
 
+    /// <summary><c>--theme light</c> or <c>--theme dark</c>: the theme the demo shows instead of the system's.</summary>
+    public static System.Windows.ThemeMode? RequestedTheme(string[] args)
+    {
+        var at = Array.IndexOf(args, "--theme");
+        return at < 0 || at + 1 >= args.Length ? null
+            : args[at + 1].ToLowerInvariant() switch
+            {
+                "light" => System.Windows.ThemeMode.Light,
+                "dark" => System.Windows.ThemeMode.Dark,
+                _ => null,
+            };
+    }
+
     /// <summary>The scenario running, while demo mode is on.</summary>
     public static string? Scenario { get; private set; }
 
@@ -81,6 +94,9 @@ static class Demo
         }
         foreach (var (name, value) in scenario.Variables)
             UserMachine.SetUserVariable(name, value);
+        // Placed as the Home links place them, at their default places in the made-up profile.
+        foreach (var kind in scenario.Decoys ?? [])
+            DecoyStore.Place(kind, null);
         if (!scenario.SetUp)
             return;
 

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Tiresias.Audit;
+using Tiresias.EnvironmentVariables;
 using Tiresias.Protocol;
 using Tiresias.Vault;
 
@@ -51,15 +52,19 @@ public sealed class UserSecretsService : IDisposable
     readonly AuditLog? audit;
     readonly ISecretReferenceResolver? references;
     readonly Func<string?, CancellationToken, Task<ReleasePolicy>> checkProgram;
+    readonly EnvironmentFile? environment;
     readonly SemaphoreSlim screen = new(1, 1);
     readonly Lock writeGate = new();
     CancellationTokenSource locked = new();
 
     /// <param name="audit">Where decisions are recorded (keys and programs only), or <c>null</c>.</param>
     /// <param name="references">Fetches what <c>tiresias:</c> values name, or <c>null</c> where nothing can (<c>tir agent</c> without a broker).</param>
+    /// <param name="environment">The sealed environment, whose variables marked for configuration <see cref="AgentRequest.LoadEnvironment"/> hands out; <c>null</c> answers it with none.</param>
     public UserSecretsService(string userSecretsRoot, IUserSecretsKeys keys, IUserSecretsConsentPrompt prompt, TimeProvider time, AuditLog? audit = null,
-        ISecretReferenceResolver? references = null, Func<string?, CancellationToken, Task<ReleasePolicy>>? checkProgram = null)
+        ISecretReferenceResolver? references = null, Func<string?, CancellationToken, Task<ReleasePolicy>>? checkProgram = null,
+        EnvironmentFile? environment = null)
     {
+        this.environment = environment;
         this.references = references;
         this.checkProgram = checkProgram ?? ((_, _) => Task.FromResult(default(ReleasePolicy)));
         this.userSecretsRoot = userSecretsRoot;
@@ -105,6 +110,8 @@ public sealed class UserSecretsService : IDisposable
 
     async Task<AgentReply> HandleCoreAsync(AgentRequest request, string? caller, CancellationToken ct)
     {
+        if (request.Op == AgentRequest.LoadEnvironment)
+            return await HandleEnvironmentAsync(request with { UserSecretsId = EnvironmentFile.Id }, caller, ct);
         if (UserSecretsPolicy.Validate(request, userSecretsRoot) is { } invalid)
         {
             Record(AuditKind.Deny, request, caller, invalid);
@@ -227,6 +234,53 @@ public sealed class UserSecretsService : IDisposable
         return new(AgentStatus.Ok, load.Document.ToJsonString(), RefreshAt: refreshAt?.ToUnixTimeSeconds());
     }
 
+    /// <summary>
+    /// A .NET app asking for the sealed variables marked for configuration. Nothing sealed, or
+    /// nothing marked for its folder, is an empty answer with no prompt, not even to unlock: most
+    /// apps on this machine ask and get nothing. Otherwise the same screen, memory and program checks
+    /// as a sealed user-secrets file, remembered by the variables and where each comes from, so a new
+    /// variable or a folder override asks again.
+    /// </summary>
+    async Task<AgentReply> HandleEnvironmentAsync(AgentRequest request, string? caller, CancellationToken ct)
+    {
+        if (!Path.IsPathFullyQualified(request.SecretsDirectory))
+        {
+            Record(AuditKind.Deny, request, caller, "the app's folder is not a full path");
+            return new(AgentStatus.Error, Message: "The app's folder is not a full path.");
+        }
+        AgentReply Refuse(string why)
+        {
+            Record(AuditKind.Deny, request, caller, why);
+            return new(AgentStatus.Denied, Message: why);
+        }
+        var none = new AgentReply(AgentStatus.Ok, "{}");
+        if (environment is not { Exists: true })
+            return none;
+        var policy = await checkProgram(caller, ct);
+        if (policy.Refusal is { } refusal)
+            return Refuse(refusal);
+        if (keys.Unlocked is null && !await AskUnlockAsync(caller, request.UserSecretsId, ct))
+            return Refuse(UserSecretsPolicy.LockedMessage);
+        if (keys.Unlocked is not { } wrapper)
+            return Refuse(UserSecretsPolicy.LockedMessage);
+        var snapshot = environment.ReadForDelivery(wrapper);
+        var wanted = snapshot.Environment.ForConfiguration(request.SecretsDirectory, request.Present ?? []);
+        if (wanted.Count == 0)
+            return none;
+        var terms = wanted.Select(v => new EnvironmentVariableAccess(v.Variable.Name, v.Folder).Describe()).ToArray();
+        var (answer, why) = await AskAsync(new(caller, request.UserSecretsId, terms, request.SecretsDirectory), string.Join('\n', terms), policy.Scope, ct);
+        if ((await checkProgram(caller, ct)).RefusalSince(policy) is { } changed)
+            return Refuse(changed);
+        if (answer == ConsentAnswer.Deny)
+            return Refuse(why);
+        snapshot.EnsureCurrent();
+        var document = new System.Text.Json.Nodes.JsonObject();
+        foreach (var (variable, _) in wanted)
+            document[variable.Name] = variable.Value;
+        Record(AuditKind.Allow, request, caller, $"{why}; {string.Join(", ", wanted.Select(v => v.Variable.Name))}");
+        return new(AgentStatus.Ok, document.ToJsonString());
+    }
+
     /// <summary>Takes its turn with the consent screens; another request may have unlocked meanwhile.</summary>
     async Task<bool> AskUnlockAsync(string? caller, string userSecretsId, CancellationToken ct)
     {
@@ -300,8 +354,12 @@ public sealed class UserSecretsService : IDisposable
 
     void Record(AuditKind kind, AgentRequest request, string? caller, string? reason)
     {
-        Say($"{(kind == AuditKind.Allow ? "Allowed" : "Refused")} {request.UserSecretsId} to {caller ?? "an unknown program"}: {reason}");
-        audit?.Append(new(kind, Consumer: "usersecrets", Service: UserSecretsVault.Slug(request.UserSecretsId), Reason: reason, Process: caller));
+        var environmentLoad = request.Op == AgentRequest.LoadEnvironment;
+        var what = environmentLoad ? $"environment variables for {request.SecretsDirectory}" : request.UserSecretsId;
+        Say($"{(kind == AuditKind.Allow ? "Allowed" : "Refused")} {what} to {caller ?? "an unknown program"}: {reason}");
+        audit?.Append(environmentLoad
+            ? new(kind, Consumer: "environment", Service: "configuration", Reason: reason, Process: caller)
+            : new(kind, Consumer: "usersecrets", Service: UserSecretsVault.Slug(request.UserSecretsId), Reason: reason, Process: caller));
     }
 
     void Say(string message) => Log?.Invoke(message);

@@ -9,7 +9,13 @@ namespace Tiresias.Client;
 public sealed record NeedOption(string Id, string Title, string Summary, Position Position, DoctorFix Action, string? GivesUp = null, bool NeedsBroker = false);
 
 /// <summary>Something a user needs ("An app needs a database"): the phrases it answers to and the ways to meet it.</summary>
-public sealed record Need(string Id, string Title, IReadOnlyList<string> Phrases, IReadOnlyList<NeedOption> Options);
+public sealed record Need(string Id, string Title, IReadOnlyList<string> Phrases, IReadOnlyList<NeedOption> Options)
+{
+    static readonly HashSet<string> DeveloperNeeds = ["database", "cli-key", "cli-sign-in", "project-secrets", "publish", "git"];
+
+    /// <summary>Only a developer has this need: the app lists it on a PC with developer tools, and finds it by search on any (docs/developer-tools.md).</summary>
+    public bool ForDevelopers => DeveloperNeeds.Contains(Id);
+}
 
 /// <summary>A product people name when they search ("Azure SQL", "OpenAI"), and the option it points at.</summary>
 public sealed record KnownService(string Name, IReadOnlyList<string> Aliases, string NeedId, string OptionId);

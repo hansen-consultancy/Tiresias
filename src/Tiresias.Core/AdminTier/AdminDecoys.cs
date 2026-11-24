@@ -10,8 +10,9 @@ namespace Tiresias.AdminTier;
 
 /// <summary>What <c>decoys.status</c> answers: the kinds placed (one per decoy) and how many files, never a place, port or value.</summary>
 /// <param name="Listening">The service has the set's ports bound now.</param>
+/// <param name="Auditing">Every held file carries the audit rule and the policy logs it, so each read is named.</param>
 public sealed record AdminDecoysStatus(bool Held, bool Listening, IReadOnlyList<DecoyKind> Kinds, int Files, bool NeedsVerification = false,
-    bool Verified = false)
+    bool Verified = false, bool Auditing = false)
 {
     /// <summary>Older services report a held set without any placement confirmation.</summary>
     public AdminDecoysStatus ConfirmedStatus() => Held && !Verified ? new(false, false, [], 0, NeedsVerification: true) : this;
@@ -20,8 +21,10 @@ public sealed record AdminDecoysStatus(bool Held, bool Listening, IReadOnlyList<
 /// <summary>What <c>decoys.release</c> answers: the set, handed back, and the user it is whose (the session's, for an over-the-shoulder caller).</summary>
 public sealed record AdminDecoysRelease(string UserSid, DecoySet? Set, string? Receipt = null);
 
-/// <summary>A service-recorded decoy use and the processes that started its program, nearest first.</summary>
-public sealed record AdminEvent(long Id, DecoyHit Hit, IReadOnlyList<string> Parents);
+/// <summary>A service-recorded decoy use or decoy file read, and the processes that started its program, nearest first.</summary>
+/// <param name="Routine">A read by a routine opener (<see cref="DecoyReads.RoutineOpener"/>): recorded, raising nothing.</param>
+/// <param name="Frozen">The service froze the program for this use and blocked its network, until <c>thaw</c>.</param>
+public sealed record AdminEvent(long Id, DecoyHit Hit, IReadOnlyList<string> Parents, string? Routine = null, bool Frozen = false);
 
 /// <summary>One page, oldest first. The protected review position advances only on explicit review.</summary>
 public sealed record AdminEvents(IReadOnlyList<AdminEvent> Events, long ReviewedThrough = 0, long LastId = 0);
@@ -144,8 +147,8 @@ public sealed record AdminHeldDecoys(DecoySet Set, IReadOnlyList<string> Files, 
 
     public string ReleaseReceipt() => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(ToJson())));
 
-    public AdminDecoysStatus Status(bool listening) => Verified
-        ? new(true, listening, [.. Set.Placed.Select(p => p.Kind)], Files.Count, Verified: true)
+    public AdminDecoysStatus Status(bool listening, bool auditing = false) => Verified
+        ? new(true, listening, [.. Set.Placed.Select(p => p.Kind)], Files.Count, Verified: true, Auditing: auditing)
         : new(false, false, [], 0, NeedsVerification: true);
 
     public bool MatchesManifest()

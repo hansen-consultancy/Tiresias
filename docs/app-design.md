@@ -65,7 +65,7 @@ behind the card's **Details** expander, closed by default.
   members together; no full-width bars. Then one line "12 checks passed" that expands to the list. Navigation to
   Secrets, Services, Environment and Activity stays as today's row, only for areas in use.
 - **Services:** left as it is: four buttons on one grid, the setups already reached through Add.
-- **Environment:** each section a card; Sealed and Add new open, the others open when they list something to act on (or when a fix opens them).
+- **Environment:** each section a card, the exposed ones (Still in Windows) first, then Sealed; Sealed and Add new open, the others open when they list something to act on (or when a fix opens them). Each heading says who can read what it lists; the Windows summary counts the variables that look like secrets out of the user's own, and names decoys apart.
 
 ## 4. Ratings in plain language
 
@@ -177,13 +177,21 @@ pure classifier in `Tiresias.Core` so the two can't disagree:
   keys; that is known only while unlocked, because only opening the file tells.
 - **Settings**: plain, and every value is a shape that can't be a credential: a boolean, a number,
   null or empty, a log level under `Logging`, or an http(s) URL with no user info, query or fragment
-  and no path segment long enough to be a token (a webhook's last segment). A value that
+  and no path segment long enough to be a token (a webhook's last segment), or a `tiresias:`
+  reference the broker resolves (`tiresias:sql/...`): it names a credential without holding one, so
+  a file of references alone has nothing to seal. A malformed reference stays doubtful. A value that
   fits none of these makes the file **Secrets**. A doubtful case falls on the side of Secrets,
   because a hidden key costs more than one warning too many.
 - **Secrets** (plain or sealed) and **Invalid**, as today.
 
 **The editor.** The list leads with folders holding secrets, as now. Settings-only folders follow
-with "(settings only)" in place of "(not sealed yet)". Empty folders are not listed; a line at the
+with "(settings only)" in place of "(not sealed yet)". Each row has a mark beside its state: a
+green lock for sealed, an amber warning for not sealed yet, a grey gear for settings only. A
+sealed file with plain keys written beside it since (`dotnet user-secrets set` on a sealed
+project) keeps its lock but turns amber, "sealed, 2 added in plain": those keys are readable by
+anything until the next run seals them. Under
+the picker, one line says what the side bar's count is made of ("58 user-secrets folders: 12
+sealed, 5 not sealed yet, 9 settings only, 32 empty"). Empty folders are not listed; a line at the
 foot, "*N* empty folders", shows them, and offers **Move *N* empty to Recycle Bin**. This uses the
 same ask-first, recoverable path as **Move unused to Recycle Bin**: `dotnet user-secrets set`
 creates the folder again whenever a project needs it. Opening a sealed file that turns out to be
@@ -210,6 +218,49 @@ finding again; today a dismissal outlives any change to the file.
 `Password=` in a connection string, `https://user@host`, `?sig=`, a webhook path);
 `ClientPlannerTests` (the Ok line, and a dismissal lapsing when a key is added); and
 `ProjectScanTests` (the picker's order and what it hides).
+
+## 13. A reason before every Windows prompt
+
+**Problem.** Windows Hello's prompt says only that Windows needs to make sure it's you, and UAC
+names the program and its publisher. Neither says what the prompt is for, so a prompt from
+Tiresias unlocking at start, from a program asking for secrets or from an admin-tier step all look
+alike, and a prompt the user didn't expect gives them nothing to judge it by. Windows takes no
+words of ours: `KeyCredential.RequestSignAsync` has no message, `UserConsentVerifier` shows one
+but is not bound to the Tiresias key (its yes proves nothing to the vault), and UAC has no free
+text.
+
+**The card.** Just before the prompt shows, a small card names the reason: "Tiresias is asking
+for Windows Hello" (or "for administrator rights") over one sentence, such as "*app.exe* asked
+for secrets while Tiresias is locked" or "To install the admin tier, which runs as a Windows
+service". It sits centred just above the middle of the screen, over the prompt Windows centres
+there, and closes when the prompt is answered. It takes no focus and has nothing to click, so the
+prompt keeps the keyboard and the card can't be mistaken for the prompt. It is on screen before
+the prompt starts: the call waits (at most a second) for it to be drawn, and UAC's dimmed
+backdrop then shows it too.
+
+**One place.** Every Hello prompt goes through `HelloKeyWrapper.Prompt`, which asks
+`HelloPrompts.Announce` for the card first. The reason is ambient (`HelloPrompts.Because`), so it
+reaches the prompt through `Task.Run` and the agent's unlock without each signature carrying it.
+`App.UnlockAsync` takes the reason as a parameter, so no unlock can be written without one; a
+prompt nobody named still gets a card, worded for an unnamed reason. UAC launches all go through
+`AdminTierElevation.Run`, which shows the card around `Process.Start`, the call that returns once
+UAC is answered. Requests that share one unlock share its card: the first caller's reason shows.
+The words come from one pure mapping, `PromptWhy`, pinned by `PromptWhyTests`.
+
+**Outside the app** there is no card: `tir` prompts from its own terminal, which says what it is
+doing, and removing the admin tier while uninstalling runs before any app window can show.
+
+**In demo mode** Hello and UAC never prompt, but the card shows for two seconds where the prompt
+would have been, so it can be seen and captured.
+
+**Considered and not chosen.**
+
+- *`UserConsentVerifier` before the key prompt.* Two prompts for one unlock, and the first proves
+  nothing.
+- *Tiresias's own dialog first, then the real prompt.* A second click for every prompt; the card
+  says the same without one.
+- *The reason as the owning window's status text.* Many prompts have no window of ours (the tray,
+  `tir`, a terminal hook), and the prompt covers the window when there is one.
 
 ## Slices
 

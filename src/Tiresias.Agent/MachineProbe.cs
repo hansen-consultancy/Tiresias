@@ -1,3 +1,4 @@
+using System.Net;
 using System.IO.Enumeration;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -38,19 +39,30 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     public bool RecoveryKeySet => RecoveryKey.IsEnrolled;
     public bool RecoveryKeyNeedsVerification => RecoveryKey.NeedsVerification;
 
-    /// <summary>Read from the solo broker's chain file; a remote broker's chain isn't fetched here.</summary>
-    public bool? HelloBound
+    /// <summary>
+    /// The chain the broker serves, which is the one <c>tir trust bind-hello</c> extends. A solo
+    /// broker running as the Windows service keeps it where this account can't read, so the
+    /// per-user chain file is only a fallback for when the broker doesn't answer.
+    /// </summary>
+    public async Task<bool?> HelloBoundAsync()
     {
-        get
-        {
-            if (KeyringStore.Tenant is not { Solo: true, GenesisHash: { } genesis } || !File.Exists(SoloBroker.TrustChainPath))
-                return null;
-            var chain = TrustLinkJson.ParseChain(File.ReadAllBytes(SoloBroker.TrustChainPath));
-            return chain is not null && TrustChainVerifier.Verify(chain, genesis).State is { } state
-                && state.Devices.TryGetValue(KeyringStore.Settings.DeviceId, out var device)
-                    ? device.Hello is not null
-                    : null;
-        }
+        if (KeyringStore.Tenant is not { GenesisHash: { } genesis })
+            return null;
+        var deviceId = KeyringStore.Settings.DeviceId;
+        if (KeyringStore.Broker is { } broker && KeyringStore.HasDeviceKey)
+            try
+            {
+                using var client = BrokerClient.For(broker);
+                var (status, body) = await client.GetAsync("/trust/chain").WaitAsync(TimeSpan.FromSeconds(5));
+                if (status == HttpStatusCode.OK && TrustChainVerifier.HelloBound(body, genesis, deviceId) is { } served)
+                    return served;
+            }
+            catch (Exception e) when (e is HttpRequestException or TimeoutException or TaskCanceledException)
+            {
+            }
+        return KeyringStore.Tenant is { Solo: true } && File.Exists(SoloBroker.TrustChainPath)
+            ? TrustChainVerifier.HelloBound(File.ReadAllBytes(SoloBroker.TrustChainPath), genesis, deviceId)
+            : null;
     }
 
     public DoctorVault? Vault
@@ -109,12 +121,7 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     }
 
     public IReadOnlyList<string> ExposedVariables =>
-        [.. EnvironmentStore.UserVariables().Where(v => v.LooksSecret && !IsDecoyVariable(v.Name)).Select(v => v.Name)];
-
-    /// <summary>The decoy variables, while placed: a decoy is not a secret to seal.</summary>
-    bool IsDecoyVariable(string name) =>
-        DecoyPlan.VariableNames.Contains(name, StringComparer.OrdinalIgnoreCase)
-        && (DecoyStore.Current is { } set ? set.Placed.Any(p => p.Kind == DecoyKind.Variables) : HeldDecoys?.Kinds.Contains(DecoyKind.Variables) == true);
+        [.. EnvironmentStore.UserVariables().Where(v => v.LooksSecret && !v.Decoy).Select(v => v.Name)];
 
     /// <summary>The set the admin tier holds, asked once per doctor run: <c>decoys.json</c> is gone then.</summary>
     AdminDecoysStatus? HeldDecoys => heldDecoys ??= AdminClient.Installed ? AdminDecoys.Status() : null;
@@ -141,6 +148,23 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     public IEnumerable<string> KeyFiles() => Found.Keys.Concat(Found.Pems.Where(HoldsPemPrivateKey));
 
     public IEnumerable<DoctorFile> GitConfigs() => Found.Repositories.Select(Read).Where(f => f.Text is not null);
+
+    public IEnumerable<DevcontainerFile> Devcontainers(IReadOnlyCollection<string> workspaces) =>
+        Found.Devcontainers.Concat(DevcontainerProbe.In(workspaces)).Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(DevcontainerProbe.Read).OfType<DevcontainerFile>();
+
+    public async Task<ReachContents> ReachContentsAsync(ReachScope scope, CancellationToken ct)
+    {
+        if (DemoMode.On)
+            return new(null);
+        var facts = Reach;
+        var docker = scope.HasFlag(ReachScope.Docker) ? EngineProbe.ReadAsync(facts, ct) : Task.FromResult(new ReachContents(null));
+        var wsl = scope.HasFlag(ReachScope.Wsl) ? WslProbe.ReadAsync(facts, ct) : Task.FromResult<IReadOnlyList<WslContents>?>(null);
+        var hyperV = scope.HasFlag(ReachScope.HyperV) ? Task.Run(() => HyperVProbe.Read(facts), ct) : Task.FromResult<HyperVContents?>(null);
+        return (await docker) with { Wsl = await wsl, HyperV = await hyperV };
+    }
+
+    public DevcontainerForwarding? DevcontainerForwarding => DevcontainerProbe.Forwarding();
 
     public DoctorGitCredentials? GitCredentials
     {
@@ -185,6 +209,9 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     /// <summary>The unlocked key, for the checks that need the sealed environment's names; <c>null</c> skips them. Never prompts.</summary>
     public IKeyWrapper? Hello { get; init; }
 
+    /// <summary>The app's failing alert sinks (<c>AlertCenter.Failing</c>); empty from <c>tir doctor</c>, which sends no alerts.</summary>
+    public IReadOnlyList<Alerts.FailingSink> FailingAlertSinks { get; init; } = [];
+
     /// <summary>Opening the environment decrypts its values too; only names leave this property.</summary>
     public DoctorEnvironment? SealedEnvironment
     {
@@ -211,11 +238,11 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     /// <inheritdoc cref="SurfaceProbe.Signature"/>
     public static (bool? Valid, string? Signer) Signature(string path) => SurfaceProbe.Signature(path);
 
-    public IEnumerable<ProgramRun> ProgramRuns() => SurfaceProbe.ProgramRuns();
+    public IEnumerable<ProgramRun> ProgramRuns(IReadOnlyCollection<string> of) => [.. SurfaceProbe.ProgramRuns(), .. AdminClient.LastRuns(of)];
 
     /// <summary>Everything the attack surface checks read, plus the global tools, which take seconds to list.</summary>
     public SurfaceInventory Inventory() =>
-        new([.. Extensions()], [.. SurfaceProbe.GlobalTools()], [.. StartupEntries()], [.. CredentialUses()], [.. ProgramRuns()]);
+        new([.. Extensions()], [.. SurfaceProbe.GlobalTools()], [.. StartupEntries()], [.. CredentialUses()], [.. SurfaceProbe.ProgramRuns()]);
 
     public IEnumerable<DecoyUseRecord> DecoyUses() => SurfaceProbe.DecoyUses();
 
@@ -241,12 +268,12 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public sealed record ScanStats(TimeSpan Elapsed, int Folders, int Files);
 
-    sealed record FoundFiles(List<string> Projects, List<string> Configs, List<string> Keys, List<string> Pems, List<string> Tools, List<string> Repositories, ScanStats Stats);
+    sealed record FoundFiles(List<string> Projects, List<string> Configs, List<string> Keys, List<string> Pems, List<string> Tools, List<string> Repositories, List<string> Devcontainers, ScanStats Stats);
 
     FoundFiles? found;
     FoundFiles Found => found ??= Walk();
 
-    static readonly string[] Patterns = ["*.csproj", "appsettings*.json", "*.pfx", "*.p12", "*.pem", "*.key", "nuget.config", ".npmrc"];
+    static readonly string[] Patterns = ["*.csproj", "appsettings*.json", "*.pfx", "*.p12", "*.pem", "*.key", "nuget.config", ".npmrc", "devcontainer.json", ".devcontainer.json"];
 
     /// <summary>
     /// One walk of the project roots for every file a check reads. Build output, packages and git
@@ -256,7 +283,7 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     FoundFiles Walk()
     {
         var clock = System.Diagnostics.Stopwatch.StartNew();
-        List<string> projects = [], configs = [], keys = [], pems = [], tools = [], repositories = [];
+        List<string> projects = [], configs = [], keys = [], pems = [], tools = [], repositories = [], devcontainers = [];
         var folders = roots.Length;
         // Not Hidden: Git for Windows hides .git. ReparsePoint: a junction can't loop the walk.
         var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = FileAttributes.ReparsePoint | FileAttributes.System };
@@ -286,11 +313,13 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
                     keys.Add(path);
                 else if (Matches("nuget.config", name) || Matches(".npmrc", name))
                     tools.Add(path);
+                else if (Matches("devcontainer.json", name) || Matches(".devcontainer.json", name))
+                    devcontainers.Add(path);
                 else
                     pems.Add(path);
             }
         }
-        return new(projects, configs, keys, pems, tools, repositories, new(clock.Elapsed, folders, projects.Count + configs.Count + keys.Count + pems.Count + tools.Count));
+        return new(projects, configs, keys, pems, tools, repositories, devcontainers, new(clock.Elapsed, folders, projects.Count + configs.Count + keys.Count + pems.Count + tools.Count + devcontainers.Count));
     }
 
     static bool Wanted(string name) => Patterns.Any(p => Matches(p, name));

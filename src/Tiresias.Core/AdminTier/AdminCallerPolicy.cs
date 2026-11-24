@@ -53,12 +53,12 @@ public static class AdminCallerPolicy
         [AdminOps.BlocksUnblock] = new(true, new Dictionary<string, ArgCheck> { ["program"] = AdminArgs.Program }),
         [AdminOps.DecoysAdopt] = new(true, new Dictionary<string, ArgCheck> { ["owner"] = AdminArgs.Owner, ["set"] = AdminArgs.Set, ["files"] = AdminArgs.Files }),
         [AdminOps.DecoysStatus] = new(false, NoArgs),
-        [AdminOps.Freeze] = new(false, null),
-        [AdminOps.Thaw] = new(true, null),
+        [AdminOps.Freeze] = new(false, new Dictionary<string, ArgCheck> { ["pid"] = AdminArgs.Pid }),
+        [AdminOps.Thaw] = new(true, new Dictionary<string, ArgCheck> { ["program"] = AdminArgs.Program }),
         [AdminOps.DecoysRelease] = new(true, NoArgs),
         [AdminOps.DecoysReleaseCommit] = new(true, new Dictionary<string, ArgCheck> { ["receipt"] = AdminArgs.Digest }),
-        [AdminOps.LastRun] = new(false, null),
-        [AdminOps.Teardown] = new(true, null),
+        [AdminOps.LastRun] = new(false, new Dictionary<string, ArgCheck> { ["paths"] = AdminArgs.RunPaths }),
+        [AdminOps.Teardown] = new(true, NoArgs),
     };
 
     /// <summary>The op, if it is one of <see cref="AdminOps"/>; otherwise <c>null</c>, so a caller's text never reaches a log.</summary>

@@ -1,6 +1,6 @@
 // A developer's laptop a few weeks in: three projects, two of them protected, a vault with two
 // services, recent activity, and the findings a busy machine has (a plain secrets.json, a key in
-// the Windows environment, a NuGet password in clear, a stored git token). Everything is made up.
+// the Windows environment, a NuGet password in clear, a stored git token) and all three decoys placed. Everything is made up.
 {
   "description": "A developer's laptop a few weeks in, with a few findings",
   "setUp": true,
@@ -27,10 +27,12 @@
   },
   // The Installed page: per-user programs (a demo has no machine-wide ones). VS Code and Docker are
   // in use, Azure Data Studio hasn't been opened in 140 days, ShopTools has no recorded run, and
-  // FtpSync's folder and uninstaller are gone.
+  // FtpSync's folder and uninstaller are gone. VS Code and ShopTools were installed in the last few
+  // days; FtpSync gives no date.
   "registry": {
     "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{771FD6B0-FA20-440A-A002-3B3BAC16DC50}_is1": {
       "DisplayName": "Microsoft Visual Studio Code (User)",
+      "InstallDate": "{{date-3d}}",
       "DisplayVersion": "1.106.2",
       "Publisher": "Microsoft Corporation",
       "InstallLocation": "{{profile}}\\AppData\\Local\\Programs\\Microsoft VS Code\\",
@@ -38,6 +40,7 @@
     },
     "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Docker Desktop": {
       "DisplayName": "Docker Desktop",
+      "InstallDate": "{{date-200d}}",
       "DisplayVersion": "4.52.0",
       "Publisher": "Docker Inc.",
       "InstallLocation": "{{profile}}\\AppData\\Local\\Programs\\Docker\\Docker",
@@ -45,6 +48,7 @@
     },
     "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{4F2C8B9A-7D31-4E6B-9C05-1A8E3D72B6F4}_is1": {
       "DisplayName": "Azure Data Studio",
+      "InstallDate": "{{date-400d}}",
       "DisplayVersion": "1.49.1",
       "Publisher": "Microsoft Corporation",
       "InstallLocation": "{{profile}}\\AppData\\Local\\Programs\\Azure Data Studio\\",
@@ -52,6 +56,7 @@
     },
     "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ShopTools": {
       "DisplayName": "ShopTools CLI",
+      "InstallDate": "{{date-1d}}",
       "DisplayVersion": "0.9.3",
       "Publisher": "Example Shop",
       "InstallLocation": "{{profile}}\\AppData\\Local\\Programs\\ShopTools",
@@ -90,6 +95,7 @@
     "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
     "JAVA_HOME": "C:\\Program Files\\Java\\jdk-21"
   },
+  "decoys": ["passwordsFile", "project", "variables"],
   "sealedVariables": {
     "GITHUB_TOKEN": "ghp_demo1111111111111111111111111111111111"
   }

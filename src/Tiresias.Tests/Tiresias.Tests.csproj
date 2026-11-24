@@ -22,6 +22,8 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="NUnit3TestAdapter" />
+    <!-- For the linked Admin\ReadAudit.cs. -->
+    <PackageReference Include="System.Diagnostics.EventLog" />
   </ItemGroup>
 
   <ItemGroup>
@@ -31,6 +33,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Tiresias.Core\Tiresias.Core.csproj" />
     <ProjectReference Include="..\Tiresias.Broker\Tiresias.Broker.csproj" />
+    <ProjectReference Include="..\Tiresias.Remote\Tiresias.Remote.csproj" />
     <!-- Aliased: the forwarder's top-level Program would otherwise collide with the broker's. -->
     <ProjectReference Include="..\Tiresias.Forwarder\Tiresias.Forwarder.csproj" Aliases="forwarder" />
     <ProjectReference Include="..\Tiresias.Extensions.Configuration\Tiresias.Extensions.Configuration.csproj" />
@@ -46,6 +49,11 @@
     <Compile Include="..\Tiresias.Admin\PipeCallerIdentity.cs" Link="Admin\PipeCallerIdentity.cs" />
     <Compile Include="..\Tiresias.Agent\WindowsSessionAccount.cs" Link="Agent\WindowsSessionAccount.cs" />
     <Compile Include="..\Tiresias.Admin\DecoyHold.cs" Link="Admin\DecoyHold.cs" />
+    <Compile Include="..\Tiresias.Admin\ReadAudit.cs" Link="Admin\ReadAudit.cs" />
+    <Compile Include="..\Tiresias.Admin\AuditRules.cs" Link="Admin\AuditRules.cs" />
+    <Compile Include="..\Tiresias.Admin\Freezer.cs" Link="Admin\Freezer.cs" />
+    <Compile Include="..\Tiresias.Admin\ProcessFreezer.cs" Link="Admin\ProcessFreezer.cs" />
+    <Compile Include="..\Tiresias.Admin\NetworkBlock.cs" Link="Admin\NetworkBlock.cs" />
     <Compile Include="..\Tiresias.Agent\ProcessTree.cs" Link="Agent\ProcessTree.cs" />
     <Compile Include="..\Tiresias.Agent\SourceHandle.cs" Link="Agent\SourceHandle.cs" />
     <Compile Include="..\Tiresias.Admin\ActionLog.cs" Link="Admin\ActionLog.cs" />
@@ -59,6 +67,7 @@
     <Compile Include="..\Tiresias.Agent\ServicePipeIdentity.cs" Link="Agent\ServicePipeIdentity.cs" />
     <Compile Include="..\Tiresias.Agent\HelloException.cs" Link="Agent\HelloException.cs" />
     <Compile Include="..\Tiresias.Agent\UnlockActivity.cs" Link="Agent\UnlockActivity.cs" />
+    <Compile Include="..\Tiresias.Agent\DevcontainerEndpoint.cs" Link="Agent\DevcontainerEndpoint.cs" />
   </ItemGroup>
 
   <!-- Likewise tir's usage and agent guide, plain text checked against each other. -->

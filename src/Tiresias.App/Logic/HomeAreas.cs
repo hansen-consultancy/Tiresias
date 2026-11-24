@@ -22,6 +22,7 @@ public enum HomeArea
 /// <param name="ActivityRecorded">The activity or audit log has a record.</param>
 /// <param name="Fixes">The fixes of the status page's last run, whose windows stay reachable.</param>
 /// <param name="Opened">Areas opened from <i>What do you need?</i> this session.</param>
+/// <param name="DeveloperTools">Developer tools show (docs/developer-tools.md): the developer areas are listed before they are in use.</param>
 public sealed record HomeFacts(
     int? Services,
     bool? SealedUserSecrets,
@@ -29,7 +30,8 @@ public sealed record HomeFacts(
     bool? SealedVariables,
     bool? ActivityRecorded,
     IReadOnlyCollection<DoctorFix> Fixes,
-    IReadOnlyCollection<HomeArea> Opened);
+    IReadOnlyCollection<HomeArea> Opened,
+    bool DeveloperTools = false);
 
 /// <summary>
 /// Home lists only the areas this machine uses; the rest are one step away through <i>What do you
@@ -41,6 +43,8 @@ public static class HomeAreas
     public static IReadOnlySet<HomeArea> Plan(HomeFacts facts)
     {
         var areas = new HashSet<HomeArea>(facts.Opened);
+        if (facts.DeveloperTools)
+            areas.UnionWith([HomeArea.UserSecrets, HomeArea.Services, HomeArea.EnvironmentVariables]);
         if (facts.Services is null or > 0)
             areas.Add(HomeArea.Services);
         if (facts.SealedUserSecrets is null or true || facts.ProjectFolders is null or true)

@@ -40,7 +40,7 @@ sealed class TrayController : IDisposable
     public TrayController(App app)
     {
         this.app = app;
-        unlock.Click += async (_, _) => await app.UnlockAsync(interactive: true);
+        unlock.Click += async (_, _) => await app.UnlockAsync(PromptReason.Unlock, interactive: true);
         lockItem.Click += async (_, _) => await app.LockAsync();
         setup.Click += (_, _) => app.ShowWindow<FirstRunWindow>();
         status = Item("Tray_Status", () => app.ShowWindow<StatusWindow>());
@@ -105,7 +105,7 @@ sealed class TrayController : IDisposable
 
     public void Refresh(AgentSnapshot snapshot)
     {
-        var view = this.view = TrayStatus.Describe(snapshot);
+        var view = this.view = TrayStatus.Describe(snapshot, DeveloperSignals.View().Shown);
         headline.Header = Text.Of(view.Headline);
         mode.Header = view.Mode is null ? null : Text.Of(view.Mode);
         mode.Visibility = view.Mode is null ? Visibility.Collapsed : Visibility.Visible;

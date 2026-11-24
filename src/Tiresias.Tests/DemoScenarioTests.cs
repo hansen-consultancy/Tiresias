@@ -108,6 +108,15 @@ public class DemoScenarioTests
     }
 
     [Test]
+    public void Decoys_are_named_by_kind()
+    {
+        var scenario = DemoScenario.Parse("""{ "decoys": ["passwordsFile", "variables"] }""");
+
+        Assert.That(scenario.Decoys, Is.EqualTo(new[] { Tiresias.Decoys.DecoyKind.PasswordsFile, Tiresias.Decoys.DecoyKind.Variables }));
+        Assert.That(() => DemoScenario.Parse("""{ "decoys": ["nope"] }"""), Throws.InstanceOf<System.Text.Json.JsonException>());
+    }
+
+    [Test]
     public void Registry_values_are_text_or_whole_numbers()
     {
         var scenario = DemoScenario.Parse("""{ "registry": { "Software\\App": { "DisplayName": "App", "NoRepair": 1 } } }""");
@@ -142,6 +151,7 @@ public class DemoScenarioTests
     [TestCase("{{now-90m}}", "2026-11-21T10:30:00.0000000+00:00")]
     [TestCase("{{now-2h}}", "2026-11-21T10:00:00.0000000+00:00")]
     [TestCase("{{now-3d}}", "2026-11-18T12:00:00.0000000+00:00")]
+    [TestCase("{{date-3d}}", "20261118")]
     [TestCase("{{later}}", "{{later}}")]
     public void Time_tokens_are_before_now(string token, string expected) =>
         Assert.That(DemoScenario.Expand(token, "activity.jsonl", Profile, Now), Is.EqualTo(expected));

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Tiresias.Protocol;
 using Tiresias.UserSecrets;
@@ -14,6 +15,27 @@ public sealed record UserSecretsFolder(string Id, string Directory)
 
     /// <summary>What the file holds, judged without unlocking: a sealed file counts as secrets.</summary>
     public SecretsContent Content => SecretsContents.OfFile(File.Exists(FilePath) ? File.ReadAllText(FilePath) : null);
+
+    /// <summary>
+    /// Plain keys written beside a sealed file's envelope since it was sealed, which the next run seals;
+    /// 0 for any other file, including one whose envelope can't be read (opening it says so).
+    /// </summary>
+    public int PlainAdditions
+    {
+        get
+        {
+            if (!File.Exists(FilePath) || File.ReadAllText(FilePath) is not { } text || SecretsFile.Classify(text) != SecretsFileKind.Sealed)
+                return 0;
+            try
+            {
+                return SecretsFile.Read(text).PlainAdditions?.Count ?? 0;
+            }
+            catch (Exception e) when (e is InvalidDataException or FormatException or JsonException or InvalidOperationException)
+            {
+                return 0;
+            }
+        }
+    }
 }
 
 /// <summary>

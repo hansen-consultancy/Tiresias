@@ -9,7 +9,7 @@ public enum SecretsContent
 {
     /// <summary>No keys: no file, whitespace, <c>{}</c>, comments only, or a sealed document with nothing in it.</summary>
     Empty,
-    /// <summary>Keys whose every value is a shape that can't be a credential.</summary>
+    /// <summary>Keys whose every value is a shape that can't be a credential, or a <c>tiresias:</c> reference to one.</summary>
     Settings,
     /// <summary>At least one value that may be a credential; also any sealed file not opened.</summary>
     Secrets,
@@ -76,10 +76,24 @@ public static class SecretsContents
             case JsonValueKind.String:
                 var text = value.GetValue<string>();
                 return text.Length == 0
+                    || IsReference(text)
                     || (key.StartsWith("Logging:", StringComparison.OrdinalIgnoreCase) && LogLevels.Contains(text, StringComparer.OrdinalIgnoreCase))
                     || IsPlainUrl(text);
             default:
                 return false;
+        }
+    }
+
+    /// <summary>A <c>tiresias:</c> reference the broker resolves: it names a credential without holding one. A malformed one stays doubtful.</summary>
+    static bool IsReference(string text)
+    {
+        try
+        {
+            return SecretReferences.Parse(text) is not null;
+        }
+        catch (InvalidDataException)
+        {
+            return false;
         }
     }
 

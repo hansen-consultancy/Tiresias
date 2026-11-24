@@ -57,6 +57,11 @@ jobs:
             dotnet publish src/Tiresias.NuGetPlugin -c Release -r $rid --self-contained -o publish/$rid
             dotnet publish src/Tiresias.Admin -c Release -r $rid --self-contained -p:PublishSingleFile=true -o publish/$rid/admin
           done
+      # tir-remote as app-release.yml publishes it for the devcontainer feature: trimmed, so a trim
+      # warning fails here rather than on a tag.
+      - name: Publish tir-remote as released
+        if: runner.os == 'Linux'
+        run: sh .github/scripts/publish-tir-remote.sh 0.0.0-ci publish/tir-remote-out
 
   denylist:
     # Names that must never land here (hosts, people, customers). The list lives in a repository

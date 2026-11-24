@@ -29,10 +29,14 @@ public enum FixAction
     RemoveEntry,
     /// <summary>Take a program off the blocklist.</summary>
     Unblock,
+    /// <summary>Thaw a program the admin tier froze (a UAC prompt), then take it off the blocklist.</summary>
+    Thaw,
     /// <summary>The Services page's add form, its address filled in.</summary>
     AddService,
     /// <summary>The Installed page: the whole list, unused programs first.</summary>
     OpenInstalledList,
+    /// <summary>The About page, where the Alerts card fixes, tests or removes a sink.</summary>
+    OpenAlerts,
     /// <summary>The steps on a page in the repository, in the browser: they need an administrator, or Docker quit, not Tiresias.</summary>
     OpenGuide,
 }
@@ -51,8 +55,14 @@ public static class FindingView
     /// <summary>Findings dismissed together: one kind, one reason, and the keys that bring them back.</summary>
     public sealed record DismissedGroup(string Title, string Reason, IReadOnlyList<string> Keys);
 
-    public static Split Of(IReadOnlyList<DoctorCheck> checks, Dismissals dismissals)
+    /// <param name="developerTools">Developer tools show. Without them, a developer check's passing line is left out and
+    /// a solo note shows as passed; findings and Warn/Fail lines show either way (docs/developer-tools.md).</param>
+    public static Split Of(IReadOnlyList<DoctorCheck> checks, Dismissals dismissals, bool developerTools = true)
     {
+        if (!developerTools)
+            checks = [.. checks
+                .Where(c => c.IsFinding || !c.ForDevelopers || c.Status != DoctorStatus.Ok)
+                .Select(c => c.SoloNote && !c.IsFinding ? c with { Status = DoctorStatus.Ok } : c)];
         var findings = checks.Where(c => c.IsFinding).Select(c => (Check: c, Dismissal: dismissals.For(c))).ToArray();
         var open = findings.Where(f => f.Dismissal is null).Select(f => f.Check)
             .GroupBy(KindOf)
@@ -97,10 +107,13 @@ public static class FindingView
         RemoveEntry { Machine: false } => (FixAction.RemoveEntry, "Finding_FixRemoveEntry"),
         RemoveEntry or Repair { Command: not null } => (FixAction.CopyCommand, "Finding_FixCopy"),
         UnblockProgram => (FixAction.Unblock, "Finding_FixUnblock"),
+        ThawProgram => (FixAction.Thaw, "Finding_FixThaw"),
         RunThroughExec { Setup: not null } => (FixAction.AddService, "Finding_FixGitHubApp"),
         RunThroughExec => (FixAction.CopyCommand, "Finding_FixCopy"),
         UninstallApp => (FixAction.OpenInstalledList, "Finding_FixInstalledList"),
+        ReviewAlerts => (FixAction.OpenAlerts, "Finding_FixAlerts"),
         ReachGuide => (FixAction.OpenGuide, "Finding_FixReachGuide"),
+        InjectAtRunTime => (FixAction.CopyCommand, "Finding_FixCopy"),
         _ => null,
     };
 

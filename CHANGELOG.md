@@ -10,16 +10,130 @@ its section below.
 
 ### Added
 
+- **Installed** marks unsigned and newly installed programs. Each program file's signature is
+  checked in the background; one without a valid signature gets a caution mark, and one installed
+  in the last 14 days a **New** mark. **Show** can pick either, and the details give the install
+  date.
+- **Devcontainers can ask instead of carrying secrets.** Put `"TIRESIAS_TICKET":
+  "${localEnv:TIRESIAS_TICKET}"` in `remoteEnv` and start VS Code with `tir run -- code <folder>`:
+  the devcontainer gets a ticket, and `tir-remote run -- <command>` inside it asks the Tiresias
+  app for the folder's sealed variables when a tool needs them. The consent dialog names the
+  devcontainer's folder; **Allow for the session** lasts until Tiresias locks. Needs Docker
+  Desktop ([devcontainers that ask](docs/devcontainers.md)).
+- **Git in a devcontainer asks for its token.** Map a host to a sealed token with
+  `tir env git add github.com GH_TOKEN`, and add the feature
+  `ghcr.io/hansen-consultancy/devcontainer-features/tiresias:0`: it installs `tir-remote` and makes
+  it git's credential helper, so `git push` in the container asks the Tiresias app, which shows the
+  host and the devcontainer's folder before handing the token over. `tir doctor`'s finding about
+  VS Code forwarding your git credentials now points at it.
+- **The app says why Windows is asking.** Just before each Windows Hello prompt, and before the UAC
+  prompt for the admin tier, a small card above it names the reason: unlocking at start, the
+  program that asked for secrets, the page you opened, the change you approved, the admin-tier
+  step. Windows takes no text of ours in either prompt, so the card is where the reason goes.
+
+### Fixed
+
+- The **Environment variables** page no longer ticks the decoy variables Tiresias placed
+  (`ADMIN_API_URL`, `ADMIN_API_TOKEN`) as secrets to seal: they are listed as decoys and sealing
+  passes them over, as do `tir env list` and `tir env protect`. A real variable of the same name, with another value, is still a secret. The
+  page now opens with what is still in Windows, each heading says who can read what it lists, and
+  the summary says what its count is out of.
+- Updates no longer fail without a word. Programs the app starts no longer keep its install folder
+  as their working folder, which blocked Velopack from swapping the files. Before applying an
+  update, the app names any program still using that folder and asks you to close it. If an update
+  still couldn't be applied, the next start says so instead of quietly running the earlier version.
+- About scrolls, and its Developer tools and Admin tier cards are shorter; the Admin tier card says
+  what the tier is for. Home's Decoys card lists one decoy per line, and the reach card's
+  **Check daily** sits beside **Check now**. A finding's **Details** toggle stays readable when
+  open. The user-secrets editor no longer shows a white grid in dark mode before you pick a project.
+  Hovering a count in the side bar says what it counts.
+- Home's trust chain check no longer says **Worth a look** after `tir trust bind-hello` when the
+  broker runs as the Windows service: it asks the broker for its chain instead of reading a copy
+  the service never updates. A check that says to run a `tir` command offers **Copy command**.
+- **How to close it** shows its steps in the app instead of opening a web page: each command names
+  your account, with **Copy**, and **Run as administrator** where it needs one.
+- The user-secrets list marks each project's state (sealed, not sealed yet, settings only, empty)
+  so they stand apart, and a line under it counts each. A sealed project with keys added beside it
+  in plain since (`dotnet user-secrets set`) is marked amber until the next run seals them. A
+  project whose secrets file holds only `tiresias:` references counts as settings only instead of
+  "not sealed yet": a reference holds no secret, so `tir doctor` no longer warns about it either.
+
+## [0.3.0] - 2026-11-23
+
+### Added
+
+- **The app stays simple on a PC that isn't a developer's.** Developer tools (Secrets, Services
+  and Environment variables on Home, the developer needs, passing developer checks, the project
+  decoy, the broker choice at setup) appear when the app finds something only a developer has,
+  such as the .NET SDK, git or an IDE, and Home says once why. **Show developer tools** on About
+  sets Auto, On or Off. Findings and warnings always show, and nothing you use is hidden.
+- **Sealed variables for .NET apps an IDE starts.** `tir env config add <NAME>` (or
+  `tir env protect --config`) lets a .NET app with `Tiresias.Extensions.Configuration` ask for a
+  sealed variable itself, so F5 in Visual Studio or Rider gets it again after **Protect**. You
+  allow each program, once or for the session; it reaches configuration with the same key and
+  precedence as from your Windows environment.
+
+- Selecting a row on Services, the secrets editor, Environment variables, About's alert sinks or
+  the service incidents window shows it in full below the list, as Activity and Installed
+  already did: values the narrow columns cut short wrap there, can be selected, and **Copy
+  details** copies them. The secrets editor shows the key only, never the value.
+- A critical alert, such as a used decoy credential, takes the LcdHub screen over in red with the
+  event and its count, until Home shows your findings or for 24 hours. **Send a test alert** shows
+  what it looks like for a minute.
+- Alerts tell you when they stop arriving: a sink whose receiver refuses them, or that hasn't
+  delivered for 15 minutes, is a finding on Home ("alerts to `phone` aren't arriving") and an
+  "Alerts to a sink are failing" alert on your other sinks, whatever their threshold. Only a
+  trusted sink learns which one is failing. The finding goes when the sink delivers again or you
+  fix or remove it.
+- Signed webhook alerts and a heartbeat: **Add a webhook...** can sign each alert the Standard
+  Webhooks way, so the receiver can prove it came from your PC, and can send "Tiresias is running"
+  every 5 to 60 minutes, so a receiver that expects it notices when alerts stop arriving. Both are
+  off unless you turn them on, and the heartbeat carries only the PC's name and the time.
+- More events raise an alert: a decoy file read, a blocked program asking again, a request refused
+  in lockdown, "This wasn't me", a program asking for a secret while the PC is locked, the solo
+  broker rejecting the trust chain, a paper key used, the vault rolled back or changed without your
+  approval, an unapproved broker request (from the app's broker or the Windows service), a decoy the
+  admin service holds being used, and new findings Home hasn't shown (a warning when one
+  fails, info when they only warn). A program asking while you're at the PC still doesn't alert.
+- Alerts on an LcdHub screen: **About**, **Alerts**, **Add LcdHub...** shows serious events as a
+  line in the status strip of the LcdHub running on this PC, such as "Decoy credential used ×1",
+  until Home shows your findings or for 24 hours. It shows only the event and its count.
+- Alerts to your phone through ntfy: **About**, **Alerts**, **Add ntfy...** pushes the same events
+  to an ntfy topic on ntfy.sh or your own server, with the severity as the notification's priority.
+  The topic and an optional access token are sealed like a webhook's URL and saving needs Windows
+  Hello; the form suggests a long random topic and a write-only token.
+- Alerts to a webhook: **About**, **Alerts**, **Add a webhook...** posts serious events (today, a
+  used decoy credential) as JSON to a URL you choose, so you hear about them when you aren't at the
+  PC, even while it is locked. The URL and header are sealed like your secrets and saving needs
+  Windows Hello; mute, remove and **Send a test alert** are on the same card. Alerts carry the
+  event, its time and a name you give the PC, never a secret's name unless you mark the webhook
+  trusted, and never a value.
 - Home and `tir doctor` say when every program you run can open your Docker engine (and with it
   every container's environment), when you are in Hyper-V Administrators, and which WSL
   distributions' disks are files you own. Nothing inside a container, distribution or VM is read.
+- `tir doctor --projects` and Home name secret-looking values written in your devcontainer files
+  (`containerEnv`, `remoteEnv`, `runArgs` and the env files they name), with the commands to seal
+  them and hand them in when VS Code starts the container; and they say when VS Code's Dev
+  Containers forwards your git credentials or Docker logins into every container. Names only.
+- `tir doctor --reach`, and **Check now** on Home's new containers card, look inside your Docker
+  engine: which containers and images hold secret-looking names in their environment, and which
+  containers mount your `.ssh`, `.aws` or other credential folders, with the commands to seal them
+  and hand them in at start instead. Only when you ask (or daily, if you tick it); names only.
+- The same look now reads your running WSL distributions too: AWS profiles, SSH keys, cloud and
+  Kubernetes logins, registry logins, npm, PyPI and GitHub CLI tokens, and secret-looking `.env`
+  names in each home, with the commands to seal them on Windows and pass them in through
+  `WSLENV`. A stopped distribution is never opened, since that would start it.
+- It also checks which Hyper-V disks, checkpoints and saved states your account can read without
+  Hyper-V Administrators: a copy of one is the guest's files or memory, offline. Only the files'
+  permissions are read, never the files. If you are in Hyper-V Administrators, it names the VMs
+  the group opens.
 - `tir solo service install` (as administrator) runs solo mode's broker as a Windows service under
   its own account, so programs running as you can't read its memory or rewrite the files it
   trusts, and an older `vault.json` restored while locked is refused. `tir solo service uninstall`
   moves it back into the app.
 - `Tiresias.Core` and `Tiresias.Protocol` carry the groundwork for out-of-band alerts: the
   `tiresias.alert/v1` payload and the planner that decides, per sink, what to send, with dedupe,
-  rate limits and redaction. Nothing sends alerts yet.
+  rate limits and redaction.
 - Home and `tir doctor` list programs you haven't opened in 90 days. A program that works without
   being opened (a tray icon, a service, a driver, something that starts at log-on, a command on
   `PATH`) is never counted, nor one that used a credential. On Home they are one line, last, that
@@ -29,6 +143,17 @@ its section below.
   installed for, the credentials it used in the last 90 days, its folder, its publisher and who
   signed it (checked on your PC), and **Search online...** to look it up in your browser. **Open Installed apps
   in Settings** is where you uninstall it.
+- Admin tier: every read of a decoy file is named, from Windows' own file auditing, with the
+  program that read it and what started it; reads by routine openers such as Windows Search are
+  kept in the incident history and raise nothing.
+- Admin tier: it now tells Tiresias when your programs last ran, from Windows' records only an
+  administrator can read (the Background Activity Moderator and Prefetch), for the programs the
+  doctor looks at and only for you. Unused applications are found more reliably, and a decoy
+  finding says when Windows last saw the program run.
+- Admin tier: a program that uses a decoy credential is now frozen, together with what it started,
+  and cut off the network until you decide. Home's finding offers **Thaw and unblock (that was me)**
+  behind an admin prompt, as does unblocking it from the blocked programs list; dismissing it keeps
+  the program frozen. **This wasn't me** freezes the program too. Removing the admin tier thaws everything and lifts every network block first.
 - `tir doctor --surface` also lists what is installed: each editor's extensions with the
   credentials that editor used through Tiresias in the last 90 days, global `dotnet`, `npm`, `pipx`
   and `cargo` tools, and what starts at log-on with its signature and when you last opened it.
@@ -70,8 +195,9 @@ its section below.
   With it, your decoys are held by the service: programs running as you can no longer read which
   files are decoys or their values, a decoy used while the app is closed is caught from boot and
   shown when the app next runs, and Home and `tir decoys list` show the kinds held. Removing the
-  decoys, or the admin tier, gives them back first (one more admin prompt). Auditing reads and
-  stopping the program come in the next releases.
+  decoys, or the admin tier, gives them back first (one more admin prompt). Every read of a held
+  decoy file is seen through Windows auditing, even one made while the app was closed, and is
+  shown as a read the app saw itself. Stopping the program comes in a next release.
 
 ### Changed
 
@@ -96,11 +222,15 @@ its section below.
 
 ### Fixed
 
+- The app's windows have the Windows 11 look (rounded buttons, cards, the light or dark theme)
+  instead of the classic Windows style they fell back to.
 - An app loading its user secrets through `Tiresias.Extensions.Configuration` now lets the
   consent dialog and Windows Hello prompt come to the front, as `tir` already did, instead of
   opening behind the IDE.
 - Microsoft Defender for Endpoint's sensor opening a decoy file during a scan is recorded as a
   routine open, like Defender's own, instead of raising a warning on Home.
+- The left menu is wide enough for "Environment variables" and its count, which it cut short
+  as "Environment variab...".
 
 ## [0.2.1] - 2026-11-20
 
@@ -387,7 +517,8 @@ were published as 0.2.0 and are unchanged.
   - `Tiresias.Core` is the vault, the trust chain, grants, leases and the audit log.
   - `Tiresias.Protocol` holds the wire formats.
 
-[Unreleased]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.2.1...HEAD
+[Unreleased]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.3.0...HEAD
+[0.3.0]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.2.1...app-v0.3.0
 [0.2.1]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.1.0-preview.4...app-v0.2.1
 [0.2.0]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.1.0-preview.4...app-v0.2.0
 [0.1.0-preview.4]: https://github.com/hansen-consultancy/Tiresias/compare/v0.1.0-preview.2...app-v0.1.0-preview.4

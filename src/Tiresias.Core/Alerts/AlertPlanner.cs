@@ -13,6 +13,8 @@ public sealed record AlertEvent(AlertKind Kind, AlertSubject Subject, DateTimeOf
 /// <c>key</c> for every sink and copies it into a <see cref="TrustedDetail"/> for trusted sinks only.
 /// Names and paths only; a source never puts a value, a token or a command line here.
 /// </summary>
+/// <param name="Sink">The sink an event is about (<c>alerts.failing</c>): the planner never sends it to that sink,
+/// and a trusted sink gets the id as <see cref="TrustedDetail.What"/>. Never its address or credential.</param>
 public sealed record AlertSubject(
     string? Program = null,
     int? ProcessId = null,
@@ -20,7 +22,8 @@ public sealed record AlertSubject(
     string? What = null,
     string? Service = null,
     IReadOnlyList<string>? Names = null,
-    IReadOnlyList<string>? Findings = null)
+    IReadOnlyList<string>? Findings = null,
+    string? Sink = null)
 {
     public static readonly AlertSubject None = new();
 }
@@ -34,7 +37,9 @@ public enum AlertRedaction
 }
 
 /// <summary>What the planner needs to know about a sink; where and how it delivers is the transport's business.</summary>
-public sealed record SinkDefinition(string Id, AlertSeverity Threshold, AlertRedaction Redaction = AlertRedaction.Public, bool Muted = false);
+/// <param name="Heartbeat">How often <see cref="AlertPlanner.Tick"/> sends it an <c>alerts.alive</c>; <c>null</c> for never.</param>
+public sealed record SinkDefinition(string Id, AlertSeverity Threshold, AlertRedaction Redaction = AlertRedaction.Public, bool Muted = false,
+    TimeSpan? Heartbeat = null);
 
 /// <summary>The alert configuration the planner works from.</summary>
 /// <param name="Machine">The label the user chose for this machine; required, never the host name.</param>
@@ -68,15 +73,19 @@ public sealed record AlertPlan(IReadOnlyList<Delivery> Now, AlertState Next);
 /// <summary>The planner's memory between calls: dedupe windows, rate buckets and storm counters per sink. Opaque to callers.</summary>
 public sealed record AlertState
 {
-    public static AlertState Empty { get; } = new(ImmutableDictionary<string, SinkState>.Empty, 0);
+    public static AlertState Empty { get; } = new(ImmutableDictionary<string, SinkState>.Empty, 0, ImmutableDictionary<string, DateTimeOffset>.Empty);
 
-    internal AlertState(ImmutableDictionary<string, SinkState> sinks, long sequence)
+    internal AlertState(ImmutableDictionary<string, SinkState> sinks, long sequence, ImmutableDictionary<string, DateTimeOffset> alive)
     {
         Sinks = sinks;
         Sequence = sequence;
+        Alive = alive;
     }
 
     internal ImmutableDictionary<string, SinkState> Sinks { get; init; }
+
+    /// <summary>When each sink last got an <c>alerts.alive</c>.</summary>
+    internal ImmutableDictionary<string, DateTimeOffset> Alive { get; init; }
 
     /// <summary>Counts deliveries, so each gets its own id.</summary>
     internal long Sequence { get; init; }
@@ -133,7 +142,9 @@ public static class AlertPlanner
         var run = new Run(setup, Tick(setup, state, now));
         foreach (var sink in setup.Sinks)
         {
-            if (sink.Muted || e.Kind.Severity < sink.Threshold)
+            // An event about a sink goes to the others: the sink itself is the one not delivering. It
+            // ignores their thresholds, as alerts.suppressed does: it says alerts may be missing.
+            if (sink.Muted || sink.Id == e.Subject.Sink || (e.Kind.Severity < sink.Threshold && e.Kind != AlertKind.AlertsFailing))
                 continue;
             run.Event(sink, e, now);
         }
@@ -142,15 +153,18 @@ public static class AlertPlanner
 
     /// <summary>
     /// Sends what time alone releases: the <c>count</c> summary of a dedupe window that closed with
-    /// repeats, and an <c>alerts.suppressed</c> summary once a bucket that held alerts back refills.
-    /// Call it about once a minute.
+    /// repeats, an <c>alerts.suppressed</c> summary once a bucket that held alerts back refills, and an
+    /// <c>alerts.alive</c> to each sink whose heartbeat is due. Call it about once a minute.
     /// </summary>
     public static AlertPlan Tick(AlertSetup setup, AlertState state, DateTimeOffset now)
     {
         var run = new Run(setup, new AlertPlan([], state));
         run.Forget(setup.Sinks.Where(s => !s.Muted).Select(s => s.Id));
         foreach (var sink in setup.Sinks.Where(s => !s.Muted))
+        {
             run.Tick(sink, now);
+            run.Heartbeat(sink, now);
+        }
         return run.Result();
     }
 
@@ -168,6 +182,9 @@ public static class AlertPlanner
             WriteText(writer, subject.Service);
             WriteList(writer, subject.Names);
             WriteList(writer, subject.Findings);
+            // Written only when set, so the keys of subjects without it stay what they were.
+            if (subject.Sink is not null)
+                WriteText(writer, subject.Sink);
         }
         var mac = HMACSHA256.HashData(installKey, buffer.ToArray());
         return $"{eventName}:{Convert.ToHexStringLower(mac.AsSpan(0, 8))}";
@@ -188,7 +205,7 @@ public static class AlertPlanner
 
     static TrustedDetail? DetailFor(AlertSubject s)
     {
-        var detail = new TrustedDetail(s.Program, s.ProcessId, NullIfEmpty(s.Parents), s.What, s.Service, NullIfEmpty(s.Names), NullIfEmpty(s.Findings));
+        var detail = new TrustedDetail(s.Program, s.ProcessId, NullIfEmpty(s.Parents), s.What ?? s.Sink, s.Service, NullIfEmpty(s.Names), NullIfEmpty(s.Findings));
         return detail == new TrustedDetail() ? null : detail;
 
         static IReadOnlyList<string>? NullIfEmpty(IReadOnlyList<string>? list) => list is { Count: > 0 } ? [.. list] : null;
@@ -199,9 +216,10 @@ public static class AlertPlanner
     {
         readonly List<Delivery> deliveries = [.. start.Now];
         ImmutableDictionary<string, SinkState> sinks = start.Next.Sinks;
+        ImmutableDictionary<string, DateTimeOffset> alive = start.Next.Alive;
         long sequence = start.Next.Sequence;
 
-        public AlertPlan Result() => new(deliveries, new AlertState(sinks, sequence));
+        public AlertPlan Result() => new(deliveries, new AlertState(sinks, sequence, alive));
 
         /// <summary>A removed or muted sink keeps nothing, so unmuting it doesn't replay old summaries.</summary>
         public void Forget(IEnumerable<string> keep)
@@ -209,6 +227,21 @@ public static class AlertPlanner
             var kept = keep.ToHashSet(StringComparer.Ordinal);
             foreach (var id in sinks.Keys.Where(id => !kept.Contains(id)).ToList())
                 sinks = sinks.Remove(id);
+            foreach (var id in alive.Keys.Where(id => !kept.Contains(id)).ToList())
+                alive = alive.Remove(id);
+        }
+
+        /// <summary>
+        /// An <c>alerts.alive</c> once the sink's heartbeat is due, the first at once. Outside threshold,
+        /// dedupe and buckets: a receiver counts on it arriving. Public on every sink: the label and the time.
+        /// </summary>
+        public void Heartbeat(SinkDefinition sink, DateTimeOffset now)
+        {
+            if (sink.Heartbeat is not { } every || (alive.TryGetValue(sink.Id, out var last) && now - last < every))
+                return;
+            alive = alive.SetItem(sink.Id, now);
+            var kind = AlertKind.AlertsAlive;
+            Emit(sink with { Redaction = AlertRedaction.Public }, kind, now, 1, KeyFor(kind.Event, AlertSubject.None, setup.InstallKey), null, now);
         }
 
         public void Event(SinkDefinition sink, AlertEvent e, DateTimeOffset now)
@@ -245,7 +278,7 @@ public static class AlertPlanner
             foreach (var window in state.Windows.Values.Where(w => now - w.Opened >= DedupeWindow).OrderBy(w => w.Opened).ToList())
             {
                 state = state with { Windows = state.Windows.Remove(window.Key) };
-                if (window.Repeats > 0 && window.Kind.Severity >= sink.Threshold)
+                if (window.Repeats > 0 && (window.Kind.Severity >= sink.Threshold || window.Kind == AlertKind.AlertsFailing))
                     state = Send(sink, state, window.Kind, window.FirstRepeatAt!.Value, window.Repeats, window.Key, window.Detail, now);
             }
 

@@ -1,5 +1,6 @@
 using System.Net.Sockets;
 using Tiresias.Audit;
+using Tiresias.Client;
 using Tiresias.Decoys;
 using Tiresias.Forwarder;
 
@@ -8,9 +9,10 @@ namespace Tiresias.Agent;
 /// <summary>
 /// A decoy used, or a decoy file opened, with the program that did it and the processes that started
 /// it (nearest first). <paramref name="Routine"/> names a routine opener (Windows Search, Defender…),
-/// whose open is recorded and raises nothing.
+/// whose open is recorded and raises nothing. <paramref name="Frozen"/>: the admin tier froze the
+/// program for this use and blocked its network.
 /// </summary>
-public sealed record DecoyTouch(DecoyHit Hit, IReadOnlyList<string> Parents, string? Routine = null)
+public sealed record DecoyTouch(DecoyHit Hit, IReadOnlyList<string> Parents, string? Routine = null, bool Frozen = false)
 {
     /// <summary>What was used or done, in the words of the activity log and the finding: a fact, nothing more.</summary>
     public string What => Hit.Use switch
@@ -34,7 +36,7 @@ public sealed record DecoyTouch(DecoyHit Hit, IReadOnlyList<string> Parents, str
     public AuditRecord Record() => new(AuditKind.Deny, Consumer: "decoy", Service: What, Path: Hit.Endpoint, Process: Process,
         Reason: Routine is { } routine
             ? $"{DecoyReads.RoutineReason} ({routine}): {Sentence}"
-            : $"{Sentence}; started by {(Parents.Count > 0 ? string.Join(" < ", Parents) : "unknown")}");
+            : $"{Sentence}; started by {(Parents.Count > 0 ? string.Join(" < ", Parents) : "unknown")}{(Frozen ? "; " + Doctor.FrozenNote : "")}");
 }
 
 /// <summary>

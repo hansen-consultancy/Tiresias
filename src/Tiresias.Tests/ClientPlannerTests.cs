@@ -111,6 +111,7 @@ public class DoctorTests
         public IReadOnlyList<string> ExposedVariables { get; set; } = [];
         public bool Solo { get; set; }
         public bool? HelloBound { get; set; }
+        public Task<bool?> HelloBoundAsync() => Task.FromResult(HelloBound);
         public BrokerServiceState BrokerService { get; set; }
         public DoctorVault? Vault { get; set; } = new(2, [], []);
         public int? BrokerStatus { get; set; } = 401;
@@ -323,6 +324,21 @@ public class DoctorTests
     {
         var checks = await Doctor.RunAsync(new FakeProbe { Enrolled = false });
         Assert.That(checks.Select(c => c.Name), Does.Not.Contain("broker reachable"));
+    }
+
+    [Test]
+    public async Task Developer_checks_and_solo_notes_are_marked()
+    {
+        var probe = new FakeProbe { Solo = true };
+        probe.Secrets.Add(new(@"C:\u\abc\secrets.json", """{"ApiKey":"sk-live-1"}"""));
+        var checks = await Doctor.RunAsync(probe);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(checks.Single(c => c.Name.StartsWith("user secrets", StringComparison.Ordinal)).ForDevelopers, Is.True);
+            Assert.That(checks.Where(c => c.SoloNote).Select(c => c.Name), Is.EquivalentTo(new[] { "egress", "isolation" }));
+            Assert.That(checks.Where(c => c.Name is "broker pinned" or "mode" or Doctor.VariablesCheck).Any(c => c.ForDevelopers), Is.False);
+        });
     }
 
     [Test]

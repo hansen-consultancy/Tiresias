@@ -52,6 +52,8 @@ public partial class AboutPage : UserControl
         Notes.Text = AppBuild.Notes() ?? Text.Get("About_NoNotes");
 
         // A development build never registers itself: its folder goes stale with the next build.
+        DeveloperToolsBox.SelectedIndex = (int)AppSettings.Load().DeveloperTools;
+        ShowDeveloperTools();
         StartWithWindowsBox.IsChecked = StartWithWindows.IsOn;
         StartWithWindowsBox.IsEnabled = build.Installed;
         StartWithWindowsNote.Text = Text.Get(build.Installed ? "Status_StartWithWindowsNote" : "Status_StartWithWindowsDev");
@@ -60,6 +62,83 @@ public partial class AboutPage : UserControl
         PageButton.Visibility = build.Installed || AppBuild.CommitPage is not null ? Visibility.Visible : Visibility.Collapsed;
 
         Loaded += async (_, _) => await ShowAdminTierAsync();
+        Loaded += (_, _) =>
+        {
+            App.Current.Alerts.Changed += OnAlertsChanged;
+            ShowAlerts();
+        };
+        Unloaded += (_, _) => App.Current.Alerts.Changed -= OnAlertsChanged;
+    }
+
+    /// <summary>A sink as the card's row binds it.</summary>
+    public sealed record AlertRow(string Id, string Detail, string MuteLabel)
+    {
+        public IReadOnlyList<DetailField> Details => [new(Text.Get("Alerts_ColName"), Id), new(Text.Get("Alerts_ColDetail"), Detail)];
+    }
+
+    void OnAlertsChanged() => Dispatcher.BeginInvoke(ShowAlerts);
+
+    void ShowAlerts()
+    {
+        var alerts = App.Current.Alerts;
+        var config = alerts.Center.Config;
+        AlertsText.Text = Text.Of(AlertsCard.Describe(alerts.Opened, config));
+        AlertSinks.ItemsSource = AlertsCard.Rows(config, AppAlerts.Narrowing, alerts.Center.Sender.IsStopped)
+            .Select(r => new AlertRow(r.Id, Text.Of(r.Detail), Text.Get(r.Muted ? "Alerts_Unmute" : "Alerts_Mute"))).ToList();
+        AlertsAddLcdHub.Visibility = AlertsCard.HasLcdHub(config?.Live(AppAlerts.Narrowing)) ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    async void OnAlertAdd(object sender, RoutedEventArgs e)
+    {
+        // Adding widens what leaves the machine: it is a sealed save, so it needs Windows Hello.
+        if (!App.Current.Host.Keys.IsUnlocked && !(await App.Current.UnlockAsync(PromptReason.Alerts, interactive: true)).Ok)
+            return;
+        var form = sender == AlertsAddNtfy ? SinkForm.Ntfy : sender == AlertsAddLcdHub ? SinkForm.LcdHub : SinkForm.Webhook;
+        var window = new AlertSinkWindow(form) { Owner = Window.GetWindow(this) };
+        if (window.ShowDialog() == true)
+            AlertsOutcome.Text = Text.Format("Alerts_Added", window.AddedId);
+    }
+
+    async void OnAlertTest(object sender, RoutedEventArgs e)
+    {
+        var button = (Button)sender;
+        var id = (string)button.Tag;
+        button.IsEnabled = false;
+        AlertsOutcome.Text = Text.Format("Alerts_Testing", id);
+        try
+        {
+            var result = await App.Current.Alerts.Center.SendTestAsync(id, CancellationToken.None);
+            AlertsOutcome.Text = Text.Of(AlertsCard.Outcome(id, result));
+            ShowAlerts();
+        }
+        finally
+        {
+            button.IsEnabled = true;
+        }
+    }
+
+    void OnAlertMute(object sender, RoutedEventArgs e)
+    {
+        var id = (string)((Button)sender).Tag;
+        var muted = AlertsCard.Rows(App.Current.Alerts.Center.Config, AppAlerts.Narrowing, _ => false).FirstOrDefault(r => r.Id == id)?.Muted == true;
+        App.Current.Alerts.Mute(id, !muted);
+    }
+
+    void OnAlertRemove(object sender, RoutedEventArgs e)
+    {
+        var id = (string)((Button)sender).Tag;
+        if (!AskWindow.Confirm(Window.GetWindow(this), Text.Get("Alerts_RemoveHeading"), Text.Format("Alerts_RemoveBody", id), Text.Get("Alerts_Remove")))
+            return;
+        try
+        {
+            App.Current.Alerts.Remove(id, App.Current.Host.Keys.Hello);
+            AlertsOutcome.Text = Text.Format("Alerts_Removed", id);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            AppLog.Error(ex, "alerts: removing a sink");
+            AlertsOutcome.Text = Text.Get("Alerts_RemoveFailed");
+        }
     }
 
     async Task ShowAdminTierAsync()
@@ -89,6 +168,22 @@ public partial class AboutPage : UserControl
         {
             AdminTierSetUp.IsEnabled = AdminTierUpdate.IsEnabled = AdminTierRemove.IsEnabled = true;
         }
+    }
+
+    void OnDeveloperTools(object sender, SelectionChangedEventArgs e)
+    {
+        if (!IsLoaded || DeveloperToolsBox.SelectedIndex < 0)
+            return;
+        (AppSettings.Load() with { DeveloperTools = (DeveloperToolsSetting)DeveloperToolsBox.SelectedIndex }).Save();
+        ShowDeveloperTools();
+        (Window.GetWindow(this) as StatusWindow)?.DeveloperToolsChanged();
+    }
+
+    void ShowDeveloperTools()
+    {
+        var view = DeveloperSignals.View();
+        DeveloperToolsReason.Text = view.Because.Count > 0 ? Text.Format("DevTools_Because", DeveloperSignals.Reasons(view))
+            : view.Shown ? "" : AppSettings.Load().DeveloperTools == DeveloperToolsSetting.Auto ? Text.Get("DevTools_NotFound") : "";
     }
 
     void OnStartWithWindows(object sender, RoutedEventArgs e)

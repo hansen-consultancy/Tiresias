@@ -1,11 +1,18 @@
 using System.Text.Json;
 using Tiresias.Agent;
+using Tiresias.Alerts;
 
 namespace Tiresias.App;
 
 /// <summary>The app's own preferences, <c>%LOCALAPPDATA%\Tiresias\app.json</c>. A missing or unreadable file means the defaults.</summary>
 /// <param name="SetupSkipped">The user finished the first-run wizard without a broker.</param>
-public sealed record AppSettings(bool SetupSkipped = false, DateTimeOffset? LastUpdateCheck = null)
+/// <param name="Alerts">Alert sinks narrowed without Windows Hello (muted, removed), by sink id; see <see cref="SinkNarrowing"/>.</param>
+/// <param name="ReachScan">Whether the checks look inside the Docker engine: not yet, when asked, or daily.</param>
+/// <param name="DeveloperTools">Whether developer tools show: when this PC looks like a developer's, always, or never (docs/developer-tools.md).</param>
+/// <param name="DeveloperToolsNoted">The user closed Home's line saying why developer tools appeared.</param>
+/// <param name="ApplyingUpdate">The version the app last quit to apply, until the next start checks it arrived.</param>
+public sealed record AppSettings(bool SetupSkipped = false, DateTimeOffset? LastUpdateCheck = null, IReadOnlyDictionary<string, SinkNarrowing>? Alerts = null, Logic.ReachScan ReachScan = Logic.ReachScan.Off,
+    Logic.DeveloperToolsSetting DeveloperTools = Logic.DeveloperToolsSetting.Auto, bool DeveloperToolsNoted = false, string? ApplyingUpdate = null)
 {
     static string Path => System.IO.Path.Combine(KeyringStore.Directory, "app.json");
 
