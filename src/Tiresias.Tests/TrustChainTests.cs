@@ -377,6 +377,23 @@ public class TrustChainTests
     }
 
     [Test]
+    public void Hello_bound_reads_the_device_from_the_chain_bytes()
+    {
+        var old = WithoutHello(laptop);
+        chain = [TrustChain.Start("personal", "alice", old, paper, new(), T0)];
+        genesisHash = TrustChain.Hash(chain[0]);
+        var before = TrustLinkJson.WriteChain(chain);
+        Add(new BindHello("alice-laptop", laptop.Hello!.PublicKey), laptop, paper);
+        var after = TrustLinkJson.WriteChain(chain);
+
+        Assert.That(TrustChainVerifier.HelloBound(before, genesisHash, "alice-laptop"), Is.False);
+        Assert.That(TrustChainVerifier.HelloBound(after, genesisHash, "alice-laptop"), Is.True);
+        Assert.That(TrustChainVerifier.HelloBound(after, genesisHash, "bob-laptop"), Is.Null, "a device the chain doesn't name");
+        Assert.That(TrustChainVerifier.HelloBound(after, new string('0', 64), "alice-laptop"), Is.Null, "another genesis");
+        Assert.That(TrustChainVerifier.HelloBound("not json"u8, genesisHash, "alice-laptop"), Is.Null);
+    }
+
+    [Test]
     public void A_device_from_before_hello_binds_its_key_once_with_the_paper_key()
     {
         var old = WithoutHello(laptop);

@@ -282,7 +282,10 @@ Each slice ships alone, with its tests and its line in `CHANGELOG.md`.
    `ReachAccess` decides who it grants (a deny wins; an owner can read a disk); Hyper-V counts as
    installed when the `vmms` service exists. Docker Desktop keeps `dockerDesktopWindowsEngine` open
    in Linux mode too, so the finding says that pipe is administrator *when Windows containers are
-   on*. **How to close it** opens this page's *Findings*.
+   on*. **How to close it** shows the steps in the app (`ReachGuide.Steps`): each command names
+   the account as `DOMAIN\user`, because a PowerShell run as administrator may run as another
+   account, with **Copy** and, for a group change, **Run as administrator**. **Read more** opens
+   this page's *Findings*.
 2. **`NameScan` and devcontainer files.** The pure scanner with the canary tests; `devcontainer.json`
    and its `.env`/Compose files under the project folders; VS Code's forwarding settings;
    `InjectAtRunTime`. Still no engine. **Built**, with these differences: devcontainer files are

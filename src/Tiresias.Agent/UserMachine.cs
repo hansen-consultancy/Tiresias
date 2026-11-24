@@ -40,6 +40,10 @@ public static class UserMachine
             // Two levels up from any id's file, as dotnet user-secrets resolves it (APPDATA first).
             : Path.GetDirectoryName(Path.GetDirectoryName(PathHelper.GetSecretsPathFromSecretsId("x")))!;
 
+    /// <summary>The user's Windows account as <c>DOMAIN\user</c>, for a command that names it; the made-up user's in demo mode.</summary>
+    public static string Account =>
+        DemoMode.On ? $@"DEMO\{Path.GetFileName(Folder(Environment.SpecialFolder.UserProfile))}" : $@"{Environment.UserDomainName}\{Environment.UserName}";
+
     /// <summary><c>HKCU</c>. Not to be disposed.</summary>
     public static RegistryKey CurrentUser =>
 #if DEBUG

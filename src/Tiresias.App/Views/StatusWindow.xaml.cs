@@ -274,6 +274,12 @@ public partial class StatusWindow : Window
     async void OnLookInside(object sender, RoutedEventArgs e) => await model.LookInsideAsync();
 
     /// <summary>Opens the window that fixes the row's finding, filled in from it.</summary>
+    void OnCopyCommand(object sender, RoutedEventArgs e)
+    {
+        if (((FrameworkElement)sender).DataContext is CheckRow { Command: { } command })
+            model.CopyFix(command);
+    }
+
     void OnReview(object sender, RoutedEventArgs e)
     {
         var fix = ((FrameworkElement)sender).DataContext switch
@@ -356,8 +362,9 @@ public partial class StatusWindow : Window
             case InjectAtRunTime inject:
                 model.CopyFix(inject.Commands);
                 break;
-            case ReachGuide:
-                Desktop.Open(FindingView.ReachGuideUrl(AppBuild.Repository));
+            case ReachGuide guide:
+                var title = ((FrameworkElement)sender).DataContext is FindingRow finding ? FindingView.Title(finding.Checks) : guide.Topic.ToString();
+                new GuideWindow(title, guide.Steps(UserMachine.Account), FindingView.ReachGuideUrl(AppBuild.Repository)) { Owner = this }.ShowDialog();
                 break;
         }
     }
@@ -588,6 +595,13 @@ public sealed record CheckRow(string Name, string StatusText, string Glyph, Brus
         ProtectVariables => Text.Get("Status_ReviewEnvironment"),
         _ => "",
     };
+
+    /// <summary>A <c>tir</c> command the detail says to run, offered to copy when there is no Review to open.</summary>
+    public string? Command => ReviewName.Length == 0 ? CheckCommand.Of(Detail) : null;
+
+    public Visibility CopyVisibility => Command is null ? Visibility.Collapsed : Visibility.Visible;
+
+    public string CopyName => Command is null ? "" : Text.Format("Status_CopyCommandName", Command);
 }
 
 /// <summary>A decoy placed, as Home's decoys card lists it.</summary>

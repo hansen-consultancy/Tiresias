@@ -43,6 +43,11 @@ its section below.
   **Check daily** sits beside **Check now**. A finding's **Details** toggle stays readable when
   open. The user-secrets editor no longer shows a white grid in dark mode before you pick a project.
   Hovering a count in the side bar says what it counts.
+- Home's trust chain check no longer says **Worth a look** after `tir trust bind-hello` when the
+  broker runs as the Windows service: it asks the broker for its chain instead of reading a copy
+  the service never updates. A check that says to run a `tir` command offers **Copy command**.
+- **How to close it** shows its steps in the app instead of opening a web page: each command names
+  your account, with **Copy**, and **Run as administrator** where it needs one.
 
 ## [0.3.0] - 2026-11-23
 
