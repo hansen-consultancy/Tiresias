@@ -41,6 +41,15 @@ public class RecoveryEnrollmentHistoryTests
     }
 
     [Test]
+    public void An_ordinary_token_can_read_the_store_it_is_not_enrolled_in()
+    {
+        using var account = WindowsIdentity.GetCurrent();
+        if (new WindowsPrincipal(account).IsInRole(WindowsBuiltInRole.Administrator))
+            Assert.Ignore("Requires a non-elevated process: an administrator can open HKLM for writing.");
+        Assert.That(RecoveryEnrollmentHistory.Current(Owner), Is.Null);
+    }
+
+    [Test]
     public void Ordinary_accounts_have_only_read_access_and_cannot_own_the_store()
     {
         var acl = RecoveryEnrollmentHistory.Security(Owner);

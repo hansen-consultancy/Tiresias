@@ -22,6 +22,13 @@ its section below.
   start at sign-in on one information line that opens Startup. A signature that doesn't verify, a
   program in Temp, Downloads or AppData, or a PC without developer tools keeps the warning.
 
+### Fixed
+
+- **0.4.0 stopped at "Recovery setup is unavailable" for anyone who is not an administrator.**
+  Reading the recovery enrollment asked Windows for write access to the local machine registry,
+  which only administrators have, so first run, alerts and Activity all failed with "Attempted to
+  perform an unauthorized operation." It now asks for read access only.
+
 ## [0.4.0] - 2026-11-24
 
 ### Added
