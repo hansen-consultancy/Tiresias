@@ -57,7 +57,7 @@ public partial class GuideWindow : Window
             return;
         }
         // Encoded, so the command's quotes reach PowerShell as written; echoed first, so the window shows what runs.
-        var script = $"Write-Host '> {command.Replace("'", "''")}'; {command}";
+        var script = $"Write-Host '> {command.Replace("'", "''", StringComparison.Ordinal)}'; {command}";
         var encoded = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
         try
         {

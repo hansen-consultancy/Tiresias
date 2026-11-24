@@ -29,6 +29,11 @@ its section below.
   as their working folder, which blocked Velopack from swapping the files. Before applying an
   update, the app names any program still using that folder and asks you to close it. If an update
   still couldn't be applied, the next start says so instead of quietly running the earlier version.
+- Home's trust chain check no longer says **Worth a look** after `tir trust bind-hello` when the
+  broker runs as the Windows service: it asks the broker for its chain instead of reading a copy
+  the service never updates. A check that says to run a `tir` command offers **Copy command**.
+- **How to close it** shows its steps in the app instead of opening a web page: each command names
+  your account, with **Copy**, and **Run as administrator** where it needs one.
 
 ## [0.3.0] - 2026-11-23
 
