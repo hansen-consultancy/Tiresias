@@ -27,7 +27,7 @@ its section below.
 
 - The **Environment variables** page no longer ticks the decoy variables Tiresias placed
   (`ADMIN_API_URL`, `ADMIN_API_TOKEN`) as secrets to seal: they are listed as decoys and sealing
-  passes them over. A real variable of the same name, with another value, is still a secret. The
+  passes them over, as do `tir env list` and `tir env protect`. A real variable of the same name, with another value, is still a secret. The
   page now opens with what is still in Windows, each heading says who can read what it lists, and
   the summary says what its count is out of.
 - Updates no longer fail without a word. Programs the app starts no longer keep its install folder

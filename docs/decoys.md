@@ -235,7 +235,8 @@ sets audit rules; Tiresias watches use and needs no admin rights. What fits Tire
   a plaintext secret to seal. The decoy variables are told by name and, while `decoys.json` is at
   hand, by value too, so a real `ADMIN_API_TOKEN` of the user's is still a secret; once the admin
   tier holds the set, the name alone decides. The **Environment variables** page lists them under
-  **Still in Windows** as decoys, never ticked, and sealing passes them over.
+  **Still in Windows** as decoys, never ticked, and sealing passes them over; `tir env list` and
+  `tir env protect` leave them out too, and naming one says it is a decoy.
 - **Removal:** one action (`tir decoys remove`) removes every decoy and stops every listener. A
   decoy folder is deleted only when nothing else is in it, and a decoy file or variable changed since
   it was placed is kept: it is the user's now. A placement that fails partway takes back what it
