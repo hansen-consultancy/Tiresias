@@ -482,6 +482,14 @@
   <data name="Recovery_Heading" xml:space="preserve">
     <value>Restore sealed secrets</value>
   </data>
+  <data name="Recovery_LookalikesRead" xml:space="preserve">
+    <value>Some letters look alike, so they were read the other way: {0}. Correct them on your paper.</value>
+    <comment>{0} = Recovery_LookalikeRead items, comma-separated.</comment>
+  </data>
+  <data name="Recovery_LookalikeRead" xml:space="preserve">
+    <value>group {0}, {1} as {2}</value>
+    <comment>{0} = 1-based four-letter group, {1} = letter as typed, {2} = letter it was read as.</comment>
+  </data>
   <data name="Recovery_CompareFingerprint" xml:space="preserve">
     <value>Check that the administrator prompt shows this SHA-256 fingerprint for the new recipient.
 {0}</value>

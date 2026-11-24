@@ -119,7 +119,12 @@ CI and people who prefer it, and it talks to the same agent.
   a reset TPM or a removed Hello credential gives a new one. Every sealed item also carries a copy
   of its key for the paper recovery key, so the status page notices items this Hello can't open and
   offers **Restore**: type the paper key and each item gets a copy for this Hello. Nothing is
-  decrypted or re-encrypted, and the recovery copy stays. `tir recovery restore` does the same. A
+  decrypted or re-encrypted, and the recovery copy stays. `tir recovery restore` does the same.
+  Letters that look alike on paper (S/5, Z/2, T/7, U/V) are read the other way when the key as
+  typed is neither this account's stored recovery key nor one that opens a sealed item here, and a
+  swapped reading is: fewest swaps first, at most 4096 readings, and two equal matches refuse
+  rather than guess. The result names each letter read differently, to correct on the paper. The
+  wizard's two-group check forgives the same lookalikes, since it knows the expected groups. A
   solo broker's device and identity keys are bound to the old PC's Windows account and are not
   restored: set solo mode up again there.
 - **Errors** say what happened, why it matters and what to do next, with a button for that next

@@ -81,21 +81,24 @@ public sealed partial class RecoveryViewModel : ObservableObject
     async Task RestoreAsync()
     {
         Message = Summary = "";
-        var typed = PaperKey.Parse(TypedKey);
-        if (typed is null)
-        {
-            Message = Text.Get("FirstRun_RecoveryType_Invalid");
-            return;
-        }
+        var text = TypedKey;
         IsWorking = true;
+        PaperKeyReading? reading = null;
         try
         {
+            reading = await Task.Run(() => RecoveryRestore.Read(text));
+            if (reading is null)
+            {
+                Message = Text.Get("FirstRun_RecoveryType_Invalid");
+                return;
+            }
             if (!App.Current.Host.Keys.IsUnlocked && !(await App.Current.UnlockAsync(PromptReason.Recovery, interactive: true)).Ok)
                 return;
             var hello = App.Current.Host.Keys.Hello!;
+            var typed = reading.Key;
             var summary = await Task.Run(() => RecoveryRestore.Run(typed, hello));
-            AppLog.Info($"recovery restore: {summary.Restored} restored, {summary.AlreadyOpen} already open, {summary.NotOpened.Count} not opened, key adopted {summary.KeyAdopted}");
-            Summary = Describe(summary);
+            AppLog.Info($"recovery restore: {summary.Restored} restored, {summary.AlreadyOpen} already open, {summary.NotOpened.Count} not opened, key adopted {summary.KeyAdopted}, {reading.Corrections.Count} lookalikes read");
+            Summary = Corrected(reading) + Describe(summary);
             TypedKey = "";
         }
         catch (InvalidOperationException e) when (e is not HelloException)
@@ -110,11 +113,17 @@ public sealed partial class RecoveryViewModel : ObservableObject
         }
         finally
         {
-            Array.Clear(typed);
+            if (reading is not null)
+                Array.Clear(reading.Key);
             IsWorking = false;
             App.Current.Refresh();
         }
     }
+
+    /// <summary>The lookalike letters read the other way, as a line of its own, or nothing.</summary>
+    internal static string Corrected(PaperKeyReading reading) => reading.Corrections.Count == 0 ? ""
+        : Text.Format("Recovery_LookalikesRead", string.Join(", ", reading.Corrections.Select(c => Text.Format("Recovery_LookalikeRead", c.Group, c.Typed, c.Read))))
+            + Environment.NewLine;
 
     internal static string Describe(RestoreSummary summary)
     {

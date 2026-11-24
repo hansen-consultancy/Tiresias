@@ -8,6 +8,14 @@ its section below.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A paper recovery key with a misread S/5, Z/2, T/7 or U/V restores.** When the key as typed
+  opens nothing, **Restore**, the first-run wizard and `tir recovery restore` try those letters the
+  other way and take a reading only when it is this account's recovery key or opens a sealed item
+  here. They then name each letter read differently, so you can correct the paper. Asking back
+  two groups during setup forgives the same lookalikes.
+
 ## [0.4.0] - 2026-11-24
 
 ### Added
