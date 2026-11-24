@@ -187,8 +187,7 @@ jobs:
           v="${GITHUB_REF_NAME#app-v}"
           dir=devcontainer-features/src/tiresias
           gh release download "$GITHUB_REF_NAME" --pattern tir-remote.sha256 --dir "$dir"
-          printf '%s
-' "$v" > "$dir/tir-remote.version"
+          printf '%s\n' "$v" > "$dir/tir-remote.version"
           jq --arg v "$v" '.version = $v' "$dir/devcontainer-feature.json" > "$RUNNER_TEMP/feature.json"
           mv "$RUNNER_TEMP/feature.json" "$dir/devcontainer-feature.json"
           cat "$dir/tir-remote.sha256"
