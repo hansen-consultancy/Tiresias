@@ -35,8 +35,8 @@ design and issue. A PR that finishes, starts or adds an item edits this page in 
       ([design](admin-tier.md), #91). Steps 1-2 built (the service, its pipe, setup; holding the
       decoys from boot); steps 3-5 in review (decoy read auditing, freezing a program that used a
       decoy and blocking its network, lastrun from BAM and Prefetch)
-- [ ] Out-of-band alerts: ntfy, LcdHub and a webhook, public by default ([design](alerts.md), #101).
-      The planner, the webhook and ntfy built; LcdHub and the other events in review
+- [x] Out-of-band alerts: ntfy, LcdHub and a webhook, public by default ([design](alerts.md), #101),
+      every event wired, failing sinks reported, signed webhooks, a heartbeat and an LcdHub alert frame
 - [x] Secrets reachable in containers, WSL and VMs from the user's account
       ([design](containers-and-vms.md), #113): what your account can open, devcontainer files and
       forwarding, Docker engine, WSL and Hyper-V contents, and [devcontainers that ask](devcontainers.md)
