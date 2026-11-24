@@ -17,8 +17,35 @@
     </StackPanel>
 
     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Focusable="False">
-      <!-- One card per task, open when it has something to act on (docs/app-design.md, rule 3). -->
+      <!-- One card per task, open when it has something to act on (docs/app-design.md, rule 3); exposed first, then sealed. -->
       <StackPanel IsEnabled="{Binding CanEdit}">
+        <Expander IsExpanded="{Binding WindowsHasSecrets, Mode=OneWay}" Margin="0,0,0,12">
+          <Expander.Header>
+            <StackPanel>
+              <TextBlock Text="{l:S Env_WindowsHeading}" Style="{StaticResource SubtitleText}" Margin="0" AutomationProperties.HeadingLevel="Level2" />
+              <TextBlock Text="{Binding WindowsSummary}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
+            </StackPanel>
+          </Expander.Header>
+          <StackPanel Margin="0,4,0,0">
+            <ListBox x:Name="InWindowsList" Style="{StaticResource PickList}" ItemsSource="{Binding InWindows}" Margin="0,4,0,0" AutomationProperties.Name="{l:S Env_WindowsHeading}">
+              <ListBox.ItemTemplate>
+                <DataTemplate>
+                  <DockPanel>
+                    <CheckBox IsChecked="{Binding IsChecked}" IsEnabled="{Binding CanPick}" MinWidth="0" Margin="0,0,8,0" VerticalAlignment="Center"
+                              AutomationProperties.Name="{Binding Name}" />
+                    <TextBlock TextTrimming="CharacterEllipsis" VerticalAlignment="Center">
+                      <Run Text="{Binding Name, Mode=OneWay}" />
+                      <Run Text="{Binding Detail, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </TextBlock>
+                  </DockPanel>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+            <v:DetailsPanel Fields="{Binding SelectedItem.Details, ElementName=InWindowsList}" />
+            <Button Style="{StaticResource RowButton}" Content="{l:S Env_Protect}" Command="{Binding ProtectCommand}" HorizontalAlignment="Left" Margin="0,8,0,0" />
+          </StackPanel>
+        </Expander>
+
         <Expander IsExpanded="True" Margin="0,0,0,12">
           <Expander.Header>
             <StackPanel>
@@ -101,33 +128,6 @@
               <Button Grid.Column="1" Style="{StaticResource RowButton}" Content="{l:S Env_FolderBrowse}" Margin="8,0,0,0" Click="OnBrowse" />
             </Grid>
             <TextBlock Text="{l:S Env_NewFolderHint}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,4,0,0" />
-          </StackPanel>
-        </Expander>
-
-        <Expander IsExpanded="{Binding WindowsHasSecrets, Mode=OneWay}" Margin="0,0,0,12">
-          <Expander.Header>
-            <StackPanel>
-              <TextBlock Text="{l:S Env_WindowsHeading}" Style="{StaticResource SubtitleText}" Margin="0" AutomationProperties.HeadingLevel="Level2" />
-              <TextBlock Text="{Binding WindowsSummary}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
-            </StackPanel>
-          </Expander.Header>
-          <StackPanel Margin="0,4,0,0">
-            <ListBox x:Name="InWindowsList" Style="{StaticResource PickList}" ItemsSource="{Binding InWindows}" Margin="0,4,0,0" AutomationProperties.Name="{l:S Env_WindowsHeading}">
-              <ListBox.ItemTemplate>
-                <DataTemplate>
-                  <DockPanel>
-                    <CheckBox IsChecked="{Binding IsChecked}" MinWidth="0" Margin="0,0,8,0" VerticalAlignment="Center"
-                              AutomationProperties.Name="{Binding Name}" />
-                    <TextBlock TextTrimming="CharacterEllipsis" VerticalAlignment="Center">
-                      <Run Text="{Binding Name, Mode=OneWay}" />
-                      <Run Text="{Binding Detail, Mode=OneWay}" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                    </TextBlock>
-                  </DockPanel>
-                </DataTemplate>
-              </ListBox.ItemTemplate>
-            </ListBox>
-            <v:DetailsPanel Fields="{Binding SelectedItem.Details, ElementName=InWindowsList}" />
-            <Button Style="{StaticResource RowButton}" Content="{l:S Env_Protect}" Command="{Binding ProtectCommand}" HorizontalAlignment="Left" Margin="0,8,0,0" />
           </StackPanel>
         </Expander>
 

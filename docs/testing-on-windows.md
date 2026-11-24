@@ -253,7 +253,7 @@ its device keys belong to that PC's Windows account.
 
 1. Make a throwaway one: `setx DEMO_API_KEY test-value`.
 2. **Status** shows **environment variables** as a warning naming it. **Review...** opens the
-   **Environment variables** window with it ticked under **In your Windows environment**.
+   **Environment variables** window with it ticked under **Still in Windows: every program can read these**, the page's first card.
 3. **Seal and remove from Windows**. A new terminal no longer has it: `echo $env:DEMO_API_KEY`
    prints nothing.
 4. `tir run -- pwsh -NoProfile -Command '$env:DEMO_API_KEY'` asks in the app's dialog, which lists

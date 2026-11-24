@@ -319,7 +319,7 @@ static class EnvCommand
             foreach (var variable in set.Variables)
                 Console.WriteLine($"  {Line(variable.Name)}");
         }
-        var exposed = user.Where(v => v.LooksSecret).ToArray();
+        var exposed = user.Where(v => v.LooksSecret && !v.Decoy).ToArray();
         if (exposed.Length > 0)
         {
             Console.WriteLine($"Still in your Windows environment and look like secrets ({exposed.Length}):");
@@ -334,9 +334,10 @@ static class EnvCommand
     static int Protect(CommandLine args)
     {
         var names = args.Positional.Skip(2).ToArray();
+        var user = EnvironmentStore.UserVariables();
         if (names.Length == 0)
         {
-            names = [.. EnvironmentStore.UserVariables().Where(v => v.LooksSecret).Select(v => v.Name)];
+            names = [.. user.Where(v => v.LooksSecret && !v.Decoy).Select(v => v.Name)];
             if (names.Length == 0)
             {
                 Console.WriteLine("None of your user environment variables look like secrets. Name one to seal it anyway: tir env protect NAME.");
@@ -348,7 +349,8 @@ static class EnvCommand
         }
         using var hello = HelloKeyWrapper.Open(create: false);
         var moved = EnvironmentStore.Protect(names, hello);
-        var missed = names.Except(moved, StringComparer.OrdinalIgnoreCase).ToArray();
+        var decoys = names.Where(n => user.Any(v => v.Decoy && string.Equals(v.Name, n, StringComparison.OrdinalIgnoreCase))).ToArray();
+        var missed = names.Except(moved, StringComparer.OrdinalIgnoreCase).Except(decoys, StringComparer.OrdinalIgnoreCase).ToArray();
         Console.WriteLine(moved.Count == 0 ? "Nothing was sealed." : $"Sealed {string.Join(", ", moved)}. New programs no longer see them; give them to one with tir run -- <command>.");
         if (moved.Count > 0 && args.Flag("--config"))
         {
@@ -360,6 +362,8 @@ static class EnvCommand
             Console.WriteLine("Programs started outside a terminal (F5 in an IDE) stop seeing them. Mark one for .NET apps with tir env config add <NAME>.");
         if (moved.Count > 0)
             Console.WriteLine("Programs already running keep their copy until they restart.");
+        if (decoys.Length > 0)
+            Console.WriteLine($"A decoy Tiresias placed, so left as bait: {string.Join(", ", decoys)}");
         if (missed.Length > 0)
             Console.WriteLine($"Not a user environment variable, so not moved: {string.Join(", ", missed)}");
         return missed.Length > 0 ? 1 : 0;
