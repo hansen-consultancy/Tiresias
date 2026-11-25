@@ -8,6 +8,14 @@ its section below.
 
 ## [Unreleased]
 
+### Changed
+
+- **On a managed PC, only what you installed is checked.** When the PC is joined to a domain or to
+  Microsoft Entra ID, or enrolled in device management, software installed for everyone is your
+  administrator's: it stays under **Installed**, but raises no finding about log-on entries,
+  uninstall entries or unused programs. A line in the checks says why. A blocked program is still
+  reported wherever it is.
+
 ### Added
 
 - **Browser and Visual Studio extensions are checked too.** Besides VS Code and its forks, the
@@ -16,9 +24,6 @@ its section below.
   credential through Tiresias, is a finding; since these programs have no command to remove an
   extension, its **Copy** button copies where to do it (`edge://extensions`, `about:addons`).
   `tir doctor --surface` lists them with their names.
-
-### Added
-
 - **Startup** lists everything that starts when you sign in without being opened: the Run keys,
   the Startup folder and scheduled tasks with a sign-in trigger, those turned off too. Each entry
   shows the installed app it belongs to, or "Not from an installed app", which is the one worth a

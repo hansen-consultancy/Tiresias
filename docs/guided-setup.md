@@ -209,10 +209,10 @@ Existing windows remain the places where the work happens; this changes how peop
    update and a new reason brings it back. Still design: the opt-in trust lookups (OSV,
    deps.dev, marketplaces, winget-pkgs) and the vulnerability and unverified-publisher findings
    they raise; **Update** and `winget`/`dotnet tool`/`npm` uninstalls; global tools and
-   JetBrains and Notepad++ plugins (browser and Visual Studio extensions are read, #107); scope on a managed
-   PC; extensions and global tools on the **Installed** page; trusting a publisher; separate
+   JetBrains and Notepad++ plugins (browser and Visual Studio extensions are read, #107);
+   extensions and global tools on the **Installed** page; trusting a publisher; separate
    *How credentials are held* and *What can reach them* groups. The global tools are listed
-   once a day, not per run (#107). `tir doctor --surface` lists the inventory (extensions with their host's
+   once a day, not per run, and on a managed PC only what the user installed is judged (#107). `tir doctor --surface` lists the inventory (extensions with their host's
    reach, global tools, log-on entries with signature and last use).
 6. **Built. More checks**: RavenDB certificate expiry and clearance, sealed keys handed
    out as values, publishing keys, git tokens and a CLI acting as the user (`gh`, `az`), each with
