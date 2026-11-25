@@ -371,7 +371,12 @@ few at a time, and a program whose file has no valid signature gets a quiet caut
 of its name; one that couldn't be checked (a part of Windows, a Store app, no file) is never called
 unsigned. A program installed in the last 14 days gets a **New** mark: its entry's `InstallDate`
 (`yyyyMMdd`), else when its own folder was created. **Show** picks all programs, not opened in 90
-days, not signed, or installed in the last 14 days, and the summary counts each. **Search online...** opens the browser with a web search for the name and version, on
+days, not signed, or installed in the last 14 days, and the summary counts each. It also picks
+**Extensions** and **Global tools** (#107), which replace the programs in the list: each extension
+with its host, publisher, last update and what its host reached in 90 days, those whose host
+reached most first; each global tool from the day's listing with its manager, and the summary says
+when it was listed. The search box matches them the same way. They have no signature, icon or
+folder of their own there. **Search online...** opens the browser with a web search for the name and version, on
 the user's click only; Tiresias itself sends nothing. Uninstalling goes through Settings, Apps, Installed apps
 (`UninstallApp`) until the inventory knows each program's installer command.
 **The Startup list is built** (#98), beside Installed: the user and machine Run keys and the

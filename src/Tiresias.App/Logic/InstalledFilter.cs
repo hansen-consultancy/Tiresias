@@ -2,8 +2,8 @@ using Tiresias.Client;
 
 namespace Tiresias.App.Logic;
 
-/// <summary>Which programs the Installed page's Show picker keeps.</summary>
-public enum InstalledView { All, Unused, Unsigned, New }
+/// <summary>Which programs the Installed page's Show picker keeps, or the extensions or global tools it lists instead (<see cref="InstalledAddOns"/>).</summary>
+public enum InstalledView { All, Unused, Unsigned, New, Extensions, Tools }
 
 /// <summary>Which programs the Installed page shows for what the user typed and picked.</summary>
 public static class InstalledFilter

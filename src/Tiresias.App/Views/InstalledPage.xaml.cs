@@ -84,7 +84,14 @@ public sealed partial class InstalledViewModel : ObservableObject
         new(Text.Get("Installed_ShowUnused"), InstalledView.Unused),
         new(Text.Get("Installed_ShowUnsigned"), InstalledView.Unsigned),
         new(Text.Format("Installed_ShowNew", InstalledFilter.NewDays), InstalledView.New),
+        new(Text.Get("Installed_ShowExtensions"), InstalledView.Extensions),
+        new(Text.Get("Installed_ShowTools"), InstalledView.Tools),
     ];
+
+    IReadOnlyList<AddOn> extensions = [], tools = [];
+
+    /// <summary>When the global tools were listed; <c>null</c> until read.</summary>
+    DateTimeOffset? toolsListed;
 
     public ObservableCollection<InstalledRow> Rows { get; } = [];
 
@@ -213,7 +220,21 @@ public sealed partial class InstalledViewModel : ObservableObject
         var scan = ++generation;
         scanning = scan;
         Apply();
+        var addOns = LoadAddOnsAsync();
         await ScanSignaturesAsync(scan);
+        await addOns;
+    }
+
+    /// <summary>Extensions and the day's global tools listing, which takes seconds when a day has passed: read after the programs show.</summary>
+    async Task LoadAddOnsAsync()
+    {
+        (extensions, tools, toolsListed) = await Task.Run(() =>
+        {
+            var probe = new MachineProbe();
+            var snapshot = ToolInventory.Current();
+            return (InstalledAddOns.Extensions(probe.Extensions(), probe.CredentialUses(), DateTimeOffset.UtcNow), InstalledAddOns.Tools(snapshot), (DateTimeOffset?)snapshot.At);
+        });
+        Apply();
     }
 
     int generation;
@@ -237,6 +258,19 @@ public sealed partial class InstalledViewModel : ObservableObject
     {
         var selected = Selected?.Name;
         Rows.Clear();
+        if (View is InstalledView.Extensions or InstalledView.Tools)
+        {
+            var list = View == InstalledView.Extensions ? extensions : tools;
+            foreach (var addOn in InstalledAddOns.Filter(list, Search))
+                Rows.Add(Row(addOn));
+            Selected = Rows.FirstOrDefault(r => r.Name == selected);
+            IsEmpty = Rows.Count == 0;
+            Summary = View == InstalledView.Extensions
+                ? Text.Format("Installed_SummaryExtensions", extensions.Count, extensions.Count(e => e.Reached.Count > 0))
+                : toolsListed is { } listed ? Text.Format("Installed_SummaryTools", tools.Count, listed.ToLocalTime().ToString("g", CultureInfo.CurrentCulture))
+                : Text.Get("Installed_Loading");
+            return;
+        }
         var today = DateOnly.FromDateTime(DateTime.Today);
         foreach (var program in InstalledFilter.Apply(all, Search, View, today, Mark))
             Rows.Add(Row(program, program.Entry.Icon is { } icon ? icons.GetValueOrDefault(icon) : null, today));
@@ -263,6 +297,18 @@ public sealed partial class InstalledViewModel : ObservableObject
             program.Entry.ProgramFile,
             program.Entry.InstalledOn?.ToString("d", CultureInfo.CurrentCulture) ?? Text.Get("Installed_InstalledOnUnknown"),
             InstalledFilter.IsNew(program.Entry, today), InstalledFilter.Mark(program.Entry, Mark));
+    }
+
+    /// <summary>An extension or tool: no file, signature, icon or install date of its own here; "For" names its host or manager.</summary>
+    static InstalledRow Row(AddOn addOn)
+    {
+        var updated = addOn.Updated?.ToLocalTime().ToString("d", CultureInfo.CurrentCulture);
+        return new(addOn.Name, addOn.Version ?? "", addOn.In,
+            updated is null ? Text.Get("Installed_ShortUpdatedUnknown") : Text.Format("Installed_ShortUpdated", updated),
+            updated is null ? Text.Get("Installed_UseAddOnUnknown") : Text.Format("Installed_UseAddOn", updated),
+            addOn.Reached.Count > 0 ? string.Join(", ", addOn.Reached) : Text.Get("Installed_ReachedNone"),
+            Text.Get("Installed_FolderUnknown"), null, addOn.Publisher ?? Text.Get("Installed_PublisherUnknown"), null,
+            Text.Get("Installed_InstalledOnUnknown"), false, ProgramMark.None);
     }
 
     static string UseText(InstalledProgram program)
