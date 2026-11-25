@@ -10,6 +10,10 @@ its section below.
 
 ### Added
 
+- **PowerShell modules you installed are checked too.** Modules in your Documents folder, for
+  PowerShell 7 and Windows PowerShell, are listed under **Installed** with their version and
+  whether they came from the PowerShell Gallery. One from elsewhere, or not updated in two years,
+  in a shell that used a credential through Tiresias, is a finding.
 - **Unpacked browser extensions are checked too.** An extension loaded from a folder in developer
   mode, in Edge, Chrome, Brave or Opera, is listed with an unknown publisher, since no store vouches
   for it; in a browser that used a credential through Tiresias, that makes it a finding.

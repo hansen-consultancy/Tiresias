@@ -35,6 +35,13 @@ static partial class SurfaceProbe
 
     static readonly ExtensionHost VisualStudio = new("Visual Studio", "devenv.exe", null, "Extensions, Manage Extensions");
 
+    /// <summary>The two PowerShells, by the folder in Documents that holds the user's modules.</summary>
+    static readonly (string Folder, ExtensionHost Host)[] PowerShells =
+    [
+        ("PowerShell", new("PowerShell", "pwsh.exe", null, "Uninstall-PSResource or Uninstall-Module")),
+        ("WindowsPowerShell", new("Windows PowerShell", "powershell.exe", null, "Uninstall-Module")),
+    ];
+
     static readonly ExtensionHost NotepadPlusPlus = new("Notepad++", "notepad++.exe", null, "Plugins, Plugins Admin, Installed");
 
     public static IEnumerable<InstalledExtension> Extensions()
@@ -50,6 +57,7 @@ static partial class SurfaceProbe
             .. Folders(Path.Combine(local, @"Microsoft\VisualStudio")).SelectMany(v => Folders(Path.Combine(v, "Extensions")))
                 .Select(e => Path.Combine(e, "extension.vsixmanifest"))
                 .Select(m => Doctor.VisualStudioExtension(VisualStudio, ReadOrNull(m), WriteTime(m))).OfType<InstalledExtension>(),
+            .. PowerShells.SelectMany(p => PowerShellModules(p.Host, Path.Combine(UserMachine.Folder(Environment.SpecialFolder.MyDocuments), p.Folder, "Modules"))),
             .. JetBrainsPlugins(Path.Combine(roaming, "JetBrains")),
             .. NotepadPlusPlusPlugins(local),
         ];
@@ -83,6 +91,14 @@ static partial class SurfaceProbe
                 locale => ReadOrNull(Path.Combine(v.Folder, "_locales", locale, "messages.json")), v.Created))
             .OfType<InstalledExtension>();
 
+    /// <summary>Each module at its newest version folder, or the module folder itself when it has none.</summary>
+    static IEnumerable<InstalledExtension> PowerShellModules(ExtensionHost host, string modules) =>
+        Folders(modules).Select(module =>
+        {
+            var version = Doctor.NewestModuleVersion(Folders(module).Select(Path.GetFileName)!);
+            var folder = version is null ? module : Path.Combine(module, version);
+            return Doctor.PowerShellModule(host, Path.GetFileName(module), version, ReadOrNull(Path.Combine(folder, "PSGetModuleInfo.xml")), CreationTime(folder));
+        }).OfType<InstalledExtension>();
     /// <summary>
     /// The plugins of the newest settings folder of each JetBrains IDE: a <c>.jar</c> in <c>plugins</c>,
     /// or a folder there whose <c>lib</c> holds the jar with the plugin's <c>META-INF/plugin.xml</c>.
