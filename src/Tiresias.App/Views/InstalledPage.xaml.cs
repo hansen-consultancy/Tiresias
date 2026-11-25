@@ -44,17 +44,27 @@ public partial class InstalledPage : UserControl
 /// <param name="ProgramFile">The file whose signature the panel checks when the row is selected.</param>
 /// <param name="InstalledOn">The install date, or why it isn't known.</param>
 /// <param name="IsNew">Installed in the last <see cref="InstalledFilter.NewDays"/> days.</param>
-/// <param name="Unsigned">Its program file was checked and has no valid signature.</param>
+/// <param name="Mark">What its program file's signature says (<see cref="ProgramMarks"/>).</param>
 public sealed record InstalledRow(string Name, string Version, string For, string ShortUse, string Use, string Reached, string Folder, ImageSource? Icon,
-    string Publisher, string? ProgramFile, string InstalledOn, bool IsNew, bool Unsigned)
+    string Publisher, string? ProgramFile, string InstalledOn, bool IsNew, ProgramMark Mark)
 {
-    public string Spoken => string.Join(". ", new[] { Name, IsNew ? NewTip : null, Unsigned ? Text.Get("Installed_UnsignedTip") : null, Use }.OfType<string>());
+    public string Spoken => string.Join(". ", new[] { Name, IsNew ? NewTip : null, MarkTip(Mark), Use }.OfType<string>());
 
     public static string NewTip => Text.Format("Installed_ShowNew", InstalledFilter.NewDays);
 
+    /// <summary>What a mark says, for its tooltip and a screen reader; <c>null</c> for none.</summary>
+    public static string? MarkTip(ProgramMark mark) => mark switch
+    {
+        ProgramMark.Unsigned => Text.Get("Installed_UnsignedTip"),
+        ProgramMark.BuiltByYou => Text.Get("Program_BuiltByYouTip"),
+        _ => null,
+    };
+
     public Visibility NewVisibility => IsNew ? Visibility.Visible : Visibility.Collapsed;
 
-    public Visibility UnsignedVisibility => Unsigned ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility UnsignedVisibility => Mark == ProgramMark.Unsigned ? Visibility.Visible : Visibility.Collapsed;
+
+    public Visibility BuiltByYouVisibility => Mark == ProgramMark.BuiltByYou ? Visibility.Visible : Visibility.Collapsed;
 
     public Visibility IconVisibility => Icon is null ? Visibility.Collapsed : Visibility.Visible;
 
@@ -94,8 +104,20 @@ public sealed partial class InstalledViewModel : ObservableObject
     [ObservableProperty]
     public partial string Signer { get; set; } = "";
 
-    /// <summary>Each program file's signature, filled by the scan after the list loads (off the UI thread) and by a selection it hasn't reached.</summary>
-    readonly ConcurrentDictionary<string, (bool? Valid, string? Signer, Publisher? Publisher)> signatures = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>
+    /// Each program file's signature and whether it looks like the user's own build, filled by the
+    /// scan after the list loads (off the UI thread) and by a selection it hasn't reached.
+    /// </summary>
+    readonly ConcurrentDictionary<string, (bool? Valid, string? Signer, Publisher? Publisher, bool BuiltByYou)> signatures = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Developer tools show, so an own build is marked as such (read with the list).</summary>
+    bool developerTools;
+
+    static (bool? Valid, string? Signer, Publisher? Publisher, bool BuiltByYou) Check(string file)
+    {
+        var (valid, signer, publisher) = MachineProbe.Signature(file);
+        return (valid, signer, publisher, MachineProbe.BuiltByYou(file, valid, signer));
+    }
 
     /// <summary>Non-zero while the scan of the list's signatures runs; each load bumps it, so an older scan's end doesn't count.</summary>
     int scanning;
@@ -149,16 +171,16 @@ public sealed partial class InstalledViewModel : ObservableObject
         if (!signatures.TryGetValue(file, out var signature))
         {
             Signer = Text.Get("Installed_SignerChecking");
-            signature = signatures[file] = await Task.Run(() => MachineProbe.Signature(file));
+            signature = signatures[file] = await Task.Run(() => Check(file));
         }
-        var (key, argument) = InstalledDetails.Signer(signature.Valid, signature.Signer);
+        var (key, argument) = InstalledDetails.Signer(signature.Valid, signature.Signer, ProgramMarks.Of(signature.Valid, signature.BuiltByYou, developerTools));
         if (Selected != value)
             return;
         Signer = argument is null ? Text.Get(key) : Text.Format(key, argument);
         ShowTrust(signature.Publisher);
     }
 
-    bool? Signed(string file) => signatures.TryGetValue(file, out var s) ? s.Valid : null;
+    ProgramMark Mark(string file) => signatures.TryGetValue(file, out var s) ? ProgramMarks.Of(s.Valid, s.BuiltByYou, developerTools) : ProgramMark.None;
 
     [ObservableProperty]
     public partial string Summary { get; set; } = Text.Get("Installed_Loading");
@@ -175,7 +197,7 @@ public sealed partial class InstalledViewModel : ObservableObject
     [RelayCommand]
     async Task LoadAsync()
     {
-        (all, icons) = await Task.Run(() =>
+        (all, icons, developerTools) = await Task.Run(() =>
         {
             var probe = new MachineProbe();
             var entries = probe.UninstallEntries().ToArray();
@@ -185,7 +207,7 @@ public sealed partial class InstalledViewModel : ObservableObject
             foreach (var entry in programs.Select(p => p.Entry).Where(e => e.Icon is not null && e.IconLocation is not null))
                 if (!read.ContainsKey(entry.Icon!) && Desktop.SmallIcon(entry.IconLocation!.Value.Path, entry.IconLocation.Value.Index) is { } image)
                     read[entry.Icon!] = image;
-            return (programs, (IReadOnlyDictionary<string, ImageSource>)read);
+            return (programs, (IReadOnlyDictionary<string, ImageSource>)read, DeveloperSignals.View().Shown);
         });
         signatures.Clear();
         var scan = ++generation;
@@ -204,7 +226,7 @@ public sealed partial class InstalledViewModel : ObservableObject
     {
         var files = all.Select(p => p.Entry.ProgramFile).OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         await Task.Run(() => Parallel.ForEach(files, new ParallelOptions { MaxDegreeOfParallelism = 4 },
-            file => signatures.TryAdd(file, MachineProbe.Signature(file))));
+            file => signatures.TryAdd(file, Check(file))));
         if (scan != generation)
             return;
         scanning = 0;
@@ -216,12 +238,12 @@ public sealed partial class InstalledViewModel : ObservableObject
         var selected = Selected?.Name;
         Rows.Clear();
         var today = DateOnly.FromDateTime(DateTime.Today);
-        foreach (var program in InstalledFilter.Apply(all, Search, View, today, Signed))
+        foreach (var program in InstalledFilter.Apply(all, Search, View, today, Mark))
             Rows.Add(Row(program, program.Entry.Icon is { } icon ? icons.GetValueOrDefault(icon) : null, today));
         Selected = Rows.FirstOrDefault(r => r.Name == selected);
         IsEmpty = Rows.Count == 0;
         Summary = Text.Format("Installed_Summary", all.Count, all.Count(p => p.Use == ProgramUse.Unused))
-            + ", " + (scanning != 0 ? Text.Get("Installed_SummaryScanning") : Text.Format("Installed_SummaryUnsigned", all.Count(p => InstalledFilter.IsUnsigned(p.Entry, Signed))))
+            + ", " + (scanning != 0 ? Text.Get("Installed_SummaryScanning") : Text.Format("Installed_SummaryUnsigned", all.Count(p => InstalledFilter.IsUnsigned(p.Entry, Mark))))
             + ", " + Text.Format("Installed_SummaryNew", all.Count(p => InstalledFilter.IsNew(p.Entry, today)), InstalledFilter.NewDays);
     }
 
@@ -240,7 +262,7 @@ public sealed partial class InstalledViewModel : ObservableObject
             program.Entry.Folder ?? Text.Get("Installed_FolderUnknown"), icon, program.Entry.Publisher ?? Text.Get("Installed_PublisherUnknown"),
             program.Entry.ProgramFile,
             program.Entry.InstalledOn?.ToString("d", CultureInfo.CurrentCulture) ?? Text.Get("Installed_InstalledOnUnknown"),
-            InstalledFilter.IsNew(program.Entry, today), InstalledFilter.IsUnsigned(program.Entry, Signed));
+            InstalledFilter.IsNew(program.Entry, today), InstalledFilter.Mark(program.Entry, Mark));
     }
 
     static string UseText(InstalledProgram program)

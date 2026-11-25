@@ -3169,4 +3169,97 @@ Close them, then choose the update in the tray menu again.</value>
   <data name="Prompt_AdminReviewIncidents" xml:space="preserve">
     <value>To mark the admin tier&apos;s incidents as reviewed.</value>
   </data>
+  <data name="Nav_Startup" xml:space="preserve">
+    <value>Startup</value>
+  </data>
+  <data name="Startup_Heading" xml:space="preserve">
+    <value>Startup</value>
+  </data>
+  <data name="Startup_Intro" xml:space="preserve">
+    <value>What Windows starts when you sign in, without you opening it: the Run keys, the Startup folder and scheduled tasks. Most belong to an installed app; one that doesn't is worth a look. Turning one off keeps the program.</value>
+  </data>
+  <data name="Startup_ListName" xml:space="preserve">
+    <value>Programs that start at sign-in</value>
+  </data>
+  <data name="Startup_ColApp" xml:space="preserve">
+    <value>Installed app</value>
+  </data>
+  <data name="Startup_ColFrom" xml:space="preserve">
+    <value>Started from</value>
+  </data>
+  <data name="Startup_ColProgram" xml:space="preserve">
+    <value>Program</value>
+  </data>
+  <data name="Startup_ColState" xml:space="preserve">
+    <value>At sign-in</value>
+  </data>
+  <data name="Startup_ColOpened" xml:space="preserve">
+    <value>Last opened by you</value>
+  </data>
+  <data name="Startup_NotFromApp" xml:space="preserve">
+    <value>Not from an installed app</value>
+  </data>
+  <data name="Startup_ShowNotFromApp" xml:space="preserve">
+    <value>Not from an installed app</value>
+  </data>
+  <data name="Startup_ShowOff" xml:space="preserve">
+    <value>Turned off</value>
+  </data>
+  <data name="Startup_Off" xml:space="preserve">
+    <value>Off</value>
+  </data>
+  <data name="Startup_OffTip" xml:space="preserve">
+    <value>Turned off: it no longer starts at sign-in</value>
+  </data>
+  <data name="Startup_StateOn" xml:space="preserve">
+    <value>Starts</value>
+  </data>
+  <data name="Startup_StateOff" xml:space="preserve">
+    <value>Turned off</value>
+  </data>
+  <data name="Startup_FromRunKey" xml:space="preserve">
+    <value>Run key</value>
+  </data>
+  <data name="Startup_FromMachineRunKey" xml:space="preserve">
+    <value>Run key, every user</value>
+  </data>
+  <data name="Startup_FromFolder" xml:space="preserve">
+    <value>Startup folder</value>
+  </data>
+  <data name="Startup_FromTask" xml:space="preserve">
+    <value>Scheduled task</value>
+  </data>
+  <data name="Startup_OpenedUnknown" xml:space="preserve">
+    <value>Not recorded</value>
+  </data>
+  <data name="Startup_ProgramUnknown" xml:space="preserve">
+    <value>Not known</value>
+  </data>
+  <data name="Startup_Signed" xml:space="preserve">
+    <value>Signed</value>
+  </data>
+  <data name="Startup_TurnOff" xml:space="preserve">
+    <value>Turn off at sign-in...</value>
+  </data>
+  <data name="Startup_TurnOffTip" xml:space="preserve">
+    <value>Keeps the program; Settings, Apps, Startup turns it back on</value>
+  </data>
+  <data name="Startup_OpenSettings" xml:space="preserve">
+    <value>Open Startup settings</value>
+  </data>
+  <data name="Startup_Empty" xml:space="preserve">
+    <value>Nothing here starts at sign-in.</value>
+  </data>
+  <data name="Startup_Summary" xml:space="preserve">
+    <value>{0} entries, {1} not from an installed app, {2} not signed, {3} turned off</value>
+  </data>
+  <data name="Program_BuiltByYouTip" xml:space="preserve">
+    <value>Not signed, built by you: it sits in a git work tree beside the project that builds it</value>
+  </data>
+  <data name="Program_NotSignedBuiltByYou" xml:space="preserve">
+    <value>Not signed; it looks like your own build</value>
+  </data>
+  <data name="Finding_FixStartupList" xml:space="preserve">
+    <value>Show startup programs</value>
+  </data>
 </root>

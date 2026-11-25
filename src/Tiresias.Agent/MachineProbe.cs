@@ -240,6 +240,12 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public Publisher? Signer(string path) => SurfaceProbe.Signature(path).Publisher;
 
+    /// <summary>Everything that starts at log-on, turned off or not, scheduled tasks included: the Startup list.</summary>
+    public static IEnumerable<StartupEntry> AllStartupEntries() => SurfaceProbe.AllStartupEntries();
+
+    /// <inheritdoc cref="OwnBuild.Looks"/>
+    public static bool BuiltByYou(string program, bool? valid, string? signer) => OwnBuild.Looks(program, valid, signer, BuildDisk.Instance);
+
     public IEnumerable<ProgramRun> ProgramRuns(IReadOnlyCollection<string> of) => [.. SurfaceProbe.ProgramRuns(), .. AdminClient.LastRuns(of)];
 
     /// <summary>Everything the attack surface checks read, plus the global tools: today's listing, or a new one with <paramref name="refresh"/>.</summary>

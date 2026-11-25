@@ -45,7 +45,7 @@
                     <TextBlock Text="&#xE74C;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14" Visibility="{Binding GenericIconVisibility}"
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                   </Grid>
-                  <!-- Quiet marks at the end of the name: New (installed lately) and an unsigned program file; each also a Show choice. -->
+                  <!-- Quiet marks at the end of the name: New (installed lately), an unsigned program file or the user's own build. -->
                   <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
                     <Border Visibility="{Binding NewVisibility}" CornerRadius="4" Padding="5,0" Margin="0,0,6,0" VerticalAlignment="Center"
                             BorderThickness="1" BorderBrush="{DynamicResource AccentTextFillColorPrimaryBrush}" ToolTip="{x:Static v:InstalledRow.NewTip}">
@@ -53,6 +53,9 @@
                     </Border>
                     <TextBlock Text="&#xE7BA;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13" Visibility="{Binding UnsignedVisibility}"
                                Foreground="{DynamicResource SystemFillColorCautionBrush}" VerticalAlignment="Center" ToolTip="{l:S Installed_UnsignedTip}" />
+                    <!-- Unsigned, but the user's own build where developer tools show (#148): information, not a caution. -->
+                    <TextBlock Text="&#xE946;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13" Visibility="{Binding BuiltByYouVisibility}"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" ToolTip="{l:S Program_BuiltByYouTip}" />
                   </StackPanel>
                   <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                 </DockPanel>
