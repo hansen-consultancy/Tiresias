@@ -41,6 +41,12 @@ public sealed record DoctorCheck(string Name, DoctorStatus Status, string Detail
     public bool SoloNote { get; init; }
 
     /// <summary>
+    /// How the line reads on a PC without developer tools, where leniency meant for a developer
+    /// doesn't apply (docs/developer-tools.md); <c>null</c> when it reads the same.
+    /// </summary>
+    public DoctorCheck? WithoutDeveloperTools { get; init; }
+
+    /// <summary>
     /// The installed thing an attack surface finding is about (an extension, a log-on entry, a
     /// program), the same across its updates. With it, a dismissal follows the thing rather than the
     /// line's name, and holds as long as the <see cref="Signer"/> and <see cref="Reasons"/> it accepted do.

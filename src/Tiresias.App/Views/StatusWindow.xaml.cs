@@ -196,6 +196,7 @@ public partial class StatusWindow : Window
             EnvironmentPage => NavEnvironment,
             ActivityPage => NavActivity,
             InstalledPage => NavInstalled,
+            StartupPage => NavStartup,
             AboutPage => NavAbout,
             _ => NavHome,
         };
@@ -225,6 +226,7 @@ public partial class StatusWindow : Window
             "Environment" => ShowEnvironment(),
             "Activity" => Navigate<ActivityPage>(),
             "Installed" => Navigate<InstalledPage>(),
+            "Startup" => Navigate<StartupPage>(),
             "About" => Navigate<AboutPage>(),
             _ => null,
         };
@@ -350,6 +352,9 @@ public partial class StatusWindow : Window
                 break;
             case UninstallApp:
                 Navigate<InstalledPage>();
+                break;
+            case ReviewStartup:
+                Navigate<StartupPage>();
                 break;
             case ReviewAlerts:
                 Navigate<AboutPage>();

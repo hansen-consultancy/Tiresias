@@ -1,6 +1,6 @@
 # Attack surface: less software, less to trust
 
-Status: **first slice, log-on use, uninstall-entry checks, unused applications, the Installed list, `tir doctor --surface`, per-item dismissals and trusted publishers built** (#34, #55, #108); the rest is design. [Guided setup](guided-setup.md) phase 5: it builds on the
+Status: **first slice, log-on use, uninstall-entry checks, unused applications, the Installed and Startup lists, own builds, `tir doctor --surface`, per-item dismissals and trusted publishers built** (#34, #55, #98, #108, #148); the rest is design. [Guided setup](guided-setup.md) phase 5: it builds on the
 findings `tir doctor` reports since phase 1 and the findings section, fixes and dismissals the app
 gets in phase 2.
 
@@ -347,6 +347,28 @@ unsigned. A program installed in the last 14 days gets a **New** mark: its entry
 days, not signed, or installed in the last 14 days, and the summary counts each. **Search online...** opens the browser with a web search for the name and version, on
 the user's click only; Tiresias itself sends nothing. Uninstalling goes through Settings, Apps, Installed apps
 (`UninstallApp`) until the inventory knows each program's installer command.
+**The Startup list is built** (#98), beside Installed: the user and machine Run keys and the
+Startup folder, entries turned off in Task Manager or Settings included (marked **Off**), and the
+scheduled tasks with a log-on trigger for anyone, the user or a group the user is in, read in process through the Task
+Scheduler's COM interface (Windows' own `\Microsoft\Windows` tasks left out; none in demo mode).
+Each entry names the installed app whose folder holds its program (the deepest one), or "Not from
+an installed app", which sorts first; its last opening by the user (UserAssist), the credentials it
+used in 90 days and its signature, with the same marks as Installed. **Turn off at sign-in...** is
+`DisableStartup` for the user's own Run key and Startup folder entries that are on; machine-wide
+entries and tasks go through Settings. **Show** picks all, not from an installed app, not signed
+or turned off.
+**Built by you** (#148): on a PC where [developer tools](developer-tools.md) show, a program with
+no signature at all that sits in a git work tree (a `.git` folder or file walking up from it) that
+also holds its project (`obj` beside its `bin`, or a `.csproj`, `.fsproj`, `.vbproj`, `.vcxproj`,
+`.sln` or `.slnx` above it), and that the user owns, is information, not a caution: an info mark
+on Installed and Startup (`Logic/ProgramMarks`, the one place both lists decide a mark), and the
+"starts at log-on unsigned" finding becomes "built by you", status `ok`, one Home line "*n*
+programs you built yourself that start at log-on" opening Startup. A signature that is present but
+doesn't verify keeps its warning, and nothing in Temp, Downloads or AppData (with the browsers'
+caches) qualifies. Detection reads names, folder listings and the file's owner, never starts
+anything or needs an administrator. Without developer tools the finding reads as before
+(`DoctorCheck.WithoutDeveloperTools`). Matching the repository's remote against owners the user
+marks as their own is not built.
 **Dismissals per item and trusted publishers are built** (#108), as [Dismissals](#dismissals)
 says.
 [Guided setup](guided-setup.md#phases) lists what is still design.

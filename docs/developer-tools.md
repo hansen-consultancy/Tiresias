@@ -54,6 +54,7 @@ how the surface is gated now; Proposed means how this design gates it.
 | Environment variables | in use | D ⚠ | in use, or developer tools on |
 | Activity | has records | E | — |
 | Installed | always | E | — |
+| Startup | always | E | — |
 | About: start with Windows, build, data folder | always | E | — |
 | About: Alerts card | always | E | — |
 | About: Admin tier card | always | A | — (offered to everyone; see [edge cases](#edge-cases)) |
@@ -105,6 +106,7 @@ filtered, so the tag only decides whether an **Ok** line shows in Passed.
 | docker engine, wsl disks, hyper-v; docker, WSL and Hyper-V contents (opt-in) | D |
 | extensions in VS Code and its forks | D |
 | blocked program still present, unsigned or unused at log-on, uninstall entries, unused programs | E |
+| unsigned at log-on but built by you: information with developer tools, the unsigned warning without | E |
 
 ### What do you need?
 
