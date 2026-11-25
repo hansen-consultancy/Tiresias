@@ -626,6 +626,116 @@ public class PaperKeyTests
         Assert.That(PaperKey.Confirm(words, (1, 4), words[4], words[1]), Is.False);
     }
 
+    // Eight lookalike letters, then filler; the last letter's spare bits are zero.
+    const string Lookalikes = "S5Z2T7UVABCDEFGHJKLMNPQRWXYABCDEFGHJKLMNPQRWXYABCDEA";
+
+    static Func<byte[], bool> Known(byte[] key) => paper => paper.AsSpan().SequenceEqual(key);
+
+    static string Swap(string letters, params int[] at)
+    {
+        var chars = letters.ToCharArray();
+        foreach (var i in at)
+            chars[i] = letters[i] switch { 'S' => '5', '5' => 'S', 'Z' => '2', '2' => 'Z', 'T' => '7', '7' => 'T', 'U' => 'V', 'V' => 'U', var c => c };
+        return new string(chars);
+    }
+
+    [Test]
+    public void A_key_that_is_known_as_typed_is_read_as_typed()
+    {
+        var reading = PaperKey.Read(PaperKey.Format(Raw), Known(Raw));
+        Assert.That(reading!.Key, Is.EqualTo(Raw));
+        Assert.That(reading.Corrections, Is.Empty);
+    }
+
+    [TestCase(0, 'S', '5')]
+    [TestCase(1, '5', 'S')]
+    [TestCase(2, 'Z', '2')]
+    [TestCase(3, '2', 'Z')]
+    [TestCase(4, 'T', '7')]
+    [TestCase(5, '7', 'T')]
+    [TestCase(6, 'U', 'V')]
+    [TestCase(7, 'V', 'U')]
+    public void A_misread_lookalike_is_read_the_other_way_when_that_gives_the_known_key(int at, char read, char typed)
+    {
+        var key = PaperKey.Parse(Lookalikes)!;
+        var reading = PaperKey.Read(Swap(Lookalikes, at), Known(key));
+        Assert.That(reading!.Key, Is.EqualTo(key));
+        Assert.That(reading.Corrections, Is.EqualTo(new[] { new PaperKeyCorrection(at / 4 + 1, typed, read) }));
+    }
+
+    [Test]
+    public void Lookalikes_are_forgiven_in_any_case_with_separators_and_with_0_1_8()
+    {
+        var key = PaperKey.Parse(Lookalikes)!;
+        var typed = Swap(Lookalikes, 0, 6).Replace('B', '8').ToLowerInvariant();
+        typed = string.Join("-", Enumerable.Range(0, 13).Select(i => typed.Substring(i * 4, 4))).Insert(20, "\n ");
+        var reading = PaperKey.Read(typed, Known(key));
+        Assert.That(reading!.Key, Is.EqualTo(key));
+        Assert.That(reading.Corrections, Is.EqualTo(new[] { new PaperKeyCorrection(1, '5', 'S'), new PaperKeyCorrection(2, 'V', 'U') }));
+    }
+
+    [Test]
+    public void A_real_typo_is_not_corrected()
+    {
+        var key = PaperKey.Parse(Lookalikes)!;
+        var typo = "SSZ2" + Lookalikes[4..8] + "ABCE" + Lookalikes[12..];
+        var reading = PaperKey.Read(typo, Known(key));
+        Assert.That(reading!.Key, Is.Not.EqualTo(key), "the key as typed, for the caller's own checks to reject");
+        Assert.That(reading.Key, Is.EqualTo(PaperKey.Parse(typo)));
+        Assert.That(reading.Corrections, Is.Empty);
+        Assert.That(PaperKey.Read("SSZ2 ABCD", Known(key)), Is.Null);
+    }
+
+    [Test]
+    public void With_nothing_known_the_key_is_read_as_typed()
+    {
+        var calls = 0;
+        var reading = PaperKey.Read(Lookalikes, _ => { calls++; return false; });
+        Assert.That(reading!.Key, Is.EqualTo(PaperKey.Parse(Lookalikes)));
+        Assert.That(reading.Corrections, Is.Empty);
+        Assert.That(calls, Is.EqualTo(256), "the key as typed and every swap of its eight lookalikes, each once");
+    }
+
+    [Test]
+    public void Two_readings_with_as_few_swaps_refuse_rather_than_guess()
+    {
+        var first = PaperKey.Parse(Swap(Lookalikes, 0))!;
+        var second = PaperKey.Parse(Swap(Lookalikes, 1))!;
+        var reading = PaperKey.Read(Lookalikes, p => Known(first)(p) || Known(second)(p));
+        Assert.That(reading!.Key, Is.EqualTo(PaperKey.Parse(Lookalikes)));
+        Assert.That(reading.Corrections, Is.Empty);
+    }
+
+    [Test]
+    public void The_reading_with_fewest_swaps_wins()
+    {
+        var one = PaperKey.Parse(Swap(Lookalikes, 3))!;
+        var two = PaperKey.Parse(Swap(Lookalikes, 0, 1))!;
+        var reading = PaperKey.Read(Lookalikes, p => Known(one)(p) || Known(two)(p));
+        Assert.That(reading!.Key, Is.EqualTo(one));
+    }
+
+    [TestCase(3, true)]
+    [TestCase(4, false)]
+    public void At_most_4096_readings_are_tried(int swaps, bool found)
+    {
+        // Twenty lookalikes: 1350 readings up to three swaps, 6195 up to four.
+        var letters = new string('S', 20) + Lookalikes[20..];
+        var key = PaperKey.Parse(letters)!;
+        var calls = 0;
+        var reading = PaperKey.Read(Swap(letters, [.. Enumerable.Range(0, swaps)]), p => { calls++; return Known(key)(p); });
+        Assert.That(reading!.Key.AsSpan().SequenceEqual(key), Is.EqualTo(found));
+        Assert.That(calls, Is.LessThanOrEqualTo(4097));
+    }
+
+    [Test]
+    public void Confirm_forgives_lookalikes_but_not_a_wrong_letter()
+    {
+        Assert.That(PaperKey.Confirm(["S5Z2", "T7UV"], (0, 1), "5s2z", "7tvu"), Is.True);
+        Assert.That(PaperKey.Confirm(["S5Z2", "T7UV"], (0, 1), "S5Z2", "T7UW"), Is.False);
+        Assert.That(PaperKey.Confirm(["S5Z2", "T7UV"], (0, 1), "S5Z", "T7UV"), Is.False);
+    }
+
     [Test]
     public void The_paper_and_the_enrolled_recipient_display_the_same_public_fingerprint()
     {
