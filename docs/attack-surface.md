@@ -153,9 +153,16 @@ the command. The new kinds:
   a habit the replacement doesn't match is a good reason to keep the app; the user says so once
   and the finding stays dismissed. Sometimes the right replacement is a slim tool of your own.
 
-On a managed PC (joined to a domain or enrolled in device management, both readable without
-admin rights), surface findings cover what the user installed. Machine-wide software there is the
-administrator's: it is listed under **Installed**, without a finding or a fix.
+On a managed PC, surface findings cover what the user installed. Machine-wide software there is the
+administrator's: it is listed under **Installed**, without a finding or a fix. This is built (#107).
+A PC counts as managed when it is joined to an Active Directory domain or to Microsoft Entra ID
+(`NetGetJoinInformation`, `NetGetAadJoinInformation`; a device only registered with a work account
+is not), or enrolled in device management (a key under `HKLM\SOFTWARE\Microsoft\Enrollments`
+with a `ProviderID` and `EnrollmentState` 1; Windows leaves other keys behind). All of it is
+readable without admin rights. Machine Run key entries and machine-wide uninstall entries are then
+left out of the startup, uninstall-entry and unused-application findings, and an `ok` line,
+**managed PC**, says by what. A blocked program is still a finding wherever it is installed: it
+already behaved like malware.
 
 ## Ranking
 
