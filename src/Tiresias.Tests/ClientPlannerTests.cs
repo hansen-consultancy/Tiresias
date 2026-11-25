@@ -729,6 +729,20 @@ public class PaperKeyTests
     }
 
     [Test]
+    public void A_misread_key_proven_by_the_stored_recipient_signs_as_the_paper_key()
+    {
+        // Solo setup and bind-hello check the reading against the stored recipient, then sign with the paper key.
+        var key = PaperKey.Parse(Lookalikes)!;
+        using var agreement = Key.Import(KeyAgreementAlgorithm.X25519, key, KeyBlobFormat.RawPrivateKey);
+        var recipient = agreement.PublicKey.Export(KeyBlobFormat.RawPublicKey);
+        var reading = PaperKey.Read(Swap(Lookalikes, 2, 7), paper => PaperKey.Matches(paper, recipient));
+        Assert.That(reading!.Corrections, Is.EqualTo(new[] { new PaperKeyCorrection(1, '2', 'Z'), new PaperKeyCorrection(2, 'U', 'V') }));
+        using var signing = PaperKey.SigningKey(reading.Key);
+        using var expected = PaperKey.SigningKey(key);
+        Assert.That(signing.PublicKey.Export(KeyBlobFormat.RawPublicKey), Is.EqualTo(expected.PublicKey.Export(KeyBlobFormat.RawPublicKey)));
+    }
+
+    [Test]
     public void Confirm_forgives_lookalikes_but_not_a_wrong_letter()
     {
         Assert.That(PaperKey.Confirm(["S5Z2", "T7UV"], (0, 1), "5s2z", "7tvu"), Is.True);

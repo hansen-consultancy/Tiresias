@@ -124,7 +124,9 @@ CI and people who prefer it, and it talks to the same agent.
   typed is neither this account's stored recovery key nor one that opens a sealed item here, and a
   swapped reading is: fewest swaps first, at most 4096 readings, and two equal matches refuse
   rather than guess. The result names each letter read differently, to correct on the paper. The
-  wizard's two-group check forgives the same lookalikes, since it knows the expected groups. A
+  wizard's two-group check forgives the same lookalikes, since it knows the expected groups. The
+  same reading applies wherever the paper key is typed back: the wizard's solo step after an
+  interrupted setup, `tir solo init` and `tir trust bind-hello`. A
   solo broker's device and identity keys are bound to the old PC's Windows account and are not
   restored: set solo mode up again there.
 - **Errors** say what happened, why it matters and what to do next, with a button for that next

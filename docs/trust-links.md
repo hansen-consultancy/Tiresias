@@ -102,7 +102,7 @@ device key gains nothing from such a genesis. `tir solo init` always writes the 
 |---|---|
 | Add a device (planned) | The new device makes its keys and shows its Hello prompt to countersign; an existing device of the same user signs with one Hello prompt. The two exchange the link as a file or a code, never through the broker unsigned |
 | Add a user (planned) | As above, with an admin's device authorizing, and with as many admins as the threshold needs |
-| Bind an old device | `tir trust bind-hello`: one Hello prompt, and the paper key typed once |
+| Bind an old device | `tir trust bind-hello`: one Hello prompt, and the paper key typed once (hidden; S/5, Z/2, T/7, U/V forgiven as in restore) |
 | Solo, starting again | `tir solo init` again, with the vault resealed to the new genesis's broker |
 
 ## Tests
