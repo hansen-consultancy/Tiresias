@@ -123,6 +123,7 @@ public class AttackSurfaceTests
     public void Surface_findings_get_their_own_buttons()
     {
         Assert.That(FindingView.Button(new RemoveExtension(Code, "acme.helper"))?.Action, Is.EqualTo(FixAction.RemoveExtension));
+        Assert.That(FindingView.Button(new RemoveExtensionByHand(new("Edge", "msedge.exe", null, "edge://extensions"), "Acme"))?.Action, Is.EqualTo(FixAction.CopyCommand));
         Assert.That(FindingView.Button(new RevealFile(@"C:\x.exe"))?.Action, Is.EqualTo(FixAction.RevealFile));
     }
 

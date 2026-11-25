@@ -8,8 +8,23 @@ its section below.
 
 ## [Unreleased]
 
+### Changed
+
+- **On a managed PC, only what you installed is checked.** When the PC is joined to a domain or to
+  Microsoft Entra ID, or enrolled in device management, software installed for everyone is your
+  administrator's: it stays under **Installed**, but raises no finding about log-on entries,
+  uninstall entries or unused programs. A line in the checks says why. A blocked program is still
+  reported wherever it is.
+
 ### Added
 
+- **Browser and Visual Studio extensions are checked too.** Besides VS Code and its forks, the
+  attack surface checks now read extensions in Edge, Chrome, Brave, Opera and Opera GX (every
+  profile), Firefox and Visual Studio. One with an unknown publisher or no update in two years, in a
+  program that used a credential through Tiresias, is a finding; since these programs have no
+  command to remove an extension, its **Copy** button copies where to do it (`edge://extensions`,
+  `about:addons`).
+  `tir doctor --surface` lists them with their names.
 - **Installed lists extensions and global tools.** **Show** now also picks **Extensions**, each
   with the program it runs in and what that program used through Tiresias in 90 days (those
   reaching most first), and **Global tools**, the day's listing of `dotnet`, `npm`, `pipx` and

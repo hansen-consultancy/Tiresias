@@ -51,7 +51,8 @@ static class CliUsage
             for projects without the protected provider, passwords in appsettings*.json connection
             strings, and private keys in files. A finding shows where it sits on the two axes (E5/C3:
             readable, used silently) and where its fix takes it. --surface also lists what is
-            installed: extensions with what their host reached, global dotnet/npm/pipx/cargo tools,
+            installed: extensions (VS Code and forks, Edge, Chrome, Brave, Firefox, Visual Studio)
+            with what their host reached, global dotnet/npm/pipx/cargo tools,
             and what starts at log-on with its signature and last use; the tools are listed once a
             day (the app keeps that listing fresh), --refresh lists them now. --reach also asks the Docker
             engine which secret-looking names its containers and images hold, and what they mount,

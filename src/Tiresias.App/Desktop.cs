@@ -67,13 +67,13 @@ static partial class Desktop
     /// <returns>Whether the command ran and reported success within a minute.</returns>
     public static async Task<bool> RemoveExtensionAsync(Tiresias.Client.RemoveExtension remove)
     {
-        if (!Tiresias.Client.RemoveExtension.IsSafeId(remove.Id))
+        if (remove.Host.Cli is not { } cli || !Tiresias.Client.RemoveExtension.IsSafeId(remove.Id))
             return false;
         // The host's CLI would remove it from the real machine.
         if (DemoMode.On)
             return true;
         var start = new ProcessStartInfo("cmd.exe") { UseShellExecute = false, CreateNoWindow = true };
-        foreach (var argument in new[] { "/d", "/c", remove.Host.Cli, "--uninstall-extension", remove.Id })
+        foreach (var argument in new[] { "/d", "/c", cli, "--uninstall-extension", remove.Id })
             start.ArgumentList.Add(argument);
         try
         {

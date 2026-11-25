@@ -141,7 +141,7 @@ public static partial class Doctor
                 .Select(u => u.Service).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToArray();
             yield return $"  {host.Key.Name} ({host.Count()}): {(reached.Length > 0 ? $"reached {string.Join(", ", reached)}" : "reached nothing")} in 90 days";
             foreach (var extension in host.OrderBy(e => e.Id, StringComparer.OrdinalIgnoreCase))
-                yield return $"    {extension.Id} {extension.Version ?? "?"}, {extension.Publisher ?? "unknown publisher"}, "
+                yield return $"    {extension.Label} {extension.Version ?? "?"}, {extension.Publisher ?? "unknown publisher"}, "
                     + $"updated {(extension.Updated is { } updated ? updated.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "unknown")}";
         }
         yield return $"Global tools (listed {inventory.Tools.At.ToOffset(now.Offset):yyyy-MM-dd HH:mm})";

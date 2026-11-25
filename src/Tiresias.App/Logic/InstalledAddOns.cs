@@ -21,7 +21,7 @@ public static class InstalledAddOns
             .ToDictionary(g => g.Key, g => (IReadOnlyList<string>)[.. g.Select(u => u.Service).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase)],
                 StringComparer.OrdinalIgnoreCase);
         return [.. extensions
-            .Select(e => new AddOn(e.Id, e.Version, e.Host.Name, e.Publisher, e.Updated, reached.GetValueOrDefault(e.Host.Executable) ?? []))
+            .Select(e => new AddOn(e.Label, e.Version, e.Host.Name, e.Publisher, e.Updated, reached.GetValueOrDefault(e.Host.Executable) ?? []))
             .OrderByDescending(a => a.Reached.Count).ThenBy(a => a.In, StringComparer.OrdinalIgnoreCase).ThenBy(a => a.Name, StringComparer.OrdinalIgnoreCase)];
     }
 
