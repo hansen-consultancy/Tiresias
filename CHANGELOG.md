@@ -14,9 +14,6 @@ its section below.
   with the program it runs in and what that program used through Tiresias in 90 days (those
   reaching most first), and **Global tools**, the day's listing of `dotnet`, `npm`, `pipx` and
   `cargo` tools. Read-only, like the rest of the page.
-
-### Added
-
 - **Startup** lists everything that starts when you sign in without being opened: the Run keys,
   the Startup folder and scheduled tasks with a sign-in trigger, those turned off too. Each entry
   shows the installed app it belongs to, or "Not from an installed app", which is the one worth a
