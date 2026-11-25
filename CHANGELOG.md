@@ -19,7 +19,8 @@ its section below.
 ### Added
 
 - **Browser and Visual Studio extensions are checked too.** Besides VS Code and its forks, the
-  attack surface checks now read extensions in Edge, Chrome and Brave (every profile), Firefox and
+  attack surface checks now read extensions in Edge, Chrome, Brave, Opera and Opera GX (every
+  profile), Firefox and
   Visual Studio. One with an unknown publisher or no update in two years, in a program that used a
   credential through Tiresias, is a finding; since these programs have no command to remove an
   extension, its **Copy** button copies where to do it (`edge://extensions`, `about:addons`).

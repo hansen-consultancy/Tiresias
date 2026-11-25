@@ -6,7 +6,7 @@ using System.Xml.Linq;
 namespace Tiresias.Client;
 
 /// <summary>
-/// Extension hosts beyond VS Code and its forks (#107): Chromium browsers, Firefox and Visual Studio.
+/// Extension hosts beyond VS Code and its forks (#107): Chromium browsers (Opera included), Firefox and Visual Studio.
 /// Each reads the host's own metadata for an extension, never its code. None has a command to
 /// remove one, so their findings say where to do it by hand.
 /// </summary>
@@ -15,7 +15,7 @@ public static partial class Doctor
     /// <summary>
     /// A Chromium browser extension from its <c>manifest.json</c>, as installed in a profile's
     /// <c>Extensions\&lt;id&gt;\&lt;version&gt;</c> folder. The publisher is the store it updates from
-    /// (Chrome Web Store, Edge Add-ons), else unknown: installed from elsewhere. A theme holds no code
+    /// (Chrome Web Store, Edge Add-ons, Opera add-ons), else unknown: installed from elsewhere. A theme holds no code
     /// and is left out, as is anything that isn't a 32-letter extension id.
     /// </summary>
     /// <param name="messages">The <c>messages.json</c> of a locale, by its folder name, for a name given as <c>__MSG_key__</c>; <c>null</c> when missing.</param>
@@ -37,6 +37,7 @@ public static partial class Doctor
                 {
                     "clients2.google.com" => "Chrome Web Store",
                     "edge.microsoft.com" => "Edge Add-ons",
+                    "extension-updates.opera.com" => "Opera add-ons",
                     _ => null,
                 }
                 : null;

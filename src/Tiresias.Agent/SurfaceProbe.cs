@@ -21,12 +21,14 @@ static partial class SurfaceProbe
         (".windsurf", new("Windsurf", "Windsurf.exe", "windsurf")),
     ];
 
-    /// <summary>Chromium browsers, by their user data folder under local app data.</summary>
-    static readonly (string Folder, ExtensionHost Host)[] Browsers =
+    /// <summary>Chromium browsers, by their user data folder under local or (Opera) roaming app data.</summary>
+    static readonly (Environment.SpecialFolder Root, string Folder, ExtensionHost Host)[] Browsers =
     [
-        (@"Microsoft\Edge\User Data", new("Edge", "msedge.exe", null, "edge://extensions")),
-        (@"Google\Chrome\User Data", new("Chrome", "chrome.exe", null, "chrome://extensions")),
-        (@"BraveSoftware\Brave-Browser\User Data", new("Brave", "brave.exe", null, "brave://extensions")),
+        (Environment.SpecialFolder.LocalApplicationData, @"Microsoft\Edge\User Data", new("Edge", "msedge.exe", null, "edge://extensions")),
+        (Environment.SpecialFolder.LocalApplicationData, @"Google\Chrome\User Data", new("Chrome", "chrome.exe", null, "chrome://extensions")),
+        (Environment.SpecialFolder.LocalApplicationData, @"BraveSoftware\Brave-Browser\User Data", new("Brave", "brave.exe", null, "brave://extensions")),
+        (Environment.SpecialFolder.ApplicationData, @"Opera Software\Opera Stable", new("Opera", "opera.exe", null, "opera://extensions")),
+        (Environment.SpecialFolder.ApplicationData, @"Opera Software\Opera GX Stable", new("Opera GX", "opera.exe", null, "opera://extensions")),
     ];
 
     static readonly ExtensionHost Firefox = new("Firefox", "firefox.exe", null, "about:addons");
@@ -41,7 +43,7 @@ static partial class SurfaceProbe
         IEnumerable<InstalledExtension> found =
         [
             .. Hosts.SelectMany(h => Doctor.Extensions(h.Host, ReadOrNull(Path.Combine(profile, h.Folder, "extensions", "extensions.json")))),
-            .. Browsers.SelectMany(b => ChromiumExtensions(b.Host, Path.Combine(local, b.Folder))),
+            .. Browsers.SelectMany(b => ChromiumExtensions(b.Host, Path.Combine(UserMachine.Folder(b.Root), b.Folder))),
             .. Folders(Path.Combine(roaming, @"Mozilla\Firefox\Profiles")).SelectMany(p => Doctor.FirefoxExtensions(Firefox, ReadOrNull(Path.Combine(p, "extensions.json")))),
             .. Folders(Path.Combine(local, @"Microsoft\VisualStudio")).SelectMany(v => Folders(Path.Combine(v, "Extensions")))
                 .Select(e => Path.Combine(e, "extension.vsixmanifest"))

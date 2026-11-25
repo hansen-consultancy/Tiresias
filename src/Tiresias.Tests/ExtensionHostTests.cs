@@ -21,6 +21,7 @@ public class ExtensionHostTests
 
         Assert.That(extension, Is.EqualTo(new InstalledExtension(Edge, Id, "1.2.0", "Chrome Web Store", Now, Name: "Acme Helper")));
         Assert.That(Chromium("""{ "name": "X", "update_url": "https://edge.microsoft.com/extensionwebstorebase/v1/crx" }""")?.Publisher, Is.EqualTo("Edge Add-ons"));
+        Assert.That(Chromium("""{ "name": "X", "update_url": "https://extension-updates.opera.com/api/omaha/update/" }""")?.Publisher, Is.EqualTo("Opera add-ons"));
     }
 
     [TestCase("""{ "name": "X" }""")]
