@@ -18,6 +18,12 @@ its section below.
 
 ### Added
 
+- **JetBrains and Notepad++ plugins are checked too.** The attack surface checks read the plugins
+  of each JetBrains IDE (IntelliJ IDEA, Rider, PyCharm and the others) and of Notepad++, and list
+  them under **Installed**. One with an unknown publisher or no update in two years, in an editor
+  that used a credential through Tiresias, is a finding; its **Copy** button copies where to remove
+  it.
+
 - **Browser and Visual Studio extensions are checked too.** Besides VS Code and its forks, the
   attack surface checks now read extensions in Edge, Chrome, Brave, Opera and Opera GX (every
   profile), Firefox and Visual Studio. One with an unknown publisher or no update in two years, in a

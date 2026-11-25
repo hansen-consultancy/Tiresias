@@ -1,6 +1,5 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using System.Xml;
 using System.Xml.Linq;
 
 namespace Tiresias.Client;
@@ -81,18 +80,8 @@ public static partial class Doctor
     /// <param name="updated">When it was put on disk: the manifest's write time.</param>
     public static InstalledExtension? VisualStudioExtension(ExtensionHost host, string? manifest, DateTimeOffset? updated)
     {
-        if (string.IsNullOrWhiteSpace(manifest))
+        if (ReadXml(manifest) is not { } document)
             return null;
-        XDocument document;
-        try
-        {
-            using var reader = XmlReader.Create(new StringReader(manifest), new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null });
-            document = XDocument.Load(reader);
-        }
-        catch (XmlException)
-        {
-            return null;
-        }
         XNamespace ns = VsixSchema;
         var metadata = document.Root?.Element(ns + "Metadata");
         var identity = metadata?.Element(ns + "Identity");
