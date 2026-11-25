@@ -17,7 +17,7 @@ internal partial class RecoveryChangeJson : JsonSerializerContext { }
 /// <summary>A committed numbered entry is both the new binding and the audit of who changed it.</summary>
 internal static partial class RecoveryEnrollmentHistory
 {
-    const string Root = @"SOFTWARE\Tiresias Recovery Enrollment";
+    const string Root = "Tiresias Recovery Enrollment";
     const AccessControlSections Permissions = AccessControlSections.Owner | AccessControlSections.Access;
 
     internal static InvalidOperationException Changed() => new("Recovery enrollment changed. Reopen it and verify the current recipient.");
@@ -48,7 +48,11 @@ internal static partial class RecoveryEnrollmentHistory
         if (!RecoveryRecipient.UserSid(ownerSid))
             throw new UnauthorizedAccessException("Recovery enrollment requires a Windows user account.");
         using var machine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
-        using var root = OpenProtected(machine, Root, create, null);
+        // Never hand the HKLM base key to OpenRead: OpenBaseKey marks it writable, so its Handle asks for
+        // write access to HKLM and throws UnauthorizedAccessException for every non-administrator.
+        using var software = machine.OpenSubKey("SOFTWARE", create)
+            ?? throw new IOException("Could not read recovery enrollment (the HKLM SOFTWARE key is missing).");
+        using var root = OpenProtected(software, Root, create, null);
         return root is null ? null : OpenProtected(root, ownerSid, create, ownerSid);
     }
 

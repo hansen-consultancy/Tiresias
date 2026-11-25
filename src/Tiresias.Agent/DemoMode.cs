@@ -33,6 +33,9 @@ public static class DemoMode
     /// <summary>The fixed secret the demo's Hello "signs" with. Not a secret: everything it seals is made up.</summary>
     internal static readonly byte[] HelloKey = System.Security.Cryptography.SHA256.HashData("tiresias/demo/hello"u8);
 
+    /// <summary>The made-up machine's signed program files, by path: who signed each, as a valid signature would say.</summary>
+    public static IReadOnlyDictionary<string, Tiresias.Client.Publisher> Signers { get; set; } = new Dictionary<string, Tiresias.Client.Publisher>();
+
     static string Root => Path.Combine(Environment.GetEnvironmentVariable("PUBLIC") ?? Path.GetTempPath(), "Tiresias-demo");
 
     /// <summary>Turns demo mode on with an empty machine, before anything reads a store.</summary>
@@ -53,6 +56,7 @@ public static class DemoMode
             return;
         CurrentUser?.Dispose();
         CurrentUser = null;
+        Signers = new Dictionary<string, Tiresias.Client.Publisher>();
         Profile = null;
         Clear();
     }
@@ -65,5 +69,7 @@ public static class DemoMode
     }
 #else
     public static bool On => false;
+
+    public static IReadOnlyDictionary<string, Tiresias.Client.Publisher> Signers { get; } = new Dictionary<string, Tiresias.Client.Publisher>();
 #endif
 }
