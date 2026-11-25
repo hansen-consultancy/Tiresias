@@ -61,8 +61,12 @@ is the store a browser extension updates from (Chrome Web Store, Edge Add-ons, O
 Mozilla signed it), else unknown; for Visual Studio, the one its manifest names. None of these is a
 marketplace publisher id, so trusting a publisher doesn't cover them. Last updated is the version
 folder's creation time, Firefox's `updateDate`, or the manifest's write time. The same extension in
-two profiles is one item. Unpacked browser extensions (loaded from a folder in developer mode) and
-JetBrains and Notepad++ plugins aren't read yet. None of these hosts has a command to remove an
+two profiles is one item. Unpacked browser extensions, loaded from a folder in developer mode or
+from the command line, live outside `Extensions`: they are the entries of a profile's
+`Secure Preferences` or `Preferences` with location 4 or 8, named by the manifest recorded there (else
+the folder's own `manifest.json`, read only when the folder is a local path, never a share). Nothing
+vouches for one, so its publisher is always unknown, whatever its manifest says. JetBrains and
+Notepad++ plugins aren't read yet. None of these hosts has a command to remove an
 extension, so their findings carry `RemoveExtensionByHand`, which names the host's page
 (`edge://extensions`, `about:addons`, **Extensions, Manage Extensions**); the app's **Copy** copies it.
 

@@ -8,16 +8,11 @@ its section below.
 
 ## [Unreleased]
 
-### Changed
-
-- **On a managed PC, only what you installed is checked.** When the PC is joined to a domain or to
-  Microsoft Entra ID, or enrolled in device management, software installed for everyone is your
-  administrator's: it stays under **Installed**, but raises no finding about log-on entries,
-  uninstall entries or unused programs. A line in the checks says why. A blocked program is still
-  reported wherever it is.
-
 ### Added
 
+- **Unpacked browser extensions are checked too.** An extension loaded from a folder in developer
+  mode, in Edge, Chrome, Brave or Opera, is listed with an unknown publisher, since no store vouches
+  for it; in a browser that used a credential through Tiresias, that makes it a finding.
 - **Browser and Visual Studio extensions are checked too.** Besides VS Code and its forks, the
   attack surface checks now read extensions in Edge, Chrome, Brave, Opera and Opera GX (every
   profile), Firefox and Visual Studio. One with an unknown publisher or no update in two years, in a
@@ -48,6 +43,11 @@ its section below.
 
 ### Changed
 
+- **On a managed PC, only what you installed is checked.** When the PC is joined to a domain or to
+  Microsoft Entra ID, or enrolled in device management, software installed for everyone is your
+  administrator's: it stays under **Installed**, but raises no finding about log-on entries,
+  uninstall entries or unused programs. A line in the checks says why. A blocked program is still
+  reported wherever it is.
 - **Dismissing an unused program, a log-on entry or an extension lasts through its updates**, and
   comes back when its signer changes or a new reason appears. Earlier dismissals still apply.
 - **`tir doctor --surface` is quick again.** Listing the global `dotnet`, `npm`, `pipx` and `cargo`
@@ -57,6 +57,7 @@ its section below.
 
 ### Fixed
 
+- The attack surface checks no longer stop on an extension whose metadata writes a number as text.
 - **A paper recovery key with a misread S/5, Z/2, T/7 or U/V restores.** When the key as typed
   opens nothing, **Restore**, the first-run wizard and `tir recovery restore` try those letters the
   other way and take a reading only when it is this account's recovery key or opens a sealed item
