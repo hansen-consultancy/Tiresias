@@ -18,6 +18,13 @@ its section below.
 
 ### Added
 
+- **Browser and Visual Studio extensions are checked too.** Besides VS Code and its forks, the
+  attack surface checks now read extensions in Edge, Chrome, Brave, Opera and Opera GX (every
+  profile), Firefox and
+  Visual Studio. One with an unknown publisher or no update in two years, in a program that used a
+  credential through Tiresias, is a finding; since these programs have no command to remove an
+  extension, its **Copy** button copies where to do it (`edge://extensions`, `about:addons`).
+  `tir doctor --surface` lists them with their names.
 - **Startup** lists everything that starts when you sign in without being opened: the Run keys,
   the Startup folder and scheduled tasks with a sign-in trigger, those turned off too. Each entry
   shows the installed app it belongs to, or "Not from an installed app", which is the one worth a

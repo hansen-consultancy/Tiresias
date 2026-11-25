@@ -4,13 +4,20 @@ using System.Text.RegularExpressions;
 namespace Tiresias.Client;
 
 /// <summary>A program that extensions run inside, such as VS Code: how it is named, its executable's file name, and its command-line tool.</summary>
-public sealed record ExtensionHost(string Name, string Executable, string Cli);
+/// <param name="Cli">The command that removes an extension (<c>--uninstall-extension</c>); <c>null</c> for a host without one, such as a browser.</param>
+/// <param name="ExtensionsPage">Where the user removes one by hand when there is no <paramref name="Cli"/>: <c>edge://extensions</c>, a menu path.</param>
+public sealed record ExtensionHost(string Name, string Executable, string? Cli, string? ExtensionsPage = null);
 
 /// <summary>An extension installed for the user, from its host's own metadata. Never its files or settings.</summary>
 /// <param name="Publisher">The marketplace publisher, or <c>null</c> when unknown: installed from a file, or without a publisher id.</param>
 /// <param name="Updated">When it was installed or last updated on this machine, or <c>null</c> when not recorded.</param>
 /// <param name="PublisherId">The marketplace's id for <paramref name="Publisher"/>, which trust is given to; <c>null</c> when not recorded.</param>
-public sealed record InstalledExtension(ExtensionHost Host, string Id, string? Version, string? Publisher, DateTimeOffset? Updated, string? PublisherId = null);
+/// <param name="Name">Its display name, where <paramref name="Id"/> doesn't say what it is (a browser's 32-letter id, a GUID); <c>null</c> otherwise.</param>
+public sealed record InstalledExtension(ExtensionHost Host, string Id, string? Version, string? Publisher, DateTimeOffset? Updated, string? PublisherId = null,
+    string? Name = null)
+{
+    public string Label => Name is null ? Id : $"{Name} ({Id})";
+}
 
 /// <summary>A program Windows starts at log-on.</summary>
 /// <param name="Where">Where the entry is: <c>Run key</c>, <c>machine Run key</c>, <c>Startup folder</c> or <c>scheduled task</c>.</param>
@@ -77,6 +84,12 @@ public sealed partial record RemoveExtension(ExtensionHost Host, string Id) : Do
     private static partial Regex SafeId();
 }
 
+/// <summary>Remove an extension in its host's own page: the host has no command for it, so Tiresias only says where.</summary>
+public sealed record RemoveExtensionByHand(ExtensionHost Host, string Name) : DoctorFix
+{
+    public override string Instruction => $"remove {Name} in {Host.Name}, {Host.ExtensionsPage ?? "its extensions page"}";
+}
+
 /// <summary>Show a file in Explorer, for the user to judge where it came from. Tiresias deletes nothing it can't attribute.</summary>
 public sealed record RevealFile(string Path) : DoctorFix
 {
@@ -129,13 +142,14 @@ public static partial class Doctor
                 StringComparer.OrdinalIgnoreCase);
         var doubted = extensions
             .Select(e => (Extension: e, Reasons: Reasons(e, now), Reach: services.GetValueOrDefault(e.Host.Executable) ?? []))
-            .Where(x => x.Reasons.Count > 0 && x.Reach.Length > 0 && RemoveExtension.IsSafeId(x.Extension.Id))
+            .Where(x => x.Reasons.Count > 0 && x.Reach.Length > 0 && (x.Extension.Host.Cli is null || RemoveExtension.IsSafeId(x.Extension.Id)))
             .OrderByDescending(x => x.Reach.Length).ThenBy(x => x.Extension.Id, StringComparer.OrdinalIgnoreCase);
         foreach (var (extension, reasons, reach) in doubted)
-            yield return new($"{extension.Id} in {extension.Host.Name} ({string.Join(", ", reasons)})", DoctorStatus.Warn,
+            yield return new($"{extension.Name ?? extension.Id} in {extension.Host.Name} ({string.Join(", ", reasons)})", DoctorStatus.Warn,
                 $"{extension.Host.Name} used {string.Join(", ", reach)} through Tiresias in the last 90 days, and every extension in it can use what it gets. "
                 + "Remove this one if you don't need it",
-                new RemoveExtension(extension.Host, extension.Id), Kind: ExtensionKind)
+                extension.Host.Cli is null ? new RemoveExtensionByHand(extension.Host, extension.Name ?? extension.Id) : new RemoveExtension(extension.Host, extension.Id),
+                Kind: ExtensionKind)
             {
                 Item = $"extension {extension.Host.Executable} {extension.Id}".ToLowerInvariant(),
                 Reasons = reasons,

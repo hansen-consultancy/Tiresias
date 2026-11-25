@@ -108,6 +108,7 @@ public static class FindingView
         ReplaceRavenCertificate => (FixAction.ReplaceRaven, "Finding_FixRavenReplace"),
         UsePlaceholder => (FixAction.UsePlaceholder, "Finding_FixPlaceholder"),
         RemoveExtension => (FixAction.RemoveExtension, "Finding_FixRemoveExtension"),
+        RemoveExtensionByHand => (FixAction.CopyCommand, "Finding_FixCopy"),
         RevealFile => (FixAction.RevealFile, "Finding_FixReveal"),
         DisableStartup { Machine: false } => (FixAction.DisableStartup, "Finding_FixDisableStartup"),
         DisableStartup => (FixAction.OpenStartupSettings, "Finding_FixStartupSettings"),
