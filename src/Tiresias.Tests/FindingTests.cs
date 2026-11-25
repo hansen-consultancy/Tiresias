@@ -78,7 +78,7 @@ public class DismissalsTests
     [TestCase(null)]
     [TestCase("")]
     [TestCase("{ not json")]
-    [TestCase("""{"v":2,"items":[{"key":"k","name":"n","reason":"r","at":"2026-11-19T10:00:00Z"}]}""")]
+    [TestCase("""{"v":3,"items":[{"key":"k","name":"n","reason":"r","at":"2026-11-19T10:00:00Z"}]}""")]
     [TestCase("""{"v":1,"items":[{"key":"","name":"n","reason":"r","at":"2026-11-19T10:00:00Z"}]}""")]
     public void A_missing_damaged_or_newer_file_dismisses_nothing(string? json)
     {

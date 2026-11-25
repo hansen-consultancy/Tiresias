@@ -78,10 +78,10 @@ static partial class SurfaceProbe
     internal static StartupEntry Entry(string name, string where, string path, string? item, HashSet<string> tray, bool on)
     {
         // Signature reads local files only; a program on a share still gets its verdict, so unsigned stays a warning.
-        var (valid, signer) = Signature(path);
+        var (valid, signer, publisher) = Signature(path);
         if (valid is null && File.Exists(path))
             valid = IsSigned(path);
-        return new(name, where, path, valid, item, tray.Contains(path), on, OwnBuild.Looks(path, valid, signer, BuildDisk.Instance));
+        return new(name, where, path, valid, item, tray.Contains(path), on, OwnBuild.Looks(path, valid, signer, BuildDisk.Instance), publisher);
     }
 
     /// <summary>Programs that have shown an icon in the notification area, from the taskbar's own record of them.</summary>
@@ -345,14 +345,19 @@ static partial class SurfaceProbe
     /// through an alias the check can't open.
     /// </summary>
     /// <summary>
-    /// Whether a local file's embedded signature is valid (offline, as <see cref="IsSigned"/>) and the
-    /// name of who signed it. The name comes from the signer's certificate and is shown only next to
-    /// the verdict: an invalid signature can name anyone.
+    /// Whether a local file's embedded signature is valid (offline, as <see cref="IsSigned"/>), the
+    /// name of who signed it, and, only when valid, the <see cref="Publisher"/> trust can be given to.
+    /// The name comes from the signer's certificate and is shown only next to the verdict: an invalid
+    /// signature can name anyone.
     /// </summary>
-    public static (bool? Valid, string? Signer) Signature(string path)
+    public static (bool? Valid, string? Signer, Publisher? Publisher) Signature(string path)
     {
-        if (!Path.IsPathFullyQualified(path) || path.StartsWith(@"\\", StringComparison.Ordinal) || !File.Exists(path))
-            return (null, null);
+        if (!Path.IsPathFullyQualified(path) || path.StartsWith(@"\\", StringComparison.Ordinal))
+            return (null, null, null);
+        if (DemoMode.Signers.TryGetValue(path, out var demo))
+            return (true, demo.Name, demo);
+        if (!File.Exists(path))
+            return (null, null, null);
         var valid = IsSigned(path);
         try
         {
@@ -361,11 +366,12 @@ static partial class SurfaceProbe
             using var certificate = new System.Security.Cryptography.X509Certificates.X509Certificate2(
                 System.Security.Cryptography.X509Certificates.X509Certificate.CreateFromSignedFile(path));
 #pragma warning restore SYSLIB0057
-            return (valid, certificate.GetNameInfo(System.Security.Cryptography.X509Certificates.X509NameType.SimpleName, forIssuer: false));
+            var name = certificate.GetNameInfo(System.Security.Cryptography.X509Certificates.X509NameType.SimpleName, forIssuer: false);
+            return (valid, name, valid == true ? Publisher.Signed(certificate.Subject, name) : null);
         }
         catch (System.Security.Cryptography.CryptographicException)
         {
-            return (valid, null);
+            return (valid, null, null);
         }
     }
 

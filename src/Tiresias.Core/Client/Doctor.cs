@@ -45,6 +45,26 @@ public sealed record DoctorCheck(string Name, DoctorStatus Status, string Detail
     /// doesn't apply (docs/developer-tools.md); <c>null</c> when it reads the same.
     /// </summary>
     public DoctorCheck? WithoutDeveloperTools { get; init; }
+
+    /// <summary>
+    /// The installed thing an attack surface finding is about (an extension, a log-on entry, a
+    /// program), the same across its updates. With it, a dismissal follows the thing rather than the
+    /// line's name, and holds as long as the <see cref="Signer"/> and <see cref="Reasons"/> it accepted do.
+    /// </summary>
+    public string? Item { get; init; }
+
+    /// <summary>Why the <see cref="Item"/> was flagged; a dismissal accepts these and comes back for any other.</summary>
+    public IReadOnlyList<string>? Reasons { get; init; }
+
+    /// <summary>Who stands behind the <see cref="Item"/>, as checked; <c>null</c> when unsigned or unknown.</summary>
+    public Publisher? Signer { get; init; }
+
+    /// <summary>
+    /// Trusting the <see cref="Signer"/> hides this finding: its reasons only doubt how much the item
+    /// is used or how well its publisher is known. Never set for a blocked program, a missing
+    /// signature, a broken entry or a vulnerability.
+    /// </summary>
+    public bool TrustHides { get; init; }
 }
 
 /// <summary>What the vault file says about recoverability: which secrets lack a Hello or a recovery wrap.</summary>
@@ -124,6 +144,9 @@ public interface IDoctorProbe
 
     /// <summary>Programs Windows starts at log-on, with whether each is signed.</summary>
     IEnumerable<StartupEntry> StartupEntries() => [];
+
+    /// <summary>Who signed a local program file, when its signature verifies; <c>null</c> otherwise.</summary>
+    Publisher? Signer(string path) => null;
 
     /// <summary>Which program got which credential, and when, from the local activity and audit logs.</summary>
     IEnumerable<CredentialUse> CredentialUses() => [];
@@ -287,7 +310,7 @@ public static partial class Doctor
         var (uses, now) = (probe.CredentialUses().ToArray(), DateTimeOffset.UtcNow);
         checks.AddRange(AttackSurface(probe.Extensions(), startup, uses, otherBlocks, now, runs));
         checks.AddRange(UninstallEntries(installed));
-        checks.AddRange(UnusedApplications(installed, runs, uses, now));
+        checks.AddRange(UnusedApplications(installed, runs, uses, now, probe.Signer));
         return checks;
     }
 

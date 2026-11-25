@@ -9,7 +9,8 @@ public sealed record ExtensionHost(string Name, string Executable, string Cli);
 /// <summary>An extension installed for the user, from its host's own metadata. Never its files or settings.</summary>
 /// <param name="Publisher">The marketplace publisher, or <c>null</c> when unknown: installed from a file, or without a publisher id.</param>
 /// <param name="Updated">When it was installed or last updated on this machine, or <c>null</c> when not recorded.</param>
-public sealed record InstalledExtension(ExtensionHost Host, string Id, string? Version, string? Publisher, DateTimeOffset? Updated);
+/// <param name="PublisherId">The marketplace's id for <paramref name="Publisher"/>, which trust is given to; <c>null</c> when not recorded.</param>
+public sealed record InstalledExtension(ExtensionHost Host, string Id, string? Version, string? Publisher, DateTimeOffset? Updated, string? PublisherId = null);
 
 /// <summary>A program Windows starts at log-on.</summary>
 /// <param name="Where">Where the entry is: <c>Run key</c>, <c>machine Run key</c>, <c>Startup folder</c> or <c>scheduled task</c>.</param>
@@ -19,8 +20,9 @@ public sealed record InstalledExtension(ExtensionHost Host, string Id, string? V
 /// <param name="InTray">Whether the program has an icon in the notification area: used from there, which Windows doesn't record, so its last use is unknown.</param>
 /// <param name="On">Whether it starts: <c>false</c> once turned off in Task Manager or Settings, or for a disabled task.</param>
 /// <param name="BuiltByYou">It has no signature and looks like the user's own build (<see cref="OwnBuild.Looks"/>).</param>
+/// <param name="Signer">Who signed it, when <paramref name="Signed"/> is <c>true</c>.</param>
 public sealed record StartupEntry(string Name, string Where, string? Path, bool? Signed, string? Item = null, bool InTray = false, bool On = true,
-    bool BuiltByYou = false)
+    bool BuiltByYou = false, Publisher? Signer = null)
 {
     public const string RunKey = "Run key";
     public const string MachineRunKey = "machine Run key";
@@ -94,6 +96,9 @@ public static partial class Doctor
     public const string BlockedKind = "blocked programs still on this PC";
     public const string IdleStartupKind = "programs that start at log-on but you haven't opened in 90 days";
 
+    /// <summary>The reason a program not opened in 90 days is flagged for; trust in its signer hides it.</summary>
+    public const string UnusedReason = "unused";
+
     /// <summary>
     /// Guided setup phase 5's first slice (docs/attack-surface.md): installed code that can reach a
     /// credential and has a reason to be doubted. Each finding has a fix and no position, since
@@ -130,7 +135,13 @@ public static partial class Doctor
             yield return new($"{extension.Id} in {extension.Host.Name} ({string.Join(", ", reasons)})", DoctorStatus.Warn,
                 $"{extension.Host.Name} used {string.Join(", ", reach)} through Tiresias in the last 90 days, and every extension in it can use what it gets. "
                 + "Remove this one if you don't need it",
-                new RemoveExtension(extension.Host, extension.Id), Kind: ExtensionKind);
+                new RemoveExtension(extension.Host, extension.Id), Kind: ExtensionKind)
+            {
+                Item = $"extension {extension.Host.Executable} {extension.Id}".ToLowerInvariant(),
+                Reasons = reasons,
+                Signer = extension.Publisher is null ? null : Publisher.Marketplace(extension.PublisherId, extension.Publisher),
+                TrustHides = true,
+            };
 
         foreach (var entry in startupEntries.Where(e => e is { Signed: false, Path: not null } && !blockedPaths.Any(b => SamePath(b, e.Path))))
         {
@@ -160,7 +171,13 @@ public static partial class Doctor
             yield return new($"{entry.Name} starts at log-on, unused", DoctorStatus.Warn,
                 $"Windows starts {entry.Path} at every log-on, from the {entry.Where}, but you last opened it yourself on {lastRun:yyyy-MM-dd}. "
                 + "Turn it off at log-on; the program stays installed and you can still open it when you need it",
-                new DisableStartup(entry.Name, entry.Where, entry.Item!), Kind: IdleStartupKind);
+                new DisableStartup(entry.Name, entry.Where, entry.Item!), Kind: IdleStartupKind)
+            {
+                Item = $"startup {entry.Where} {entry.Item}".ToLowerInvariant(),
+                Reasons = [UnusedReason],
+                Signer = entry.Signed == true ? entry.Signer : null,
+                TrustHides = true,
+            };
         }
     }
 
@@ -291,8 +308,10 @@ public static partial class Doctor
                     continue;
                 string? publisher = id.Split('.')[0];
                 DateTimeOffset? updated = null;
+                string? publisherId = null;
                 if (item.TryGetProperty("metadata", out var metadata) && metadata.ValueKind == JsonValueKind.Object)
                 {
+                    publisherId = Text(metadata, "publisherId");
                     publisher = Text(metadata, "source") == "vsix" || Text(metadata, "publisherId") is not { Length: > 0 }
                         ? null
                         : Text(metadata, "publisherDisplayName") ?? publisher;
@@ -300,7 +319,7 @@ public static partial class Doctor
                         && ms >= 0 && ms <= DateTimeOffset.MaxValue.ToUnixTimeMilliseconds())
                         updated = DateTimeOffset.FromUnixTimeMilliseconds(ms);
                 }
-                found.Add(new(host, id, Text(item, "version"), publisher, updated));
+                found.Add(new(host, id, Text(item, "version"), publisher, updated, publisher is null ? null : publisherId));
             }
             return found;
         }

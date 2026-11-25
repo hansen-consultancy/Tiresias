@@ -148,6 +148,9 @@ public partial class StatusWindow : Window
 
     bool recheckOnHome;
 
+    /// <summary>Installed can trust or stop trusting a publisher, which moves Home's findings in or out of Dismissed.</summary>
+    bool resortOnHome;
+
     bool navigating;
 
     /// <summary>Shows page <typeparamref name="T"/>, new each time; <c>null</c> when the page open now keeps the window (unsaved secrets).</summary>
@@ -157,6 +160,7 @@ public partial class StatusWindow : Window
             return null;
         var page = new T();
         recheckOnHome |= page is EnvironmentPage;
+        resortOnHome |= page is InstalledPage;
         Show(page);
         return page;
     }
@@ -172,8 +176,11 @@ public partial class StatusWindow : Window
             recheckOnHome = false;
             model.Refresh();
         }
+        else if (resortOnHome)
+            model.Show();
         else
             model.ShowAreas();
+        resortOnHome = false;
     }
 
     void Show(UserControl? page)
@@ -479,8 +486,18 @@ public partial class StatusWindow : Window
 
     void OnRestoreFinding(object sender, RoutedEventArgs e)
     {
-        if (((FrameworkElement)sender).DataContext is DismissedRow row)
+        if (((FrameworkElement)sender).DataContext is not DismissedRow row)
+            return;
+        if (row.Publisher is { } publisher)
+            model.Distrust(publisher.Key);
+        else
             model.RestoreFindings(row.Keys);
+    }
+
+    void OnTrust(object sender, RoutedEventArgs e)
+    {
+        if (((FrameworkElement)sender).DataContext is FindingRow { Publisher: { } publisher })
+            model.Trust(publisher);
     }
 }
 
@@ -563,6 +580,15 @@ public sealed partial class FindingRow(IReadOnlyList<DoctorCheck> checks) : Obse
 
     public string DismissName => Text.Format("Finding_DismissName", Name);
 
+    /// <summary>Who the row offers to trust instead of dismissing its findings one by one; <c>null</c> for none.</summary>
+    public Publisher? Publisher { get; } = FindingView.Trustable(checks);
+
+    public string TrustLabel => Publisher is null ? "" : Text.Format("Finding_Trust", Publisher.Name);
+
+    public string TrustTip => Publisher is null ? "" : Text.Format("Finding_TrustTip", Publisher.Name);
+
+    public Visibility TrustVisibility => Publisher is null ? Visibility.Collapsed : Visibility.Visible;
+
     public string Spoken => $"{Name}. {Detail} {Moves}";
 
     [ObservableProperty]
@@ -580,10 +606,17 @@ public sealed partial class FindingRow(IReadOnlyList<DoctorCheck> checks) : Obse
     public Visibility ActionsVisibility => IsDismissing ? Visibility.Collapsed : Visibility.Visible;
 }
 
-/// <summary>Findings set aside together, with the reason given and Show again.</summary>
-public sealed record DismissedRow(IReadOnlyList<string> Keys, string Name, string Reason)
+/// <summary>Findings set aside together, with the reason given and Show again; or a trusted publisher, with what it hides and Stop trusting.</summary>
+public sealed record DismissedRow(IReadOnlyList<string> Keys, string Name, string Reason, TrustedPublisher? Publisher = null)
 {
-    public string RestoreName => Text.Format("Finding_RestoreName", Name);
+    public static DismissedRow Of(FindingView.DismissedGroup group) => group.Publisher is { } publisher
+        ? new(group.Keys, Text.Format("Finding_TrustedTitle", publisher.Name),
+            Text.Format("Finding_TrustedHides", group.Keys.Count, publisher.At.ToLocalTime().ToString("d", System.Globalization.CultureInfo.CurrentCulture)), publisher)
+        : new(group.Keys, group.Title, group.Reason);
+
+    public string RestoreLabel => Text.Get(Publisher is null ? "Finding_ShowAgain" : "Finding_StopTrusting");
+
+    public string RestoreName => Publisher is null ? Text.Format("Finding_RestoreName", Name) : Text.Format("Finding_StopTrustingName", Publisher.Name);
 }
 
 /// <summary>One check as a row. Status is said in words and a glyph, never by colour alone.</summary>
@@ -1041,7 +1074,7 @@ public sealed partial class StatusViewModel : ObservableObject
     }
 
     /// <summary>Sorts the last run's lines into findings, dismissed findings and the other checks.</summary>
-    void Show()
+    public void Show()
     {
         var split = FindingView.Of(last, DismissalStore.Load(), DeveloperSignals.View().Shown);
         allFindings = [.. split.Open.Select((group, i) => new FindingRow(group) { IsOpen = i == 0, Number = i + 1 })];
@@ -1053,7 +1086,7 @@ public sealed partial class StatusViewModel : ObservableObject
         ShowFindings();
         Dismissed.Clear();
         foreach (var group in split.Dismissed)
-            Dismissed.Add(new(group.Keys, group.Title, group.Reason));
+            Dismissed.Add(DismissedRow.Of(group));
         Checks.Clear();
         Passed.Clear();
         foreach (var check in split.Others)
@@ -1073,6 +1106,10 @@ public sealed partial class StatusViewModel : ObservableObject
         ChangeDismissals(d => checks.Aggregate(d, (all, check) => all.Dismiss(check, reason, DateTimeOffset.Now)));
 
     public void RestoreFindings(IEnumerable<string> keys) => ChangeDismissals(d => keys.Aggregate(d, (all, key) => all.Restore(key)));
+
+    public void Trust(Publisher publisher) => ChangeDismissals(d => d.Trust(publisher, DateTimeOffset.Now));
+
+    public void Distrust(string key) => ChangeDismissals(d => d.Distrust(key));
 
     void ChangeDismissals(Func<Dismissals, Dismissals> change)
     {

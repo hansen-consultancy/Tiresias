@@ -1,3 +1,5 @@
+using Tiresias.Client;
+
 namespace Tiresias.App.Logic;
 
 /// <summary>What the Installed page's details panel says beyond the list: who signed it, where to look it up.</summary>
@@ -16,6 +18,17 @@ public static class InstalledDetails
         (true, _) => ("Installed_SignedNoName", null),
         (false, { Length: > 0 }) => ("Installed_SignedInvalid", signer),
         (false, _) => ("Installed_NotSigned", null),
+    };
+
+    /// <summary>
+    /// The string keys for the panel's trust line and its button (each with the publisher's name):
+    /// only a valid signature's publisher can be trusted, so a claimed name never gets a button.
+    /// </summary>
+    public static (string Key, string? Argument, string? Button) Trust(Publisher? publisher, Dismissals dismissals) => publisher switch
+    {
+        null => ("Installed_TrustNone", null, null),
+        _ when dismissals.Trusts(publisher) => ("Installed_Trusted", publisher.Name, "Finding_StopTrustingName"),
+        _ => ("Installed_NotTrusted", null, "Installed_TrustButton"),
     };
 
     /// <summary>

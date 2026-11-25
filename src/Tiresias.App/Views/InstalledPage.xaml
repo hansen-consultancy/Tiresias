@@ -98,6 +98,7 @@
           <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <TextBlock Grid.ColumnSpan="2" Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,8" />
         <TextBlock Grid.Row="1" Text="{l:S Installed_ColVersion}" Style="{StaticResource CaptionText}" Margin="0,2,16,2" />
@@ -118,8 +119,17 @@
         <TextBlock Grid.Row="8" Text="{l:S Installed_ColSigner}" Style="{StaticResource CaptionText}" Margin="0,2,16,2" />
         <TextBlock Grid.Row="8" Grid.Column="1" x:Name="SignerText" Text="{Binding DataContext.Signer, RelativeSource={RelativeSource AncestorType=UserControl}}"
                    TextWrapping="Wrap" Margin="0,2" />
-        <Button Grid.Row="9" Grid.ColumnSpan="2" Style="{StaticResource RowButton}" Content="{l:S Installed_SearchOnline}" Click="OnSearchOnline"
-                HorizontalAlignment="Left" Margin="0,8,0,0" ToolTip="{l:S Installed_SearchOnlineTip}" />
+        <!-- Trust goes to the valid signature's publisher only; the panel's other button row stays Search online. -->
+        <TextBlock Grid.Row="9" Text="{l:S Installed_ColTrust}" Style="{StaticResource CaptionText}" Margin="0,2,16,2" />
+        <TextBlock Grid.Row="9" Grid.Column="1" Text="{Binding DataContext.Trust, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                   TextWrapping="Wrap" Margin="0,2" />
+        <WrapPanel Grid.Row="10" Grid.ColumnSpan="2" Margin="0,8,0,0">
+          <Button Style="{StaticResource RowButton}" Content="{l:S Installed_SearchOnline}" Click="OnSearchOnline"
+                  Margin="0,0,8,0" ToolTip="{l:S Installed_SearchOnlineTip}" />
+          <Button Style="{StaticResource RowButton}" Click="OnTrust" ToolTip="{l:S Installed_TrustTip}"
+                  Content="{Binding DataContext.TrustButton, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                  Visibility="{Binding DataContext.TrustButtonVisibility, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+        </WrapPanel>
       </Grid>
     </Border>
 

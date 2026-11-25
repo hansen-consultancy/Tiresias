@@ -50,12 +50,13 @@ public enum FixAction
 public static class FindingView
 {
     /// <param name="Open">Groups of findings not dismissed, failures first, then the largest.</param>
-    /// <param name="Dismissed">Findings the user set aside, grouped by kind and reason.</param>
+    /// <param name="Dismissed">Findings the user set aside, grouped by kind and reason, then one group per trusted publisher, even one hiding nothing now.</param>
     /// <param name="Others">Every other line: Tiresias's own health, and checks that passed.</param>
     public sealed record Split(IReadOnlyList<IReadOnlyList<DoctorCheck>> Open, IReadOnlyList<DismissedGroup> Dismissed, IReadOnlyList<DoctorCheck> Others);
 
     /// <summary>Findings dismissed together: one kind, one reason, and the keys that bring them back.</summary>
-    public sealed record DismissedGroup(string Title, string Reason, IReadOnlyList<string> Keys);
+    /// <param name="Publisher">For the findings a trusted publisher hides: that publisher, whose trust is undone to bring them back.</param>
+    public sealed record DismissedGroup(string Title, string Reason, IReadOnlyList<string> Keys, TrustedPublisher? Publisher = null);
 
     /// <param name="developerTools">Developer tools show. Without them, a line reads as its <see cref="DoctorCheck.WithoutDeveloperTools"/>,
     /// a developer check's passing line is left out and a solo note shows as passed; findings and Warn/Fail lines show either way
@@ -72,10 +73,12 @@ public static class FindingView
             .GroupBy(KindOf)
             .Select(g => (IReadOnlyList<DoctorCheck>)[.. g])
             .OrderByDescending(g => g[0].Status).ThenByDescending(g => g.Count);
-        var dismissed = findings.Where(f => f.Dismissal is not null)
+        var dismissed = findings.Where(f => f.Dismissal is { Trusted: null })
             .GroupBy(f => (Kind: KindOf(f.Check), f.Dismissal!.Reason))
             .Select(g => new DismissedGroup(Title([.. g.Select(f => f.Check)]), g.Key.Reason, [.. g.Select(f => f.Dismissal!.Key)]));
-        return new([.. open], [.. dismissed], [.. checks.Where(c => !c.IsFinding)]);
+        var trusted = dismissals.Publishers.Select(p => new DismissedGroup(p.Name, "",
+            [.. findings.Where(f => f.Dismissal?.Trusted?.Key == p.Key).Select(f => f.Dismissal!.Key)], p));
+        return new([.. open], [.. dismissed, .. trusted], [.. checks.Where(c => !c.IsFinding)]);
     }
 
     /// <summary>Findings of one kind group together; a line without a kind stands alone.</summary>
@@ -130,6 +133,14 @@ public static class FindingView
         group.Count == 1 ? Button(group[0].Fix)
         : group.Select(c => Button(c.Fix)).Distinct().ToArray() is [{ Action: FixAction.OpenInstalledList or FixAction.OpenStartupList } shared] ? shared
         : null;
+
+    /// <summary>
+    /// The publisher a row offers to trust: the checked signer every finding in it shares, when trust
+    /// may hide each of them. A row mixing signers offers none; its members each offer their own.
+    /// </summary>
+    public static Publisher? Trustable(IReadOnlyList<DoctorCheck> group) =>
+        group.Count > 0 && group.All(c => c is { TrustHides: true, Signer: not null }) && group.Select(c => c.Signer!.Key).Distinct().Count() == 1
+            ? group[0].Signer : null;
 
     /// <summary>The page a <see cref="ReachGuide"/> opens: its findings, which say how to close each path.</summary>
     public static string ReachGuideUrl(string repository) => $"{repository}/blob/main/{ReachGuide.Page}#findings";

@@ -236,7 +236,9 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
     public IEnumerable<string> BlockedPrograms() => SurfaceProbe.BlockedPrograms();
 
     /// <inheritdoc cref="SurfaceProbe.Signature"/>
-    public static (bool? Valid, string? Signer) Signature(string path) => SurfaceProbe.Signature(path);
+    public static (bool? Valid, string? Signer, Publisher? Publisher) Signature(string path) => SurfaceProbe.Signature(path);
+
+    public Publisher? Signer(string path) => SurfaceProbe.Signature(path).Publisher;
 
     /// <summary>Everything that starts at log-on, turned off or not, scheduled tasks included: the Startup list.</summary>
     public static IEnumerable<StartupEntry> AllStartupEntries() => SurfaceProbe.AllStartupEntries();

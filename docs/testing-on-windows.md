@@ -341,7 +341,8 @@ opens the status window on that place (`Home`, `Secrets`, `Services`, `Environme
   in the made-up user's profile (projects, `projects.json`, a vault's services, activity, NuGet and
   git config, installed programs' folders), vault secrets, sealed user secrets, Windows and sealed
   environment variables, `HKCU` keys (`registry`: the Installed page's uninstall entries and the Startup page's Run key) and when
-  each program was last opened (`programRuns`), and which decoys are placed (`decoys`:
+  each program was last opened (`programRuns`), which program files have a valid signature and its
+  subject (`signers`, so **Trust *publisher*** can be tried), and which decoys are placed (`decoys`:
   `passwordsFile`, `project`, `variables`), all in plain text. The app seals them at start. `{{profile}}` in a file is the profile's path,
   `{{now-2h}}` a time two hours ago, `{{date-3d}}` the day three days ago as `yyyyMMdd` (an uninstall entry's `InstallDate`). Add a scenario for any case you want to see or reproduce.
 - The made-up user is `alice`, with her profile in `%PUBLIC%\Tiresias-demo\alice` and her `HKCU`
