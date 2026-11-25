@@ -49,10 +49,17 @@ public enum FixAction
 /// </summary>
 public static class FindingView
 {
-    /// <param name="Open">Groups of findings not dismissed, failures first, then the largest.</param>
+    /// <param name="Held">Groups of findings not dismissed about how credentials are held, failures first, then the largest.</param>
+    /// <param name="Reach">The same about what can reach them (<see cref="DoctorCheck.Surface"/>), ranked apart: one
+    /// order across both would rank a plaintext password against an old extension (docs/attack-surface.md#ranking).</param>
     /// <param name="Dismissed">Findings the user set aside, grouped by kind and reason, then one group per trusted publisher, even one hiding nothing now.</param>
     /// <param name="Others">Every other line: Tiresias's own health, and checks that passed.</param>
-    public sealed record Split(IReadOnlyList<IReadOnlyList<DoctorCheck>> Open, IReadOnlyList<DismissedGroup> Dismissed, IReadOnlyList<DoctorCheck> Others);
+    public sealed record Split(IReadOnlyList<IReadOnlyList<DoctorCheck>> Held, IReadOnlyList<IReadOnlyList<DoctorCheck>> Reach,
+        IReadOnlyList<DismissedGroup> Dismissed, IReadOnlyList<DoctorCheck> Others)
+    {
+        /// <summary>Every open group, as Home numbers them: how credentials are held, then what can reach them.</summary>
+        public IReadOnlyList<IReadOnlyList<DoctorCheck>> Open => [.. Held, .. Reach];
+    }
 
     /// <summary>Findings dismissed together: one kind, one reason, and the keys that bring them back.</summary>
     /// <param name="Publisher">For the findings a trusted publisher hides: that publisher, whose trust is undone to bring them back.</param>
@@ -72,13 +79,14 @@ public static class FindingView
         var open = findings.Where(f => f.Dismissal is null).Select(f => f.Check)
             .GroupBy(KindOf)
             .Select(g => (IReadOnlyList<DoctorCheck>)[.. g])
-            .OrderByDescending(g => g[0].Status).ThenByDescending(g => g.Count);
+            .OrderByDescending(g => g[0].Status).ThenByDescending(g => g.Count)
+            .ToLookup(g => g[0].Surface);
         var dismissed = findings.Where(f => f.Dismissal is { Trusted: null })
             .GroupBy(f => (Kind: KindOf(f.Check), f.Dismissal!.Reason))
             .Select(g => new DismissedGroup(Title([.. g.Select(f => f.Check)]), g.Key.Reason, [.. g.Select(f => f.Dismissal!.Key)]));
         var trusted = dismissals.Publishers.Select(p => new DismissedGroup(p.Name, "",
             [.. findings.Where(f => f.Dismissal?.Trusted?.Key == p.Key).Select(f => f.Dismissal!.Key)], p));
-        return new([.. open], [.. dismissed, .. trusted], [.. checks.Where(c => !c.IsFinding)]);
+        return new([.. open[false]], [.. open[true]], [.. dismissed, .. trusted], [.. checks.Where(c => !c.IsFinding)]);
     }
 
     /// <summary>Findings of one kind group together; a line without a kind stands alone.</summary>

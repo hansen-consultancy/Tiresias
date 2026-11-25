@@ -2020,6 +2020,12 @@ Close them, then choose the update in the tray menu again.</value>
   <data name="Finding_ConfirmDismiss" xml:space="preserve">
     <value>Dismiss</value>
   </data>
+  <data name="Finding_HeldHeader" xml:space="preserve">
+    <value>How credentials are held</value>
+  </data>
+  <data name="Finding_ReachHeader" xml:space="preserve">
+    <value>What can reach them</value>
+  </data>
   <data name="Finding_DismissedHeader" xml:space="preserve">
     <value>Dismissed ({0})</value>
   </data>
