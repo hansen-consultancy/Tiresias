@@ -31,6 +31,10 @@ its section below.
 
 - **Dismissing an unused program, a log-on entry or an extension lasts through its updates**, and
   comes back when its signer changes or a new reason appears. Earlier dismissals still apply.
+- **`tir doctor --surface` is quick again.** Listing the global `dotnet`, `npm`, `pipx` and `cargo`
+  tools takes seconds, so it now happens once a day: the app does it in the background and keeps
+  the list in `inventory.json` beside the keyring (names and versions only, on this PC only). The
+  listing says when it was taken; `--refresh` lists the tools again now.
 
 ### Fixed
 

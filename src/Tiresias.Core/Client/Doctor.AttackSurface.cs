@@ -325,7 +325,7 @@ public static partial class Doctor
         }
     }
 
-    static string? Text(JsonElement element, string name) =>
+    internal static string? Text(JsonElement element, string name) =>
         element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
 
     /// <summary>The executable a Run-key command starts: the quoted part, or the text up to <c>.exe</c>; <c>null</c> when there is none.</summary>

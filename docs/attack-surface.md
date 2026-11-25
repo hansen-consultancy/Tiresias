@@ -232,7 +232,12 @@ planner stays pure and an offline machine gets the same findings minus those tha
 each saying "not checked online".
 
 Listing every package manager takes seconds, so the inventory runs once a day and on request
-(`tir doctor --surface`, **Check now**), not each time the app opens. `tir doctor --surface` is
+(`tir doctor --surface --refresh`, **Check now**), not each time the app opens. The global tools'
+listing is built that way (#107): the app's background checks, every four hours, list them again
+once the last listing is a day old and keep it in `inventory.json` beside the keyring, names and
+versions only and never sent anywhere; `tir doctor --surface` reads that listing, says when it was
+taken, and lists again when it is a day old or with `--refresh`. A damaged file or one of another
+format version is listed again rather than read. `tir doctor --surface` is
 built: after the checks it lists each extension host with what it reached in 90 days and its
 extensions, the global `dotnet`, `npm`, `pipx` and `cargo` tools (each manager given half a minute,
 a missing one lists nothing), and what starts at log-on with its signature and last use.

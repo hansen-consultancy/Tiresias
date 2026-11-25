@@ -77,6 +77,8 @@ static class FindingWatch
                 FailingAlertSinks = App.Current.Alerts.Center.Failing,
             };
             var checks = await Task.Run(async () => await Doctor.RunAsync(probe, await ReachMemory.ForRunAsync(probe, asked: false)));
+            // The daily inventory (docs/attack-surface.md): lists the global tools when a day has passed, else reads them.
+            await Task.Run(() => ToolInventory.Current());
             var dismissals = DismissalStore.Load();
             Home.LastFindings = FindingView.Of(checks, dismissals).Open.Count;
             var seen = ReadSeen();
