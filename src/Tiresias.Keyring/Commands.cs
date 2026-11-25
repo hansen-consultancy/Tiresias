@@ -211,9 +211,7 @@ static class Commands
     /// <summary>Binds this device's Hello key into the trust chain with the paper key (docs/trust-links.md).</summary>
     public static async Task<int> TrustBindHelloAsync()
     {
-        Console.WriteLine("Type the recovery key to sign the trust chain (spaces and case don't matter). Windows Hello asks next.");
-        var raw = PaperKey.Parse(Console.ReadLine() ?? "")
-            ?? throw new InvalidOperationException("That is not a recovery key: it should be 13 groups of four letters and digits 2-7.");
+        var raw = ReadPaper("Type the recovery key to sign the trust chain (spaces and case don't matter; Windows Hello asks next): ");
         try
         {
             await TrustLinks.BindHelloAsync(raw);

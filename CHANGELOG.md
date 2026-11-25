@@ -72,10 +72,12 @@ its section below.
 
 - The attack surface checks no longer stop on an extension whose metadata writes a number as text.
 - **A paper recovery key with a misread S/5, Z/2, T/7 or U/V restores.** When the key as typed
-  opens nothing, **Restore**, the first-run wizard and `tir recovery restore` try those letters the
-  other way and take a reading only when it is this account's recovery key or opens a sealed item
-  here. They then name each letter read differently, so you can correct the paper. Asking back
-  two groups during setup forgives the same lookalikes.
+  opens nothing, **Restore**, the first-run wizard (also when it asks for the key again to finish
+  solo setup), `tir recovery restore`, `tir solo init` and `tir trust bind-hello` try those letters
+  the other way and take a reading only when it is this account's recovery key or opens a sealed
+  item here. They then name each letter read differently, so you can correct the paper. Asking
+  back two groups during setup forgives the same lookalikes. `tir trust bind-hello` no longer
+  shows the key as you type it.
 
 ## [0.4.1] - 2026-11-25
 

@@ -233,14 +233,20 @@ public sealed partial class FirstRunViewModel : ObservableObject
                     await ChooseModeAsync();
                     break;
                 case FirstRunStep.RecoveryType:
-                    var typed = PaperKey.Parse(TypedKey);
-                    if (typed is null)
+                    var text = TypedKey;
+                    var reading = await Task.Run(() => RecoveryRestore.Read(text));
+                    if (reading is null)
                     {
                         Message = Text.Get("FirstRun_RecoveryType_Invalid");
                         return;
                     }
-                    recoveryKey = typed;
+                    if (recoveryKey is not null)
+                        Array.Clear(recoveryKey);
+                    recoveryKey = reading.Key;
                     await SetUpSoloAsync();
+                    AppLog.Info($"first run: solo set up from the typed recovery key, {reading.Corrections.Count} lookalikes read");
+                    // Done shows the letters read differently, so the paper gets corrected.
+                    DoneText = RecoveryViewModel.Corrected(reading) + DoneText;
                     break;
                 case FirstRunStep.AdminTier:
                     var result = await AdminTierElevation.RunAsync("install");
