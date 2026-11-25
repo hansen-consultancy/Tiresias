@@ -18,6 +18,10 @@ its section below.
 
 ### Added
 
+- **PowerShell modules you installed are checked too.** Modules in your Documents folder, for
+  PowerShell 7 and Windows PowerShell, are listed under **Installed** with their version and
+  whether they came from the PowerShell Gallery. One from elsewhere, or not updated in two years,
+  in a shell that used a credential through Tiresias, is a finding.
 - **Browser and Visual Studio extensions are checked too.** Besides VS Code and its forks, the
   attack surface checks now read extensions in Edge, Chrome, Brave, Opera and Opera GX (every
   profile), Firefox and Visual Studio. One with an unknown publisher or no update in two years, in a

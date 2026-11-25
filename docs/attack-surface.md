@@ -66,6 +66,15 @@ JetBrains and Notepad++ plugins aren't read yet. None of these hosts has a comma
 extension, so their findings carry `RemoveExtensionByHand`, which names the host's page
 (`edge://extensions`, `about:addons`, **Extensions, Manage Extensions**); the app's **Copy** copies it.
 
+**PowerShell modules installed for the user are read** (#107) as extensions of the shell that
+loads them: `Documents\PowerShell\Modules` for PowerShell 7 (`pwsh.exe`) and
+`Documents\WindowsPowerShell\Modules` for Windows PowerShell (`powershell.exe`), each module at its
+newest version folder. The `PSGetModuleInfo.xml` that PowerShellGet and PSResourceGet leave beside
+a module gives its version and install or update date (DTD prohibited); its publisher is the
+PowerShell Gallery only when its source is `https://www.powershellgallery.com`, whatever the
+repository is called, else unknown, as for a module copied in by hand. Their findings name
+`Uninstall-PSResource` or `Uninstall-Module`.
+
 **Uninstall entries are checked, not trusted.** An entry is only a claim that something is
 installed. Each one is compared with the disk: the uninstaller its `UninstallString` names, its
 `InstallLocation`, and whether another entry has the same uninstall command. The whole command,

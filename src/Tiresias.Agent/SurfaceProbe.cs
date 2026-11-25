@@ -35,6 +35,13 @@ static partial class SurfaceProbe
 
     static readonly ExtensionHost VisualStudio = new("Visual Studio", "devenv.exe", null, "Extensions, Manage Extensions");
 
+    /// <summary>The two PowerShells, by the folder in Documents that holds the user's modules.</summary>
+    static readonly (string Folder, ExtensionHost Host)[] PowerShells =
+    [
+        ("PowerShell", new("PowerShell", "pwsh.exe", null, "Uninstall-PSResource or Uninstall-Module")),
+        ("WindowsPowerShell", new("Windows PowerShell", "powershell.exe", null, "Uninstall-Module")),
+    ];
+
     public static IEnumerable<InstalledExtension> Extensions()
     {
         var profile = UserMachine.Folder(Environment.SpecialFolder.UserProfile);
@@ -48,6 +55,7 @@ static partial class SurfaceProbe
             .. Folders(Path.Combine(local, @"Microsoft\VisualStudio")).SelectMany(v => Folders(Path.Combine(v, "Extensions")))
                 .Select(e => Path.Combine(e, "extension.vsixmanifest"))
                 .Select(m => Doctor.VisualStudioExtension(VisualStudio, ReadOrNull(m), WriteTime(m))).OfType<InstalledExtension>(),
+            .. PowerShells.SelectMany(p => PowerShellModules(p.Host, Path.Combine(UserMachine.Folder(Environment.SpecialFolder.MyDocuments), p.Folder, "Modules"))),
         ];
         // The same extension in two profiles, or two Visual Studio versions, is one item; its newest copy speaks for it.
         return found.GroupBy(e => (e.Host, e.Id)).Select(g => g.OrderByDescending(e => e.Updated).First());
@@ -66,6 +74,15 @@ static partial class SurfaceProbe
             .Select(v => Doctor.ChromiumExtension(host, Path.GetFileName(Path.GetDirectoryName(v.Folder)!), ReadOrNull(Path.Combine(v.Folder, "manifest.json")),
                 locale => ReadOrNull(Path.Combine(v.Folder, "_locales", locale, "messages.json")), v.Created))
             .OfType<InstalledExtension>();
+
+    /// <summary>Each module at its newest version folder, or the module folder itself when it has none.</summary>
+    static IEnumerable<InstalledExtension> PowerShellModules(ExtensionHost host, string modules) =>
+        Folders(modules).Select(module =>
+        {
+            var version = Doctor.NewestModuleVersion(Folders(module).Select(Path.GetFileName)!);
+            var folder = version is null ? module : Path.Combine(module, version);
+            return Doctor.PowerShellModule(host, Path.GetFileName(module), version, ReadOrNull(Path.Combine(folder, "PSGetModuleInfo.xml")), CreationTime(folder));
+        }).OfType<InstalledExtension>();
 
     static IEnumerable<string> Folders(string path)
     {
