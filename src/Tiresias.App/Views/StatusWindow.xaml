@@ -112,6 +112,9 @@
                               Content="{l:S Finding_Details}" Visibility="{Binding MembersVisibility}" />
                 <Button Padding="12,4" Background="Transparent" BorderThickness="0" Content="{Binding DismissLabel}"
                         AutomationProperties.Name="{Binding DismissName}" Click="OnDismiss" />
+                <Button Padding="12,4" Background="Transparent" BorderThickness="0" Content="{Binding TrustLabel}"
+                        ToolTip="{Binding TrustTip}" AutomationProperties.HelpText="{Binding TrustTip}"
+                        Visibility="{Binding TrustVisibility}" Click="OnTrust" />
               </WrapPanel>
               <StackPanel Margin="0,8,0,0" Visibility="{Binding IsChecked, ElementName=DetailsToggle, Converter={StaticResource Visible}}">
                 <!-- A group's members, each with its own fix; DynamicResource because this template is still being read. -->
@@ -413,7 +416,7 @@
                     <TextBlock Text="{Binding Reason}" Style="{StaticResource CaptionText}" TextWrapping="Wrap" />
                   </StackPanel>
                   <Button Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0" Padding="12,4"
-                          Content="{l:S Finding_ShowAgain}" AutomationProperties.Name="{Binding RestoreName}" Click="OnRestoreFinding" />
+                          Content="{Binding RestoreLabel}" AutomationProperties.Name="{Binding RestoreName}" Click="OnRestoreFinding" />
                 </Grid>
               </DataTemplate>
             </ItemsControl.ItemTemplate>

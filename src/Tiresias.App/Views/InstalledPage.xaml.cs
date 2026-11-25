@@ -29,6 +29,8 @@ public partial class InstalledPage : UserControl
 
     void OnOpenSettings(object sender, RoutedEventArgs e) => Desktop.Open("ms-settings:appsfeatures");
 
+    void OnTrust(object sender, RoutedEventArgs e) => (DataContext as InstalledViewModel)?.ToggleTrust();
+
     void OnSearchOnline(object sender, RoutedEventArgs e)
     {
         if (DataContext is InstalledViewModel { Selected: { } row })
@@ -93,16 +95,55 @@ public sealed partial class InstalledViewModel : ObservableObject
     public partial string Signer { get; set; } = "";
 
     /// <summary>Each program file's signature, filled by the scan after the list loads (off the UI thread) and by a selection it hasn't reached.</summary>
-    readonly ConcurrentDictionary<string, (bool? Valid, string? Signer)> signatures = new(StringComparer.OrdinalIgnoreCase);
+    readonly ConcurrentDictionary<string, (bool? Valid, string? Signer, Publisher? Publisher)> signatures = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Non-zero while the scan of the list's signatures runs; each load bumps it, so an older scan's end doesn't count.</summary>
     int scanning;
+
+    /// <summary>The selected program's checked publisher, which the trust line speaks of; <c>null</c> without a valid signature.</summary>
+    Publisher? publisher;
+
+    /// <summary>Whether the selected program's publisher is trusted, in words.</summary>
+    [ObservableProperty]
+    public partial string Trust { get; set; } = "";
+
+    /// <summary>Trust or Stop trusting for the selected program's publisher; empty hides the button.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TrustButtonVisibility))]
+    public partial string TrustButton { get; set; } = "";
+
+    public Visibility TrustButtonVisibility => TrustButton.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+
+    void ShowTrust(Publisher? value)
+    {
+        publisher = value;
+        var (key, argument, button) = InstalledDetails.Trust(value, DismissalStore.Load());
+        Trust = argument is null ? Text.Get(key) : Text.Format(key, argument);
+        TrustButton = button is null ? "" : Text.Format(button, value!.Name);
+    }
+
+    /// <summary>Trusts the selected program's publisher, or stops: Home re-sorts its findings when shown again.</summary>
+    public void ToggleTrust()
+    {
+        if (publisher is not { } current)
+            return;
+        try
+        {
+            DismissalStore.Update(d => d.Trusts(current) ? d.Distrust(current.Key) : d.Trust(current, DateTimeOffset.Now));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            AppLog.Error(e, "saving a trusted publisher");
+        }
+        ShowTrust(current);
+    }
 
     async partial void OnSelectedChanged(InstalledRow? value)
     {
         if (value?.ProgramFile is not { } file)
         {
             Signer = Text.Get("Installed_SignerUnknown");
+            ShowTrust(null);
             return;
         }
         if (!signatures.TryGetValue(file, out var signature))
@@ -111,8 +152,10 @@ public sealed partial class InstalledViewModel : ObservableObject
             signature = signatures[file] = await Task.Run(() => MachineProbe.Signature(file));
         }
         var (key, argument) = InstalledDetails.Signer(signature.Valid, signature.Signer);
-        if (Selected == value)
-            Signer = argument is null ? Text.Get(key) : Text.Format(key, argument);
+        if (Selected != value)
+            return;
+        Signer = argument is null ? Text.Get(key) : Text.Format(key, argument);
+        ShowTrust(signature.Publisher);
     }
 
     bool? Signed(string file) => signatures.TryGetValue(file, out var s) ? s.Valid : null;

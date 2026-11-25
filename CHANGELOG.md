@@ -8,6 +8,19 @@ its section below.
 
 ## [Unreleased]
 
+### Added
+
+- **Trust a publisher.** An unused program, an idle log-on entry or an old extension now offers
+  **Trust *publisher*** beside **Dismiss** when a valid signature (or, for an extension, its
+  marketplace publisher) says who made it, and so does the **Installed** panel. Its findings of
+  that kind leave Home; blocked, unsigned or broken ones never do. Home's **Dismissed** lists each
+  trusted publisher with **Stop trusting**.
+
+### Changed
+
+- **Dismissing an unused program, a log-on entry or an extension lasts through its updates**, and
+  comes back when its signer changes or a new reason appears. Earlier dismissals still apply.
+
 ## [0.4.1] - 2026-11-25
 
 ### Fixed
