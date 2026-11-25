@@ -8,26 +8,16 @@ its section below.
 
 ## [Unreleased]
 
-### Changed
-
-- **On a managed PC, only what you installed is checked.** When the PC is joined to a domain or to
-  Microsoft Entra ID, or enrolled in device management, software installed for everyone is your
-  administrator's: it stays under **Installed**, but raises no finding about log-on entries,
-  uninstall entries or unused programs. A line in the checks says why. A blocked program is still
-  reported wherever it is.
-- **Home splits findings in two groups.** **How credentials are held** (secrets on disk,
-  environment variables, the vault, recovery) comes first, then **What can reach them** (unused
-  programs, log-on entries, extensions, blocked programs, Docker and Hyper-V access), each ranked
-  on its own, so an old extension no longer competes with a plaintext password.
-- **Dismissing an unused program, a log-on entry or an extension lasts through its updates**, and
-  comes back when its signer changes or a new reason appears. Earlier dismissals still apply.
-- **`tir doctor --surface` is quick again.** Listing the global `dotnet`, `npm`, `pipx` and `cargo`
-  tools takes seconds, so it now happens once a day: the app does it in the background and keeps
-  the list in `inventory.json` beside the keyring (names and versions only, on this PC only). The
-  listing says when it was taken; `--refresh` lists the tools again now.
-
 ### Added
 
+- **Unpacked browser extensions are checked too.** An extension loaded from a folder in developer
+  mode, in Edge, Chrome, Brave or Opera, is listed with an unknown publisher, since no store vouches
+  for it; in a browser that used a credential through Tiresias, that makes it a finding.
+- **JetBrains and Notepad++ plugins are checked too.** The attack surface checks read the plugins
+  of each JetBrains IDE (IntelliJ IDEA, Rider, PyCharm and the others) and of Notepad++, and list
+  them under **Installed**. One with an unknown publisher or no update in two years, in an editor
+  that used a credential through Tiresias, is a finding; its **Copy** button copies where to remove
+  it.
 - **Browser and Visual Studio extensions are checked too.** Besides VS Code and its forks, the
   attack surface checks now read extensions in Edge, Chrome, Brave, Opera and Opera GX (every
   profile), Firefox and Visual Studio. One with an unknown publisher or no update in two years, in a
@@ -56,8 +46,27 @@ its section below.
   that kind leave Home; blocked, unsigned or broken ones never do. Home's **Dismissed** lists each
   trusted publisher with **Stop trusting**.
 
+### Changed
+
+- **On a managed PC, only what you installed is checked.** When the PC is joined to a domain or to
+  Microsoft Entra ID, or enrolled in device management, software installed for everyone is your
+  administrator's: it stays under **Installed**, but raises no finding about log-on entries,
+  uninstall entries or unused programs. A line in the checks says why. A blocked program is still
+  reported wherever it is.
+- **Home splits findings in two groups.** **How credentials are held** (secrets on disk,
+  environment variables, the vault, recovery) comes first, then **What can reach them** (unused
+  programs, log-on entries, extensions, blocked programs, Docker and Hyper-V access), each ranked
+  on its own, so an old extension no longer competes with a plaintext password.
+- **Dismissing an unused program, a log-on entry or an extension lasts through its updates**, and
+  comes back when its signer changes or a new reason appears. Earlier dismissals still apply.
+- **`tir doctor --surface` is quick again.** Listing the global `dotnet`, `npm`, `pipx` and `cargo`
+  tools takes seconds, so it now happens once a day: the app does it in the background and keeps
+  the list in `inventory.json` beside the keyring (names and versions only, on this PC only). The
+  listing says when it was taken; `--refresh` lists the tools again now.
+
 ### Fixed
 
+- The attack surface checks no longer stop on an extension whose metadata writes a number as text.
 - **A paper recovery key with a misread S/5, Z/2, T/7 or U/V restores.** When the key as typed
   opens nothing, **Restore**, the first-run wizard and `tir recovery restore` try those letters the
   other way and take a reading only when it is this account's recovery key or opens a sealed item

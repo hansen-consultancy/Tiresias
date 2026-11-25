@@ -61,10 +61,25 @@ is the store a browser extension updates from (Chrome Web Store, Edge Add-ons, O
 Mozilla signed it), else unknown; for Visual Studio, the one its manifest names. None of these is a
 marketplace publisher id, so trusting a publisher doesn't cover them. Last updated is the version
 folder's creation time, Firefox's `updateDate`, or the manifest's write time. The same extension in
-two profiles is one item. Unpacked browser extensions (loaded from a folder in developer mode) and
-JetBrains and Notepad++ plugins aren't read yet. None of these hosts has a command to remove an
-extension, so their findings carry `RemoveExtensionByHand`, which names the host's page
-(`edge://extensions`, `about:addons`, **Extensions, Manage Extensions**); the app's **Copy** copies it.
+two profiles is one item.
+
+**JetBrains and Notepad++ plugins are read** too (#107). For each JetBrains IDE (IntelliJ IDEA,
+Rider, PyCharm, WebStorm, GoLand, CLion, PhpStorm, DataGrip, RubyMine, RustRover, DataSpell), only
+its newest settings folder under `%APPDATA%\JetBrains` counts, since an upgrade leaves the old one
+behind: each plugin's `META-INF/plugin.xml`, read from its jar without unpacking anything else, gives
+its id, name, version and vendor (DTD prohibited; the vendor is the publisher, as for Visual
+Studio). Notepad++ plugins are the folders in `plugins` holding a DLL of the same name, in Program
+Files (both) and `%LOCALAPPDATA%\Notepad++\plugins`; the version is the DLL's file version and the
+publisher who signed it, when that signature verifies, else unknown.
+
+Unpacked browser extensions, loaded from a folder in developer mode or from the command line, live
+outside `Extensions`: they are the entries of a profile's `Secure Preferences` or `Preferences` with
+location 4 or 8, named by the manifest recorded there (else the folder's own `manifest.json`, read
+only when the folder is a local path, never a share). Nothing vouches for one, so its publisher is
+always unknown, whatever its manifest says. None of these
+hosts has a command to remove an extension, so their findings carry `RemoveExtensionByHand`, which
+names the host's page (`edge://extensions`, `about:addons`, **Extensions, Manage Extensions**,
+**Settings, Plugins, Installed**, **Plugins, Plugins Admin, Installed**); the app's **Copy** copies it.
 
 **Uninstall entries are checked, not trusted.** An entry is only a claim that something is
 installed. Each one is compared with the disk: the uninstaller its `UninstallString` names, its
