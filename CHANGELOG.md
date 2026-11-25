@@ -22,6 +22,8 @@ its section below.
   start at sign-in on one information line that opens Startup. A signature that doesn't verify, a
   program in Temp, Downloads or AppData, or a PC without developer tools keeps the warning.
 
+## [0.4.1] - 2026-11-25
+
 ### Fixed
 
 - **0.4.0 stopped at "Recovery setup is unavailable" for anyone who is not an administrator.**
@@ -546,7 +548,8 @@ were published as 0.2.0 and are unchanged.
   - `Tiresias.Core` is the vault, the trust chain, grants, leases and the audit log.
   - `Tiresias.Protocol` holds the wire formats.
 
-[Unreleased]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.4.0...HEAD
+[Unreleased]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.4.1...HEAD
+[0.4.1]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.4.0...app-v0.4.1
 [0.4.0]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.3.0...app-v0.4.0
 [0.3.0]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.2.1...app-v0.3.0
 [0.2.1]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.1.0-preview.4...app-v0.2.1
