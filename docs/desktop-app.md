@@ -33,8 +33,10 @@ CI and people who prefer it, and it talks to the same agent.
   service incidents window shows a panel below the list. It holds every column in full, with
   values that wrap and can be selected, and **Copy details** copies them all.
 - **Home leads with the next step**: the lock state with Lock and Add..., then a heading that
-  counts what could be safer over a bar of the checks that pass. The findings are numbered; the
-  first is open with its fix; the others are one line each, and clicking one opens it instead
+  counts what could be safer over a bar of the checks that pass. The findings are numbered, in two
+  groups ranked apart: **How credentials are held**, then **What can reach them** (programs,
+  extensions, log-on entries, engines and VMs open to your account;
+  [design](attack-surface.md#ranking)). The first is open with its fix; the others are one line each, and clicking one opens it instead
   ([design](app-design.md#8-home-leads-with-the-next-step)). Links at the foot open the checks
   passed and the dismissed, and run the checks again; Copy details and Open data folder are on
   About ([design](app-design.md#11-the-chosen-look)).

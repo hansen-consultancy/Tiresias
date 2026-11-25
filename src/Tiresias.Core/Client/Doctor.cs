@@ -65,6 +65,13 @@ public sealed record DoctorCheck(string Name, DoctorStatus Status, string Detail
     /// signature, a broken entry or a vulnerability.
     /// </summary>
     public bool TrustHides { get; init; }
+
+    /// <summary>
+    /// About what can reach credentials (programs, extensions, log-on entries, decoy incidents, engines
+    /// and VMs open to the account) rather than how they are held: Home shows it under
+    /// *What can reach them* (docs/attack-surface.md#ranking).
+    /// </summary>
+    public bool Surface { get; init; }
 }
 
 /// <summary>What the vault file says about recoverability: which secrets lack a Hello or a recovery wrap.</summary>
@@ -297,28 +304,32 @@ public static partial class Doctor
             checks.Add(new("decoy incidents and program blocks", DoctorStatus.Warn, "The admin service could not supply its incident history and block list."));
         else
         {
-            checks.AddRange(Decoys(decoyUses, blocked, DateTimeOffset.UtcNow, runs));
+            checks.AddRange(Surface(Decoys(decoyUses, blocked, DateTimeOffset.UtcNow, runs)));
             otherBlocks = [.. blocked.Where(b => !decoyUses.Any(u => !u.IsRead && SamePath(u.Program, b)))];
         }
         developer = checks.Count;
         checks.AddRange(CliSignIns(probe.CliConfigs, probe.GitHubAppService));
         var reach = probe.Reach;
-        checks.AddRange(Reach(reach));
+        checks.AddRange(Surface(Reach(reach)));
         checks.AddRange(Contents(reach, contents));
         checks.AddRange(WslContents(reach, contents));
-        checks.AddRange(HyperVContents(reach, contents));
+        checks.AddRange(Surface(HyperVContents(reach, contents)));
         string[] workspaces = [.. contents?.Docker?.Containers.Select(c => PastableFolder(c.Workspace)).OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase) ?? []];
-        checks.AddRange(Devcontainers(probe.Devcontainers(workspaces), probe.DevcontainerForwarding));
+        checks.AddRange(Devcontainers(probe.Devcontainers(workspaces), probe.DevcontainerForwarding)
+            .Select(c => c.Name == ForwardingCheck ? c with { Surface = true } : c));
         ForDevelopers(checks, developer);
         var (uses, now) = (probe.CredentialUses().ToArray(), DateTimeOffset.UtcNow);
         var management = probe.Management;
         checks.AddRange(Managed(management));
         var (judgedStartup, judgedInstalled) = Judged(management, startup, installed);
-        checks.AddRange(AttackSurface(probe.Extensions(), judgedStartup, uses, otherBlocks, now, runs));
-        checks.AddRange(UninstallEntries(judgedInstalled));
-        checks.AddRange(UnusedApplications(judgedInstalled, runs, uses, now, probe.Signer));
+        checks.AddRange(Surface(AttackSurface(probe.Extensions(), judgedStartup, uses, otherBlocks, now, runs)));
+        checks.AddRange(Surface(UninstallEntries(judgedInstalled)));
+        checks.AddRange(Surface(UnusedApplications(judgedInstalled, runs, uses, now, probe.Signer)));
         return checks;
     }
+
+    /// <summary>Marks lines as about what can reach credentials.</summary>
+    static IEnumerable<DoctorCheck> Surface(IEnumerable<DoctorCheck> checks) => checks.Select(c => c with { Surface = true });
 
     /// <summary>Marks the lines from <paramref name="from"/> on as about something only a developer has.</summary>
     static void ForDevelopers(List<DoctorCheck> checks, int from)

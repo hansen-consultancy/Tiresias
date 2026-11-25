@@ -388,9 +388,16 @@
           </StackPanel>
         </Border>
 
-        <!-- Findings: deliveries weaker than they could be, each with its fix and Dismiss with a reason. -->
-        <ItemsControl ItemsSource="{Binding Findings}" Focusable="False" ItemTemplate="{StaticResource FindingTemplate}"
-                      AutomationProperties.Name="{Binding Summary}" />
+        <!-- Findings, each with its fix and Dismiss with a reason, in two groups ranked apart (docs/attack-surface.md#ranking):
+             deliveries weaker than they could be, then programs, extensions and access that can reach the credentials. -->
+        <TextBlock x:Name="HeldTitle" Text="{l:S Finding_HeldHeader}" Style="{StaticResource SubtitleText}" Margin="0,12,0,8"
+                   AutomationProperties.HeadingLevel="Level2" Visibility="{Binding HeldFindingsVisibility}" />
+        <ItemsControl ItemsSource="{Binding HeldFindings}" Focusable="False" ItemTemplate="{StaticResource FindingTemplate}"
+                      AutomationProperties.LabeledBy="{Binding ElementName=HeldTitle}" Visibility="{Binding HeldFindingsVisibility}" />
+        <TextBlock x:Name="ReachTitle" Text="{l:S Finding_ReachHeader}" Style="{StaticResource SubtitleText}" Margin="0,12,0,8"
+                   AutomationProperties.HeadingLevel="Level2" Visibility="{Binding ReachFindingsVisibility}" />
+        <ItemsControl ItemsSource="{Binding ReachFindings}" Focusable="False" ItemTemplate="{StaticResource FindingTemplate}"
+                      AutomationProperties.LabeledBy="{Binding ElementName=ReachTitle}" Visibility="{Binding ReachFindingsVisibility}" />
         <Button HorizontalAlignment="Left" Padding="12,4" Margin="0,0,0,8" Content="{Binding MoreFindingsLabel}"
                 Visibility="{Binding MoreFindingsVisibility}" Click="OnMoreFindings" />
         <TextBox Text="{Binding FindingMessage, Mode=OneWay}" Style="{StaticResource SelectableText}" TextWrapping="Wrap"

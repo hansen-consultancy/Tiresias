@@ -193,8 +193,9 @@ The activity log already decides what matters, so Home lists surface findings by
    hygiene, not a warning, and doesn't count toward the tray badge.
 
 Delivery findings and surface findings sit in separate groups, **How credentials are held** and
-**What can reach them**. They answer different questions, and one ordering across both would rank
-a plaintext password against an old browser extension.
+**What can reach them**, each with its heading and only when it has an open finding. They answer
+different questions, and one ordering across both would rank a plaintext password against an old
+browser extension.
 
 ## Dismissals
 
@@ -402,7 +403,11 @@ anything or needs an administrator. Without developer tools the finding reads as
 (`DoctorCheck.WithoutDeveloperTools`). Matching the repository's remote against owners the user
 marks as their own is not built.
 **Dismissals per item and trusted publishers are built** (#108), as [Dismissals](#dismissals)
-says.
+says, and so are Home's two groups (#108): a check marked `DoctorCheck.Surface` (programs,
+extensions, log-on and uninstall entries, decoy incidents and blocks, the Docker engine and
+Hyper-V reach, devcontainer forwarding) is under **What can reach them**, every other finding under
+**How credentials are held**. Each group is ranked on its own, failures first, and Home numbers
+the first group before the second.
 [Guided setup](guided-setup.md#phases) lists what is still design.
 
 1. **Inventory**: applications, extensions, global tools and startup entries, with last use where

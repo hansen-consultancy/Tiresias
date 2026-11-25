@@ -809,8 +809,17 @@ public sealed partial class StatusViewModel : ObservableObject
     [RelayCommand]
     void ToggleDismissed() => ShowDismissed = !ShowDismissed;
 
-    /// <summary>The findings shown: the first <see cref="FirstFindings"/> until Show all, since the page has one scroll region and a drive of repositories has hundreds.</summary>
-    public ObservableCollection<FindingRow> Findings { get; } = [];
+    /// <summary>
+    /// The findings shown, about how credentials are held and about what can reach them: the first
+    /// <see cref="FirstFindings"/> of both until Show all, since the page has one scroll region and a drive of repositories has hundreds.
+    /// </summary>
+    public ObservableCollection<FindingRow> HeldFindings { get; } = [];
+
+    public ObservableCollection<FindingRow> ReachFindings { get; } = [];
+
+    public Visibility HeldFindingsVisibility => HeldFindings.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+
+    public Visibility ReachFindingsVisibility => ReachFindings.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
 
     const int FirstFindings = 20;
 
@@ -818,7 +827,7 @@ public sealed partial class StatusViewModel : ObservableObject
 
     bool showAllFindings;
 
-    public Visibility MoreFindingsVisibility => Findings.Count < allFindings.Count ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility MoreFindingsVisibility => HeldFindings.Count + ReachFindings.Count < allFindings.Count ? Visibility.Visible : Visibility.Collapsed;
 
     public string MoreFindingsLabel => Text.Format("Finding_ShowAll", allFindings.Count);
 
@@ -830,9 +839,12 @@ public sealed partial class StatusViewModel : ObservableObject
 
     void ShowFindings()
     {
-        Findings.Clear();
+        HeldFindings.Clear();
+        ReachFindings.Clear();
         foreach (var row in showAllFindings ? allFindings : allFindings.Take(FirstFindings))
-            Findings.Add(row);
+            (row.Check.Surface ? ReachFindings : HeldFindings).Add(row);
+        OnPropertyChanged(nameof(HeldFindingsVisibility));
+        OnPropertyChanged(nameof(ReachFindingsVisibility));
         OnPropertyChanged(nameof(MoreFindingsVisibility));
         OnPropertyChanged(nameof(MoreFindingsLabel));
     }

@@ -15,6 +15,16 @@ its section below.
   administrator's: it stays under **Installed**, but raises no finding about log-on entries,
   uninstall entries or unused programs. A line in the checks says why. A blocked program is still
   reported wherever it is.
+- **Home splits findings in two groups.** **How credentials are held** (secrets on disk,
+  environment variables, the vault, recovery) comes first, then **What can reach them** (unused
+  programs, log-on entries, extensions, blocked programs, Docker and Hyper-V access), each ranked
+  on its own, so an old extension no longer competes with a plaintext password.
+- **Dismissing an unused program, a log-on entry or an extension lasts through its updates**, and
+  comes back when its signer changes or a new reason appears. Earlier dismissals still apply.
+- **`tir doctor --surface` is quick again.** Listing the global `dotnet`, `npm`, `pipx` and `cargo`
+  tools takes seconds, so it now happens once a day: the app does it in the background and keeps
+  the list in `inventory.json` beside the keyring (names and versions only, on this PC only). The
+  listing says when it was taken; `--refresh` lists the tools again now.
 
 ### Added
 
@@ -45,15 +55,6 @@ its section below.
   marketplace publisher) says who made it, and so does the **Installed** panel. Its findings of
   that kind leave Home; blocked, unsigned or broken ones never do. Home's **Dismissed** lists each
   trusted publisher with **Stop trusting**.
-
-### Changed
-
-- **Dismissing an unused program, a log-on entry or an extension lasts through its updates**, and
-  comes back when its signer changes or a new reason appears. Earlier dismissals still apply.
-- **`tir doctor --surface` is quick again.** Listing the global `dotnet`, `npm`, `pipx` and `cargo`
-  tools takes seconds, so it now happens once a day: the app does it in the background and keeps
-  the list in `inventory.json` beside the keyring (names and versions only, on this PC only). The
-  listing says when it was taken; `--refresh` lists the tools again now.
 
 ### Fixed
 
