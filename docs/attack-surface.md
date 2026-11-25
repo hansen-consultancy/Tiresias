@@ -51,6 +51,21 @@ Read-only, per user wherever possible, from sources each check can name:
 
 What Windows doesn't record is shown as unknown, never guessed.
 
+**Other extension hosts are read** (#107), each from its own metadata, never the extension's code:
+Edge, Chrome and Brave from each profile's `Extensions\<id>\<version>\manifest.json` (the newest
+version folder; a theme holds no code and is skipped; a name given as `__MSG_key__` is read from the
+default locale's `messages.json`); Firefox from each profile's `extensions.json`, only what the user
+installed and has on (`app-profile`, not disabled); Visual Studio from
+`%LOCALAPPDATA%\Microsoft\VisualStudio\<version>\Extensions\*\extension.vsixmanifest`. The publisher
+is the store a browser extension updates from (Chrome Web Store, Edge Add-ons; Firefox Add-ons when
+Mozilla signed it), else unknown; for Visual Studio, the one its manifest names. None of these is a
+marketplace publisher id, so trusting a publisher doesn't cover them. Last updated is the version
+folder's creation time, Firefox's `updateDate`, or the manifest's write time. The same extension in
+two profiles is one item. Unpacked browser extensions (loaded from a folder in developer mode) and
+JetBrains and Notepad++ plugins aren't read yet. None of these hosts has a command to remove an
+extension, so their findings carry `RemoveExtensionByHand`, which names the host's page
+(`edge://extensions`, `about:addons`, **Extensions, Manage Extensions**); the app's **Copy** copies it.
+
 **Uninstall entries are checked, not trusted.** An entry is only a claim that something is
 installed. Each one is compared with the disk: the uninstaller its `UninstallString` names, its
 `InstallLocation`, and whether another entry has the same uninstall command. The whole command,

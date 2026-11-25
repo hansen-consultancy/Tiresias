@@ -21,10 +21,80 @@ static partial class SurfaceProbe
         (".windsurf", new("Windsurf", "Windsurf.exe", "windsurf")),
     ];
 
+    /// <summary>Chromium browsers, by their user data folder under local app data.</summary>
+    static readonly (string Folder, ExtensionHost Host)[] Browsers =
+    [
+        (@"Microsoft\Edge\User Data", new("Edge", "msedge.exe", null, "edge://extensions")),
+        (@"Google\Chrome\User Data", new("Chrome", "chrome.exe", null, "chrome://extensions")),
+        (@"BraveSoftware\Brave-Browser\User Data", new("Brave", "brave.exe", null, "brave://extensions")),
+    ];
+
+    static readonly ExtensionHost Firefox = new("Firefox", "firefox.exe", null, "about:addons");
+
+    static readonly ExtensionHost VisualStudio = new("Visual Studio", "devenv.exe", null, "Extensions, Manage Extensions");
+
     public static IEnumerable<InstalledExtension> Extensions()
     {
         var profile = UserMachine.Folder(Environment.SpecialFolder.UserProfile);
-        return Hosts.SelectMany(h => Doctor.Extensions(h.Host, ReadOrNull(Path.Combine(profile, h.Folder, "extensions", "extensions.json"))));
+        var local = UserMachine.Folder(Environment.SpecialFolder.LocalApplicationData);
+        var roaming = UserMachine.Folder(Environment.SpecialFolder.ApplicationData);
+        IEnumerable<InstalledExtension> found =
+        [
+            .. Hosts.SelectMany(h => Doctor.Extensions(h.Host, ReadOrNull(Path.Combine(profile, h.Folder, "extensions", "extensions.json")))),
+            .. Browsers.SelectMany(b => ChromiumExtensions(b.Host, Path.Combine(local, b.Folder))),
+            .. Folders(Path.Combine(roaming, @"Mozilla\Firefox\Profiles")).SelectMany(p => Doctor.FirefoxExtensions(Firefox, ReadOrNull(Path.Combine(p, "extensions.json")))),
+            .. Folders(Path.Combine(local, @"Microsoft\VisualStudio")).SelectMany(v => Folders(Path.Combine(v, "Extensions")))
+                .Select(e => Path.Combine(e, "extension.vsixmanifest"))
+                .Select(m => Doctor.VisualStudioExtension(VisualStudio, ReadOrNull(m), WriteTime(m))).OfType<InstalledExtension>(),
+        ];
+        // The same extension in two profiles, or two Visual Studio versions, is one item; its newest copy speaks for it.
+        return found.GroupBy(e => (e.Host, e.Id)).Select(g => g.OrderByDescending(e => e.Updated).First());
+    }
+
+    /// <summary>Each profile's (<c>Default</c>, <c>Profile 1</c>...) extensions, each at its newest version folder.</summary>
+    static IEnumerable<InstalledExtension> ChromiumExtensions(ExtensionHost host, string userData) =>
+        Folders(userData).Where(p => Path.GetFileName(p) is "Default" || Path.GetFileName(p).StartsWith("Profile ", StringComparison.Ordinal))
+            .SelectMany(p => Folders(Path.Combine(p, "Extensions")))
+            .Select(e => Folders(e).Select(v => (Folder: v, Created: CreationTime(v))).OrderByDescending(v => v.Created).FirstOrDefault())
+            .Where(v => v.Folder is not null)
+            .Select(v => Doctor.ChromiumExtension(host, Path.GetFileName(Path.GetDirectoryName(v.Folder)!), ReadOrNull(Path.Combine(v.Folder, "manifest.json")),
+                locale => ReadOrNull(Path.Combine(v.Folder, "_locales", locale, "messages.json")), v.Created))
+            .OfType<InstalledExtension>();
+
+    static IEnumerable<string> Folders(string path)
+    {
+        try
+        {
+            return Directory.Exists(path) ? Directory.GetDirectories(path) : [];
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return [];
+        }
+    }
+
+    static DateTimeOffset? CreationTime(string folder)
+    {
+        try
+        {
+            return new DateTimeOffset(Directory.GetCreationTimeUtc(folder), TimeSpan.Zero);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    static DateTimeOffset? WriteTime(string file)
+    {
+        try
+        {
+            return File.Exists(file) ? new DateTimeOffset(File.GetLastWriteTimeUtc(file), TimeSpan.Zero) : null;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
     }
 
     const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";

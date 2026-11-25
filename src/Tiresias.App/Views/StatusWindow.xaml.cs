@@ -335,6 +335,10 @@ public partial class StatusWindow : Window
             case RemoveExtension remove:
                 _ = RemoveExtensionAsync(remove);
                 break;
+            case RemoveExtensionByHand byHand:
+                // A browser's own page (edge://extensions) opens from its address bar only.
+                model.CopyFix(byHand.Host.ExtensionsPage ?? byHand.Instruction);
+                break;
             case RevealFile { Path: var path }:
                 Desktop.Reveal(path);
                 break;
