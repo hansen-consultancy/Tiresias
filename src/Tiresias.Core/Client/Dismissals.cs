@@ -76,10 +76,12 @@ public sealed record Dismissals(IReadOnlyList<Dismissal> Items, IReadOnlyList<Tr
         if (!check.IsFinding || string.IsNullOrWhiteSpace(reason))
             return this;
         var key = KeyOf(check);
+        var legacy = LineKey(check);
         var dismissal = check.Item is null
             ? new Dismissal(key, check.Name, reason.Trim(), now)
             : new Dismissal(key, check.Name, reason.Trim(), now, check.Signer?.Key, [.. check.Reasons ?? []]);
-        return this with { Items = [.. Items.Where(d => d.Key != key), dismissal] };
+        // An item's version-1 dismissal goes too, or it would keep hiding the finding after Show again.
+        return this with { Items = [.. Items.Where(d => d.Key != key && d.Key != legacy), dismissal] };
     }
 
     public Dismissals Restore(string key) => this with { Items = [.. Items.Where(d => d.Key != key)] };

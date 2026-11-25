@@ -151,6 +151,19 @@ public class PublisherTrustTests
     }
 
     [Test]
+    public void Dismissing_an_item_again_replaces_its_version_1_dismissal_so_Show_again_shows_it()
+    {
+        var check = Unused(signer: Acme);
+        var v1Key = Dismissals.KeyOf(check with { Item = null });
+        var v1 = new Dismissals([new Dismissal(v1Key, "Acme", "yearly", Now)]);
+
+        var dismissed = v1.Dismiss(check, "still yearly", Now);
+
+        Assert.That(dismissed.Items.Single().Key, Is.EqualTo(Dismissals.KeyOf(check)));
+        Assert.That(dismissed.Restore(Dismissals.KeyOf(check)).For(check), Is.Null);
+    }
+
+    [Test]
     public void Trusted_publishers_and_item_dismissals_round_trip_in_version_2_and_a_newer_file_is_dropped()
     {
         var json = Dismissals.Empty.Trust(Acme, Now).Dismiss(Extension(), "finished", Now).ToJson();
