@@ -32,7 +32,7 @@ public class ExtensionHostTests
         Assert.That(found, Is.EqualTo(new[] { new InstalledExtension(Edge, Id, "0.1.0", null, DateTimeOffset.FromFileTime(134384659566101840).ToUniversalTime(), Name: "Acme Helper") }));
     }
 
-    [Test]
+    [Test, Platform("Win")] // a drive-letter path is a full path only on Windows
     public void Without_a_recorded_manifest_the_folders_own_is_read()
     {
         List<string> asked = [];
