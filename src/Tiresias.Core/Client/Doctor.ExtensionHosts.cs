@@ -45,6 +45,49 @@ public static partial class Doctor
     }
 
     /// <summary>
+    /// The unpacked extensions in a Chromium profile's <c>Secure Preferences</c> or <c>Preferences</c>:
+    /// those loaded from a folder in developer mode (location 4) or from the command line (8). They
+    /// live outside the <c>Extensions</c> folder, so this is the only place that names them. Nothing
+    /// vouches for one, so its publisher is always unknown, whatever its manifest claims. The manifest
+    /// recorded there is used, else the folder's own; a folder that isn't a local path (a share,
+    /// which reading would sign in to) is never read.
+    /// </summary>
+    /// <param name="read">Reads a file by its full path; <c>null</c> when missing.</param>
+    public static IEnumerable<InstalledExtension> UnpackedChromiumExtensions(ExtensionHost host, string? preferences, Func<string, string?> read) =>
+        ReadObject(preferences, root =>
+        {
+            if (!root.TryGetProperty("extensions", out var extensions) || extensions.ValueKind != JsonValueKind.Object)
+                return [];
+            List<InstalledExtension> found = [];
+            foreach (var settings in extensions.EnumerateObject().Where(p => p.Name is "settings" or "opsettings" && p.Value.ValueKind == JsonValueKind.Object))
+                foreach (var (id, entry) in settings.Value.EnumerateObject().Select(p => (p.Name, p.Value)))
+                {
+                    if (entry.ValueKind != JsonValueKind.Object || !entry.TryGetProperty("location", out var location)
+                        || !Number(location, out var where) || where is not (4 or 8))
+                        continue;
+                    var folder = Text(entry, "path") is { } path && Path.IsPathFullyQualified(path) && !path.StartsWith(@"\\", StringComparison.Ordinal) ? path : null;
+                    var manifest = entry.TryGetProperty("manifest", out var recorded) && recorded.ValueKind == JsonValueKind.Object
+                        ? recorded.GetRawText() : folder is null ? null : read(Path.Combine(folder, "manifest.json"));
+                    if (ChromiumExtension(host, id, manifest, locale => folder is null ? null : read(Path.Combine(folder, "_locales", locale, "messages.json")),
+                            ChromiumTime(Text(entry, "last_update_time") ?? Text(entry, "first_install_time"))) is { } extension)
+                        found.Add(extension with { Publisher = null });
+                }
+            return (IReadOnlyList<InstalledExtension>)found;
+        }) ?? [];
+
+    /// <summary>A whole number; <c>false</c> for any other value, which <c>TryGetInt64</c> would throw on.</summary>
+    static bool Number(JsonElement element, out long value)
+    {
+        value = 0;
+        return element.ValueKind == JsonValueKind.Number && element.TryGetInt64(out value);
+    }
+
+    /// <summary>Chromium's time stamps: microseconds since 1601 (a Windows file time), as text.</summary>
+    static DateTimeOffset? ChromiumTime(string? microseconds) =>
+        long.TryParse(microseconds, out var value) && value > 0 && value < DateTimeOffset.MaxValue.ToFileTime() / 10
+            ? DateTimeOffset.FromFileTime(value * 10).ToUniversalTime() : null;
+
+    /// <summary>
     /// The extensions in a Firefox profile's <c>extensions.json</c> that the user installed and has on
     /// (<c>app-profile</c>, not disabled): built-in and system add-ons are Firefox's own. One Mozilla
     /// signed (<c>signedState</c> 2 or more) is published through Firefox Add-ons, else unknown.
@@ -61,8 +104,8 @@ public static partial class Doctor
                     || addon.TryGetProperty("userDisabled", out var disabled) && disabled.ValueKind == JsonValueKind.True
                     || Text(addon, "id") is not { Length: > 0 } id)
                     continue;
-                var signed = addon.TryGetProperty("signedState", out var state) && state.TryGetInt32(out var value) && value >= 2;
-                DateTimeOffset? updated = addon.TryGetProperty("updateDate", out var stamp) && stamp.TryGetInt64(out var ms)
+                var signed = addon.TryGetProperty("signedState", out var state) && Number(state, out var value) && value >= 2;
+                DateTimeOffset? updated = addon.TryGetProperty("updateDate", out var stamp) && Number(stamp, out var ms)
                     && ms >= 0 && ms <= DateTimeOffset.MaxValue.ToUnixTimeMilliseconds() ? DateTimeOffset.FromUnixTimeMilliseconds(ms) : null;
                 var name = addon.TryGetProperty("defaultLocale", out var locale) && locale.ValueKind == JsonValueKind.Object ? Text(locale, "name") : null;
                 found.Add(new(host, id, Text(addon, "version"), signed ? "Firefox Add-ons" : null, updated, Name: string.IsNullOrWhiteSpace(name) ? null : name));

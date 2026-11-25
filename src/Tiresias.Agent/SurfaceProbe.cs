@@ -60,10 +60,22 @@ static partial class SurfaceProbe
     /// <summary>
     /// Each profile's (<c>Default</c>, <c>Profile 1</c>...) extensions, each at its newest version folder.
     /// The user data folder itself counts as a profile too: older Opera keeps its one profile there.
+    /// Unpacked ones, loaded from a folder elsewhere, are named only in the profile's preferences.
     /// </summary>
-    static IEnumerable<InstalledExtension> ChromiumExtensions(ExtensionHost host, string userData) =>
-        Folders(userData).Where(p => Path.GetFileName(p) is "Default" || Path.GetFileName(p).StartsWith("Profile ", StringComparison.Ordinal))
-            .Prepend(userData)
+    static IEnumerable<InstalledExtension> ChromiumExtensions(ExtensionHost host, string userData)
+    {
+        var profiles = Folders(userData).Where(p => Path.GetFileName(p) is "Default" || Path.GetFileName(p).StartsWith("Profile ", StringComparison.Ordinal))
+            .Prepend(userData).ToList();
+        return
+        [
+            .. PackedChromiumExtensions(host, profiles),
+            .. profiles.SelectMany(p => new[] { "Secure Preferences", "Preferences" }
+                .SelectMany(f => Doctor.UnpackedChromiumExtensions(host, ReadOrNull(Path.Combine(p, f)), ReadOrNull))),
+        ];
+    }
+
+    static IEnumerable<InstalledExtension> PackedChromiumExtensions(ExtensionHost host, IEnumerable<string> profiles) =>
+        profiles
             .SelectMany(p => Folders(Path.Combine(p, "Extensions")))
             .Select(e => Folders(e).Select(v => (Folder: v, Created: CreationTime(v))).OrderByDescending(v => v.Created).FirstOrDefault())
             .Where(v => v.Folder is not null)

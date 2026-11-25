@@ -72,7 +72,11 @@ Studio). Notepad++ plugins are the folders in `plugins` holding a DLL of the sam
 Files (both) and `%LOCALAPPDATA%\Notepad++\plugins`; the version is the DLL's file version and the
 publisher who signed it, when that signature verifies, else unknown.
 
-Unpacked browser extensions (loaded from a folder in developer mode) aren't read yet. None of these
+Unpacked browser extensions, loaded from a folder in developer mode or from the command line, live
+outside `Extensions`: they are the entries of a profile's `Secure Preferences` or `Preferences` with
+location 4 or 8, named by the manifest recorded there (else the folder's own `manifest.json`, read
+only when the folder is a local path, never a share). Nothing vouches for one, so its publisher is
+always unknown, whatever its manifest says. None of these
 hosts has a command to remove an extension, so their findings carry `RemoveExtensionByHand`, which
 names the host's page (`edge://extensions`, `about:addons`, **Extensions, Manage Extensions**,
 **Settings, Plugins, Installed**, **Plugins, Plugins Admin, Installed**); the app's **Copy** copies it.
