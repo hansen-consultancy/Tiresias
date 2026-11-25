@@ -1,6 +1,6 @@
 # Attack surface: less software, less to trust
 
-Status: **first slice, log-on use, uninstall-entry checks, unused applications, the Installed list and `tir doctor --surface` built** (#34, #55); the rest is design. [Guided setup](guided-setup.md) phase 5: it builds on the
+Status: **first slice, log-on use, uninstall-entry checks, unused applications, the Installed list, `tir doctor --surface`, per-item dismissals and trusted publishers built** (#34, #55, #108); the rest is design. [Guided setup](guided-setup.md) phase 5: it builds on the
 findings `tir doctor` reports since phase 1 and the findings section, fixes and dismissals the app
 gets in phase 2.
 
@@ -188,12 +188,26 @@ findings use phase 2's dismissals, a reason kept per finding, with two additions
   vulnerability is never covered by it. The trust is tied to the signing certificate's subject, so
   an item from a different signer is judged on its own.
 
-The first slice needs neither: it puts the reasons in the finding's name, so phase 2's key (name,
-fix, position) already brings a dismissal back for a new reason and keeps it through a version
-update. The two additions don't fit that record. A new credential changes the reach, not the
-name, and trust needs the publisher, so `Dismissal` gains the publisher, the accepted reasons and
-the credentials reached, and matches on those for surface findings. That changes
-`dismissals.json`, so its version bumps and the old file is read forward rather than dropped.
+**Built** (#108), except the credentials reached:
+
+- An extension, idle log-on or unused-program finding names its **item** (host and extension id,
+  log-on entry, or uninstall key), its **reasons** and its **signer**. Its dismissal is keyed by
+  the item, not the name, so it survives a version update; it records the signer and the reasons
+  it accepted, and comes back when the signer changes (or loses its valid signature) or a reason
+  it didn't accept appears. A reason gone keeps it dismissed. Every other finding keeps phase 2's
+  key (name, fix, position).
+- A **publisher** is the full Authenticode subject of a signature WinVerifyTrust accepts, checked
+  offline; never the thumbprint (it changes at each renewal) and never the name an uninstall entry
+  claims. An extension's publisher is its marketplace `publisherId`, never for a vsix or one with
+  no known publisher.
+- Trust hides only the findings that say an item is unused, idle at log-on, old or from an
+  unverified publisher. Blocked, unsigned, broken-entry and vulnerability findings are never
+  hidden by it. **Trust *publisher*** sits beside **Dismiss** on a finding whose items all share
+  one publisher, and in the Installed panel for a program with a valid signature. Home's
+  **Dismissed** lists each trusted publisher, with the findings it hides and **Stop trusting**,
+  even when it hides none; the Installed panel offers **Stop trusting** too.
+- `dismissals.json` is version 2: it adds `publishers` and the item fields. A version-1 file is
+  read forward, its dismissals still matching by name; a newer one is dropped.
 
 A dismissed blocked program stays blocked: the dismissal hides the finding, not the block, which
 only **Unblock** lifts.
@@ -338,6 +352,8 @@ unsigned. A program installed in the last 14 days gets a **New** mark: its entry
 days, not signed, or installed in the last 14 days, and the summary counts each. **Search online...** opens the browser with a web search for the name and version, on
 the user's click only; Tiresias itself sends nothing. Uninstalling goes through Settings, Apps, Installed apps
 (`UninstallApp`) until the inventory knows each program's installer command.
+**Dismissals per item and trusted publishers are built** (#108), as [Dismissals](#dismissals)
+says.
 [Guided setup](guided-setup.md#phases) lists what is still design.
 
 1. **Inventory**: applications, extensions, global tools and startup entries, with last use where

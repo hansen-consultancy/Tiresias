@@ -1,5 +1,7 @@
 using System.Security.Cryptography;
 using NSec.Cryptography;
+using Tiresias.Alerts;
+using Tiresias.Client;
 using Tiresias.EnvironmentVariables;
 using Tiresias.Protocol;
 using Tiresias.UserSecrets;
@@ -186,6 +188,39 @@ public static class RecoveryRestore
         if (AlertsStore.IsSealed && !AlertsStore.Opens(hello))
             names.Add("alerts");
         return names;
+    }
+
+    /// <summary>
+    /// A typed paper key, with its lookalike letters (<see cref="PaperKey.Read"/>) read the other way
+    /// when that, and only that, makes it the recipient this account stores or a key that opens a
+    /// sealed item here. <c>null</c> when the text is not a key at all.
+    /// </summary>
+    public static PaperKeyReading? Read(string typed)
+    {
+        var recipient = RecoveryEnrollment.Current()?.PublicKey ?? KeyringStore.Settings.RecoveryPublicKey;
+        var publicKey = recipient is null ? null : Convert.FromBase64String(recipient);
+        var opens = new Lazy<Func<IKeyWrapper, bool>>(SealedHere);
+        return PaperKey.Read(typed, paper =>
+        {
+            if (publicKey is not null && PaperKey.Matches(paper, publicKey))
+                return true;
+            using var key = Key.Import(KeyAgreementAlgorithm.X25519, paper, KeyBlobFormat.RawPrivateKey);
+            return opens.Value(X25519KeyWrapper.ForKey(RecoveryKey.WrapperId, key));
+        });
+    }
+
+    /// <summary>Whether a wrapper opens any sealed item here, with every file read once up front.</summary>
+    static Func<IKeyWrapper, bool> SealedHere()
+    {
+        var secrets = VaultPaths().SelectMany(path => VaultFile.Load(path).Secrets).ToArray();
+        var files = Projects().Where(f => ProjectKind(f) == SecretsFileKind.Sealed)
+            .Select(f => (f.Id, Text: File.ReadAllText(f.FilePath))).ToList();
+        if (AlertsStore.IsSealed)
+            files.Add((AlertsFile.Id, File.ReadAllText(AlertsStore.FilePath)));
+        var environment = EnvironmentStore.Exists;
+        return wrapper => secrets.Any(s => Opens(s, wrapper))
+            || files.Any(f => UserSecretsVault.Opens(f.Id, f.Text, wrapper))
+            || (environment && EnvironmentStore.Opens(wrapper));
     }
 
     static bool Opens(SealedSecret secret, IKeyWrapper hello)

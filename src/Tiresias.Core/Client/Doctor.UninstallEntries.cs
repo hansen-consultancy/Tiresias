@@ -232,17 +232,25 @@ public static partial class Doctor
     /// The <see cref="ProgramUse.Unused"/> programs of <see cref="InstalledPrograms"/> as findings,
     /// except one already reported as broken (its uninstaller is gone). Hygiene, not a warning: the
     /// status is <see cref="DoctorStatus.Ok"/>, so on Home they are one line, last, and don't count
-    /// for the badge.
+    /// for the badge. Each is about its entry, so dismissing one holds through updates; trust in the
+    /// verified signer of its <see cref="UninstallEntry.ProgramFile"/> hides it.
     /// </summary>
+    /// <param name="signer">Who signed a program file, when its signature verifies; asked only for the programs reported.</param>
     public static IEnumerable<DoctorCheck> UnusedApplications(IEnumerable<UninstallEntry> entries, IEnumerable<ProgramRun> runs,
-        IEnumerable<CredentialUse> uses, DateTimeOffset now) =>
+        IEnumerable<CredentialUse> uses, DateTimeOffset now, Func<string, Publisher?>? signer = null) =>
         InstalledPrograms(entries, runs, uses, now)
             .Where(p => p is { Use: ProgramUse.Unused, Entry: var e } && (e.Uninstaller is null || e.UninstallerExists))
             .OrderBy(p => p.Entry.Name, StringComparer.OrdinalIgnoreCase)
             .Select(p => new DoctorCheck($"{Label(p.Entry)} not opened since {p.LastOpened:yyyy-MM-dd}", DoctorStatus.Ok,
                 $"Nothing in {p.Entry.Folder} has been opened from the Start menu, the taskbar or Explorer in 90 days. "
                 + "Uninstall it if you don't need it: software you don't use still gets updates, or doesn't, and runs as you when something opens it",
-                new UninstallApp(p.Entry.Name, p.Entry.Machine), Kind: UnusedAppKind));
+                new UninstallApp(p.Entry.Name, p.Entry.Machine), Kind: UnusedAppKind)
+            {
+                Item = $"app {p.Entry.Key}".ToLowerInvariant(),
+                Reasons = [UnusedReason],
+                Signer = p.Entry.ProgramFile is { } file ? signer?.Invoke(file) : null,
+                TrustHides = true,
+            });
 
     /// <summary>A program's own folder, not a root such as <c>C:\Program Files</c> that holds everyone's.</summary>
     static bool Deep(string folder) => folder.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries).Length >= 3;

@@ -482,6 +482,14 @@
   <data name="Recovery_Heading" xml:space="preserve">
     <value>Restore sealed secrets</value>
   </data>
+  <data name="Recovery_LookalikesRead" xml:space="preserve">
+    <value>Some letters look alike, so they were read the other way: {0}. Correct them on your paper.</value>
+    <comment>{0} = Recovery_LookalikeRead items, comma-separated.</comment>
+  </data>
+  <data name="Recovery_LookalikeRead" xml:space="preserve">
+    <value>group {0}, {1} as {2}</value>
+    <comment>{0} = 1-based four-letter group, {1} = letter as typed, {2} = letter it was read as.</comment>
+  </data>
   <data name="Recovery_CompareFingerprint" xml:space="preserve">
     <value>Check that the administrator prompt shows this SHA-256 fingerprint for the new recipient.
 {0}</value>
@@ -2020,6 +2028,42 @@ Close them, then choose the update in the tray menu again.</value>
   </data>
   <data name="Finding_RestoreName" xml:space="preserve">
     <value>Show {0} again</value>
+  </data>
+  <data name="Finding_Trust" xml:space="preserve">
+    <value>Trust {0}</value>
+  </data>
+  <data name="Finding_TrustTip" xml:space="preserve">
+    <value>Hide findings that only say something {0} signed is unused or old, for everything it signs, now and after updates. A blocked program, a missing signature or a known vulnerability still shows.</value>
+  </data>
+  <data name="Finding_TrustedTitle" xml:space="preserve">
+    <value>You trust {0}</value>
+  </data>
+  <data name="Finding_TrustedHides" xml:space="preserve">
+    <value>Findings hidden: {0}. Trusted since {1}</value>
+  </data>
+  <data name="Finding_StopTrusting" xml:space="preserve">
+    <value>Stop trusting</value>
+  </data>
+  <data name="Finding_StopTrustingName" xml:space="preserve">
+    <value>Stop trusting {0}</value>
+  </data>
+  <data name="Installed_ColTrust" xml:space="preserve">
+    <value>Trust</value>
+  </data>
+  <data name="Installed_Trusted" xml:space="preserve">
+    <value>You trust {0}: findings that only say what it signed is unused or old are hidden</value>
+  </data>
+  <data name="Installed_NotTrusted" xml:space="preserve">
+    <value>Not trusted</value>
+  </data>
+  <data name="Installed_TrustNone" xml:space="preserve">
+    <value>Only a valid signature can be trusted</value>
+  </data>
+  <data name="Installed_TrustTip" xml:space="preserve">
+    <value>Hide findings that only say something this publisher signed is unused or old, for everything it signs, now and after updates. A blocked program, a missing signature or a known vulnerability still shows.</value>
+  </data>
+  <data name="Installed_TrustButton" xml:space="preserve">
+    <value>Trust {0}</value>
   </data>
   <data name="Finding_DismissFailed" xml:space="preserve">
     <value>The dismissal couldn't be saved: {0}</value>

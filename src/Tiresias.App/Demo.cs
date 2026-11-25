@@ -92,6 +92,8 @@ static class Demo
                     DemoScenario.UserAssistValue(DateTimeOffset.Parse(DemoScenario.Expand(at, "", profile, now), CultureInfo.InvariantCulture)),
                     RegistryValueKind.Binary);
         }
+        DemoMode.Signers = (scenario.Signers ?? new Dictionary<string, string>())
+            .ToDictionary(s => DemoScenario.Expand(s.Key, "", profile, now), s => DemoScenario.Signer(s.Value), StringComparer.OrdinalIgnoreCase);
         foreach (var (name, value) in scenario.Variables)
             UserMachine.SetUserVariable(name, value);
         // Placed as the Home links place them, at their default places in the made-up profile.

@@ -8,12 +8,39 @@ its section below.
 
 ## [Unreleased]
 
+### Added
+
+- **Trust a publisher.** An unused program, an idle log-on entry or an old extension now offers
+  **Trust *publisher*** beside **Dismiss** when a valid signature (or, for an extension, its
+  marketplace publisher) says who made it, and so does the **Installed** panel. Its findings of
+  that kind leave Home; blocked, unsigned or broken ones never do. Home's **Dismissed** lists each
+  trusted publisher with **Stop trusting**.
+
 ### Changed
 
+- **Dismissing an unused program, a log-on entry or an extension lasts through its updates**, and
+  comes back when its signer changes or a new reason appears. Earlier dismissals still apply.
 - **`tir doctor --surface` is quick again.** Listing the global `dotnet`, `npm`, `pipx` and `cargo`
   tools takes seconds, so it now happens once a day: the app does it in the background and keeps
   the list in `inventory.json` beside the keyring (names and versions only, on this PC only). The
   listing says when it was taken; `--refresh` lists the tools again now.
+
+### Fixed
+
+- **A paper recovery key with a misread S/5, Z/2, T/7 or U/V restores.** When the key as typed
+  opens nothing, **Restore**, the first-run wizard and `tir recovery restore` try those letters the
+  other way and take a reading only when it is this account's recovery key or opens a sealed item
+  here. They then name each letter read differently, so you can correct the paper. Asking back
+  two groups during setup forgives the same lookalikes.
+
+## [0.4.1] - 2026-11-25
+
+### Fixed
+
+- **0.4.0 stopped at "Recovery setup is unavailable" for anyone who is not an administrator.**
+  Reading the recovery enrollment asked Windows for write access to the local machine registry,
+  which only administrators have, so first run, alerts and Activity all failed with "Attempted to
+  perform an unauthorized operation." It now asks for read access only.
 
 ## [0.4.0] - 2026-11-24
 
@@ -532,7 +559,8 @@ were published as 0.2.0 and are unchanged.
   - `Tiresias.Core` is the vault, the trust chain, grants, leases and the audit log.
   - `Tiresias.Protocol` holds the wire formats.
 
-[Unreleased]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.4.0...HEAD
+[Unreleased]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.4.1...HEAD
+[0.4.1]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.4.0...app-v0.4.1
 [0.4.0]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.3.0...app-v0.4.0
 [0.3.0]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.2.1...app-v0.3.0
 [0.2.1]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.1.0-preview.4...app-v0.2.1

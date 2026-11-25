@@ -20,6 +20,7 @@ namespace Tiresias.App.Logic;
 /// <param name="SealedVariables">The sealed environment's global variables.</param>
 /// <param name="Registry">Keys under the made-up <c>HKCU</c>, by path (<c>Software\Microsoft\...\Uninstall\app</c>), with their values: text (with <see cref="Expand"/>'s tokens) or a whole number.</param>
 /// <param name="ProgramRuns">When each program was last opened from Explorer, the Start menu or the taskbar, by path; both with <see cref="Expand"/>'s tokens.</param>
+/// <param name="Signers">The program files whose signature is valid, by path (with <see cref="Expand"/>'s tokens), with the signing certificate's subject.</param>
 public sealed partial record DemoScenario(
     string Description,
     bool SetUp,
@@ -31,7 +32,8 @@ public sealed partial record DemoScenario(
     IReadOnlyDictionary<string, string> SealedVariables,
     IReadOnlyDictionary<string, IReadOnlyDictionary<string, object>> Registry,
     IReadOnlyDictionary<string, string> ProgramRuns,
-    IReadOnlyList<Tiresias.Decoys.DecoyKind>? Decoys = null)
+    IReadOnlyList<Tiresias.Decoys.DecoyKind>? Decoys = null,
+    IReadOnlyDictionary<string, string>? Signers = null)
 {
     static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { ReadCommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true };
 
@@ -45,7 +47,7 @@ public sealed partial record DemoScenario(
             k => (IReadOnlyDictionary<string, object>)k.Value.ToDictionary(v => v.Key, v => RegistryValue(k.Key, v.Key, v.Value)));
         return new(dto.Description ?? "", dto.SetUp ?? true, dto.Unlocked ?? false,
             dto.Files ?? [], dto.Secrets ?? [], dto.UserSecrets ?? [], dto.Variables ?? [], dto.SealedVariables ?? [],
-            registry, dto.ProgramRuns ?? [], dto.Decoys?.Select(DecoyKindOf).ToArray() ?? []);
+            registry, dto.ProgramRuns ?? [], dto.Decoys?.Select(DecoyKindOf).ToArray() ?? [], dto.Signers ?? []);
     }
 
     static object RegistryValue(string key, string name, JsonElement value) => value.ValueKind switch
@@ -148,7 +150,15 @@ public sealed partial record DemoScenario(
         Dictionary<string, string>? SealedVariables,
         Dictionary<string, Dictionary<string, JsonElement>>? Registry,
         Dictionary<string, string>? ProgramRuns,
-        string[]? Decoys);
+        string[]? Decoys,
+        Dictionary<string, string>? Signers);
+
+    /// <summary>The publisher a certificate subject (<c>CN=Name, O=..., C=...</c>) stands for, named by its common name.</summary>
+    public static Tiresias.Client.Publisher Signer(string subject) =>
+        Tiresias.Client.Publisher.Signed(subject, CommonName().Match(subject) is { Success: true } match ? match.Groups[1].Value.Trim() : null);
+
+    [GeneratedRegex(@"(?:^|,)\s*CN=([^,]+)")]
+    private static partial Regex CommonName();
 
     /// <summary>A decoy as a scenario names it: <c>passwordsFile</c>, <c>project</c> or <c>variables</c>.</summary>
     static Tiresias.Decoys.DecoyKind DecoyKindOf(string name) =>

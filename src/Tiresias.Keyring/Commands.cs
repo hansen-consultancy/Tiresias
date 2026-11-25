@@ -92,17 +92,26 @@ static class Commands
     static byte[] ReadPaper(string prompt)
     {
         const string invalid = "The recovery key must contain 13 groups of four letters and digits 2-7.";
+        PaperKeyReading? reading;
         if (Console.IsInputRedirected)
-            return PaperKey.Parse(Console.ReadLine() ?? "") ?? throw new UsageException(invalid);
-        var input = Terminal.ReadHidden(prompt);
-        try
+            reading = Agent.RecoveryRestore.Read(Console.ReadLine() ?? "");
+        else
         {
-            return PaperKey.Parse(System.Text.Encoding.UTF8.GetString(input)) ?? throw new UsageException(invalid);
+            var input = Terminal.ReadHidden(prompt);
+            try
+            {
+                reading = Agent.RecoveryRestore.Read(System.Text.Encoding.UTF8.GetString(input));
+            }
+            finally
+            {
+                Array.Clear(input);
+            }
         }
-        finally
-        {
-            Array.Clear(input);
-        }
+        if (reading is null)
+            throw new UsageException(invalid);
+        if (reading.Corrections.Count > 0)
+            Console.WriteLine($"Read lookalike letters the other way ({string.Join(", ", reading.Corrections)}). Correct them on your paper.");
+        return reading.Key;
     }
 
     /// <summary>

@@ -341,12 +341,14 @@ public sealed partial class FirstRunViewModel : ObservableObject
             MoveFrom(App.SetupFacts());
             return;
         }
-        var paper = PaperKey.Parse(RestoreKey);
-        if (paper is null)
+        var text = RestoreKey;
+        var reading = await Task.Run(() => RecoveryRestore.Read(text));
+        if (reading is null)
         {
             Message = Text.Get("FirstRun_RecoveryType_Invalid");
             return;
         }
+        var paper = reading.Key;
         RestoreSummary summary;
         try
         {
@@ -364,20 +366,23 @@ public sealed partial class FirstRunViewModel : ObservableObject
             Array.Clear(paper);
             throw;
         }
-        AppLog.Info($"first run: recovery restore, {summary.Restored} restored, {summary.AlreadyOpen} already open, {summary.NotOpened.Count} not opened");
+        AppLog.Info($"first run: recovery restore, {summary.Restored} restored, {summary.AlreadyOpen} already open, {summary.NotOpened.Count} not opened, {reading.Corrections.Count} lookalikes read");
         RestoreKey = "";
         App.Current.Refresh();
+        var corrected = RecoveryViewModel.Corrected(reading);
         if (!RecoveryKey.IsEnrolled)
         {
-            RestoreResult = RecoveryViewModel.Describe(summary) + Environment.NewLine + Text.Get("FirstRun_RecoveryMigrate_StillNeeded");
+            RestoreResult = corrected + RecoveryViewModel.Describe(summary) + Environment.NewLine + Text.Get("FirstRun_RecoveryMigrate_StillNeeded");
             return;
         }
-        if (summary.NotOpened.Count == 0)
+        // Stay on the page when letters were read differently, so the paper gets corrected.
+        if (summary.NotOpened.Count == 0 && corrected.Length == 0)
         {
             MoveFrom(App.SetupFacts());
             return;
         }
-        RestoreResult = RecoveryViewModel.Describe(summary) + Environment.NewLine + Text.Get("FirstRun_RecoveryRestore_Later");
+        RestoreResult = corrected + RecoveryViewModel.Describe(summary)
+            + (summary.NotOpened.Count == 0 ? "" : Environment.NewLine + Text.Get("FirstRun_RecoveryRestore_Later"));
         RestoreDone = true;
     }
 
