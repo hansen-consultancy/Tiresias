@@ -53,9 +53,13 @@ static partial class SurfaceProbe
         return found.GroupBy(e => (e.Host, e.Id)).Select(g => g.OrderByDescending(e => e.Updated).First());
     }
 
-    /// <summary>Each profile's (<c>Default</c>, <c>Profile 1</c>...) extensions, each at its newest version folder.</summary>
+    /// <summary>
+    /// Each profile's (<c>Default</c>, <c>Profile 1</c>...) extensions, each at its newest version folder.
+    /// The user data folder itself counts as a profile too: older Opera keeps its one profile there.
+    /// </summary>
     static IEnumerable<InstalledExtension> ChromiumExtensions(ExtensionHost host, string userData) =>
         Folders(userData).Where(p => Path.GetFileName(p) is "Default" || Path.GetFileName(p).StartsWith("Profile ", StringComparison.Ordinal))
+            .Prepend(userData)
             .SelectMany(p => Folders(Path.Combine(p, "Extensions")))
             .Select(e => Folders(e).Select(v => (Folder: v, Created: CreationTime(v))).OrderByDescending(v => v.Created).FirstOrDefault())
             .Where(v => v.Folder is not null)
