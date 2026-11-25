@@ -2212,6 +2212,30 @@ Close them, then choose the update in the tray menu again.</value>
   <data name="Installed_UseRecentNoRun" xml:space="preserve">
     <value>Not recorded, but it used credentials through Tiresias in the last 90 days</value>
   </data>
+  <data name="Installed_ShowExtensions" xml:space="preserve">
+    <value>Extensions</value>
+  </data>
+  <data name="Installed_ShowTools" xml:space="preserve">
+    <value>Global tools</value>
+  </data>
+  <data name="Installed_SummaryExtensions" xml:space="preserve">
+    <value>{0} extensions, {1} in programs that used credentials in 90 days</value>
+  </data>
+  <data name="Installed_SummaryTools" xml:space="preserve">
+    <value>{0} global tools, listed {1}</value>
+  </data>
+  <data name="Installed_ShortUpdated" xml:space="preserve">
+    <value>Updated {0}</value>
+  </data>
+  <data name="Installed_ShortUpdatedUnknown" xml:space="preserve">
+    <value>Not recorded</value>
+  </data>
+  <data name="Installed_UseAddOn" xml:space="preserve">
+    <value>Installed or last updated {0}. Its use isn't recorded: it runs whenever the program it belongs to does</value>
+  </data>
+  <data name="Installed_UseAddOnUnknown" xml:space="preserve">
+    <value>Its use and last update aren't recorded</value>
+  </data>
   <data name="Installed_Summary" xml:space="preserve">
     <value>{0} programs, {1} not opened in 90 days</value>
   </data>

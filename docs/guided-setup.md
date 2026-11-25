@@ -210,7 +210,7 @@ Existing windows remain the places where the work happens; this changes how peop
    deps.dev, marketplaces, winget-pkgs) and the vulnerability and unverified-publisher findings
    they raise; **Update** and `winget`/`dotnet tool`/`npm` uninstalls; global tools and other
    hosts' extensions; scope on a managed
-   PC; extensions and global tools on the **Installed** page; trusting a publisher; separate
+   PC; trusting a publisher; separate
    *How credentials are held* and *What can reach them* groups. The global tools are listed
    once a day, not per run (#107). `tir doctor --surface` lists the inventory (extensions with their host's
    reach, global tools, log-on entries with signature and last use).
