@@ -14,6 +14,53 @@ public class ExtensionHostTests
     static InstalledExtension? Chromium(string manifest, Func<string, string?>? messages = null, string id = Id) =>
         Doctor.ChromiumExtension(Edge, id, manifest, messages ?? (_ => null), Now);
 
+    static IEnumerable<InstalledExtension> Unpacked(string preferences, Func<string, string?>? read = null) =>
+        Doctor.UnpackedChromiumExtensions(Edge, preferences, read ?? (_ => null));
+
+    [Test]
+    public void An_unpacked_extension_comes_from_the_preferences_with_an_unknown_publisher()
+    {
+        var found = Unpacked($$"""
+            { "extensions": { "settings": {
+                "{{Id}}": { "location": 4, "path": "C:\\dev\\helper", "last_update_time": "13438465956610184",
+                    "manifest": { "name": "Acme Helper", "version": "0.1.0", "update_url": "https://clients2.google.com/service/update2/crx" } },
+                "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": { "location": 1, "path": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\\1.0_0", "manifest": { "name": "Store" } },
+                "cccccccccccccccccccccccccccccccc": { "location": 5, "manifest": { "name": "Built in" } }
+            } } }
+            """).ToList();
+
+        Assert.That(found, Is.EqualTo(new[] { new InstalledExtension(Edge, Id, "0.1.0", null, DateTimeOffset.FromFileTime(134384659566101840).ToUniversalTime(), Name: "Acme Helper") }));
+    }
+
+    [Test, Platform("Win")] // a drive-letter path is a full path only on Windows
+    public void Without_a_recorded_manifest_the_folders_own_is_read()
+    {
+        List<string> asked = [];
+        var found = Unpacked($$"""{ "extensions": { "opsettings": { "{{Id}}": { "location": 8, "path": "C:\\dev\\helper" } } } }""",
+            path => { asked.Add(path); return path.EndsWith("manifest.json", StringComparison.Ordinal) ? """{ "name": "__MSG_n__", "default_locale": "en" }""" : """{ "n": { "message": "Acme Helper" } }"""; }).Single();
+
+        Assert.That(found.Name, Is.EqualTo("Acme Helper"));
+        Assert.That(asked, Is.EqualTo(new[] { @"C:\dev\helper\manifest.json", @"C:\dev\helper\_locales\en\messages.json" }));
+    }
+
+    [TestCase(@"\\\\server\\share\\helper")]
+    [TestCase(@"relative\\helper")]
+    public void A_folder_on_a_share_or_relative_is_never_read(string path)
+    {
+        var read = false;
+        var found = Unpacked($$"""{ "extensions": { "settings": { "{{Id}}": { "location": 4, "path": "{{path}}" } } } }""", _ => { read = true; return null; });
+
+        Assert.That(found, Is.Empty);
+        Assert.That(read, Is.False);
+    }
+
+    [TestCase(null)]
+    [TestCase("not json")]
+    [TestCase("""{ "extensions": [] }""")]
+    [TestCase("""{ "extensions": { "settings": { "abcdefghijklmnopabcdefghijklmnop": { "location": "4" } } } }""")]
+    public void Damaged_preferences_name_none(string? preferences) =>
+        Assert.That(Doctor.UnpackedChromiumExtensions(Edge, preferences, _ => null), Is.Empty);
+
     [Test]
     public void A_store_extension_names_its_store_as_publisher()
     {
@@ -87,6 +134,16 @@ public class ExtensionHostTests
     [TestCase("""{ "addons": 3 }""")]
     public void A_missing_or_odd_Firefox_file_lists_nothing(string? json) =>
         Assert.That(Doctor.FirefoxExtensions(Firefox, json), Is.Empty);
+
+    [Test]
+    public void A_number_written_as_text_counts_as_missing()
+    {
+        var found = Doctor.FirefoxExtensions(Firefox, """
+            { "addons": [ { "id": "a@example.com", "type": "extension", "location": "app-profile", "signedState": "2", "updateDate": "1" } ] }
+            """).Single();
+
+        Assert.That((found.Publisher, found.Updated), Is.EqualTo(((string?)null, (DateTimeOffset?)null)));
+    }
 
     [Test]
     public void Visual_Studio_reads_the_manifest_identity()

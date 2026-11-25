@@ -208,9 +208,8 @@ Existing windows remain the places where the work happens; this changes how peop
    finding's reasons are in its name, so a dismissal survives a version
    update and a new reason brings it back. Still design: the opt-in trust lookups (OSV,
    deps.dev, marketplaces, winget-pkgs) and the vulnerability and unverified-publisher findings
-   they raise; **Update** and `winget`/`dotnet tool`/`npm` uninstalls; global tools and
-   JetBrains and Notepad++ plugins (browser and Visual Studio extensions and PowerShell modules are
-   read, #107);
+   they raise; **Update** and `winget`/`dotnet tool`/`npm` uninstalls (browser, unpacked,
+   Visual Studio, JetBrains and Notepad++ extensions and PowerShell modules are read, #107);
    trusting a publisher; separate
    *How credentials are held* and *What can reach them* groups. The global tools are listed
    once a day, not per run, and on a managed PC only what the user installed is judged (#107). `tir doctor --surface` lists the inventory (extensions with their host's

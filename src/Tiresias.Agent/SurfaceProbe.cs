@@ -42,6 +42,8 @@ static partial class SurfaceProbe
         ("WindowsPowerShell", new("Windows PowerShell", "powershell.exe", null, "Uninstall-Module")),
     ];
 
+    static readonly ExtensionHost NotepadPlusPlus = new("Notepad++", "notepad++.exe", null, "Plugins, Plugins Admin, Installed");
+
     public static IEnumerable<InstalledExtension> Extensions()
     {
         var profile = UserMachine.Folder(Environment.SpecialFolder.UserProfile);
@@ -56,6 +58,8 @@ static partial class SurfaceProbe
                 .Select(e => Path.Combine(e, "extension.vsixmanifest"))
                 .Select(m => Doctor.VisualStudioExtension(VisualStudio, ReadOrNull(m), WriteTime(m))).OfType<InstalledExtension>(),
             .. PowerShells.SelectMany(p => PowerShellModules(p.Host, Path.Combine(UserMachine.Folder(Environment.SpecialFolder.MyDocuments), p.Folder, "Modules"))),
+            .. JetBrainsPlugins(Path.Combine(roaming, "JetBrains")),
+            .. NotepadPlusPlusPlugins(local),
         ];
         // The same extension in two profiles, or two Visual Studio versions, is one item; its newest copy speaks for it.
         return found.GroupBy(e => (e.Host, e.Id)).Select(g => g.OrderByDescending(e => e.Updated).First());
@@ -64,10 +68,22 @@ static partial class SurfaceProbe
     /// <summary>
     /// Each profile's (<c>Default</c>, <c>Profile 1</c>...) extensions, each at its newest version folder.
     /// The user data folder itself counts as a profile too: older Opera keeps its one profile there.
+    /// Unpacked ones, loaded from a folder elsewhere, are named only in the profile's preferences.
     /// </summary>
-    static IEnumerable<InstalledExtension> ChromiumExtensions(ExtensionHost host, string userData) =>
-        Folders(userData).Where(p => Path.GetFileName(p) is "Default" || Path.GetFileName(p).StartsWith("Profile ", StringComparison.Ordinal))
-            .Prepend(userData)
+    static IEnumerable<InstalledExtension> ChromiumExtensions(ExtensionHost host, string userData)
+    {
+        var profiles = Folders(userData).Where(p => Path.GetFileName(p) is "Default" || Path.GetFileName(p).StartsWith("Profile ", StringComparison.Ordinal))
+            .Prepend(userData).ToList();
+        return
+        [
+            .. PackedChromiumExtensions(host, profiles),
+            .. profiles.SelectMany(p => new[] { "Secure Preferences", "Preferences" }
+                .SelectMany(f => Doctor.UnpackedChromiumExtensions(host, ReadOrNull(Path.Combine(p, f)), ReadOrNull))),
+        ];
+    }
+
+    static IEnumerable<InstalledExtension> PackedChromiumExtensions(ExtensionHost host, IEnumerable<string> profiles) =>
+        profiles
             .SelectMany(p => Folders(Path.Combine(p, "Extensions")))
             .Select(e => Folders(e).Select(v => (Folder: v, Created: CreationTime(v))).OrderByDescending(v => v.Created).FirstOrDefault())
             .Where(v => v.Folder is not null)
@@ -83,6 +99,89 @@ static partial class SurfaceProbe
             var folder = version is null ? module : Path.Combine(module, version);
             return Doctor.PowerShellModule(host, Path.GetFileName(module), version, ReadOrNull(Path.Combine(folder, "PSGetModuleInfo.xml")), CreationTime(folder));
         }).OfType<InstalledExtension>();
+    /// <summary>
+    /// The plugins of the newest settings folder of each JetBrains IDE: a <c>.jar</c> in <c>plugins</c>,
+    /// or a folder there whose <c>lib</c> holds the jar with the plugin's <c>META-INF/plugin.xml</c>.
+    /// </summary>
+    static IEnumerable<InstalledExtension> JetBrainsPlugins(string jetBrains) =>
+        Folders(jetBrains).Select(f => (Folder: f, Ide: Doctor.JetBrainsIde(Path.GetFileName(f))))
+            .Where(f => f.Ide is not null)
+            .GroupBy(f => f.Ide!.Value.Host)
+            .Select(g => g.MaxBy(f => f.Ide!.Value.Version))
+            .SelectMany(ide => Entries(Path.Combine(ide.Folder, "plugins")).Select(plugin => Directory.Exists(plugin)
+                ? Doctor.JetBrainsPlugin(ide.Ide!.Value.Host, Files(Path.Combine(plugin, "lib"), "*.jar")
+                    .OrderByDescending(j => Path.GetFileNameWithoutExtension(j).StartsWith(Path.GetFileName(plugin), StringComparison.OrdinalIgnoreCase))
+                    .Select(PluginXml).FirstOrDefault(x => x is not null), CreationTime(plugin))
+                : plugin.EndsWith(".jar", StringComparison.OrdinalIgnoreCase) ? Doctor.JetBrainsPlugin(ide.Ide!.Value.Host, PluginXml(plugin), WriteTime(plugin)) : null))
+            .OfType<InstalledExtension>();
+
+    /// <summary>A jar's <c>META-INF/plugin.xml</c>, read without unpacking anything else; <c>null</c> when it has none.</summary>
+    static string? PluginXml(string jar)
+    {
+        try
+        {
+            using var zip = System.IO.Compression.ZipFile.OpenRead(jar);
+            if (zip.GetEntry("META-INF/plugin.xml") is not { Length: <= 1024 * 1024 } entry)
+                return null;
+            using var reader = new StreamReader(entry.Open());
+            return reader.ReadToEnd();
+        }
+        catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Notepad++ plugins: those of an install in Program Files (not in demo mode, which never reads
+    /// this machine's), and those Notepad++ loads for the user from local app data.
+    /// </summary>
+    static IEnumerable<InstalledExtension> NotepadPlusPlusPlugins(string local) =>
+        (DemoMode.On ? [] : new[] { Environment.SpecialFolder.ProgramFiles, Environment.SpecialFolder.ProgramFilesX86 }
+                .Select(f => Path.Combine(Environment.GetFolderPath(f), "Notepad++", "plugins")))
+            .Append(Path.Combine(local, "Notepad++", "plugins"))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .SelectMany(Folders)
+            .Select(folder => (Folder: folder, Dll: Path.Combine(folder, Path.GetFileName(folder) + ".dll")))
+            .Where(p => File.Exists(p.Dll))
+            .Select(p => Doctor.NotepadPlusPlusPlugin(NotepadPlusPlus, Path.GetFileName(p.Folder), FileVersion(p.Dll), Signature(p.Dll).Publisher?.Name, WriteTime(p.Dll)))
+            .OfType<InstalledExtension>();
+
+    static string? FileVersion(string file)
+    {
+        try
+        {
+            return FileVersionInfo.GetVersionInfo(file).FileVersion;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    static IEnumerable<string> Entries(string path)
+    {
+        try
+        {
+            return Directory.Exists(path) ? Directory.GetFileSystemEntries(path) : [];
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return [];
+        }
+    }
+
+    static IEnumerable<string> Files(string path, string pattern)
+    {
+        try
+        {
+            return Directory.Exists(path) ? Directory.GetFiles(path, pattern) : [];
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return [];
+        }
+    }
 
     static IEnumerable<string> Folders(string path)
     {
