@@ -8,6 +8,14 @@ its section below.
 
 ## [Unreleased]
 
+### Changed
+
+- **On a managed PC, only what you installed is checked.** When the PC is joined to a domain or to
+  Microsoft Entra ID, or enrolled in device management, software installed for everyone is your
+  administrator's: it stays under **Installed**, but raises no finding about log-on entries,
+  uninstall entries or unused programs. A line in the checks says why. A blocked program is still
+  reported wherever it is.
+
 ### Added
 
 - **Startup** lists everything that starts when you sign in without being opened: the Run keys,

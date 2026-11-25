@@ -164,6 +164,9 @@ public interface IDoctorProbe
     /// <summary>The uninstall registry entries, machine and user, each with whether its uninstaller and folder are on disk.</summary>
     IEnumerable<UninstallEntry> UninstallEntries() => [];
 
+    /// <summary>Whether a domain, Entra ID or device management manages this PC.</summary>
+    Management Management => Management.None;
+
     /// <summary>Uses of a decoy, from the activity log.</summary>
     IEnumerable<DecoyUseRecord> DecoyUses() => [];
 
@@ -308,9 +311,12 @@ public static partial class Doctor
         checks.AddRange(Devcontainers(probe.Devcontainers(workspaces), probe.DevcontainerForwarding));
         ForDevelopers(checks, developer);
         var (uses, now) = (probe.CredentialUses().ToArray(), DateTimeOffset.UtcNow);
-        checks.AddRange(AttackSurface(probe.Extensions(), startup, uses, otherBlocks, now, runs));
-        checks.AddRange(UninstallEntries(installed));
-        checks.AddRange(UnusedApplications(installed, runs, uses, now, probe.Signer));
+        var management = probe.Management;
+        checks.AddRange(Managed(management));
+        var (judgedStartup, judgedInstalled) = Judged(management, startup, installed);
+        checks.AddRange(AttackSurface(probe.Extensions(), judgedStartup, uses, otherBlocks, now, runs));
+        checks.AddRange(UninstallEntries(judgedInstalled));
+        checks.AddRange(UnusedApplications(judgedInstalled, runs, uses, now, probe.Signer));
         return checks;
     }
 

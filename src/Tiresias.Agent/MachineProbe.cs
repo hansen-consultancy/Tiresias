@@ -233,6 +233,8 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public IEnumerable<UninstallEntry> UninstallEntries() => SurfaceProbe.UninstallEntries();
 
+    public Management Management => ManagementProbe.Read();
+
     public IEnumerable<string> BlockedPrograms() => SurfaceProbe.BlockedPrograms();
 
     /// <inheritdoc cref="SurfaceProbe.Signature"/>
