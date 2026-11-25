@@ -35,6 +35,9 @@ sealed class BuildDisk : IBuildDisk
 
     public IEnumerable<string> FileNames(string folder)
     {
+        // "C:" alone is drive C's current folder, not its root.
+        if (folder.Length == 2 && folder[1] == ':')
+            folder += @"\";
         try
         {
             return Directory.Exists(folder) ? [.. Directory.EnumerateFiles(folder).Select(Path.GetFileName).OfType<string>()] : [];

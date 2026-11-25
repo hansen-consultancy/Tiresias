@@ -335,7 +335,7 @@ the user's click only; Tiresias itself sends nothing. Uninstalling goes through 
 (`UninstallApp`) until the inventory knows each program's installer command.
 **The Startup list is built** (#98), beside Installed: the user and machine Run keys and the
 Startup folder, entries turned off in Task Manager or Settings included (marked **Off**), and the
-scheduled tasks with a log-on trigger for anyone or for the user, read in process through the Task
+scheduled tasks with a log-on trigger for anyone, the user or a group the user is in, read in process through the Task
 Scheduler's COM interface (Windows' own `\Microsoft\Windows` tasks left out; none in demo mode).
 Each entry names the installed app whose folder holds its program (the deepest one), or "Not from
 an installed app", which sorts first; its last opening by the user (UserAssist), the credentials it

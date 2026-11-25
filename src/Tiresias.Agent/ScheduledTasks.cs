@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Security.Principal;
 using Tiresias.Client;
 
 namespace Tiresias.Agent;
@@ -6,7 +7,7 @@ namespace Tiresias.Agent;
 /// <summary>
 /// The scheduled tasks that start a program when someone signs in, read through the Task Scheduler's
 /// own COM interface, in process and as the user: only the tasks the user may read, nothing run.
-/// Windows' own tasks (<c>\Microsoft\Windows</c>) and those for another user's log-on are left out. None in demo mode.
+/// Windows' own tasks (<c>\Microsoft\Windows</c>) and those for another user's log-on only are left out. None in demo mode.
 /// </summary>
 static class ScheduledTasks
 {
@@ -66,14 +67,28 @@ static class ScheduledTasks
         }
     }
 
-    /// <summary>A log-on trigger for anyone (no user named) or for the current user, by account name or SID.</summary>
+    /// <summary>
+    /// A log-on trigger that fires when the current user signs in: no account named, the user, or a
+    /// group the user is in (by name or SID). One naming an account that can't be resolved counts too,
+    /// so an entry is shown rather than hidden; only another user's account is left out.
+    /// </summary>
     static bool ForYou(string? user)
     {
         if (string.IsNullOrEmpty(user))
             return true;
-        using var you = System.Security.Principal.WindowsIdentity.GetCurrent();
-        return user.Equals(you.Name, StringComparison.OrdinalIgnoreCase) || user.Equals(you.User?.Value, StringComparison.OrdinalIgnoreCase)
-            || user.Equals(Environment.UserName, StringComparison.OrdinalIgnoreCase);
+        using var you = WindowsIdentity.GetCurrent();
+        SecurityIdentifier sid;
+        try
+        {
+            sid = user.StartsWith("S-", StringComparison.OrdinalIgnoreCase)
+                ? new SecurityIdentifier(user)
+                : (SecurityIdentifier)new NTAccount(user).Translate(typeof(SecurityIdentifier));
+        }
+        catch (Exception e) when (e is IdentityNotMappedException or ArgumentException or SystemException)
+        {
+            return true;
+        }
+        return sid == you.User || you.Groups?.Contains(sid) == true;
     }
 
     static void Read(dynamic task, List<StartupEntry> entries, HashSet<string> tray)

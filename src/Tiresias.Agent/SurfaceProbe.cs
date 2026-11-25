@@ -77,7 +77,10 @@ static partial class SurfaceProbe
 
     internal static StartupEntry Entry(string name, string where, string path, string? item, HashSet<string> tray, bool on)
     {
+        // Signature reads local files only; a program on a share still gets its verdict, so unsigned stays a warning.
         var (valid, signer) = Signature(path);
+        if (valid is null && File.Exists(path))
+            valid = IsSigned(path);
         return new(name, where, path, valid, item, tray.Contains(path), on, OwnBuild.Looks(path, valid, signer, BuildDisk.Instance));
     }
 
