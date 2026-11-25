@@ -41,7 +41,8 @@ static class ScheduledTasks
     static void Walk(dynamic folder, List<StartupEntry> entries, HashSet<string> tray)
     {
         string path = folder.Path;
-        if (path.StartsWith(@"\Microsoft\Windows", StringComparison.OrdinalIgnoreCase))
+        if (path.Equals(@"\Microsoft\Windows", StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith(@"\Microsoft\Windows\", StringComparison.OrdinalIgnoreCase))
             return;
         dynamic tasks = folder.GetTasks(IncludeHidden);
         for (var i = 1; i <= (int)tasks.Count; i++)
