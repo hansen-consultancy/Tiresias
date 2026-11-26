@@ -50,6 +50,40 @@ public class SupplyChainTests
     }
 
     [Test]
+    public void The_users_npmrc_wins_over_npms_global_one()
+    {
+        var npm = Path.Combine(Profile, "AppData", "Roaming", "npm");
+        var files = Doctor.NpmSettingsFiles(Profile, npm);
+        var tool = new DoctorToolchain(Toolchain.Npm, "11.12.0",
+            [new(files[0], "ignore-scripts=false\nmin-release-age=1\n"), new(files[1], "ignore-scripts=true\nmin-release-age=7\n")], new Dictionary<string, string>());
+
+        Assert.That(files[1], Is.EqualTo(Path.Combine(Profile, ".npmrc")));
+        Assert.That(Lines(tool)["npm install scripts"].Status, Is.EqualTo(DoctorStatus.Ok));
+        Assert.That(Lines(tool)["npm release age"].Detail, Does.Contain("7 days"));
+    }
+
+    [Test]
+    public void Pips_appdata_file_wins_over_the_legacy_one()
+    {
+        var roaming = Path.Combine(Profile, "AppData", "Roaming");
+        var files = Doctor.PipSettingsFiles(Profile, roaming);
+        var tool = new DoctorToolchain(Toolchain.Pip, "26.1",
+            [new(files[0], "[global]\nonly-binary = :none:\n"), new(files[1], "[global]\nonly-binary = :all:\n")], new Dictionary<string, string>());
+
+        Assert.That(files[1], Is.EqualTo(Path.Combine(roaming, "pip", "pip.ini")));
+        Assert.That(Lines(tool)["pip install scripts"].Detail, Does.Contain("wheels only"));
+    }
+
+    [Test]
+    public void Pnpm_of_unknown_version_may_run_every_install_script()
+    {
+        var line = Lines(Tool(Toolchain.Pnpm, null))["pnpm install scripts"];
+
+        Assert.That(line.Status, Is.EqualTo(DoctorStatus.Warn));
+        Assert.That(line.Detail, Does.Contain("version unknown"));
+    }
+
+    [Test]
     public void Pnpm_10_reads_npmrc_and_pnpm_11_only_its_yaml()
     {
         var ten = new DoctorToolchain(Toolchain.Pnpm, "10.20.0", [new(Path.Combine(Profile, ".npmrc"), "minimum-release-age=10080\n")], new Dictionary<string, string>());
@@ -141,6 +175,19 @@ public class SupplyChainTests
             "<configuration><packageSources><add key=\"corp\" value=\"https://pkgs.example.com/feed/index.json\" /></packageSources></configuration>", "NuGet.Config"));
 
         Assert.That(lines["NuGet release age"].Fix!.Instruction, Is.EqualTo("dotnet nuget update source <source> --min-publish-age-hours 168"));
+    }
+
+    [Test]
+    public void NuGet_partly_gated_names_the_source_still_ungated()
+    {
+        static string Fix(string sources) => Lines(Tool(Toolchain.NuGet, "11.0.100",
+            $"<configuration><packageSources>{sources}</packageSources></configuration>", "NuGet.Config"))["NuGet release age"].Fix!.Instruction;
+        const string Org = "<add key=\"nuget.org\" value=\"https://api.nuget.org/v3/index.json\" minPublishAgeHours=\"168\" />";
+        const string Corp = "<add key=\"corp\" value=\"https://pkgs.example.com/feed/index.json\" />";
+
+        Assert.That(Fix(Org + Corp), Does.StartWith("dotnet nuget update source <source> "));
+        Assert.That(Fix(Org.Replace(" minPublishAgeHours=\"168\"", "") + Corp.Replace(" />", " minPublishAgeHours=\"168\" />")),
+            Does.StartWith("dotnet nuget update source nuget.org "));
     }
 
     [Test]

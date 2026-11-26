@@ -78,6 +78,14 @@ public static partial class Doctor
         "CARGO_REGISTRY_GLOBAL_MIN_PUBLISH_AGE",
     ];
 
+    /// <summary>npm's settings files, lowest precedence first: its global <c>etc\npmrc</c> under the folder <c>npm.cmd</c> is in, then the user's <c>.npmrc</c>.</summary>
+    public static string[] NpmSettingsFiles(string profile, string npmFolder) =>
+        [Path.Combine(npmFolder, "etc", "npmrc"), Path.Combine(profile, ".npmrc")];
+
+    /// <summary>pip's user settings files, lowest precedence first: the legacy <c>~\pip\pip.ini</c>, then <c>%APPDATA%\pip\pip.ini</c>.</summary>
+    public static string[] PipSettingsFiles(string profile, string roaming) =>
+        [Path.Combine(profile, "pip", "pip.ini"), Path.Combine(roaming, "pip", "pip.ini")];
+
     /// <summary>Whether <paramref name="name"/> is a toolchain setting the probe may read the value of.</summary>
     public static bool IsToolchainVariable(string name) => ToolchainVariables.Contains(name, StringComparer.OrdinalIgnoreCase);
 
@@ -120,8 +128,11 @@ public static partial class Doctor
         if (settings.Flag("dangerously-allow-all-builds") == true)
             yield return Scripts("pnpm", DoctorStatus.Warn, $"{label} runs every dependency's build script: dangerouslyAllowAllBuilds is on",
                 new ChangeToolSetting("pnpm config set dangerouslyAllowAllBuilds false"));
-        else if (version is null || version >= new Version(10, 0))
+        else if (version >= new Version(10, 0))
             yield return Scripts("pnpm", DoctorStatus.Ok, $"{label} runs a dependency's build script only when the project's allowBuilds names it");
+        else if (version is null)
+            yield return Scripts("pnpm", DoctorStatus.Warn, $"{label} may run every dependency's install script as you: pnpm before 10 did. pnpm 10 runs only those a project allows",
+                new ChangeToolSetting("npm install -g pnpm@latest (or pnpm self-update)"));
         else
             yield return Scripts("pnpm", DoctorStatus.Warn, $"{label} runs every dependency's install script as you. pnpm 10 runs only those a project allows",
                 new ChangeToolSetting("npm install -g pnpm@latest (or pnpm self-update)"));
@@ -226,7 +237,9 @@ public static partial class Doctor
 
         var sources = config?.Sources ?? [];
         var gated = sources.Count(s => s.Hours > 0);
-        var source = sources.Any(s => s.Source.Equals("nuget.org", StringComparison.OrdinalIgnoreCase)) || sources.Count == 0 ? "nuget.org" : "<source>";
+        // The fix names a source still ungated; any but nuget.org is a placeholder, so no private feed is printed.
+        var ungated = sources.FirstOrDefault(s => s.Hours == 0).Source;
+        var source = ungated is null || ungated.Equals("nuget.org", StringComparison.OrdinalIgnoreCase) ? "nuget.org" : "<source>";
         if (gated > 0 && gated == sources.Count)
             yield return Age("NuGet", DoctorStatus.Ok,
                 $"{label} adds and updates only packages at least {Days(sources.Min(s => s.Hours) / 24.0)} old (minPublishAgeHours on every source)");

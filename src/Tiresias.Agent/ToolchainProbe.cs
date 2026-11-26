@@ -26,7 +26,7 @@ static class ToolchainProbe
         var npm = On("npm.cmd");
         var npmrc = Path.Combine(profile, ".npmrc");
         if (npm is not null)
-            yield return new(Toolchain.Npm, PackageVersion(npm, "npm"), Files(npmrc, GlobalNpmrc(npm)), variables);
+            yield return new(Toolchain.Npm, PackageVersion(npm, "npm"), Files(Doctor.NpmSettingsFiles(profile, Path.GetDirectoryName(npm)!)), variables);
 
         var pnpm = On("pnpm.cmd", "pnpm.exe");
         if (pnpm is not null)
@@ -49,7 +49,7 @@ static class ToolchainProbe
 
         var pip = On("pip.exe", "pip3.exe");
         if (pip is not null)
-            yield return new(Toolchain.Pip, PipVersion(pip) ?? FileVersion(pip), Files(Path.Combine(roaming, "pip", "pip.ini"), Path.Combine(profile, "pip", "pip.ini")), variables);
+            yield return new(Toolchain.Pip, PipVersion(pip) ?? FileVersion(pip), Files(Doctor.PipSettingsFiles(profile, roaming)), variables);
 
         var uv = On("uv.exe");
         if (uv is not null)
@@ -105,9 +105,6 @@ static class ToolchainProbe
             return JsonVersion(text);
         return shim.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? FileVersion(shim) : null;
     }
-
-    /// <summary>npm's own global <c>npmrc</c>, in <c>etc</c> under its prefix: the folder <c>npm.cmd</c> is in on Windows.</summary>
-    static string GlobalNpmrc(string npm) => Path.Combine(Path.GetDirectoryName(npm)!, "etc", "npmrc");
 
     static string? JsonVersion(string text)
     {
