@@ -11,8 +11,8 @@ its section below.
 ### Added
 
 - **Update and uninstall with the package manager that installed it.** On **Installed**, a program
-  winget installed, and a `dotnet` or `npm` global tool, has **Update to *version*...** when its
-  manager knows a newer version, and **Uninstall with *manager*...**. A program whose uninstaller is
+  winget installed has **Update to *version*...** when winget offers a newer version, a `dotnet` or
+  `npm` global tool has **Update...**, and each has **Uninstall with *manager*...**. A program whose uninstaller is
   missing gets **Repair...**, which reinstalls the same version with winget. Each says exactly what
   will run and asks first; software installed for everyone asks Windows for an administrator.
 

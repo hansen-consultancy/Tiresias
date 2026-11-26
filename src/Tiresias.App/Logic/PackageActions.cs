@@ -30,8 +30,6 @@ public static class PackageActions
     public static string? Target(PackageFix fix) => fix switch
     {
         { Change: PackageChange.Update, Command: { Manager: "winget", Arguments: [.., "--version", var version] } } => version,
-        { Change: PackageChange.Update, Command: { Manager: "npm", Arguments: [.., var package] } } when package.LastIndexOf('@', StringComparison.Ordinal) > 0 =>
-            package[(package.LastIndexOf('@', StringComparison.Ordinal) + 1)..],
         _ => null,
     };
 

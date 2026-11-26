@@ -100,12 +100,11 @@ public class PackageFixTests
     }
 
     [Test]
-    public void Npm_updates_only_to_a_newer_version_its_registry_named_and_runs_through_cmd()
+    public void Npm_updates_to_the_latest_when_asked_and_runs_through_cmd()
     {
         GlobalTool tool = new("npm", "@acme/cli", "3.0.0");
 
-        Assert.That(Packages.Update(tool), Is.Null);
-        Assert.That(Packages.Update(tool with { Latest = "3.1.0" })?.Instruction, Is.EqualTo("npm install --global @acme/cli@3.1.0"));
+        Assert.That(Packages.Update(tool)?.Instruction, Is.EqualTo("npm install --global @acme/cli@latest"));
         var uninstall = Packages.Uninstall(tool)!;
         Assert.That(uninstall.Instruction, Is.EqualTo("npm uninstall --global @acme/cli"));
         Assert.That(uninstall.Command.Start.Program, Is.EqualTo("cmd.exe"));
@@ -126,8 +125,8 @@ public class PackageFixTests
             Assert.That(Packages.Update(new WingetPackage("Acme", id, "1.0", "1.1"), machine: false), Is.Null);
             return;
         }
-        Assert.That(Packages.Uninstall(new GlobalTool(manager, id, "1.0", "1.1")), Is.Null);
-        Assert.That(Packages.Update(new GlobalTool(manager, id, "1.0", "1.1")), Is.Null);
+        Assert.That(Packages.Uninstall(new GlobalTool(manager, id, "1.0")), Is.Null);
+        Assert.That(Packages.Update(new GlobalTool(manager, id, "1.0")), Is.Null);
     }
 
     [TestCase("1.1 & calc")]
@@ -135,18 +134,6 @@ public class PackageFixTests
     public void No_update_is_built_to_a_version_that_isnt_a_plain_number(string version)
     {
         Assert.That(Packages.Update(new WingetPackage("Acme", "Acme.App", "1.0", version), machine: false), Is.Null);
-        Assert.That(Packages.Update(new GlobalTool("npm", "acme", "1.0", version)), Is.Null);
-    }
-
-    [Test]
-    public void Npm_outdated_names_the_newer_version_of_npm_tools_only()
-    {
-        const string outdated = """{ "sass": { "current": "1.0.0", "wanted": "1.2.0", "latest": "1.2.0" }, "acme": { "latest": "9.0.0" } }""";
-        GlobalTool[] tools = [new("npm", "sass", "1.0.0"), new("npm", "other", "2.0.0"), new("dotnet", "acme", "1.0.0")];
-
-        Assert.That(Packages.WithLatest(tools, outdated), Is.EqualTo(new GlobalTool[]
-            { new("npm", "sass", "1.0.0", "1.2.0"), new("npm", "other", "2.0.0"), new("dotnet", "acme", "1.0.0") }));
-        Assert.That(Packages.WithLatest(tools, "not json"), Is.EqualTo(tools));
     }
 
     [Test]
@@ -164,7 +151,7 @@ public class PackageFixTests
     public void An_update_button_names_the_version_it_moves_to_when_known()
     {
         Assert.That(PackageActions.Target(Packages.Update(new WingetPackage("Acme", "Acme.App", "1.0", "1.1"), false)!), Is.EqualTo("1.1"));
-        Assert.That(PackageActions.Target(Packages.Update(new GlobalTool("npm", "@acme/cli", "1.0", "2.0"))!), Is.EqualTo("2.0"));
+        Assert.That(PackageActions.Target(Packages.Update(new GlobalTool("npm", "@acme/cli", "1.0"))!), Is.Null);
         var dotnet = Packages.Update(new GlobalTool("dotnet", "acme", "1.0"))!;
         Assert.That(PackageActions.Target(dotnet), Is.Null);
         Assert.That(PackageActions.Ask(dotnet).Button, Is.EqualTo("Package_UpdateNewest"));

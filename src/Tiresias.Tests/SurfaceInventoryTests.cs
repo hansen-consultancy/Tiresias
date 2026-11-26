@@ -59,7 +59,7 @@ public class SurfaceInventoryTests
         var code = new ExtensionHost("VS Code", "Code.exe", "code");
         var inventory = new SurfaceInventory(
             [new(code, "acme.helper", "1.0.0", null, null), new(code, "beta.tool", "2.0.0", "Beta", Now.AddDays(-10))],
-            new(Now.AddHours(-5), [new("dotnet", "acme.cli", "1.1.0"), new("npm", "sass", "1.0.0", "1.2.0")]),
+            new(Now.AddHours(-5), [new("dotnet", "acme.cli", "1.1.0")]),
             [new("Chat", StartupEntry.RunKey, @"C:\Chat\chat.exe", true, "Chat"), new("Tray", StartupEntry.RunKey, @"C:\Tray\tray.exe", null, "Tray", InTray: true)],
             [new(@"C:\Programs\VS Code\Code.exe", "github", Now.AddDays(-3)), new(@"C:\Programs\VS Code\Code.exe", "openai", Now.AddDays(-200))],
             []);
@@ -72,7 +72,6 @@ public class SurfaceInventoryTests
             "    beta.tool 2.0.0, Beta, updated 2026-11-09",
             "Global tools (listed 2026-11-19 05:00)",
             "  dotnet: acme.cli 1.1.0",
-            "  npm: sass 1.0.0, 1.2.0 available",
             "Starts at log-on",
             @"  Chat (Run key): C:\Chat\chat.exe, signed, last opened unknown",
             @"  Tray (Run key): C:\Tray\tray.exe, signature unchecked, used from the tray",
@@ -92,7 +91,7 @@ public class SurfaceInventoryTests
     [Test]
     public void A_listing_round_trips_through_its_file()
     {
-        var snapshot = new ToolSnapshot(Now, [new("npm", "@acme/cli", "3.0.0", "3.1.0"), new("pipx", "bare", null)], [new("Acme App", "Acme.App", "1.0", "1.1")]);
+        var snapshot = new ToolSnapshot(Now, [new("npm", "@acme/cli", "3.0.0"), new("pipx", "bare", null)], [new("Acme App", "Acme.App", "1.0", "1.1")]);
 
         var read = ToolSnapshot.Parse(snapshot.ToJson());
 
@@ -108,7 +107,7 @@ public class SurfaceInventoryTests
 
         using var document = System.Text.Json.JsonDocument.Parse(json);
         Assert.That(document.RootElement.EnumerateObject().Select(p => p.Name), Is.EqualTo(new[] { "version", "at", "tools", "winget" }));
-        Assert.That(document.RootElement.GetProperty("tools")[0].EnumerateObject().Select(p => p.Name), Is.EqualTo(new[] { "manager", "id", "version", "latest" }));
+        Assert.That(document.RootElement.GetProperty("tools")[0].EnumerateObject().Select(p => p.Name), Is.EqualTo(new[] { "manager", "id", "version" }));
     }
 
     [TestCase(null)]

@@ -405,17 +405,19 @@ folder of their own there. **Search online...** opens the browser with a web sea
 the user's click only; Tiresias itself sends nothing. Uninstalling goes through Settings, Apps, Installed apps
 (`UninstallApp`), except for what a package manager installed:
 **Package fixes are built** (#106). The day's listing of global tools also runs
-`winget list --source winget` and `npm outdated --global --json`, so it knows each winget
-program's package id and any newer version winget offers, and the newer version npm's registry
-names for each npm tool. Each manager checks its own source for that, as running it by hand does;
-Tiresias sends nothing itself. An uninstall entry is that winget program when exactly one row has
-its name and version. The selected program or tool then gets **Update to *version*...** (only when
-the manager names a newer one; a `dotnet tool` always gets **Update...**, since dotnet finds the
-newest itself) and **Uninstall with *manager*...**, and the "can't be uninstalled" finding gets
-**Repair...**. Each asks first, with the exact command, which is built by `Packages` from plain
-ids and versions only (`winget upgrade --id <id> --exact --version <v>`,
-`winget uninstall --id <id> --exact`, `dotnet tool update|uninstall --global <id>`,
-`npm install --global <id>@<v>`, `npm uninstall --global <id>`), never a shell string. It runs in
+`winget list --source winget`, so it knows each winget program's package id and any newer version
+winget offers. That compares against winget's local copy of its catalog, which winget may refresh
+by downloading the whole catalog; nothing about what is installed leaves the machine, so it stays
+within the privacy rule above. No registry is asked which global tools are outdated (`npm outdated`
+would send every package's name, unattended). An uninstall entry is that winget program when
+exactly one row has its name and version. The selected program or tool then gets **Update to
+*version*...** for a winget program winget offers a newer version of, or **Update...** for a
+`dotnet` or npm tool, whose manager looks up the newest only when the user asks; and **Uninstall
+with *manager*...**. The "can't be uninstalled" finding gets **Repair...**. Each asks first, with
+the exact command, which is built by `Packages` from plain ids and versions only
+(`winget upgrade --id <id> --exact --version <v>`, `winget uninstall --id <id> --exact`,
+`dotnet tool update|uninstall --global <id>`, `npm install --global <id>@latest`,
+`npm uninstall --global <id>`), never a shell string. It runs in
 a console the user can watch and answer; a machine-wide program's command starts elevated, so
 Windows asks for an administrator, and on a managed PC machine-wide programs get none. Afterwards
 the listing is taken again and the page reloads. A demo runs nothing.

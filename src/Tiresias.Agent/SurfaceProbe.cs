@@ -331,8 +331,7 @@ static partial class SurfaceProbe
     /// day. A demo lists none: these are the real machine's tools.
     /// </summary>
     public static IEnumerable<GlobalTool> GlobalTools() => DemoMode.On ? [] :
-        Packages.WithLatest([.. Doctor.ToolManagers.SelectMany(m => Doctor.GlobalTools(m.Manager, Output(m.Manager, m.Arguments)))],
-            Output(Packages.NpmOutdated.Manager, Packages.NpmOutdated.Arguments));
+        Doctor.ToolManagers.SelectMany(m => Doctor.GlobalTools(m.Manager, Output(m.Manager, m.Arguments)));
 
     /// <summary>What winget installed and what it would update, from its source's own listing; none without winget, and none in a demo.</summary>
     public static IReadOnlyList<WingetPackage> WingetPackages() => DemoMode.On ? [] :

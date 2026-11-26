@@ -6,8 +6,7 @@ namespace Tiresias.Client;
 
 /// <summary>A developer tool installed for every project: its package manager, its package id and version.</summary>
 /// <param name="Manager"><c>dotnet</c>, <c>npm</c>, <c>pipx</c> or <c>cargo</c>.</param>
-/// <param name="Latest">A newer version its manager's registry names; <c>null</c> when none or not asked (only npm says).</param>
-public sealed record GlobalTool(string Manager, string Id, string? Version, string? Latest = null);
+public sealed record GlobalTool(string Manager, string Id, string? Version);
 
 /// <summary>
 /// The global tools and winget's programs as last listed and when. Listing them takes seconds, so the
@@ -34,7 +33,7 @@ public sealed record ToolSnapshot(DateTimeOffset At, IReadOnlyList<GlobalTool> T
     {
         version = Version,
         at = At,
-        tools = Tools.Select(t => new { manager = t.Manager, id = t.Id, version = t.Version, latest = t.Latest }),
+        tools = Tools.Select(t => new { manager = t.Manager, id = t.Id, version = t.Version }),
         winget = WingetPackages.Select(p => new { name = p.Name, id = p.Id, version = p.Version, available = p.Available }),
     });
 
@@ -57,7 +56,7 @@ public sealed record ToolSnapshot(DateTimeOffset At, IReadOnlyList<GlobalTool> T
             {
                 if (tool.ValueKind != JsonValueKind.Object || Doctor.Text(tool, "manager") is not { } manager || Doctor.Text(tool, "id") is not { } id)
                     return null;
-                list.Add(new(manager, id, Doctor.Text(tool, "version"), Doctor.Text(tool, "latest")));
+                list.Add(new(manager, id, Doctor.Text(tool, "version")));
             }
             List<WingetPackage> winget = [];
             if (root.TryGetProperty("winget", out var packages) && packages.ValueKind == JsonValueKind.Array)
@@ -162,7 +161,7 @@ public static partial class Doctor
         if (inventory.Tools.Tools.Count == 0)
             yield return "  none found";
         foreach (var tool in inventory.Tools.Tools.OrderBy(t => t.Manager, StringComparer.Ordinal).ThenBy(t => t.Id, StringComparer.OrdinalIgnoreCase))
-            yield return $"  {tool.Manager}: {tool.Id} {tool.Version ?? "?"}{(tool.Latest is { } latest ? $", {latest} available" : "")}";
+            yield return $"  {tool.Manager}: {tool.Id} {tool.Version ?? "?"}";
         yield return "Starts at log-on";
         if (inventory.Startup.Count == 0)
             yield return "  none found";

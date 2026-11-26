@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace Tiresias.Client;
@@ -58,14 +57,14 @@ public static partial class Packages
     public static bool Manages(string manager) => manager is "dotnet" or "npm";
 
     /// <summary>
-    /// Update a global tool. npm's to the newer version its registry named (<see cref="GlobalTool.Latest"/>),
-    /// only when there is one; <c>dotnet tool update</c> finds the newest itself, so it is always offered.
+    /// Update a global tool to the newest version, which the manager finds when the user asks. Neither is
+    /// asked beforehand: <c>npm outdated</c> would send every global package's name to the registry
+    /// unattended, and online lookups are opt-in (docs/attack-surface.md).
     /// </summary>
     public static PackageFix? Update(GlobalTool tool) => tool.Manager switch
     {
         "dotnet" when Plain(tool.Id) => new(PackageChange.Update, tool.Id, new("dotnet", ["tool", "update", "--global", tool.Id])),
-        "npm" when NpmName(tool.Id) && tool.Latest is { } latest && IsVersion(latest) && latest != tool.Version =>
-            new(PackageChange.Update, tool.Id, new("npm", ["install", "--global", $"{tool.Id}@{latest}"])),
+        "npm" when NpmName(tool.Id) => new(PackageChange.Update, tool.Id, new("npm", ["install", "--global", $"{tool.Id}@latest"])),
         _ => null,
     };
 
@@ -110,9 +109,6 @@ public static partial class Packages
 
     /// <summary>The command that lists what winget installed and what it would update.</summary>
     public static readonly (string Manager, string[] Arguments) WingetListing = ("winget", ["list", "--source", "winget", "--disable-interactivity"]);
-
-    /// <summary>The command that has npm ask its registry which global packages have a newer version.</summary>
-    public static readonly (string Manager, string[] Arguments) NpmOutdated = ("npm", ["outdated", "--global", "--json"]);
 
     /// <summary>
     /// The rows of <c>winget list</c>'s table: Name, Id, Version and, when anything has one, Available.
@@ -161,31 +157,6 @@ public static partial class Packages
             cells[i] = line[start..end].Trim();
         }
         return cells[1].Contains(' ', StringComparison.Ordinal) ? null : cells;
-    }
-
-    /// <summary>
-    /// The global tools with the newer version npm's registry names for each of npm's, from
-    /// <c>npm outdated --global --json</c>; the others unchanged.
-    /// </summary>
-    public static IReadOnlyList<GlobalTool> WithLatest(IReadOnlyList<GlobalTool> tools, string? npmOutdated)
-    {
-        Dictionary<string, string> latest = new(StringComparer.Ordinal);
-        if (!string.IsNullOrWhiteSpace(npmOutdated))
-        {
-            try
-            {
-                using var document = JsonDocument.Parse(npmOutdated);
-                if (document.RootElement.ValueKind == JsonValueKind.Object)
-                    foreach (var package in document.RootElement.EnumerateObject())
-                        if (package.Value.ValueKind == JsonValueKind.Object && Doctor.Text(package.Value, "latest") is { } version)
-                            latest[package.Name] = version;
-            }
-            catch (JsonException)
-            {
-                // Not npm's listing: no newer versions known.
-            }
-        }
-        return [.. tools.Select(t => t.Manager == "npm" && latest.TryGetValue(t.Id, out var newer) && newer != t.Version ? t with { Latest = newer } : t)];
     }
 
     /// <summary>A package id or version and nothing else: no space, quote, or shell character.</summary>
