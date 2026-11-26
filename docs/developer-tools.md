@@ -105,6 +105,7 @@ filtered, so the tag only decides whether an **Ok** line shows in Passed.
 | gh signed in, az signed in | D |
 | docker engine, wsl disks, hyper-v; docker, WSL and Hyper-V contents (opt-in) | D |
 | extensions in VS Code and its forks | D |
+| package managers' safeguards ([supply chain](supply-chain.md)) | D |
 | blocked program still present, unsigned or unused at log-on, uninstall entries, unused programs | E |
 | unsigned at log-on but built by you: information with developer tools, the unsigned warning without | E |
 
