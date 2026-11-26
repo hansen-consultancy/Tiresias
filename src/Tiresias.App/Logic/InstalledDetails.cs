@@ -32,6 +32,24 @@ public static class InstalledDetails
     };
 
     /// <summary>
+    /// The string key and arguments for what the online lookups said about a global tool
+    /// (docs/attack-surface.md#trust), shown beside the offline signer.
+    /// </summary>
+    /// <param name="lookups">The saved answers; <c>null</c> while lookups are off.</param>
+    public static (string Key, string[] Arguments) Online(GlobalTool tool, TrustLookups? lookups) =>
+        lookups is null ? ("Installed_OnlineOff", [])
+        : PackageQuery.Of(tool) is not { } package ? ("Installed_OnlineCantCheck", [])
+        : lookups.For(package) switch
+        {
+            null => ("Installed_OnlineNotYet", []),
+            { Advisories.Count: 0, At: var at } => ("Installed_OnlineClean", [Doctor.OsvSource, Date(at)]),
+            { Advisories: var advisories, At: var at } => ("Installed_OnlineVulnerable",
+                [Doctor.OsvSource, Date(at), string.Join(", ", advisories.Select(a => a.Id))]),
+        };
+
+    static string Date(DateTimeOffset at) => at.ToLocalTime().ToString("d", System.Globalization.CultureInfo.CurrentCulture);
+
+    /// <summary>
     /// A web search for the program by name and version; nothing else about the PC goes in it.
     /// DuckDuckGo, because it doesn't tie the search to an account.
     /// </summary>

@@ -8,6 +8,15 @@ its section below.
 
 ## [Unreleased]
 
+### Added
+
+- **Check global tools for known vulnerabilities, if you want.** The Installed page has a new
+  **Check global tools online** switch, off unless you turn it on. Once a day it asks OSV.dev about
+  your `dotnet`, `npm`, `pipx` and `cargo` global tools, sending only each tool's name, version and
+  package manager. A tool with a known vulnerability becomes a finding on Home whose **Copy** button
+  copies the command that updates it (or uninstalls it when nothing fixes it), and the Installed
+  panel shows what was found for each tool. Turning the switch off forgets every answer.
+
 ## [0.5.0] - 2026-11-25
 
 ### Added

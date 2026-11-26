@@ -45,8 +45,9 @@ public partial class InstalledPage : UserControl
 /// <param name="InstalledOn">The install date, or why it isn't known.</param>
 /// <param name="IsNew">Installed in the last <see cref="InstalledFilter.NewDays"/> days.</param>
 /// <param name="Mark">What its program file's signature says (<see cref="ProgramMarks"/>).</param>
+/// <param name="Tool">The global tool it is, which the online lookups ask about; <c>null</c> for a program or an extension.</param>
 public sealed record InstalledRow(string Name, string Version, string For, string ShortUse, string Use, string Reached, string Folder, ImageSource? Icon,
-    string Publisher, string? ProgramFile, string InstalledOn, bool IsNew, ProgramMark Mark)
+    string Publisher, string? ProgramFile, string InstalledOn, bool IsNew, ProgramMark Mark, GlobalTool? Tool = null)
 {
     public string Spoken => string.Join(". ", new[] { Name, IsNew ? NewTip : null, MarkTip(Mark), Use }.OfType<string>());
 
@@ -167,8 +168,65 @@ public sealed partial class InstalledViewModel : ObservableObject
         ShowTrust(current);
     }
 
+    /// <summary>The online lookups' saved answers, read with the list; <c>null</c> while they are off.</summary>
+    TrustLookups? lookups;
+
+    /// <summary>What the online lookups said about the selected global tool.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OnlineVisibility))]
+    public partial string Online { get; set; } = "";
+
+    public Visibility OnlineVisibility => Online.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+
+    void ShowOnline(InstalledRow? row)
+    {
+        if (row?.Tool is not { } tool)
+        {
+            Online = "";
+            return;
+        }
+        var (key, arguments) = InstalledDetails.Online(tool, lookups);
+        Online = arguments.Length == 0 ? Text.Get(key) : Text.Format(key, arguments);
+    }
+
+    bool isOnline = AppSettings.Load().OnlineLookups;
+
+    /// <summary>
+    /// The Check online switch, saved as it changes. On asks at once; off forgets every answer, so no
+    /// finding stands on one.
+    /// </summary>
+    public bool IsOnline
+    {
+        get => isOnline;
+        set
+        {
+            if (isOnline == value)
+                return;
+            isOnline = value;
+            (AppSettings.Load() with { OnlineLookups = value }).Save();
+            OnPropertyChanged();
+            _ = AskOnlineAsync();
+        }
+    }
+
+    async Task AskOnlineAsync()
+    {
+        var on = isOnline;
+        lookups = await Task.Run(async () =>
+        {
+            if (!on)
+            {
+                TrustLookupStore.Clear();
+                return null;
+            }
+            return await TrustLookupStore.RefreshAsync(ToolInventory.Current().Tools);
+        });
+        ShowOnline(Selected);
+    }
+
     async partial void OnSelectedChanged(InstalledRow? value)
     {
+        ShowOnline(value);
         if (value?.ProgramFile is not { } file)
         {
             Signer = Text.Get("Installed_SignerUnknown");
@@ -234,6 +292,7 @@ public sealed partial class InstalledViewModel : ObservableObject
             var snapshot = ToolInventory.Current();
             return (InstalledAddOns.Extensions(probe.Extensions(), probe.CredentialUses(), DateTimeOffset.UtcNow), InstalledAddOns.Tools(snapshot), (DateTimeOffset?)snapshot.At);
         });
+        lookups = isOnline ? await Task.Run(async () => await TrustLookupStore.RefreshAsync(ToolInventory.Current().Tools)) : null;
         Apply();
     }
 
@@ -308,7 +367,7 @@ public sealed partial class InstalledViewModel : ObservableObject
             updated is null ? Text.Get("Installed_UseAddOnUnknown") : Text.Format("Installed_UseAddOn", updated),
             addOn.Reached.Count > 0 ? string.Join(", ", addOn.Reached) : Text.Get("Installed_ReachedNone"),
             Text.Get("Installed_FolderUnknown"), null, addOn.Publisher ?? Text.Get("Installed_PublisherUnknown"), null,
-            Text.Get("Installed_InstalledOnUnknown"), false, ProgramMark.None);
+            Text.Get("Installed_InstalledOnUnknown"), false, ProgramMark.None, addOn.Tool);
     }
 
     static string UseText(InstalledProgram program)

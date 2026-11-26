@@ -11,8 +11,10 @@ namespace Tiresias.App;
 /// <param name="DeveloperTools">Whether developer tools show: when this PC looks like a developer's, always, or never (docs/developer-tools.md).</param>
 /// <param name="DeveloperToolsNoted">The user closed Home's line saying why developer tools appeared.</param>
 /// <param name="ApplyingUpdate">The version the app last quit to apply, until the next start checks it arrived.</param>
+/// <param name="OnlineLookups">The user turned on the online trust lookups (docs/attack-surface.md#trust); off by default.</param>
 public sealed record AppSettings(bool SetupSkipped = false, DateTimeOffset? LastUpdateCheck = null, IReadOnlyDictionary<string, SinkNarrowing>? Alerts = null, Logic.ReachScan ReachScan = Logic.ReachScan.Off,
-    Logic.DeveloperToolsSetting DeveloperTools = Logic.DeveloperToolsSetting.Auto, bool DeveloperToolsNoted = false, string? ApplyingUpdate = null)
+    Logic.DeveloperToolsSetting DeveloperTools = Logic.DeveloperToolsSetting.Auto, bool DeveloperToolsNoted = false, string? ApplyingUpdate = null,
+    bool OnlineLookups = false)
 {
     static string Path => System.IO.Path.Combine(KeyringStore.Directory, "app.json");
 

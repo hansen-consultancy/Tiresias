@@ -29,6 +29,13 @@ public static class ToolInventory
         }
     }
 
+    /// <summary>The listing on disk, however old, without listing again; <c>null</c> when there is none.</summary>
+    public static ToolSnapshot? Saved()
+    {
+        lock (gate)
+            return Read();
+    }
+
     static ToolSnapshot? Read()
     {
         try

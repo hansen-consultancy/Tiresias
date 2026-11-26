@@ -2726,6 +2726,30 @@ Close them, then choose the update in the tray menu again.</value>
   <data name="Installed_SearchOnlineTip" xml:space="preserve">
     <value>Opens your browser with a web search for this name and version</value>
   </data>
+  <data name="Installed_ColOnline" xml:space="preserve">
+    <value>Checked online</value>
+  </data>
+  <data name="Installed_OnlineOff" xml:space="preserve">
+    <value>Not checked online. Turn on Check online to ask OSV.dev</value>
+  </data>
+  <data name="Installed_OnlineCantCheck" xml:space="preserve">
+    <value>Can't be checked online: no version, or a manager OSV.dev doesn't know</value>
+  </data>
+  <data name="Installed_OnlineNotYet" xml:space="preserve">
+    <value>Not checked yet: it will be within a few hours, or press Refresh</value>
+  </data>
+  <data name="Installed_OnlineClean" xml:space="preserve">
+    <value>No known vulnerability ({0}, {1})</value>
+  </data>
+  <data name="Installed_OnlineVulnerable" xml:space="preserve">
+    <value>Known vulnerabilities ({0}, {1}): {2}. Home says how to fix it</value>
+  </data>
+  <data name="Installed_Online" xml:space="preserve">
+    <value>Check global tools online</value>
+  </data>
+  <data name="Installed_OnlineTip" xml:space="preserve">
+    <value>Asks OSV.dev about known vulnerabilities in your global tools, once a day. Only each tool's name, version and package manager are sent: never a path, your name or what uses which credential</value>
+  </data>
   <data name="Reach_Title" xml:space="preserve">
     <value>See what your containers, WSL and VMs expose</value>
   </data>
