@@ -71,8 +71,9 @@ a new action with effects outside those (a shell command, the Recycle Bin, a net
 
 ## Conventions
 
-- CI treats warnings as errors (`Directory.Build.props`); a local build only reports them. Build
-  clean before pushing.
+- CI treats warnings as errors (`Directory.Build.props`); a local build only reports them, so
+  green tests prove nothing about CI. Before pushing, build the way CI does and fix every error:
+  `dotnet build Tiresias.slnx -c Release -p:TreatWarningsAsErrors=true`.
 - Central package management: versions only in `Directory.Packages.props`, never on a
   `PackageReference`. A project uses a package only if it references it directly — don't rely on
   a transitive one.
