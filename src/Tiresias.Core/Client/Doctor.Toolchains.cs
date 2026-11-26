@@ -194,6 +194,9 @@ public static partial class Doctor
                 yield return Age("Yarn", DoctorStatus.Warn, $"{label} installs a release the minute it is published: npmMinimalAgeGate is 0",
                     new ChangeToolSetting($"yarn config set -H npmMinimalAgeGate {SuggestedDays}d"));
         }
+        else if (gate is not null)
+            yield return Age("Yarn", DoctorStatus.Warn, $"{label} can't read npmMinimalAgeGate: {gate}, so it may install a release the minute it is published",
+                new ChangeToolSetting($"yarn config set -H npmMinimalAgeGate {SuggestedDays}d"));
         else if (known && version >= new Version(4, 15))
             yield return Age("Yarn", DoctorStatus.Ok, $"{label} installs only releases at least a day old, its default; a week catches more (npmMinimalAgeGate: {SuggestedDays}d)");
         else

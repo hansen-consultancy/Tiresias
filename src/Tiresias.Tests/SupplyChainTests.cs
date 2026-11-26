@@ -83,6 +83,17 @@ public class SupplyChainTests
         Assert.That(line.Detail, Does.Contain("version unknown"));
     }
 
+    [TestCase("false")]
+    [TestCase("7 day")]
+    [TestCase("none")]
+    public void Yarn_with_an_unreadable_age_gate_warns_naming_it(string gate)
+    {
+        var line = Lines(Tool(Toolchain.Yarn, "4.19.0", $"npmMinimalAgeGate: {gate}\n", ".yarnrc.yml"))["Yarn release age"];
+
+        Assert.That(line.Status, Is.EqualTo(DoctorStatus.Warn));
+        Assert.That(line.Detail, Does.Contain(gate));
+    }
+
     [Test]
     public void Pnpm_10_reads_npmrc_and_pnpm_11_only_its_yaml()
     {
