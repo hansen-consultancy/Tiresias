@@ -157,6 +157,14 @@ public class SupplyChainTests
         Assert.That(off["Bun release age"].Status, Is.EqualTo(DoctorStatus.Warn), "outside [install] it isn't the setting");
     }
 
+    [Test]
+    public void A_quoted_value_with_a_trailing_comment_is_read()
+    {
+        Assert.That(Lines(Tool(Toolchain.Bun, "1.4.5", "[install]\nminimumReleaseAge = \"604800\" # a week\n", ".bunfig.toml"))["Bun release age"].Detail, Does.Contain("7 days"));
+        Assert.That(Lines(Tool(Toolchain.Yarn, "4.19.0", "npmMinimalAgeGate: \"7d\" # a week\n", ".yarnrc.yml"))["Yarn release age"].Detail, Does.Contain("7 days"));
+        Assert.That(Lines(Tool(Toolchain.Pnpm, "11.3.0", "minimumReleaseAge: '10080' # a week\n", "config.yaml"))["pnpm release age"].Detail, Does.Contain("7 days"));
+    }
+
     const string GatedNuGet = """
         <configuration>
           <packageSources>

@@ -477,10 +477,11 @@ sealed partial class ToolSettings
 
     static string Unquote(string value)
     {
+        // A quoted value ends at its closing quote, whatever follows (a comment); an unquoted one at " #".
+        if (value.Length >= 2 && value[0] is '"' or '\'' && value.AsSpan(1).IndexOf(value[0]) is >= 0 and var close)
+            return value[1..(close + 1)];
         var hash = value.IndexOf(" #", StringComparison.Ordinal);
-        if (hash >= 0 && value[0] is not '"' and not '\'')
-            value = value[..hash].TrimEnd();
-        return value.Length >= 2 && value[0] is '"' or '\'' && value[^1] == value[0] ? value[1..^1] : value;
+        return hash >= 0 ? value[..hash].TrimEnd() : value;
     }
 
     [GeneratedRegex(@"^(?<key>[A-Za-z0-9_.\-]+)\s*[=:]\s*(?<value>.*?)\s*$")]
