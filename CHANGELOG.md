@@ -8,6 +8,16 @@ its section below.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Updates apply while `tir run` is open.** A program started with `tir run` kept `tir` running
+  from the app's install folder, so an update waited until it closed, and never applied when a
+  launcher restarted the program at once. `tir` on your PATH now runs a copy of itself kept in
+  `%LOCALAPPDATA%\Tiresias\tir`: a running `tir run` keeps working through an update, and the next
+  `tir` you start is the new version. The app moves your PATH entry to
+  `%LOCALAPPDATA%\Tiresias\bin` by itself; restart a launcher that runs `tir`, or sign out and in,
+  once after this update so it picks up the new PATH.
+
 ## [0.5.0] - 2026-11-25
 
 ### Added

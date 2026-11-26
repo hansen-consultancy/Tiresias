@@ -13,7 +13,7 @@ static class Program
             .OnAfterInstallFastCallback(_ => StartWithWindows.Set(true))
             .OnBeforeUninstallFastCallback(_ =>
             {
-                TirOnPath.Remove();
+                TirInstall.Remove();
                 StartWithWindows.Set(false);
                 RemoveAdminTier();
             })

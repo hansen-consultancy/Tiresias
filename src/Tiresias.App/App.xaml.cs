@@ -138,7 +138,8 @@ public partial class App : Application
         }
         // A development build leaves PATH alone: it would put its own tir ahead of the installed one's.
         if (AppBuild.Current.Installed)
-            TirOnPath.Ensure();
+            // Copies a few hundred MB on the first start of a version: off the UI thread.
+            _ = Task.Run(() => TirInstall.Ensure(AppUpdates.CurrentVersion));
         AppLog.Info($"started {Text.Of(AppBuild.Current.Label)} from {AppBuild.Current.Folder}");
 
         tray = new TrayController(this);
