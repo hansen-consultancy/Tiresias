@@ -33,6 +33,8 @@ public enum FixAction
     Thaw,
     /// <summary>The Services page's add form, its address filled in.</summary>
     AddService,
+    /// <summary>Run a package manager's command (a winget repair), after the user approves it.</summary>
+    RunPackage,
     /// <summary>The Installed page: the whole list, unused programs first.</summary>
     OpenInstalledList,
     /// <summary>The Startup page: everything that starts at sign-in.</summary>
@@ -121,7 +123,8 @@ public static class FindingView
         DisableStartup { Machine: false } => (FixAction.DisableStartup, "Finding_FixDisableStartup"),
         DisableStartup => (FixAction.OpenStartupSettings, "Finding_FixStartupSettings"),
         RemoveEntry { Machine: false } => (FixAction.RemoveEntry, "Finding_FixRemoveEntry"),
-        RemoveEntry or Repair { Command: not null } => (FixAction.CopyCommand, "Finding_FixCopy"),
+        RemoveEntry => (FixAction.CopyCommand, "Finding_FixCopy"),
+        PackageFix package => (FixAction.RunPackage, PackageActions.Ask(package).Button),
         UnblockProgram => (FixAction.Unblock, "Finding_FixUnblock"),
         ThawProgram => (FixAction.Thaw, "Finding_FixThaw"),
         RunThroughExec { Setup: not null } => (FixAction.AddService, "Finding_FixGitHubApp"),

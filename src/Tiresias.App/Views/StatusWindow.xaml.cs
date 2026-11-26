@@ -351,8 +351,11 @@ public partial class StatusWindow : Window
             case RemoveEntry { Machine: false } entry:
                 _ = RemoveEntryAsync(entry);
                 break;
-            case RemoveEntry or Repair { Command: not null }:
+            case RemoveEntry:
                 model.CopyFix(fix.Instruction);
+                break;
+            case PackageFix package:
+                _ = RunPackageAsync(package);
                 break;
             case UninstallApp:
                 Navigate<InstalledPage>();
@@ -415,6 +418,16 @@ public partial class StatusWindow : Window
             ? Text.Format("Finding_Removed", remove.Id, remove.Host.Name)
             : Text.Format("Finding_RemoveFailed", remove.Id, remove.Instruction);
         if (removed)
+            model.Refresh();
+    }
+
+    /// <summary>Runs a package manager's command once the user approves, then checks again.</summary>
+    async Task RunPackageAsync(PackageFix fix)
+    {
+        if (await PackageRun.ApproveAndRunAsync(this, fix) is not { } outcome)
+            return;
+        model.FindingMessage = outcome.Message;
+        if (outcome.Done)
             model.Refresh();
     }
 

@@ -23,10 +23,17 @@ public static class ToolInventory
             var now = DateTimeOffset.UtcNow;
             if (!refresh && Read() is { } saved && !ToolSnapshot.IsDue(saved, now))
                 return saved;
-            var taken = new ToolSnapshot(now, [.. SurfaceProbe.GlobalTools()]);
+            var taken = new ToolSnapshot(now, [.. SurfaceProbe.GlobalTools()], SurfaceProbe.WingetPackages());
             Write(taken);
             return taken;
         }
+    }
+
+    /// <summary>The listing on disk, however old, without listing: <c>null</c> when there is none.</summary>
+    public static ToolSnapshot? Saved()
+    {
+        lock (gate)
+            return Read();
     }
 
     static ToolSnapshot? Read()

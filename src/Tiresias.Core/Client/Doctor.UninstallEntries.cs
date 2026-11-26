@@ -91,21 +91,13 @@ public sealed partial record RemoveEntry(string Key, string Name) : DoctorFix
 }
 
 /// <summary>
-/// Reinstall the installed version over itself, which restores a missing uninstaller. With the
-/// winget id it is winget's own command; without one, the steps.
+/// Reinstall the installed version over itself, which restores a missing uninstaller: the steps, for a
+/// program winget doesn't know. One it knows gets winget's command instead (<see cref="Packages.Repair"/>).
 /// </summary>
-public sealed partial record Repair(string Name, string? Version, string? WingetId = null) : DoctorFix
+public sealed record Repair(string Name, string? Version) : DoctorFix
 {
-    /// <summary>winget's command, only when the id and version are plain tokens: both come from the machine.</summary>
-    public string? Command => WingetId is not null && Token().IsMatch(WingetId) && (Version is null || Token().IsMatch(Version))
-        ? $"winget install --id {WingetId} --exact{(Version is null ? "" : $" --version {Version}")} --force"
-        : null;
-
     public override string Instruction =>
-        Command ?? $"reinstall {Name}{(Version is null ? "" : $" {Version}")} over itself with its own installer; that restores its uninstaller";
-
-    [GeneratedRegex(@"^[A-Za-z0-9][A-Za-z0-9._+-]*$")]
-    private static partial Regex Token();
+        $"reinstall {Name}{(Version is null ? "" : $" {Version}")} over itself with its own installer; that restores its uninstaller";
 }
 
 /// <summary>What is known of how an installed program is used.</summary>
@@ -148,9 +140,9 @@ public static partial class Doctor
     /// entry with the same uninstall command as a newer one. The whole command, not the program it
     /// starts: shared uninstallers (an installer engine, <c>rundll32</c>) serve many products, each
     /// with its own arguments. Entries that say nothing about the disk (Windows Installer, no full
-    /// path) raise nothing.
+    /// path) raise nothing. A program winget installed (<paramref name="winget"/>) is repaired with winget's command.
     /// </summary>
-    public static IEnumerable<DoctorCheck> UninstallEntries(IEnumerable<UninstallEntry> entries)
+    public static IEnumerable<DoctorCheck> UninstallEntries(IEnumerable<UninstallEntry> entries, IReadOnlyList<WingetPackage>? winget = null)
     {
         var all = entries.Where(e => e.Uninstaller is not null).ToArray();
         foreach (var entry in all.Where(e => !e.UninstallerExists).OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase))
@@ -158,7 +150,7 @@ public static partial class Doctor
                 ? new($"{Label(entry)} can't be uninstalled", DoctorStatus.Warn,
                     $"Its uninstaller {entry.Uninstaller} is gone, but the program is still there. Reinstall the same version over it to restore the uninstaller; "
                     + "removing it by hand leaves its shell extensions and services registered",
-                    new Repair(entry.Name, entry.Version), Kind: NoUninstallerKind)
+                    RepairFix(entry, winget ?? []), Kind: NoUninstallerKind)
                 : new($"{Label(entry)} is listed but gone", DoctorStatus.Warn,
                     $"Windows lists it as installed, but neither its uninstaller {entry.Uninstaller} nor its folder exists. "
                     + "Remove the entry; any data folders it left are yours to check"
@@ -256,6 +248,10 @@ public static partial class Doctor
     static bool Deep(string folder) => folder.Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries).Length >= 3;
 
     static bool IsUnder(string path, string folder) => Tiresias.UserSecrets.ProjectIndex.IsUnder(path, folder);
+
+    /// <summary>winget's reinstall when it knows the program, else the steps.</summary>
+    static DoctorFix RepairFix(UninstallEntry entry, IReadOnlyList<WingetPackage> winget) =>
+        Packages.Of(entry, winget) is { } package && Packages.Repair(package, entry.Machine) is { } fix ? fix : new Repair(entry.Name, entry.Version);
 
     /// <summary>
     /// The fix for an entry to remove; none for a key whose name isn't plain, which no command is
