@@ -80,16 +80,20 @@ public class RecoveryChangeGuardTests
         using var child = PowerShell($$"""
             $pipe = [IO.Pipes.NamedPipeServerStream]::new('tiresias.recovery.{{nonce}}', 'Out', 1, 'Byte', 'Asynchronous')
             try {
+                [Console]::Out.WriteLine('ready'); [Console]::Out.Flush()
                 $wait = $pipe.BeginWaitForConnection($null, $null)
                 if ($wait.AsyncWaitHandle.WaitOne(10000)) { $pipe.EndWaitForConnection($wait); $pipe.WriteByte(1) }
             } finally { $pipe.Dispose() }
             """);
         try
         {
+            // A cold PowerShell can take longer to start than the connect timeout: connect only once its pipe exists.
+            var ready = child.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(60)).GetAwaiter().GetResult();
+            Assert.That(ready, Is.EqualTo("ready"));
             Assert.That(() => RecoveryChangeGuard.ConfirmAsync(nonce, System.Environment.ProcessId, TimeSpan.FromSeconds(10)),
                 Throws.TypeOf<UnauthorizedAccessException>());
         }
-        finally { Assert.That(child.WaitForExit(15000), Is.True); }
+        finally { Assert.That(child.WaitForExit(30000), Is.True); }
     }
 
     static Process PowerShell(string script, bool redirectInput = false)
