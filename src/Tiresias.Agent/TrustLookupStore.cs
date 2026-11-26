@@ -33,13 +33,15 @@ public static class TrustLookupStore
 
     /// <summary>
     /// Asks OSV.dev about the global tools whose answer is a day old or missing and saves what it said.
-    /// Sends each tool's ecosystem, name and version, nothing else. Call only while lookups are on.
+    /// Sends each tool's ecosystem, name and version, nothing else. Asking takes seconds, and the user
+    /// may turn lookups off meanwhile: <paramref name="stillOn"/> is asked again under the lock that
+    /// <see cref="Clear"/> takes, so answers are never saved after they were deleted.
     /// </summary>
-    public static async Task<TrustLookups> RefreshAsync(IEnumerable<GlobalTool> tools, CancellationToken cancellationToken = default)
+    /// <returns>The answers, or <c>null</c> when lookups were off by the time they came.</returns>
+    public static async Task<TrustLookups?> RefreshAsync(IEnumerable<GlobalTool> tools, Func<bool> stillOn, CancellationToken cancellationToken = default)
     {
         var refreshed = await (Load() ?? TrustLookups.Empty).RefreshAsync(tools, OsvSource.Instance, DateTimeOffset.UtcNow, cancellationToken);
-        Save(refreshed);
-        return refreshed;
+        return Save(refreshed, stillOn) ? refreshed : null;
     }
 
     /// <summary>Turns lookups off: the saved answers go, so no finding stands on them.</summary>
@@ -59,10 +61,13 @@ public static class TrustLookupStore
     }
 
     /// <summary>A unique temporary name: the app and <c>tir</c> may both be writing.</summary>
-    static void Save(TrustLookups lookups)
+    /// <returns>Whether lookups were still on.</returns>
+    static bool Save(TrustLookups lookups, Func<bool> stillOn)
     {
         lock (gate)
         {
+            if (!stillOn())
+                return false;
             try
             {
                 Directory.CreateDirectory(KeyringStore.Directory);
@@ -74,6 +79,7 @@ public static class TrustLookupStore
             {
                 // Not saved: the next refresh asks again.
             }
+            return true;
         }
     }
 

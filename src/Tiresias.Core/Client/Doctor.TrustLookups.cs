@@ -192,12 +192,18 @@ public static class Osv
         }
     }
 
-    /// <summary>The lowest <c>fixed</c> event above the installed version among the ranges for this package.</summary>
+    /// <summary>
+    /// The version that fixes the advisory for the installed one: the highest fix among the ranges
+    /// (<c>introduced</c> to <c>fixed</c>) that hold the installed version, or <c>null</c> when one of
+    /// them has no fix. A range of commits (<c>GIT</c>) says nothing about versions and is skipped.
+    /// When no range is seen to hold it (OSV matched on its own version scheme, or on a list of
+    /// versions), the lowest fix above it is named, as the best guess.
+    /// </summary>
     static string? Fixed(JsonElement vuln, PackageQuery package)
     {
         if (!vuln.TryGetProperty("affected", out var affected) || affected.ValueKind != JsonValueKind.Array)
             return null;
-        List<string> fixes = [];
+        List<(string? Fix, bool Holds)> intervals = [];
         foreach (var entry in affected.EnumerateArray())
         {
             if (entry.ValueKind != JsonValueKind.Object || !entry.TryGetProperty("package", out var p) || p.ValueKind != JsonValueKind.Object
@@ -205,11 +211,49 @@ public static class Osv
                 || !entry.TryGetProperty("ranges", out var ranges) || ranges.ValueKind != JsonValueKind.Array)
                 continue;
             foreach (var range in ranges.EnumerateArray())
-                if (range.ValueKind == JsonValueKind.Object && range.TryGetProperty("events", out var events) && events.ValueKind == JsonValueKind.Array)
-                    fixes.AddRange(events.EnumerateArray().Where(e => e.ValueKind == JsonValueKind.Object).Select(e => Doctor.Text(e, "fixed")).OfType<string>());
+                if (range.ValueKind == JsonValueKind.Object && Doctor.Text(range, "type") != "GIT"
+                    && range.TryGetProperty("events", out var events) && events.ValueKind == JsonValueKind.Array)
+                    intervals.AddRange(Intervals(events, package.Version));
         }
-        return fixes.Where(f => VersionOrder.Compare(f, package.Version) > 0).Order(VersionOrder).FirstOrDefault();
+        var holding = intervals.Where(i => i.Holds).ToArray();
+        if (holding.Length > 0)
+            return holding.Any(i => i.Fix is null) ? null : holding.Select(i => i.Fix!).Order(VersionOrder).Last();
+        return intervals.Select(i => i.Fix).OfType<string>().Where(f => VersionOrder.Compare(f, package.Version) > 0).Order(VersionOrder).FirstOrDefault();
     }
+
+    /// <summary>
+    /// A range's affected intervals, in OSV's event order: each from an <c>introduced</c> to a
+    /// <c>fixed</c> (its fix), a <c>last_affected</c> or <c>limit</c> (no fix), or open (no fix);
+    /// with whether it holds <paramref name="installed"/>.
+    /// </summary>
+    static IEnumerable<(string? Fix, bool Holds)> Intervals(JsonElement events, string installed)
+    {
+        string? from = null;
+        foreach (var e in events.EnumerateArray().Where(e => e.ValueKind == JsonValueKind.Object))
+        {
+            if (Doctor.Text(e, "introduced") is { } introduced)
+            {
+                if (from is not null)
+                    yield return (null, Above(installed, from));
+                from = introduced;
+            }
+            else if (from is not null && Doctor.Text(e, "fixed") is { } fix)
+            {
+                yield return (fix, Above(installed, from) && VersionOrder.Compare(installed, fix) < 0);
+                from = null;
+            }
+            else if (from is not null && (Doctor.Text(e, "last_affected") ?? Doctor.Text(e, "limit")) is { } last)
+            {
+                yield return (null, Above(installed, from) && VersionOrder.Compare(installed, last) <= (Doctor.Text(e, "limit") is null ? 0 : -1));
+                from = null;
+            }
+        }
+        if (from is not null)
+            yield return (null, Above(installed, from));
+    }
+
+    /// <summary>Whether <paramref name="version"/> is at or above <paramref name="introduced"/>; <c>0</c> is the start of time.</summary>
+    static bool Above(string version, string introduced) => introduced == "0" || VersionOrder.Compare(version, introduced) >= 0;
 
     /// <summary>
     /// Dotted numbers compared as numbers, a pre-release (<c>-beta</c>) before its release; loose on

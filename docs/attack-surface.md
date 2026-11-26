@@ -135,8 +135,10 @@ forgotten, and an answer that doesn't come keeps the last one. Turning it off de
 finding stands on an old answer. The checks only read that file (`IDoctorProbe.TrustLookups`), behind
 the `IAdvisorySource` seam, so the planner stays pure and tests need no network; `tir doctor` reads
 it too but never asks, and `tir doctor --surface` says per tool what was found, or "not checked
-online". A demo never goes online. Each advisory names the lowest fixed version above the installed
-one for that package, compared loosely as dotted numbers. Not built yet: deps.dev and Scorecard,
+online". A demo never goes online. An advisory's fix is the highest `fixed` among its version
+ranges that hold the installed version (from `introduced`), none when one of them has no fix, so
+the finding then suggests uninstalling; versions are compared loosely as dotted numbers. Turning
+lookups off while one is asking keeps its answers from being saved. Not built yet: deps.dev and Scorecard,
 the marketplaces, winget-pkgs, OSV for extensions and PowerShell modules, and the unverified or
 changed publisher finding.
 

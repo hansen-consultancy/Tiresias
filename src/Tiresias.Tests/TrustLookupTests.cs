@@ -48,6 +48,34 @@ public class TrustLookupTests
     }
 
     [Test]
+    public void A_fix_from_a_range_that_does_not_hold_the_installed_version_is_not_the_fix()
+    {
+        const string answer = """
+            { "vulns": [ { "id": "GHSA-1", "affected": [ { "package": { "name": "acme-cli", "ecosystem": "npm" },
+              "ranges": [ { "type": "SEMVER", "events": [ { "introduced": "1.2.0" } ] },
+                          { "type": "SEMVER", "events": [ { "introduced": "0" }, { "fixed": "2.0.1" } ] } ] } ] } ] }
+            """;
+
+        Assert.That(Osv.Parse(answer, AcmeQuery)!.Single().Fixed, Is.Null);
+    }
+
+    [Test]
+    public void Every_range_holding_the_installed_version_must_be_passed()
+    {
+        const string answer = """
+            { "vulns": [ { "id": "GHSA-1", "affected": [
+              { "package": { "name": "acme-cli", "ecosystem": "npm" },
+                "ranges": [ { "type": "ECOSYSTEM", "events": [ { "introduced": "1.0.0" }, { "fixed": "1.3.0" } ] },
+                            { "type": "GIT", "events": [ { "introduced": "0" }, { "fixed": "abc123" } ] } ] },
+              { "package": { "name": "acme-cli", "ecosystem": "npm" },
+                "ranges": [ { "type": "SEMVER", "events": [ { "introduced": "1.1.0" }, { "fixed": "1.5.0" } ] },
+                            { "type": "SEMVER", "events": [ { "introduced": "0" }, { "last_affected": "1.0.9" } ] } ] } ] } ] }
+            """;
+
+        Assert.That(Osv.Parse(answer, AcmeQuery)!.Single().Fixed, Is.EqualTo("1.5.0"));
+    }
+
+    [Test]
     public void An_advisory_without_a_fix_says_so() =>
         Assert.That(Osv.Parse("""{ "vulns": [ { "id": "OSV-1", "affected": [] } ] }""", AcmeQuery), Is.EqualTo(new[] { new Advisory("OSV-1", null, null) }));
 

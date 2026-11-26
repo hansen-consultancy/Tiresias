@@ -219,7 +219,7 @@ public sealed partial class InstalledViewModel : ObservableObject
                 TrustLookupStore.Clear();
                 return null;
             }
-            return await TrustLookupStore.RefreshAsync(ToolInventory.Current().Tools);
+            return await TrustLookupStore.RefreshAsync(ToolInventory.Current().Tools, () => AppSettings.Load().OnlineLookups);
         });
         ShowOnline(Selected);
     }
@@ -292,7 +292,7 @@ public sealed partial class InstalledViewModel : ObservableObject
             var snapshot = ToolInventory.Current();
             return (InstalledAddOns.Extensions(probe.Extensions(), probe.CredentialUses(), DateTimeOffset.UtcNow), InstalledAddOns.Tools(snapshot), (DateTimeOffset?)snapshot.At);
         });
-        lookups = isOnline ? await Task.Run(async () => await TrustLookupStore.RefreshAsync(ToolInventory.Current().Tools)) : null;
+        lookups = isOnline ? await Task.Run(async () => await TrustLookupStore.RefreshAsync(ToolInventory.Current().Tools, () => AppSettings.Load().OnlineLookups)) : null;
         Apply();
     }
 
