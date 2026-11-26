@@ -165,6 +165,15 @@ public class SupplyChainTests
         Assert.That(Lines(Tool(Toolchain.Pnpm, "11.3.0", "minimumReleaseAge: '10080' # a week\n", "config.yaml"))["pnpm release age"].Detail, Does.Contain("7 days"));
     }
 
+    [Test]
+    public void A_quoted_value_keeps_a_hash_inside_it()
+    {
+        var line = Lines(Tool(Toolchain.Yarn, "4.19.0", "npmMinimalAgeGate: \"7d #x\" # a week\n", ".yarnrc.yml"))["Yarn release age"];
+
+        Assert.That(line.Status, Is.EqualTo(DoctorStatus.Warn));
+        Assert.That(line.Detail, Does.Contain("7d #x"));
+    }
+
     const string GatedNuGet = """
         <configuration>
           <packageSources>
