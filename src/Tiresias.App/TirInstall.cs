@@ -125,7 +125,7 @@ static partial class TirInstall
         foreach (var name in StableTir.Stale(names, version))
         {
             var folder = Path.Combine(layout.Versions, name);
-            if (InstallFolderUsers.Find(folder).Count > 0)
+            if (InstallFolderUsers.Find(folder).Count > 0 || AnyFileLoaded(folder))
                 continue;
             try
             {
@@ -137,6 +137,29 @@ static partial class TirInstall
                 AppLog.Info($"left the tir copy {name}: {e.Message}");
             }
         }
+    }
+
+    /// <summary>
+    /// Whether a program has a file of <paramref name="folder"/> loaded: an exe or DLL a process
+    /// runs can't be opened for writing. This sees a <c>tir</c> run elevated or as another account
+    /// too, which <see cref="InstallFolderUsers"/> can't read.
+    /// </summary>
+    static bool AnyFileLoaded(string folder)
+    {
+        foreach (var file in Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories))
+        {
+            if (!file.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) && !file.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+                continue;
+            try
+            {
+                using var _ = new FileStream(file, FileMode.Open, FileAccess.Write, FileShare.None);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     static void DeleteQuietly(string folder)
