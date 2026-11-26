@@ -186,7 +186,7 @@ public class SupplyChainTests
         const string Corp = "<add key=\"corp\" value=\"https://pkgs.example.com/feed/index.json\" />";
 
         Assert.That(Fix(Org + Corp), Does.StartWith("dotnet nuget update source <source> "));
-        Assert.That(Fix(Org.Replace(" minPublishAgeHours=\"168\"", "") + Corp.Replace(" />", " minPublishAgeHours=\"168\" />")),
+        Assert.That(Fix(Org.Replace(" minPublishAgeHours=\"168\"", "", StringComparison.Ordinal) + Corp.Replace(" />", " minPublishAgeHours=\"168\" />", StringComparison.Ordinal)),
             Does.StartWith("dotnet nuget update source nuget.org "));
     }
 
