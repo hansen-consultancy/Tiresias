@@ -8,6 +8,15 @@ its section below.
 
 ## [Unreleased]
 
+### Added
+
+- **Package managers' safeguards are checked.** `tir doctor` and Home list each package manager
+  and toolchain on your PC (npm, pnpm, Yarn, Bun, NuGet, pip, uv, Go, Cargo and Gradle), with its
+  version, and say whether it runs dependencies' install scripts and whether it waits before
+  installing a new release. When one is off, the finding's **Copy** button copies the command that
+  turns it on, such as `npm config set min-release-age 7`. Only settings and versions are read and
+  shown, never a file's path or a registry.
+
 ## [0.5.0] - 2026-11-25
 
 ### Added

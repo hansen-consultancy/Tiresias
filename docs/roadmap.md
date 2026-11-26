@@ -42,6 +42,8 @@ design and issue. A PR that finishes, starts or adds an item edits this page in 
       forwarding, Docker engine, WSL and Hyper-V contents, and [devcontainers that ask](devcontainers.md)
       with git credentials and a published feature
 - [x] `tir ai`: instructions for AI coding agents ([guide](ai-agents.md))
+- [x] Package managers' supply-chain safeguards: install scripts, minimum release age, signatures
+      and checksums, judged per version ([design](supply-chain.md))
 - [x] Developer tools appear only on a developer's PC: detected signals and one override, no mode
       ([design](developer-tools.md), #141)
 - [x] Velopack installer and auto-update from GitHub Releases (`app-release.yml`)
