@@ -140,6 +140,9 @@ public static partial class Doctor
         var minutes = settings.Number("minimum-release-age");
         if (minutes is > 0)
             yield return Age("pnpm", DoctorStatus.Ok, $"{label} installs only releases at least {Days(minutes.Value / 1440)} old (minimumReleaseAge)");
+        else if (minutes is null && settings.Value("minimum-release-age") is { } unread)
+            yield return Age("pnpm", DoctorStatus.Warn, $"{label} can't read minimumReleaseAge: {unread}, so it may install a release the minute it is published",
+                new ChangeToolSetting($"pnpm config set minimumReleaseAge {SuggestedDays * 1440}"));
         else if (minutes is null && eleven)
             yield return Age("pnpm", DoctorStatus.Ok, $"{label} installs only releases at least a day old, its default; a week catches more (minimumReleaseAge: {SuggestedDays * 1440})");
         else if (version is null || version >= new Version(10, 16))

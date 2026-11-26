@@ -95,6 +95,15 @@ public class SupplyChainTests
     }
 
     [Test]
+    public void Pnpm_with_an_unreadable_release_age_warns_naming_it()
+    {
+        var line = Lines(Tool(Toolchain.Pnpm, "11.3.0", "minimumReleaseAge: false\n", "config.yaml"))["pnpm release age"];
+
+        Assert.That(line.Status, Is.EqualTo(DoctorStatus.Warn));
+        Assert.That(line.Detail, Does.Contain("false"));
+    }
+
+    [Test]
     public void Pnpm_10_reads_npmrc_and_pnpm_11_only_its_yaml()
     {
         var ten = new DoctorToolchain(Toolchain.Pnpm, "10.20.0", [new(Path.Combine(Profile, ".npmrc"), "minimum-release-age=10080\n")], new Dictionary<string, string>());
