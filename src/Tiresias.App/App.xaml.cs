@@ -45,6 +45,9 @@ public partial class App : Application
 
     internal ConsentPresenter Consent => consent!;
 
+    /// <summary>Velopack updates; <c>null</c> until startup creates them.</summary>
+    internal AppUpdates? Updates => updates;
+
     /// <summary>About's Azure CLI sign-out: as Tiresias locks, or after idle time.</summary>
     internal AzureCliSignOut AzureCli => azureCli;
 

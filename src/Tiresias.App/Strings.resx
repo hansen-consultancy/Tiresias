@@ -1548,6 +1548,25 @@ Store them in clear?</value>
   <data name="FirstRun_Done_Next" xml:space="preserve">
     <value>Next: add the Tiresias.Extensions.Configuration package to a project and start it. Its secrets are sealed on first run.</value>
   </data>
+  <data name="Tray_CheckUpdates" xml:space="preserve">
+    <value>Check for updates</value>
+  </data>
+  <data name="About_CheckUpdates" xml:space="preserve">
+    <value>Check for updates</value>
+  </data>
+  <data name="Update_Latest" xml:space="preserve">
+    <value>Tiresias {0} is the latest version.</value>
+    <comment>{0}: the running version</comment>
+  </data>
+  <data name="Update_CheckFailed" xml:space="preserve">
+    <value>Couldn't check for updates: GitHub didn't answer. Check the connection and try again later.</value>
+  </data>
+  <data name="Update_Checking" xml:space="preserve">
+    <value>Tiresias is already checking for updates. It says so in the menu once one is ready.</value>
+  </data>
+  <data name="Update_Off" xml:space="preserve">
+    <value>This copy wasn't installed with the installer, so it doesn't update itself.</value>
+  </data>
   <data name="Update_WindowTitle" xml:space="preserve">
     <value>Tiresias - update</value>
   </data>

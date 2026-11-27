@@ -46,6 +46,7 @@ sealed class TrayController : IDisposable
         status = Item("Tray_Status", () => app.ShowWindow<StatusWindow>());
         var add = Item("Tray_Add", () => app.ShowWindow<NeedsWindow>());
         var activity = Item("Tray_Activity", () => app.ShowPage<ActivityPage>());
+        var checkUpdates = Item("Tray_CheckUpdates", () => _ = app.Updates?.CheckNowAsync());
         var quit = Item("Tray_Quit", app.Quit);
 
         icon = new TaskbarIcon
@@ -70,6 +71,7 @@ sealed class TrayController : IDisposable
         icon.ContextMenu.Items.Add(status);
         icon.ContextMenu.Items.Add(add);
         icon.ContextMenu.Items.Add(activity);
+        icon.ContextMenu.Items.Add(checkUpdates);
         icon.ContextMenu.Items.Add(updateSeparator);
         icon.ContextMenu.Items.Add(update);
         icon.ContextMenu.Items.Add(new Separator());

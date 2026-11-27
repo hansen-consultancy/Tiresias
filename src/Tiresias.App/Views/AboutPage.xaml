@@ -142,6 +142,7 @@
       </Grid.ColumnDefinitions>
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
         <Button Content="{l:S About_GitHub}" Padding="12,6" Click="OnGitHub" />
+        <Button Content="{l:S About_CheckUpdates}" Padding="12,6" Margin="8,0,0,0" Click="OnCheckUpdates" />
         <Button x:Name="PageButton" Padding="12,6" Margin="8,0,0,0" Click="OnPage" />
         <Button Content="{l:S Status_CopyDetails}" Padding="12,6" Margin="8,0,0,0" Click="OnCopy" />
         <Button Content="{l:S Problem_Action_DataFolder}" Padding="12,6" Margin="8,0,0,0" Click="OnDataFolder" />

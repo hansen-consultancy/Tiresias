@@ -228,6 +228,12 @@ public partial class AboutPage : UserControl
 
     void OnGitHub(object sender, RoutedEventArgs e) => Desktop.Open(AppBuild.Repository);
 
+    async void OnCheckUpdates(object sender, RoutedEventArgs e)
+    {
+        if (App.Current.Updates is { } updates)
+            await updates.CheckNowAsync();
+    }
+
     void OnPage(object sender, RoutedEventArgs e) => Desktop.Open(AppBuild.Current.Installed ? AppBuild.ReleasePage : AppBuild.CommitPage!);
 
     void OnCopy(object sender, RoutedEventArgs e)
