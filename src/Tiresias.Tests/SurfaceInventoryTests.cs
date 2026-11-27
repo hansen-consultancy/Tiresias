@@ -91,12 +91,13 @@ public class SurfaceInventoryTests
     [Test]
     public void A_listing_round_trips_through_its_file()
     {
-        var snapshot = new ToolSnapshot(Now, [new("npm", "@acme/cli", "3.0.0"), new("pipx", "bare", null)]);
+        var snapshot = new ToolSnapshot(Now, [new("npm", "@acme/cli", "3.0.0"), new("pipx", "bare", null)], [new("Acme App", "Acme.App", "1.0", "1.1")]);
 
         var read = ToolSnapshot.Parse(snapshot.ToJson());
 
         Assert.That(read?.At, Is.EqualTo(Now));
         Assert.That(read?.Tools, Is.EqualTo(snapshot.Tools));
+        Assert.That(read?.WingetPackages, Is.EqualTo(snapshot.WingetPackages));
     }
 
     [Test]
@@ -105,7 +106,7 @@ public class SurfaceInventoryTests
         var json = new ToolSnapshot(Now, [new("dotnet", "acme.cli", "1.1.0")]).ToJson();
 
         using var document = System.Text.Json.JsonDocument.Parse(json);
-        Assert.That(document.RootElement.EnumerateObject().Select(p => p.Name), Is.EqualTo(new[] { "version", "at", "tools" }));
+        Assert.That(document.RootElement.EnumerateObject().Select(p => p.Name), Is.EqualTo(new[] { "version", "at", "tools", "winget" }));
         Assert.That(document.RootElement.GetProperty("tools")[0].EnumerateObject().Select(p => p.Name), Is.EqualTo(new[] { "manager", "id", "version" }));
     }
 
@@ -113,10 +114,11 @@ public class SurfaceInventoryTests
     [TestCase("")]
     [TestCase("not json")]
     [TestCase("[]")]
-    [TestCase("""{ "version": 2, "at": "2026-11-19T10:00:00+00:00", "tools": [] }""")]
-    [TestCase("""{ "version": 1, "at": "yesterday", "tools": [] }""")]
-    [TestCase("""{ "version": 1, "at": "2026-11-19T10:00:00+00:00", "tools": {} }""")]
-    [TestCase("""{ "version": 1, "at": "2026-11-19T10:00:00+00:00", "tools": [{ "manager": "npm" }] }""")]
+    [TestCase("""{ "version": 1, "at": "2026-11-19T10:00:00+00:00", "tools": [] }""")]
+    [TestCase("""{ "version": 2, "at": "yesterday", "tools": [] }""")]
+    [TestCase("""{ "version": 2, "at": "2026-11-19T10:00:00+00:00", "tools": {} }""")]
+    [TestCase("""{ "version": 2, "at": "2026-11-19T10:00:00+00:00", "tools": [{ "manager": "npm" }] }""")]
+    [TestCase("""{ "version": 2, "at": "2026-11-19T10:00:00+00:00", "tools": [], "winget": [{ "name": "Acme" }] }""")]
     public void A_damaged_or_other_version_file_is_listed_again(string? json) =>
         Assert.That(ToolSnapshot.Parse(json), Is.Null);
 }

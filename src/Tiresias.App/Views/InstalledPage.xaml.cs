@@ -14,8 +14,9 @@ namespace Tiresias.App.Views;
 
 /// <summary>
 /// The installed-apps list with what Tiresias knows of each program's use (docs/attack-surface.md,
-/// <b>Installed</b>): hygiene, read-only. Uninstalling happens in Settings, which runs the program's
-/// own uninstaller.
+/// <b>Installed</b>). It changes nothing by itself: a program winget installed, and a dotnet or npm
+/// global tool, can be updated or uninstalled through its manager after the user approves the exact
+/// command (#106); any other program is uninstalled in Settings, which runs its own uninstaller.
 /// </summary>
 public partial class InstalledPage : UserControl
 {
@@ -30,6 +31,18 @@ public partial class InstalledPage : UserControl
     void OnOpenSettings(object sender, RoutedEventArgs e) => Desktop.Open("ms-settings:appsfeatures");
 
     void OnTrust(object sender, RoutedEventArgs e) => (DataContext as InstalledViewModel)?.ToggleTrust();
+
+    async void OnUpdate(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is InstalledViewModel { Selected.Update: { } fix } model)
+            await model.RunAsync(Window.GetWindow(this), fix);
+    }
+
+    async void OnUninstall(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is InstalledViewModel { Selected.Uninstall: { } fix } model)
+            await model.RunAsync(Window.GetWindow(this), fix);
+    }
 
     void OnSearchOnline(object sender, RoutedEventArgs e)
     {
@@ -46,9 +59,21 @@ public partial class InstalledPage : UserControl
 /// <param name="IsNew">Installed in the last <see cref="InstalledFilter.NewDays"/> days.</param>
 /// <param name="Mark">What its program file's signature says (<see cref="ProgramMarks"/>).</param>
 /// <param name="Tool">The global tool it is, which the online lookups ask about; <c>null</c> for a program or an extension.</param>
+/// <param name="Update">Its manager's update, when it knows a newer version (<see cref="PackageActions"/>).</param>
+/// <param name="Uninstall">Its manager's uninstall, when its manager is known.</param>
 public sealed record InstalledRow(string Name, string Version, string For, string ShortUse, string Use, string Reached, string Folder, ImageSource? Icon,
-    string Publisher, string? ProgramFile, string InstalledOn, bool IsNew, ProgramMark Mark, GlobalTool? Tool = null)
+    string Publisher, string? ProgramFile, string InstalledOn, bool IsNew, ProgramMark Mark, GlobalTool? Tool = null, PackageFix? Update = null,
+    PackageFix? Uninstall = null)
 {
+    public string UpdateLabel => Update is null ? "" : PackageActions.Target(Update) is { } version
+        ? Text.Format(PackageActions.Ask(Update).Button, version) : Text.Get(PackageActions.Ask(Update).Button);
+
+    public string UninstallLabel => Uninstall is null ? "" : Text.Format(PackageActions.Ask(Uninstall).Button, Uninstall.Command.Manager);
+
+    public Visibility UpdateVisibility => Update is null ? Visibility.Collapsed : Visibility.Visible;
+
+    public Visibility UninstallVisibility => Uninstall is null ? Visibility.Collapsed : Visibility.Visible;
+
     public string Spoken => string.Join(". ", new[] { Name, IsNew ? NewTip : null, MarkTip(Mark), Use }.OfType<string>());
 
     public static string NewTip => Text.Format("Installed_ShowNew", InstalledFilter.NewDays);
@@ -90,6 +115,22 @@ public sealed partial class InstalledViewModel : ObservableObject
     ];
 
     IReadOnlyList<AddOn> extensions = [], tools = [];
+
+    /// <summary>What winget installed, from the day's listing, to match programs against.</summary>
+    IReadOnlyList<WingetPackage> winget = [];
+
+    /// <summary>Joined to a domain, Entra ID or device management: machine-wide software is then the administrator's.</summary>
+    bool managed;
+
+    /// <summary>Runs a package fix once the user approves it, then lists everything again; a failure is said in a dialog.</summary>
+    public async Task RunAsync(Window? owner, PackageFix fix)
+    {
+        if (await PackageRun.ApproveAndRunAsync(owner, fix) is not { } outcome)
+            return;
+        if (!outcome.Done)
+            AskWindow.Tell(owner, null, outcome.Message);
+        await LoadAsync();
+    }
 
     /// <summary>When the global tools were listed; <c>null</c> until read.</summary>
     DateTimeOffset? toolsListed;
@@ -262,7 +303,7 @@ public sealed partial class InstalledViewModel : ObservableObject
     [RelayCommand]
     async Task LoadAsync()
     {
-        (all, icons, developerTools) = await Task.Run(() =>
+        (all, icons, developerTools, winget, managed) = await Task.Run(() =>
         {
             var probe = new MachineProbe();
             var entries = probe.UninstallEntries().ToArray();
@@ -272,7 +313,7 @@ public sealed partial class InstalledViewModel : ObservableObject
             foreach (var entry in programs.Select(p => p.Entry).Where(e => e.Icon is not null && e.IconLocation is not null))
                 if (!read.ContainsKey(entry.Icon!) && Desktop.SmallIcon(entry.IconLocation!.Value.Path, entry.IconLocation.Value.Index) is { } image)
                     read[entry.Icon!] = image;
-            return (programs, (IReadOnlyDictionary<string, ImageSource>)read, DeveloperSignals.View().Shown);
+            return (programs, (IReadOnlyDictionary<string, ImageSource>)read, DeveloperSignals.View().Shown, probe.WingetPackages(), probe.Management.IsManaged);
         });
         signatures.Clear();
         var scan = ++generation;
@@ -286,11 +327,12 @@ public sealed partial class InstalledViewModel : ObservableObject
     /// <summary>Extensions and the day's global tools listing, which takes seconds when a day has passed: read after the programs show.</summary>
     async Task LoadAddOnsAsync()
     {
-        (extensions, tools, toolsListed) = await Task.Run(() =>
+        (extensions, tools, toolsListed, winget) = await Task.Run(() =>
         {
             var probe = new MachineProbe();
             var snapshot = ToolInventory.Current();
-            return (InstalledAddOns.Extensions(probe.Extensions(), probe.CredentialUses(), DateTimeOffset.UtcNow), InstalledAddOns.Tools(snapshot), (DateTimeOffset?)snapshot.At);
+            return (InstalledAddOns.Extensions(probe.Extensions(), probe.CredentialUses(), DateTimeOffset.UtcNow), InstalledAddOns.Tools(snapshot), (DateTimeOffset?)snapshot.At,
+                snapshot.WingetPackages);
         });
         lookups = isOnline ? await Task.Run(async () => await TrustLookupStore.RefreshAsync(ToolInventory.Current().Tools, () => AppSettings.Load().OnlineLookups)) : null;
         Apply();
@@ -350,24 +392,26 @@ public sealed partial class InstalledViewModel : ObservableObject
             ProgramUse.NotRecorded => Text.Get("Installed_ShortNotRecorded"),
             _ => date ?? Text.Get("Installed_ShortRecentNoRun"),
         };
+        var (update, uninstall) = PackageActions.For(program.Entry, winget, managed);
         return new(program.Entry.Name, program.Entry.Version ?? "", Text.Get(program.Entry.Machine ? "Installed_ForEveryone" : "Installed_ForYou"),
             shortUse, UseText(program), program.Reached.Count > 0 ? string.Join(", ", program.Reached) : Text.Get("Installed_ReachedNone"),
             program.Entry.Folder ?? Text.Get("Installed_FolderUnknown"), icon, program.Entry.Publisher ?? Text.Get("Installed_PublisherUnknown"),
             program.Entry.ProgramFile,
             program.Entry.InstalledOn?.ToString("d", CultureInfo.CurrentCulture) ?? Text.Get("Installed_InstalledOnUnknown"),
-            InstalledFilter.IsNew(program.Entry, today), InstalledFilter.Mark(program.Entry, Mark));
+            InstalledFilter.IsNew(program.Entry, today), InstalledFilter.Mark(program.Entry, Mark), Update: update, Uninstall: uninstall);
     }
 
     /// <summary>An extension or tool: no file, signature, icon or install date of its own here; "For" names its host or manager.</summary>
     static InstalledRow Row(AddOn addOn)
     {
         var updated = addOn.Updated?.ToLocalTime().ToString("d", CultureInfo.CurrentCulture);
+        var (update, uninstall) = addOn.Tool is { } tool ? PackageActions.For(tool) : (null, null);
         return new(addOn.Name, addOn.Version ?? "", addOn.In,
             updated is null ? Text.Get("Installed_ShortUpdatedUnknown") : Text.Format("Installed_ShortUpdated", updated),
             updated is null ? Text.Get("Installed_UseAddOnUnknown") : Text.Format("Installed_UseAddOn", updated),
             addOn.Reached.Count > 0 ? string.Join(", ", addOn.Reached) : Text.Get("Installed_ReachedNone"),
             Text.Get("Installed_FolderUnknown"), null, addOn.Publisher ?? Text.Get("Installed_PublisherUnknown"), null,
-            Text.Get("Installed_InstalledOnUnknown"), false, ProgramMark.None, addOn.Tool);
+            Text.Get("Installed_InstalledOnUnknown"), false, ProgramMark.None, addOn.Tool, update, uninstall);
     }
 
     static string UseText(InstalledProgram program)

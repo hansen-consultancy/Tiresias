@@ -134,6 +134,11 @@
                    TextWrapping="Wrap" Margin="0,2"
                    Visibility="{Binding DataContext.OnlineVisibility, RelativeSource={RelativeSource AncestorType=UserControl}}" />
         <WrapPanel Grid.Row="11" Grid.ColumnSpan="2" Margin="0,8,0,0">
+          <!-- Its manager's update and uninstall (#106): each asks first, with the exact command. -->
+          <Button Style="{StaticResource RowButton}" Content="{Binding UpdateLabel}" Click="OnUpdate" Margin="0,0,8,0"
+                  Visibility="{Binding UpdateVisibility}" ToolTip="{l:S Package_UpdateTip}" />
+          <Button Style="{StaticResource RowButton}" Content="{Binding UninstallLabel}" Click="OnUninstall" Margin="0,0,8,0"
+                  Visibility="{Binding UninstallVisibility}" ToolTip="{l:S Package_UninstallTip}" />
           <Button Style="{StaticResource RowButton}" Content="{l:S Installed_SearchOnline}" Click="OnSearchOnline"
                   Margin="0,0,8,0" ToolTip="{l:S Installed_SearchOnlineTip}" />
           <Button Style="{StaticResource RowButton}" Click="OnTrust" ToolTip="{l:S Installed_TrustTip}"

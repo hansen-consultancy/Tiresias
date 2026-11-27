@@ -10,6 +10,11 @@ its section below.
 
 ### Added
 
+- **Update and uninstall with the package manager that installed it.** On **Installed**, a program
+  winget installed has **Update to *version*...** when winget offers a newer version, a `dotnet` or
+  `npm` global tool has **Update...**, and each has **Uninstall with *manager*...**. A program whose uninstaller is
+  missing gets **Repair...**, which reinstalls the same version with winget. Each says exactly what
+  will run and asks first; software installed for everyone asks Windows for an administrator.
 - **Check global tools for known vulnerabilities, if you want.** The Installed page has a new
   **Check global tools online** switch, off unless you turn it on. Once a day it asks OSV.dev about
   your `dotnet`, `npm`, `pipx` and `cargo` global tools, sending only each tool's name, version and

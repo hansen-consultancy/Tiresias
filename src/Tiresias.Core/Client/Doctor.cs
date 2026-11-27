@@ -177,6 +177,9 @@ public interface IDoctorProbe
     /// <summary>The uninstall registry entries, machine and user, each with whether its uninstaller and folder are on disk.</summary>
     IEnumerable<UninstallEntry> UninstallEntries() => [];
 
+    /// <summary>The programs winget installed, from the day's saved listing; never listed here, which takes seconds.</summary>
+    IReadOnlyList<WingetPackage> WingetPackages() => [];
+
     /// <summary>Whether a domain, Entra ID or device management manages this PC.</summary>
     Management Management => Management.None;
 
@@ -333,7 +336,7 @@ public static partial class Doctor
         var (judgedStartup, judgedInstalled) = Judged(management, startup, installed);
         checks.AddRange(Surface(AttackSurface(probe.Extensions(), judgedStartup, uses, otherBlocks, now, runs)));
         checks.AddRange(Surface(KnownVulnerabilities(probe.GlobalTools(), probe.TrustLookups)));
-        checks.AddRange(Surface(UninstallEntries(judgedInstalled)));
+        checks.AddRange(Surface(UninstallEntries(judgedInstalled, probe.WingetPackages())));
         checks.AddRange(Surface(UnusedApplications(judgedInstalled, runs, uses, now, probe.Signer)));
         checks.AddRange(SupplyChain(probe.Toolchains()));
         return checks;

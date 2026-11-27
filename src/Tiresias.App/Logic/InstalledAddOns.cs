@@ -5,7 +5,7 @@ namespace Tiresias.App.Logic;
 /// <summary>An extension or a global tool, as a row of the Installed page's Extensions and Global tools views.</summary>
 /// <param name="In">The program it runs inside (an extension's host), or the package manager that installed a tool.</param>
 /// <param name="Reached">What its host used through Tiresias in the last 90 days, sorted; empty for a tool, whose use isn't recorded.</param>
-/// <param name="Tool">The global tool it is, which the online lookups ask about; <c>null</c> for an extension.</param>
+/// <param name="Tool">The global tool it is, which its manager can update and uninstall and the online lookups ask about; <c>null</c> for an extension.</param>
 public sealed record AddOn(string Name, string? Version, string In, string? Publisher, DateTimeOffset? Updated, IReadOnlyList<string> Reached, GlobalTool? Tool = null);
 
 /// <summary>What the Installed page lists beside programs (#107): read-only, no findings of its own.</summary>
