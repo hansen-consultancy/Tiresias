@@ -312,7 +312,7 @@ public partial class StatusWindow : Window
             case SetUpRaven { CertificatePath: var path }:
                 SetUpRaven(path);
                 break;
-            case ReferenceConfigurationPackage or ImportNuGetCredentials { InProfile: false }:
+            case ReferenceConfigurationPackage or ImportNuGetCredentials { InProfile: false } or UpdateGlobalTool or UninstallGlobalTool:
                 model.CopyFix(fix.Instruction);
                 break;
             case ImportNuGetCredentials:

@@ -152,6 +152,12 @@ public interface IDoctorProbe
     /// <summary>Programs Windows starts at log-on, with whether each is signed.</summary>
     IEnumerable<StartupEntry> StartupEntries() => [];
 
+    /// <summary>The global tools of the last listing, read without listing again; empty when there is none.</summary>
+    IReadOnlyList<GlobalTool> GlobalTools() => [];
+
+    /// <summary>The opt-in online lookups' saved answers; <c>null</c> while they are off (docs/attack-surface.md#trust).</summary>
+    TrustLookups? TrustLookups => null;
+
     /// <summary>Who signed a local program file, when its signature verifies; <c>null</c> otherwise.</summary>
     Publisher? Signer(string path) => null;
 
@@ -326,6 +332,7 @@ public static partial class Doctor
         checks.AddRange(Managed(management));
         var (judgedStartup, judgedInstalled) = Judged(management, startup, installed);
         checks.AddRange(Surface(AttackSurface(probe.Extensions(), judgedStartup, uses, otherBlocks, now, runs)));
+        checks.AddRange(Surface(KnownVulnerabilities(probe.GlobalTools(), probe.TrustLookups)));
         checks.AddRange(Surface(UninstallEntries(judgedInstalled)));
         checks.AddRange(Surface(UnusedApplications(judgedInstalled, runs, uses, now, probe.Signer)));
         checks.AddRange(SupplyChain(probe.Toolchains()));

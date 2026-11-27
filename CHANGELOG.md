@@ -10,6 +10,12 @@ its section below.
 
 ### Added
 
+- **Check global tools for known vulnerabilities, if you want.** The Installed page has a new
+  **Check global tools online** switch, off unless you turn it on. Once a day it asks OSV.dev about
+  your `dotnet`, `npm`, `pipx` and `cargo` global tools, sending only each tool's name, version and
+  package manager. A tool with a known vulnerability becomes a finding on Home whose **Copy** button
+  copies the command that updates it (or uninstalls it when nothing fixes it), and the Installed
+  panel shows what was found for each tool. Turning the switch off forgets every answer.
 - **Package managers' safeguards are checked.** `tir doctor` and Home list each package manager
   and toolchain on your PC (npm, pnpm, Yarn, Bun, NuGet, pip, uv, Go, Cargo and Gradle), with its
   version, and say whether it runs dependencies' install scripts and whether it waits before

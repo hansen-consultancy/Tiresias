@@ -206,9 +206,9 @@ Existing windows remain the places where the work happens; this changes how peop
    **Show installed programs** opens the **Installed** page: every installed program with its last
    opening, why its use is unknown where it is, and the credentials it used, unused first. A
    finding's reasons are in its name, so a dismissal survives a version
-   update and a new reason brings it back. Still design: the opt-in trust lookups (OSV,
-   deps.dev, marketplaces, winget-pkgs) and the vulnerability and unverified-publisher findings
-   they raise; **Update** and `winget`/`dotnet tool`/`npm` uninstalls (browser, unpacked,
+   update and a new reason brings it back. OSV lookups for global tools, opt-in, and the
+   known-vulnerability finding they raise are built (#105). Still design: the other trust lookups
+   (deps.dev, marketplaces, winget-pkgs, Scorecard) and the unverified-publisher finding; **Update** and `winget`/`dotnet tool`/`npm` uninstalls (browser, unpacked,
    Visual Studio, JetBrains and Notepad++ extensions and PowerShell modules are read, #107).
    Trusting a publisher and Home's two groups, *How credentials are held* and *What can reach
    them*, are built (#108). The global tools are listed
