@@ -33,7 +33,7 @@ public static partial class Doctor
         if (configs.AzureProfile?.Text is { } profile && AzureCliProfile.Accounts(profile) is { Count: > 0 } azure)
             yield return new("az signed in", DoctorStatus.Warn,
                 $"the Azure CLI is signed in as {string.Join(", ", azure)}, and its cached Entra session is as reusable as a stored token: any program running as you can use it, unasked and unrecorded. "
-                + "Tiresias has no broker-held Entra identity to offer instead yet; sign it out with az logout when you're done",
+                + "Tiresias has no broker-held Entra identity to offer instead yet; sign it out with az logout when you're done, or let the app do it when Tiresias locks or the PC is idle (About, Sign the Azure CLI out)",
                 Now: Position.Plaintext);
     }
 }

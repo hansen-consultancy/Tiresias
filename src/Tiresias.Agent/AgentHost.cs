@@ -116,6 +116,13 @@ public sealed class AgentHost : IAsyncDisposable
     public event Action? StateChanged;
 
     /// <summary>
+    /// A lock was asked for, by the user or by the workstation locking, sleeping or logging off, or the
+    /// lease ended; raised even when the keys were already locked, with the reason as the log gives it.
+    /// On the thread that locked, which a session event holds up: a handler must return at once.
+    /// </summary>
+    public event Action<string>? LockRequested;
+
+    /// <summary>
     /// A decoy credential was used, after it is in the activity log. Raised on a pool thread; the
     /// app blocks the program and raises a finding, <c>tir agent</c> only prints it.
     /// </summary>
@@ -368,6 +375,7 @@ public sealed class AgentHost : IAsyncDisposable
         UserSecrets.Lock();
         if (wasUnlocked)
             Say($"Locked: {reason}.");
+        LockRequested?.Invoke(reason);
         StateChanged?.Invoke();
     }
 

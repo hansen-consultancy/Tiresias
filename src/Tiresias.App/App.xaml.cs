@@ -31,6 +31,7 @@ public partial class App : Application
     TrayController? tray;
     AppUpdates? updates;
     AppAlerts? alerts;
+    readonly AzureCliSignOut azureCli = new();
     /// <summary>Whether the Windows session is locked or disconnected, as the last session switch said; assumed not at start.</summary>
     volatile bool sessionLocked;
     readonly Dictionary<Type, Window> windows = [];
@@ -43,6 +44,9 @@ public partial class App : Application
     internal AppAlerts Alerts => alerts!;
 
     internal ConsentPresenter Consent => consent!;
+
+    /// <summary>About's Azure CLI sign-out: as Tiresias locks, or after idle time.</summary>
+    internal AzureCliSignOut AzureCli => azureCli;
 
     /// <summary>The "This wasn't me" lockdown and blocklist.</summary>
     internal ProgramGuard Guard => guard!;
@@ -153,6 +157,8 @@ public partial class App : Application
             Dispatcher.BeginInvoke(Refresh);
         };
         host.DecoyTouched += OnDecoyTouched;
+        host.LockRequested += azureCli.OnLock;
+        azureCli.Start();
         host.UserSecrets.FirstSealed += id => Dispatcher.BeginInvoke(() =>
             tray?.Notify(Text.Get("Notify_FirstSealed_Title"), Text.Format("Notify_FirstSealed_Body", id)));
         SystemEvents.SessionSwitch += OnSessionSwitch;
@@ -851,6 +857,7 @@ public partial class App : Application
         SystemEvents.SessionSwitch -= OnSessionSwitch;
         SystemEvents.PowerModeChanged -= OnPowerModeChanged;
         updates?.Dispose();
+        azureCli.Dispose();
         FindingWatch.Stop();
         tray?.Dispose();
         await stop.CancelAsync();

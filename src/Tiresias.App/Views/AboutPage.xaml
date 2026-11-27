@@ -43,6 +43,24 @@
         </TextBlock>
       </StackPanel>
     </Border>
+    <!-- The Azure CLI never signs itself out; the app can, as Tiresias locks or after idle time (docs/desktop-app.md). -->
+    <Border x:Name="AzSignOutCard" Style="{StaticResource Card}">
+      <StackPanel>
+        <DockPanel>
+          <ComboBox x:Name="AzSignOutIdleBox" DockPanel.Dock="Right" MinWidth="120" Margin="8,0,0,0" SelectionChanged="OnAzSignOut"
+                    VerticalAlignment="Center" AutomationProperties.Name="{l:S AzSignOut_IdleTime}" />
+          <ComboBox x:Name="AzSignOutBox" DockPanel.Dock="Right" MinWidth="260" Margin="12,0,0,0" SelectionChanged="OnAzSignOut"
+                    VerticalAlignment="Center" AutomationProperties.Name="{l:S AzSignOut_Heading}">
+            <ComboBoxItem Content="{l:S AzSignOut_Off}" />
+            <ComboBoxItem Content="{l:S AzSignOut_OnLock}" />
+            <ComboBoxItem Content="{l:S AzSignOut_Idle}" />
+          </ComboBox>
+          <TextBlock Text="{l:S AzSignOut_Heading}" Style="{StaticResource SubtitleText}" Margin="0" VerticalAlignment="Center"
+                     AutomationProperties.HeadingLevel="Level2" />
+        </DockPanel>
+        <TextBlock x:Name="AzSignOutNote" Style="{StaticResource CaptionText}" Margin="0,6,0,0" />
+      </StackPanel>
+    </Border>
     <!-- Out-of-band alerts (docs/alerts.md): adding a sink is a sealed save behind Windows Hello; muting and removing are not. -->
     <Border Style="{StaticResource Card}">
       <StackPanel>
