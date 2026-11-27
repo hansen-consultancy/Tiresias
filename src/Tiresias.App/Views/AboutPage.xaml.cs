@@ -54,6 +54,13 @@ public partial class AboutPage : UserControl
         // A development build never registers itself: its folder goes stale with the next build.
         DeveloperToolsBox.SelectedIndex = (int)AppSettings.Load().DeveloperTools;
         ShowDeveloperTools();
+        var settings = AppSettings.Load();
+        AzSignOutIdleBox.ItemsSource = AzSignOutPlan.IdleChoices.Select(m => Text.Format("AzSignOut_Minutes", m)).ToList();
+        AzSignOutIdleBox.SelectedIndex = AzSignOutPlan.IdleChoices.IndexOf(AzSignOutPlan.IdleMinutes(settings.AzSignOutIdleMinutes));
+        AzSignOutBox.SelectedIndex = (int)settings.AzSignOut;
+        ShowAzSignOut(settings.AzSignOut);
+        // Without the Azure CLI there is nothing to offer; a setting left on still shows, saying so.
+        AzSignOutCard.Visibility = !DemoMode.On && settings.AzSignOut == AzSignOut.Off && AzureCliSignOut.Program is null ? Visibility.Collapsed : Visibility.Visible;
         StartWithWindowsBox.IsChecked = StartWithWindows.IsOn;
         StartWithWindowsBox.IsEnabled = build.Installed;
         StartWithWindowsNote.Text = Text.Get(build.Installed ? "Status_StartWithWindowsNote" : "Status_StartWithWindowsDev");
@@ -184,6 +191,29 @@ public partial class AboutPage : UserControl
         var view = DeveloperSignals.View();
         DeveloperToolsReason.Text = view.Because.Count > 0 ? Text.Format("DevTools_Because", DeveloperSignals.Reasons(view))
             : view.Shown ? "" : AppSettings.Load().DeveloperTools == DeveloperToolsSetting.Auto ? Text.Get("DevTools_NotFound") : "";
+    }
+
+    void OnAzSignOut(object sender, SelectionChangedEventArgs e)
+    {
+        if (!IsLoaded || AzSignOutBox.SelectedIndex < 0 || AzSignOutIdleBox.SelectedIndex < 0)
+            return;
+        var setting = (AzSignOut)AzSignOutBox.SelectedIndex;
+        (AppSettings.Load() with { AzSignOut = setting, AzSignOutIdleMinutes = AzSignOutPlan.IdleChoices[AzSignOutIdleBox.SelectedIndex] }).Save();
+        App.Current.AzureCli.Reload();
+        ShowAzSignOut(setting);
+    }
+
+    /// <summary>The idle time only beside the idle choice; the note says what the choice does, or that there is no az to run.</summary>
+    void ShowAzSignOut(AzSignOut setting)
+    {
+        AzSignOutIdleBox.Visibility = setting == AzSignOut.Idle ? Visibility.Visible : Visibility.Collapsed;
+        // A demo has no programs of its own, and never runs the real one.
+        AzSignOutNote.Text = !DemoMode.On && AzureCliSignOut.Program is null ? Text.Get("AzSignOut_NotFound") : Text.Get(setting switch
+        {
+            AzSignOut.OnLock => "AzSignOut_OnLockNote",
+            AzSignOut.Idle => "AzSignOut_IdleNote",
+            _ => "AzSignOut_OffNote",
+        });
     }
 
     void OnStartWithWindows(object sender, RoutedEventArgs e)

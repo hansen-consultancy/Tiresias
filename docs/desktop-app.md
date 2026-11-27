@@ -50,6 +50,16 @@ CI and people who prefer it, and it talks to the same agent.
   once why they appeared. Without them, findings and checks that warn or fail still show, and
   solo mode's trade-offs count as passed. **Show developer tools** on About (Auto, On, Off)
   overrides; Off never hides an area in use ([design](developer-tools.md)).
+- **The Azure CLI can be signed out for you.** `az` keeps its Entra session until `az logout` and
+  has no timeout of its own, which is the "az signed in" finding. **Sign the Azure CLI out** on
+  About has three choices, kept in `app.json`: **Never** (the default); **When Tiresias locks**,
+  which is whenever you lock it and whenever Windows locks, sleeps or signs out, since Tiresias
+  locks then too; or **When the PC has been idle** for 5, 15, 30, 60 or 120 minutes without keyboard
+  or mouse input. Signing out runs the CLI's own `az account clear`, which forgets every account
+  (`az logout` forgets only the current one), and only when the CLI's profile names an account, so
+  a lock while signed out starts nothing. Only the app does this, while it runs: `tir agent` does
+  not, and nothing is installed in Task Scheduler or your shell profile. The card is hidden when
+  `az` isn't on `PATH` and the setting is off.
 - **One per user session.** Starting it again brings the running one forward. `tir agent` refuses
   to start while the app runs.
 - **The agent runs in the app:** the user-secrets pipe server, the lease heartbeat, locking on

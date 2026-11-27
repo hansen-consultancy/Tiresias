@@ -12,9 +12,11 @@ namespace Tiresias.App;
 /// <param name="DeveloperToolsNoted">The user closed Home's line saying why developer tools appeared.</param>
 /// <param name="ApplyingUpdate">The version the app last quit to apply, until the next start checks it arrived.</param>
 /// <param name="OnlineLookups">The user turned on the online trust lookups (docs/attack-surface.md#trust); off by default.</param>
+/// <param name="AzSignOut">Whether the app signs the Azure CLI out: never, when Tiresias locks, or after the PC has been idle.</param>
+/// <param name="AzSignOutIdleMinutes">The idle time for <see cref="Logic.AzSignOut.Idle"/>.</param>
 public sealed record AppSettings(bool SetupSkipped = false, DateTimeOffset? LastUpdateCheck = null, IReadOnlyDictionary<string, SinkNarrowing>? Alerts = null, Logic.ReachScan ReachScan = Logic.ReachScan.Off,
     Logic.DeveloperToolsSetting DeveloperTools = Logic.DeveloperToolsSetting.Auto, bool DeveloperToolsNoted = false, string? ApplyingUpdate = null,
-    bool OnlineLookups = false)
+    bool OnlineLookups = false, Logic.AzSignOut AzSignOut = Logic.AzSignOut.Off, int AzSignOutIdleMinutes = Logic.AzSignOutPlan.DefaultIdleMinutes)
 {
     static string Path => System.IO.Path.Combine(KeyringStore.Directory, "app.json");
 

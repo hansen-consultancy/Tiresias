@@ -3170,6 +3170,36 @@ Close them, then choose the update in the tray menu again.</value>
   <data name="DevTools_NotFound" xml:space="preserve">
     <value>Hidden: nothing on this PC looks like a developer's.</value>
   </data>
+  <data name="AzSignOut_Heading" xml:space="preserve">
+    <value>Sign the Azure CLI out</value>
+  </data>
+  <data name="AzSignOut_Off" xml:space="preserve">
+    <value>Never</value>
+  </data>
+  <data name="AzSignOut_OnLock" xml:space="preserve">
+    <value>When Tiresias locks</value>
+  </data>
+  <data name="AzSignOut_Idle" xml:space="preserve">
+    <value>When the PC has been idle</value>
+  </data>
+  <data name="AzSignOut_IdleTime" xml:space="preserve">
+    <value>Idle time</value>
+  </data>
+  <data name="AzSignOut_Minutes" xml:space="preserve">
+    <value>{0} minutes</value>
+  </data>
+  <data name="AzSignOut_OffNote" xml:space="preserve">
+    <value>The Azure CLI (az) stays signed in until you run az logout: it has no timeout of its own, and any program running as you can use its sign-in.</value>
+  </data>
+  <data name="AzSignOut_OnLockNote" xml:space="preserve">
+    <value>Every account is signed out of the Azure CLI (az account clear) whenever Tiresias locks: when you lock it, and when Windows locks, sleeps or signs out. Run az login again when you need it.</value>
+  </data>
+  <data name="AzSignOut_IdleNote" xml:space="preserve">
+    <value>Every account is signed out of the Azure CLI (az account clear) once this PC has had no keyboard or mouse input for that long, while Tiresias runs. Run az login again when you need it.</value>
+  </data>
+  <data name="AzSignOut_NotFound" xml:space="preserve">
+    <value>The Azure CLI (az) isn't on PATH, so there is nothing to sign out. If you just installed it, restart Tiresias.</value>
+  </data>
   <data name="DevTools_HomeLine" xml:space="preserve">
     <value>Developer tools are shown because {0}.</value>
   </data>

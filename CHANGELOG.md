@@ -29,6 +29,11 @@ its section below.
   turns it on, such as `npm config set min-release-age 7`. Only settings and versions are read and
   shown, never a file's path or a registry. A minimum age set on a version too old to know it counts as
   off, with the update to make.
+- **The app can sign the Azure CLI out for you.** `az` stays signed in until you run `az logout`,
+  and any program running as you can use that sign-in. **Sign the Azure CLI out** on About now
+  offers three choices: never, whenever Tiresias locks (which includes Windows locking or going
+  to sleep), or after the PC has been idle for a time you pick. Every account is signed out, and
+  you run `az login` again when you need it.
 
 ### Fixed
 

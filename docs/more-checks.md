@@ -206,6 +206,9 @@ E5/C3, its refresh token as reusable as `gh`'s. Any program running as the user 
 which mints a token per run after consent (E2/C1). Keep `gh`'s own sign-in only for interactive
 use, or sign it out with `gh auth logout`. For `az`, no fix yet: Tiresias has no broker-held Entra
 identity. It still carries its `Now` (E5/C3), so it is a finding without a fix, which says so.
+The app can shorten how long the session lies there: About's **Sign the Azure CLI out** runs
+`az account clear` when Tiresias locks or after idle time ([desktop app](desktop-app.md)). That
+ends the finding until the next `az login`; it does not make the session any safer while it lasts.
 
 **As built.** The `gh` finding's fix is `RunThroughExec("gh", service)`: with no GitHub App
 service in the vault, the app's **Add a GitHub App...** opens the Services add form with

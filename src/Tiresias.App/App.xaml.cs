@@ -31,6 +31,7 @@ public partial class App : Application
     TrayController? tray;
     AppUpdates? updates;
     AppAlerts? alerts;
+    readonly AzureCliSignOut azureCli = new();
     /// <summary>Whether the Windows session is locked or disconnected, as the last session switch said; assumed not at start.</summary>
     volatile bool sessionLocked;
     readonly Dictionary<Type, Window> windows = [];
@@ -43,6 +44,9 @@ public partial class App : Application
     internal AppAlerts Alerts => alerts!;
 
     internal ConsentPresenter Consent => consent!;
+
+    /// <summary>About's Azure CLI sign-out: as Tiresias locks, or after idle time.</summary>
+    internal AzureCliSignOut AzureCli => azureCli;
 
     /// <summary>The "This wasn't me" lockdown and blocklist.</summary>
     internal ProgramGuard Guard => guard!;
@@ -107,6 +111,9 @@ public partial class App : Application
             _ = Dispatcher.InvokeAsync(() => NotMeAsync(asker, asked, names)).Task.Unwrap();
         };
         host.Log += AppLog.Info;
+        // Before the agent starts: its lease keeper hears a workstation lock from then on, and that lock signs out too.
+        azureCli.Start();
+        host.LockRequested += azureCli.OnLock;
         // Before the broker starts: a trust chain it rejects at startup is audited, and so alerts, then.
         host.BrokerAudited += (record, at) =>
         {
@@ -852,6 +859,7 @@ public partial class App : Application
         SystemEvents.SessionSwitch -= OnSessionSwitch;
         SystemEvents.PowerModeChanged -= OnPowerModeChanged;
         updates?.Dispose();
+        azureCli.Dispose();
         FindingWatch.Stop();
         tray?.Dispose();
         await stop.CancelAsync();
