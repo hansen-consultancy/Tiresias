@@ -62,7 +62,7 @@ sealed class AppUpdates(App app, TrayController tray) : IDisposable
     /// </summary>
     public async Task CheckNowAsync()
     {
-        if (manager is null)
+        if (manager is not { IsInstalled: true })
         {
             // A demo, or a build folder: nothing updates in place.
             AskWindow.Tell(null, null, Text.Get("Update_Off"));
