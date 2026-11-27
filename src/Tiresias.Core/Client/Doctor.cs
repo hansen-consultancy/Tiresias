@@ -208,6 +208,9 @@ public interface IDoctorProbe
 
     /// <summary>What VS Code's Dev Containers forwards into containers; <c>null</c> when it isn't installed.</summary>
     DevcontainerForwarding? DevcontainerForwarding => null;
+
+    /// <summary>The package managers and toolchains installed, with their versions and user-level settings. See <see cref="Doctor.SupplyChain"/>.</summary>
+    IEnumerable<DoctorToolchain> Toolchains() => [];
 }
 
 /// <summary>How many decoys are placed, and whether something listens on their endpoints (checked without connecting, which would be a hit).</summary>
@@ -328,6 +331,7 @@ public static partial class Doctor
         checks.AddRange(Surface(AttackSurface(probe.Extensions(), judgedStartup, uses, otherBlocks, now, runs)));
         checks.AddRange(Surface(UninstallEntries(judgedInstalled, probe.WingetPackages())));
         checks.AddRange(Surface(UnusedApplications(judgedInstalled, runs, uses, now, probe.Signer)));
+        checks.AddRange(SupplyChain(probe.Toolchains()));
         return checks;
     }
 

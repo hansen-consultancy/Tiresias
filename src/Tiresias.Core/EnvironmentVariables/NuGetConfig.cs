@@ -28,6 +28,9 @@ public sealed record NuGetConfigCredential(string Key, string? Source, string? U
     public string? UsernameVariable => NuGetConfig.VariableIn(Username);
 }
 
+/// <summary>A NuGet.Config's supply-chain settings: each source key with its minimum publish age in hours, and the signature validation mode as written.</summary>
+public sealed record NuGetSafeguards(IReadOnlyList<(string Source, int Hours)> Sources, string? SignatureValidationMode);
+
 /// <summary>
 /// Finds the credentials NuGet.Config files hold for package sources, and takes them out once the
 /// sources are mapped to sealed variables. NuGet only asks its credential plugins when the config
@@ -80,6 +83,25 @@ public static class NuGetConfig
                 ? null
                 : new NuGetConfigCredential(key, sources.GetValueOrDefault(key), Value("Username"), kind, password);
         }).OfType<NuGetConfigCredential>()];
+    }
+
+    /// <summary>
+    /// The supply-chain settings in <paramref name="xml"/>: each source's minimum publish age in hours
+    /// (<c>minPublishAgeHours</c>, NuGet 8; 0 when unset), the last entry of a key winning as NuGet's
+    /// does, and <c>signatureValidationMode</c>. <c>null</c> when it isn't a NuGet.Config.
+    /// </summary>
+    public static NuGetSafeguards? Safeguards(string xml)
+    {
+        if (Parse(xml, LoadOptions.None)?.Root is not { } root)
+            return null;
+        var sources = (root.Element("packageSources")?.Elements("add") ?? [])
+            .Where(e => e.Attribute("key") is not null)
+            .GroupBy(e => (string)e.Attribute("key")!, StringComparer.OrdinalIgnoreCase)
+            .Select(g => (Source: g.Key, Hours: int.TryParse((string?)g.Last().Attribute("minPublishAgeHours"), out var hours) ? hours : 0))
+            .ToArray();
+        var mode = root.Element("config")?.Elements("add")
+            .LastOrDefault(e => string.Equals((string?)e.Attribute("key"), "signatureValidationMode", StringComparison.OrdinalIgnoreCase))?.Attribute("value")?.Value;
+        return new(sources, mode);
     }
 
     /// <summary>The sources with a push key under <c>apikeys</c>, which NuGet encrypts for the Windows account. Never the keys.</summary>

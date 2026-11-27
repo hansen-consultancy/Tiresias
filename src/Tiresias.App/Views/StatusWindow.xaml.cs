@@ -351,7 +351,7 @@ public partial class StatusWindow : Window
             case RemoveEntry { Machine: false } entry:
                 _ = RemoveEntryAsync(entry);
                 break;
-            case RemoveEntry:
+            case RemoveEntry or ChangeToolSetting:
                 model.CopyFix(fix.Instruction);
                 break;
             case PackageFix package:

@@ -449,6 +449,10 @@ extensions, log-on and uninstall entries, decoy incidents and blocks, the Docker
 Hyper-V reach, devcontainer forwarding) is under **What can reach them**, every other finding under
 **How credentials are held**. Each group is ranked on its own, failures first, and Home numbers
 the first group before the second.
+**Package managers' safeguards are checked** ([supply chain](supply-chain.md)): a package installed
+today runs as the user too, so each package manager on the PC is judged on whether it runs
+dependencies' install scripts and waits before installing a new release. Its lines are under
+**What can reach them**.
 [Guided setup](guided-setup.md#phases) lists what is still design.
 
 1. **Inventory**: applications, extensions, global tools and startup entries, with last use where
