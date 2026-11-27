@@ -290,7 +290,10 @@ public static class Osv
     }
 }
 
-/// <summary>Update a global tool with the manager that installed it: the latest version, which holds every published fix.</summary>
+/// <summary>
+/// Update a global tool with the manager that installed it: the latest version, which holds every
+/// published fix. Copied, not run: for the managers <see cref="Packages"/> can't run (pipx, cargo).
+/// </summary>
 /// <param name="Fixed">The version that fixes the advisory, when known: said, not pinned.</param>
 public sealed record UpdateGlobalTool(string Manager, string Id, string? Fixed) : DoctorFix
 {
@@ -303,7 +306,7 @@ public sealed record UpdateGlobalTool(string Manager, string Id, string? Fixed) 
     };
 }
 
-/// <summary>Uninstall a global tool no published version fixes.</summary>
+/// <summary>Uninstall a global tool no published version fixes; copied, like <see cref="UpdateGlobalTool"/>.</summary>
 public sealed record UninstallGlobalTool(string Manager, string Id) : DoctorFix
 {
     public override string Instruction => Manager switch
@@ -326,7 +329,8 @@ public static partial class Doctor
     /// The global tools OSV reports an advisory for at their installed version, from the opt-in
     /// lookups' saved answers (<paramref name="lookups"/> is <c>null</c> while they are off: no
     /// finding then, since nothing was asked). A new advisory is a new reason, so a dismissal comes
-    /// back for it; trust in a publisher never hides one.
+    /// back for it; trust in a publisher never hides one. The fix is a <see cref="PackageFix"/> the
+    /// app runs after approval where <see cref="Packages"/> builds one (dotnet, npm), else a command to copy.
     /// </summary>
     public static IEnumerable<DoctorCheck> KnownVulnerabilities(IEnumerable<GlobalTool> tools, TrustLookups? lookups)
     {
@@ -346,7 +350,8 @@ public static partial class Doctor
                 $"{OsvSource} lists {ids} for the {tool.Manager} global tool {tool.Id} {tool.Version}. "
                 + (fixedAll ? $"Update it{(highest is null ? "" : $"; {highest} fixes {(advisories.Count == 1 ? "it" : "them all")}")}"
                     : "No version fixes every one of them: uninstall it unless you need it"),
-                fixedAll ? new UpdateGlobalTool(tool.Manager, tool.Id, highest) : new UninstallGlobalTool(tool.Manager, tool.Id),
+                fixedAll ? (DoctorFix?)Packages.Update(tool) ?? new UpdateGlobalTool(tool.Manager, tool.Id, highest)
+                    : (DoctorFix?)Packages.Uninstall(tool) ?? new UninstallGlobalTool(tool.Manager, tool.Id),
                 Kind: VulnerableToolKind)
             {
                 Item = $"tool {tool.Manager} {tool.Id}".ToLowerInvariant(),
