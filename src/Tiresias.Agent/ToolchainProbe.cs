@@ -23,18 +23,18 @@ static class ToolchainProbe
         string? On(params string[] files) => path.SelectMany(d => files.Select(f => Path.Combine(d, f))).FirstOrDefault(File.Exists);
         DoctorFile[] Files(params string[] paths) => [.. paths.Where(File.Exists).Select(Read)];
 
-        var npm = On("npm.cmd");
+        var npm = Doctor.FindNodeShim(path, "npm");
         var npmrc = Path.Combine(profile, ".npmrc");
         if (npm is not null)
             yield return new(Toolchain.Npm, PackageVersion(npm, "npm"), Files(Doctor.NpmSettingsFiles(profile, Path.GetDirectoryName(npm)!)), variables);
 
-        var pnpm = On("pnpm.cmd", "pnpm.exe");
+        var pnpm = Doctor.FindNodeShim(path, "pnpm");
         if (pnpm is not null)
             yield return new(Toolchain.Pnpm, PackageVersion(pnpm, "pnpm"),
                 Files(npmrc, Path.Combine(local, "pnpm", "config", "rc"), Path.Combine(local, "pnpm", "config", "config.yaml")), variables);
 
         var yarnrc = Path.Combine(profile, ".yarnrc.yml");
-        var yarn = On("yarn.cmd");
+        var yarn = Doctor.FindNodeShim(path, "yarn");
         if (yarn is not null || File.Exists(yarnrc))
             yield return new(Toolchain.Yarn, yarn is null ? null : PackageVersion(yarn, "yarn"), Files(yarnrc), variables);
 

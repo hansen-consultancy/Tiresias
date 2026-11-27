@@ -17,7 +17,8 @@ remembers setting. A developer's PC has five or six of these tools.
 `Doctor.SupplyChain` judges each toolchain the probe found. Lines name the tool, its version and
 the setting, never a file path, a feed or a registry. A version is read from a file the tool
 installs beside itself (`node_modules\npm\package.json`, the SDK folder, pip's `dist-info`, uv's
-`uv-receipt.json`, Go's `VERSION`); no tool is started. When the version is unknown, the line says
+`uv-receipt.json`, Go's `VERSION`); no tool is started. npm, pnpm and Yarn are found by any of their shims on `PATH`
+(`.cmd`, `.exe`, `.ps1` or the extensionless script). When the version is unknown, the line says
 so and the setting alone decides.
 
 | Tool | Install scripts | Release age | Also |
@@ -61,6 +62,7 @@ machine's default is.
 | Install scripts run for every dependency | Warn | Update to the version that turns them off, or the tool's own setting |
 | No minimum release age | Warn | The tool's command for a week: `npm config set min-release-age 7`, `pnpm config set minimumReleaseAge 10080`, `yarn config set -H npmMinimalAgeGate 7d`, `dotnet nuget update source nuget.org --min-publish-age-hours 168`, `pip config set global.uploaded-prior-to P7D`, or the line to add for Bun, uv and Cargo. On a version without the setting, the update comes first |
 | Builds from source (pip, uv), unsigned packages accepted (NuGet) | Ok, with a fix | A suggestion: it can break a working setup, so it sorts last and doesn't count for the tray badge |
+| A release age set on a version older than the setting (npm before 11.10, pnpm before 10.16, Bun before 1.3, NuGet before the .NET 11 SDK, pip before 26.0 or a duration before 26.1, a uv duration before 0.9.17, Cargo before 1.100) | Warn | The update; the setting then applies. Not for Yarn: a project picks its own Yarn, so the one on `PATH` says little |
 | Go checksums off, Gradle verification weakened | Warn | Remove the setting |
 
 The fix is `ChangeToolSetting`: the app's **Copy** copies it, `tir doctor` prints it. Warnings of

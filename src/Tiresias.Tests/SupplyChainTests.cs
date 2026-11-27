@@ -35,6 +35,52 @@ public class SupplyChainTests
         Assert.That(lines["npm release age"].Detail, Does.Contain("7 days"));
     }
 
+    [TestCase(Toolchain.Npm, "11.9.0", "min-release-age=7\n", ".npmrc", "npm 11.10")]
+    [TestCase(Toolchain.Pnpm, "10.15.0", "minimum-release-age=10080\n", ".npmrc", "pnpm 10.16")]
+    [TestCase(Toolchain.Bun, "1.2.20", "[install]\nminimumReleaseAge = 604800\n", ".bunfig.toml", "Bun 1.3")]
+    [TestCase(Toolchain.NuGet, "10.0.203", "<configuration><packageSources><add key=\"nuget.org\" value=\"https://api.nuget.org/v3/index.json\" minPublishAgeHours=\"168\" /></packageSources></configuration>", "NuGet.Config", ".NET 11 SDK")]
+    [TestCase(Toolchain.Pip, "25.3", "[global]\nuploaded-prior-to = 2026-01-01\n", "pip.ini", "pip 26.0")]
+    [TestCase(Toolchain.Pip, "26.0", "[global]\nuploaded-prior-to = P7D\n", "pip.ini", "pip 26.1")]
+    [TestCase(Toolchain.Uv, "0.9.5", "exclude-newer = \"7 days\"\n", "uv.toml", "uv 0.9.17")]
+    [TestCase(Toolchain.Cargo, "1.99.0", "[registry]\nglobal-min-publish-age = \"7 days\"\n", "config.toml", "Cargo 1.100")]
+    public void An_age_setting_the_version_doesnt_know_yet_is_a_warning(Toolchain tool, string version, string file, string fileName, string since)
+    {
+        var line = Doctor.SupplyChain([Tool(tool, version, file, fileName)]).Single(c => c.Name.EndsWith(" release age", StringComparison.Ordinal));
+
+        Assert.That(line.Status, Is.EqualTo(DoctorStatus.Warn));
+        Assert.That(line.Detail, Does.Contain("ignores").And.Contain(since));
+        Assert.That(line.Fix, Is.Not.Null);
+    }
+
+    [Test]
+    public void An_age_setting_on_a_version_that_knows_it_or_an_unknown_one_is_believed()
+    {
+        Assert.That(Lines(Tool(Toolchain.Npm, "11.10.0", "min-release-age=7\n", ".npmrc"))["npm release age"].Status, Is.EqualTo(DoctorStatus.Ok));
+        Assert.That(Lines(Tool(Toolchain.Cargo, null, "[registry]\nglobal-min-publish-age = \"7 days\"\n", "config.toml"))["Cargo release age"].Status, Is.EqualTo(DoctorStatus.Ok));
+        Assert.That(Lines(Tool(Toolchain.Pip, "26.0", "[global]\nuploaded-prior-to = 2026-01-01\n", "pip.ini"))["pip release age"].Status, Is.EqualTo(DoctorStatus.Ok));
+        Assert.That(Lines(Tool(Toolchain.Uv, "0.9.5", "exclude-newer = \"2026-01-01T00:00:00Z\"\n", "uv.toml"))["uv release age"].Status, Is.EqualTo(DoctorStatus.Ok));
+    }
+
+    [TestCase("npm.ps1")]
+    [TestCase("npm")]
+    [TestCase("npm.exe")]
+    public void Npm_is_found_by_any_of_its_shims(string shim)
+    {
+        var empty = Directory.CreateTempSubdirectory("tir-path-");
+        var folder = Directory.CreateTempSubdirectory("tir-path-");
+        try
+        {
+            File.WriteAllText(Path.Combine(folder.FullName, shim), "");
+            Assert.That(Doctor.FindNodeShim([empty.FullName, folder.FullName], "npm"), Is.EqualTo(Path.Combine(folder.FullName, shim)));
+            Assert.That(Doctor.FindNodeShim([empty.FullName], "npm"), Is.Null);
+        }
+        finally
+        {
+            empty.Delete(true);
+            folder.Delete(true);
+        }
+    }
+
     [Test]
     public void Npm_before_11_10_is_told_to_update_before_it_can_set_an_age() =>
         Assert.That(Lines(Tool(Toolchain.Npm, "10.9.2"))["npm release age"].Fix!.Instruction, Does.StartWith("npm install -g npm@latest"));

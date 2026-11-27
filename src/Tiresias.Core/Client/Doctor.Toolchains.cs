@@ -82,6 +82,14 @@ public static partial class Doctor
     public static string[] NpmSettingsFiles(string profile, string npmFolder) =>
         [Path.Combine(npmFolder, "etc", "npmrc"), Path.Combine(profile, ".npmrc")];
 
+    /// <summary>
+    /// The first shim of a Node package manager on <paramref name="path"/>, folder by folder: npm
+    /// installs <c>.cmd</c>, <c>.ps1</c> and an extensionless shell script, a standalone install an
+    /// <c>.exe</c>; a folder may hold only some of them.
+    /// </summary>
+    public static string? FindNodeShim(IEnumerable<string> path, string name) =>
+        path.SelectMany(folder => new[] { ".cmd", ".exe", ".ps1", "" }.Select(extension => Path.Combine(folder, name + extension))).FirstOrDefault(File.Exists);
+
     /// <summary>pip's user settings files, lowest precedence first: the legacy <c>~\pip\pip.ini</c>, then <c>%APPDATA%\pip\pip.ini</c>.</summary>
     public static string[] PipSettingsFiles(string profile, string roaming) =>
         [Path.Combine(profile, "pip", "pip.ini"), Path.Combine(roaming, "pip", "pip.ini")];
@@ -104,7 +112,9 @@ public static partial class Doctor
                 $"{label} runs every dependency's install script as you, the moment it is installed. npm 12 runs only those a project allows",
                 new ChangeToolSetting("npm install -g npm@latest; or, to keep this npm, npm config set ignore-scripts true"));
 
-        if (settings.Number("min-release-age") is > 0 and var days)
+        if (settings.Number("min-release-age") is > 0 && Before(version, 11, 10))
+            yield return Ignored("npm", label, "min-release-age", "npm 11.10", "npm install -g npm@latest; your min-release-age then applies");
+        else if (settings.Number("min-release-age") is > 0 and var days)
             yield return Age("npm", DoctorStatus.Ok, $"{label} installs only releases at least {Days(days)} old (min-release-age)");
         else if (settings.Value("before") is not null)
             yield return Age("npm", DoctorStatus.Ok, $"{label} installs only releases published before a set date (before)");
@@ -138,7 +148,9 @@ public static partial class Doctor
                 new ChangeToolSetting("npm install -g pnpm@latest (or pnpm self-update)"));
 
         var minutes = settings.Number("minimum-release-age");
-        if (minutes is > 0)
+        if (minutes is > 0 && Before(version, 10, 16))
+            yield return Ignored("pnpm", label, "minimumReleaseAge", "pnpm 10.16", "pnpm self-update; your minimumReleaseAge then applies");
+        else if (minutes is > 0)
             yield return Age("pnpm", DoctorStatus.Ok, $"{label} installs only releases at least {Days(minutes.Value / 1440)} old (minimumReleaseAge)");
         else if (minutes is null && settings.Value("minimum-release-age") is { } unread)
             yield return Age("pnpm", DoctorStatus.Warn, $"{label} can't read minimumReleaseAge: {unread}, so it may install a release the minute it is published",
@@ -221,7 +233,10 @@ public static partial class Doctor
             ? Scripts("Bun", DoctorStatus.Ok, $"{label} runs no install scripts: ignoreScripts is on")
             : Scripts("Bun", DoctorStatus.Ok, $"{label} runs a dependency's install script only when the project trusts it, or it is on Bun's list of popular packages");
 
-        yield return settings.Number("install.minimum-release-age") is > 0 and var seconds
+        var version = ToolVersion.Parse(tool.Version);
+        yield return settings.Number("install.minimum-release-age") is > 0 && Before(version, 1, 3)
+            ? Ignored("Bun", label, "minimumReleaseAge", "Bun 1.3", "bun upgrade; your minimumReleaseAge then applies")
+            : settings.Number("install.minimum-release-age") is > 0 and var seconds
             ? Age("Bun", DoctorStatus.Ok, $"{label} installs only releases at least {Days(seconds / 86400)} old (minimumReleaseAge)")
             : Age("Bun", DoctorStatus.Warn, $"{label} installs a release the minute it is published, before anyone has noticed a malicious one",
                 new ChangeToolSetting($"add minimumReleaseAge = {SuggestedDays * 86400} under [install] in .bunfig.toml in your user folder (Bun 1.3 or later)"));
@@ -246,7 +261,9 @@ public static partial class Doctor
         // The fix names a source still ungated; any but nuget.org is a placeholder, so no private feed is printed.
         var ungated = sources.FirstOrDefault(s => s.Hours == 0).Source;
         var source = ungated is null || ungated.Equals("nuget.org", StringComparison.OrdinalIgnoreCase) ? "nuget.org" : "<source>";
-        if (gated > 0 && gated == sources.Count)
+        if (gated > 0 && Before(version, 11, 0, 100))
+            yield return Ignored("NuGet", label, "minPublishAgeHours", "the .NET 11 SDK", "install the .NET 11 SDK; your minPublishAgeHours then applies");
+        else if (gated > 0 && gated == sources.Count)
             yield return Age("NuGet", DoctorStatus.Ok,
                 $"{label} adds and updates only packages at least {Days(sources.Min(s => s.Hours) / 24.0)} old (minPublishAgeHours on every source)");
         else if (version is null || version >= new Version(11, 0, 100))
@@ -287,7 +304,13 @@ public static partial class Doctor
                 $"{label} runs a package's build code when it has no wheel for this machine. Installing wheels only stops that, and fails for the few packages without one",
                 new ChangeToolSetting("pip config set global.only-binary :all:"), Kind: BuildKind);
 
-        if (Value("uploaded-prior-to") is not null)
+        var prior = Value("uploaded-prior-to");
+        // A date works from 26.0; a duration such as P7D from 26.1.
+        var relative = prior?.TrimStart() is ['P' or 'p', ..];
+        if (prior is not null && (Before(version, 26, 0) || relative && Before(version, 26, 1)))
+            yield return Ignored("pip", label, "uploaded-prior-to" + (relative ? " as a duration" : ""), relative ? "pip 26.1" : "pip 26.0",
+                "python -m pip install --upgrade pip; your uploaded-prior-to then applies");
+        else if (prior is not null)
             yield return Age("pip", DoctorStatus.Ok, $"{label} installs only releases uploaded before a set age or date (uploaded-prior-to)");
         else if (version is null || version >= new Version(26, 1))
             yield return Age("pip", DoctorStatus.Warn, $"{label} installs a release the minute it is uploaded, before anyone has noticed a malicious one",
@@ -313,7 +336,11 @@ public static partial class Doctor
                 new ChangeToolSetting("add no-build = true to uv.toml in %APPDATA%\\uv"), Kind: BuildKind);
 
         var newer = settings.Value("exclude-newer");
-        if (newer is not null && !newer.Equals("false", StringComparison.OrdinalIgnoreCase))
+        var set = newer is not null && !newer.Equals("false", StringComparison.OrdinalIgnoreCase);
+        // A date always worked; a duration such as "7 days" came in 0.9.17.
+        if (set && !IsDate(newer!) && Before(version, 0, 9, 17))
+            yield return Ignored("uv", label, "exclude-newer as a duration", "uv 0.9.17", "uv self update; your exclude-newer then applies");
+        else if (set)
             yield return Age("uv", DoctorStatus.Ok, $"{label} installs only releases older than its exclude-newer setting");
         else
             yield return Age("uv", DoctorStatus.Warn, $"{label} installs a release the minute it is published, before anyone has noticed a malicious one",
@@ -344,7 +371,9 @@ public static partial class Doctor
         var label = Label("Cargo", tool.Version);
         yield return Scripts("Cargo", DoctorStatus.Ok, $"{label} runs a crate's build script when it builds, which no setting stops");
         var age = settings.Value("registry.global-min-publish-age");
-        yield return age is not null && age.Trim() != "0"
+        yield return age is not null && age.Trim() != "0" && Before(version, 1, 100)
+            ? Ignored("Cargo", label, "global-min-publish-age", "Cargo 1.100", "rustup update; your global-min-publish-age then applies")
+            : age is not null && age.Trim() != "0"
             ? Age("Cargo", DoctorStatus.Ok, $"{label} resolves only crates published at least {age} ago (global-min-publish-age)")
             : Age("Cargo", DoctorStatus.Warn, $"{label} resolves a release the minute it is published, before anyone has noticed a malicious one",
                 new ChangeToolSetting((version is not null && version < new Version(1, 100) ? "rustup update, then add " : "add ")
@@ -371,6 +400,16 @@ public static partial class Doctor
 
     static DoctorCheck Age(string tool, DoctorStatus status, string detail, DoctorFix? fix = null) =>
         new($"{tool} release age", status, detail, fix, Kind: fix is null ? null : AgeKind);
+
+    /// <summary>A release age set on a version that doesn't know the setting yet, and so installs a release the minute it is published.</summary>
+    static DoctorCheck Ignored(string tool, string label, string setting, string since, string update) =>
+        Age(tool, DoctorStatus.Warn, $"{label} ignores {setting}, which came in {since}: it installs a release the minute it is published",
+            new ChangeToolSetting(update));
+
+    /// <summary>Whether a known version is older than the one given; an unknown one is not (<see cref="Version"/> orders null first), and 26.1 is not before 26.1.0.</summary>
+    static bool Before(Version? version, int major, int minor, int build = 0) => version is not null && version < (build == 0 ? new Version(major, minor) : new Version(major, minor, build));
+
+    static bool IsDate(string value) => DateOnly.TryParse(value.Trim().Split('T', ' ')[0], System.Globalization.CultureInfo.InvariantCulture, out _);
 
     static string Label(string tool, string? version) => version is null ? $"{tool} (version unknown)" : $"{tool} {version}";
 

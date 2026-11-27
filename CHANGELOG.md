@@ -15,7 +15,8 @@ its section below.
   version, and say whether it runs dependencies' install scripts and whether it waits before
   installing a new release. When one is off, the finding's **Copy** button copies the command that
   turns it on, such as `npm config set min-release-age 7`. Only settings and versions are read and
-  shown, never a file's path or a registry.
+  shown, never a file's path or a registry. A minimum age set on a version too old to know it counts as
+  off, with the update to make.
 
 ## [0.5.0] - 2026-11-25
 
