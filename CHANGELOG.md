@@ -8,6 +8,8 @@ its section below.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-27
+
 ### Added
 
 - **Update and uninstall with the package manager that installed it.** On **Installed**, a program
@@ -651,7 +653,8 @@ were published as 0.2.0 and are unchanged.
   - `Tiresias.Core` is the vault, the trust chain, grants, leases and the audit log.
   - `Tiresias.Protocol` holds the wire formats.
 
-[Unreleased]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.5.0...HEAD
+[Unreleased]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.6.0...HEAD
+[0.6.0]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.5.0...app-v0.6.0
 [0.5.0]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.4.1...app-v0.5.0
 [0.4.1]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.4.0...app-v0.4.1
 [0.4.0]: https://github.com/hansen-consultancy/Tiresias/compare/app-v0.3.0...app-v0.4.0
