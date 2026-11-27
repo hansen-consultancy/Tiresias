@@ -89,9 +89,10 @@ public sealed class UserSecretsInterceptorGenerator : IIncrementalGenerator
                     + "        return builder;";
             case ("Microsoft.Extensions.Hosting.Host", "CreateDefaultBuilder"):
                 // Defaults are registered first, so this callback sees their sources and runs before the build.
-                return $"return global::Microsoft.Extensions.Hosting.HostingHostBuilderExtensions.ConfigureAppConfiguration(\n"
-                    + $"            global::{type}.{m.Name}({string.Join(", ", p.Select(x => "@" + x.Name))}),\n"
-                    + "            static (_, configuration) => global::Tiresias.Extensions.Configuration.ProtectedUserSecretsExtensions.ProtectUserSecrets(configuration));";
+                // Called on the instance: the (context, builder) overload is IHostBuilder's own method, and
+                // the extension class only has the one taking the builder alone.
+                return $"return global::{type}.{m.Name}({string.Join(", ", p.Select(x => "@" + x.Name))})\n"
+                    + "            .ConfigureAppConfiguration(static (_, configuration) => global::Tiresias.Extensions.Configuration.ProtectedUserSecretsExtensions.ProtectUserSecrets(configuration));";
             default:
                 return null;
         }
@@ -100,7 +101,10 @@ public sealed class UserSecretsInterceptorGenerator : IIncrementalGenerator
     /// <summary><c>ReturnType Name&lt;T&gt;(this A a, B b) where T : class</c> with <c>Name</c> left as <c>{0}</c>.</summary>
     static string Signature(IMethodSymbol m)
     {
-        var fq = SymbolDisplayFormat.FullyQualifiedFormat;
+        // With the "?" of nullable reference types: an interceptor taking string[] where the method takes
+        // string[]? is CS9159 in every consumer build, and an error where warnings are.
+        var fq = SymbolDisplayFormat.FullyQualifiedFormat.AddMiscellaneousOptions(
+            SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier);
         var sb = new StringBuilder();
         sb.Append(m.ReturnType.ToDisplayString(fq)).Append(" {0}");
         if (m.IsGenericMethod)

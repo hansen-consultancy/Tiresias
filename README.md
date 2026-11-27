@@ -44,8 +44,9 @@ tools run as you. Tiresias moves those secrets behind three things:
 <PackageReference Include="Tiresias.Extensions.Configuration" Version="0.1.0-preview.2" />
 ```
 
-Your existing `builder.Configuration.AddUserSecrets<Program>()` and
-`WebApplication.CreateBuilder(args)` calls are rerouted at compile time by a C# interceptor. The
+Your existing `builder.Configuration.AddUserSecrets<Program>()`, `WebApplication.CreateBuilder(args)`,
+`Host.CreateApplicationBuilder(args)` and `Host.CreateDefaultBuilder(args)` calls are rerouted at
+compile time by a C# interceptor. The
 agent (the tray app, or `tir agent` in a terminal) answers on a per-user named pipe.
 
 - **With the agent running:** the first load converts `secrets.json` into a sealed envelope that
