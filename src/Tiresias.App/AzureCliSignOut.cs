@@ -51,7 +51,9 @@ sealed partial class AzureCliSignOut : IDisposable
             while (await timer.WaitForNextTickAsync(ct))
             {
                 var now = settings;
-                (var signOut, done) = AzSignOutPlan.OnIdle(now.AzSignOut, now.AzSignOutIdleMinutes, Idle(), done);
+                // Off or on lock, Windows isn't asked when the user last typed.
+                var idle = now.AzSignOut == AzSignOut.Idle ? Idle() : TimeSpan.Zero;
+                (var signOut, done) = AzSignOutPlan.OnIdle(now.AzSignOut, now.AzSignOutIdleMinutes, idle, done);
                 if (signOut)
                     await SignOutAsync($"the PC was idle for {AzSignOutPlan.IdleMinutes(now.AzSignOutIdleMinutes)} minutes");
             }

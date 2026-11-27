@@ -111,6 +111,9 @@ public partial class App : Application
             _ = Dispatcher.InvokeAsync(() => NotMeAsync(asker, asked, names)).Task.Unwrap();
         };
         host.Log += AppLog.Info;
+        // Before the agent starts: its lease keeper hears a workstation lock from then on, and that lock signs out too.
+        azureCli.Start();
+        host.LockRequested += azureCli.OnLock;
         // Before the broker starts: a trust chain it rejects at startup is audited, and so alerts, then.
         host.BrokerAudited += (record, at) =>
         {
@@ -157,8 +160,6 @@ public partial class App : Application
             Dispatcher.BeginInvoke(Refresh);
         };
         host.DecoyTouched += OnDecoyTouched;
-        host.LockRequested += azureCli.OnLock;
-        azureCli.Start();
         host.UserSecrets.FirstSealed += id => Dispatcher.BeginInvoke(() =>
             tray?.Notify(Text.Get("Notify_FirstSealed_Title"), Text.Format("Notify_FirstSealed_Body", id)));
         SystemEvents.SessionSwitch += OnSessionSwitch;
