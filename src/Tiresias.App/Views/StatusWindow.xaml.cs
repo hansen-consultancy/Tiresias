@@ -351,7 +351,7 @@ public partial class StatusWindow : Window
             case RemoveEntry { Machine: false } entry:
                 _ = RemoveEntryAsync(entry);
                 break;
-            case RemoveEntry or Repair { Command: not null }:
+            case RemoveEntry or Repair { Command: not null } or ChangeToolSetting:
                 model.CopyFix(fix.Instruction);
                 break;
             case UninstallApp:

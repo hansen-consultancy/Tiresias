@@ -227,6 +227,8 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public IEnumerable<InstalledExtension> Extensions() => SurfaceProbe.Extensions();
 
+    public IEnumerable<DoctorToolchain> Toolchains() => ToolchainProbe.Read();
+
     public IEnumerable<StartupEntry> StartupEntries() => SurfaceProbe.StartupEntries();
 
     public IEnumerable<CredentialUse> CredentialUses() => SurfaceProbe.CredentialUses();

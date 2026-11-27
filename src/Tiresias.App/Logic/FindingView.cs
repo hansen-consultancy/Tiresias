@@ -132,6 +132,7 @@ public static class FindingView
         ReachGuide => (FixAction.OpenGuide, "Finding_FixReachGuide"),
         InjectAtRunTime => (FixAction.CopyCommand, "Finding_FixCopy"),
         UpdateGlobalTool or UninstallGlobalTool => (FixAction.CopyCommand, "Finding_FixCopy"),
+        ChangeToolSetting => (FixAction.CopyCommand, "Finding_FixCopy"),
         _ => null,
     };
 
