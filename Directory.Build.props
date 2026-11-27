@@ -9,7 +9,7 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageTags>secrets;credentials;user-secrets;vault;ai-agents;windows-hello</PackageTags>
-    <VersionPrefix>0.5.0</VersionPrefix>
+    <VersionPrefix>0.6.0</VersionPrefix>
     <!-- Local builds only: both release workflows set Version from the tag. "dev" keeps a local
          build from claiming a released version, and needs no bump after a release. -->
     <VersionSuffix>dev</VersionSuffix>
