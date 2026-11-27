@@ -144,11 +144,11 @@ public class TrustLookupTests
 
         Assert.That(finding.Name, Is.EqualTo("acme-cli 1.2.0 has 2 known vulnerabilities"));
         Assert.That(finding.Detail, Does.Contain("OSV.dev lists GHSA-1, GHSA-2").And.Contain("1.4.0 fixes them all"));
-        Assert.That(finding.Fix, Is.EqualTo(new UpdateGlobalTool("npm", "acme-cli", "1.4.0")));
+        Assert.That(finding.Fix, Is.EqualTo(Packages.Update(Acme)));
         Assert.That(finding.Fix!.Instruction, Is.EqualTo("npm install --global acme-cli@latest"));
         Assert.That(finding.Kind, Is.EqualTo(Doctor.VulnerableToolKind));
         Assert.That(finding.TrustHides, Is.False);
-        Assert.That(FindingView.Button(finding.Fix), Is.EqualTo((FixAction.CopyCommand, "Finding_FixCopy")));
+        Assert.That(FindingView.Button(finding.Fix), Is.EqualTo((FixAction.RunPackage, "Package_UpdateNewest")));
     }
 
     [Test]
@@ -158,7 +158,31 @@ public class TrustLookupTests
 
         var finding = Doctor.KnownVulnerabilities([new("dotnet", "acme.tool", "2.0.0")], lookups).Single();
 
-        Assert.That(finding.Fix!.Instruction, Is.EqualTo("dotnet tool uninstall --global acme.tool"));
+        Assert.That(finding.Fix, Is.EqualTo(new PackageFix(PackageChange.Uninstall, "acme.tool",
+            new PackageCommand("dotnet", ["tool", "uninstall", "--global", "acme.tool"]))));
+        Assert.That(FindingView.Button(finding.Fix), Is.EqualTo((FixAction.RunPackage, "Package_Uninstall")));
+    }
+
+    [Test]
+    public void A_tool_the_app_cant_run_a_manager_for_gets_a_command_to_copy()
+    {
+        var lookups = new TrustLookups([new(new("PyPI", "acme", "1.0"), Now, [new("GHSA-1", null, "1.1")]),
+            new(new("crates.io", "acme", "1.0"), Now, [new("GHSA-2", null, null)])]);
+
+        var findings = Doctor.KnownVulnerabilities([new("pipx", "acme", "1.0"), new("cargo", "acme", "1.0")], lookups).ToArray();
+
+        Assert.That(findings.Select(f => f.Fix), Is.EqualTo(new DoctorFix[] { new UninstallGlobalTool("cargo", "acme"), new UpdateGlobalTool("pipx", "acme", "1.1") }));
+        Assert.That(findings.Select(f => FindingView.Button(f.Fix)), Is.All.EqualTo((FixAction.CopyCommand, "Finding_FixCopy")));
+    }
+
+    [Test]
+    public void A_dismissal_made_while_the_fix_was_copied_still_hides_the_runnable_one()
+    {
+        var finding = Doctor.KnownVulnerabilities([Acme], new TrustLookups([new(AcmeQuery, Now, [new("GHSA-1", null, "1.3.0")])])).Single();
+        var dismissals = Dismissals.Empty.Dismiss(finding with { Fix = new UpdateGlobalTool("npm", "acme-cli", "1.3.0") }, "not exposed", Now);
+
+        Assert.That(finding.Fix, Is.InstanceOf<PackageFix>());
+        Assert.That(dismissals.For(finding), Is.Not.Null);
     }
 
     [Test]
