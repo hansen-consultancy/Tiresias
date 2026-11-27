@@ -41,4 +41,32 @@ public class UserPathTests
         Assert.That(UserPath.TirFolder(@"C:\T\app\", p => p == @"C:\T\cli\tir.exe"), Is.EqualTo(@"C:\T\cli"));
         Assert.That(UserPath.TirFolder(@"C:\T\app\", _ => false), Is.Null);
     }
+
+    const string Bin = @"C:\Users\u\AppData\Local\Tiresias\bin";
+
+    [Test]
+    public void Moving_tir_puts_bin_where_the_install_folder_was()
+    {
+        Assert.That(UserPath.Replace($@"C:\a;{Tir}\;C:\b", Tir, Bin), Is.EqualTo($@"C:\a;{Bin};C:\b"));
+    }
+
+    [Test]
+    public void Moving_tir_appends_bin_when_the_install_folder_was_never_on_path()
+    {
+        Assert.That(UserPath.Replace(@"C:\a", Tir, Bin), Is.EqualTo($@"C:\a;{Bin}"));
+        Assert.That(UserPath.Replace(null, Tir, Bin), Is.EqualTo(Bin));
+    }
+
+    [Test]
+    public void Moving_tir_twice_changes_nothing_and_never_doubles_bin()
+    {
+        Assert.That(UserPath.Replace($@"C:\a;{Bin}", Tir, Bin), Is.Null);
+        Assert.That(UserPath.Replace($@"{Tir};C:\a;{Bin}", Tir, Bin), Is.EqualTo($@"{Bin};C:\a"));
+    }
+
+    [Test]
+    public void Moving_tir_keeps_other_repeated_entries()
+    {
+        Assert.That(UserPath.Replace($@"C:\a;C:\a;{Tir}", Tir, Bin), Is.EqualTo($@"C:\a;C:\a;{Bin}"));
+    }
 }

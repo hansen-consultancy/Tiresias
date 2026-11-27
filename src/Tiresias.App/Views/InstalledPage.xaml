@@ -28,6 +28,9 @@
         <ComboBox x:Name="Show" Width="200" ItemsSource="{Binding Filters}" DisplayMemberPath="Label" SelectedValuePath="Value"
                   SelectedValue="{Binding View}" AutomationProperties.LabeledBy="{Binding ElementName=ShowLabel}" />
       </StackPanel>
+      <!-- Off by default: the only thing the app sends anywhere about what is installed (docs/attack-surface.md#trust). -->
+      <CheckBox Content="{l:S Installed_Online}" IsChecked="{Binding IsOnline}" ToolTip="{l:S Installed_OnlineTip}"
+                VerticalAlignment="Bottom" Margin="0,0,12,12" />
     </WrapPanel>
 
     <Grid Grid.Row="3">
@@ -99,6 +102,7 @@
           <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <TextBlock Grid.ColumnSpan="2" Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,8" />
         <TextBlock Grid.Row="1" Text="{l:S Installed_ColVersion}" Style="{StaticResource CaptionText}" Margin="0,2,16,2" />
@@ -123,7 +127,13 @@
         <TextBlock Grid.Row="9" Text="{l:S Installed_ColTrust}" Style="{StaticResource CaptionText}" Margin="0,2,16,2" />
         <TextBlock Grid.Row="9" Grid.Column="1" Text="{Binding DataContext.Trust, RelativeSource={RelativeSource AncestorType=UserControl}}"
                    TextWrapping="Wrap" Margin="0,2" />
-        <WrapPanel Grid.Row="10" Grid.ColumnSpan="2" Margin="0,8,0,0">
+        <!-- A global tool only: what the online lookups said, beside the offline signer. -->
+        <TextBlock Grid.Row="10" Text="{l:S Installed_ColOnline}" Style="{StaticResource CaptionText}" Margin="0,2,16,2"
+                   Visibility="{Binding DataContext.OnlineVisibility, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+        <TextBlock Grid.Row="10" Grid.Column="1" Text="{Binding DataContext.Online, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                   TextWrapping="Wrap" Margin="0,2"
+                   Visibility="{Binding DataContext.OnlineVisibility, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+        <WrapPanel Grid.Row="11" Grid.ColumnSpan="2" Margin="0,8,0,0">
           <!-- Its manager's update and uninstall (#106): each asks first, with the exact command. -->
           <Button Style="{StaticResource RowButton}" Content="{Binding UpdateLabel}" Click="OnUpdate" Margin="0,0,8,0"
                   Visibility="{Binding UpdateVisibility}" ToolTip="{l:S Package_UpdateTip}" />

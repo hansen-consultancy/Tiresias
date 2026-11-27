@@ -58,10 +58,12 @@ public partial class InstalledPage : UserControl
 /// <param name="InstalledOn">The install date, or why it isn't known.</param>
 /// <param name="IsNew">Installed in the last <see cref="InstalledFilter.NewDays"/> days.</param>
 /// <param name="Mark">What its program file's signature says (<see cref="ProgramMarks"/>).</param>
+/// <param name="Tool">The global tool it is, which the online lookups ask about; <c>null</c> for a program or an extension.</param>
 /// <param name="Update">Its manager's update, when it knows a newer version (<see cref="PackageActions"/>).</param>
 /// <param name="Uninstall">Its manager's uninstall, when its manager is known.</param>
 public sealed record InstalledRow(string Name, string Version, string For, string ShortUse, string Use, string Reached, string Folder, ImageSource? Icon,
-    string Publisher, string? ProgramFile, string InstalledOn, bool IsNew, ProgramMark Mark, PackageFix? Update = null, PackageFix? Uninstall = null)
+    string Publisher, string? ProgramFile, string InstalledOn, bool IsNew, ProgramMark Mark, GlobalTool? Tool = null, PackageFix? Update = null,
+    PackageFix? Uninstall = null)
 {
     public string UpdateLabel => Update is null ? "" : PackageActions.Target(Update) is { } version
         ? Text.Format(PackageActions.Ask(Update).Button, version) : Text.Get(PackageActions.Ask(Update).Button);
@@ -207,8 +209,65 @@ public sealed partial class InstalledViewModel : ObservableObject
         ShowTrust(current);
     }
 
+    /// <summary>The online lookups' saved answers, read with the list; <c>null</c> while they are off.</summary>
+    TrustLookups? lookups;
+
+    /// <summary>What the online lookups said about the selected global tool.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OnlineVisibility))]
+    public partial string Online { get; set; } = "";
+
+    public Visibility OnlineVisibility => Online.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+
+    void ShowOnline(InstalledRow? row)
+    {
+        if (row?.Tool is not { } tool)
+        {
+            Online = "";
+            return;
+        }
+        var (key, arguments) = InstalledDetails.Online(tool, lookups);
+        Online = arguments.Length == 0 ? Text.Get(key) : Text.Format(key, arguments);
+    }
+
+    bool isOnline = AppSettings.Load().OnlineLookups;
+
+    /// <summary>
+    /// The Check online switch, saved as it changes. On asks at once; off forgets every answer, so no
+    /// finding stands on one.
+    /// </summary>
+    public bool IsOnline
+    {
+        get => isOnline;
+        set
+        {
+            if (isOnline == value)
+                return;
+            isOnline = value;
+            (AppSettings.Load() with { OnlineLookups = value }).Save();
+            OnPropertyChanged();
+            _ = AskOnlineAsync();
+        }
+    }
+
+    async Task AskOnlineAsync()
+    {
+        var on = isOnline;
+        lookups = await Task.Run(async () =>
+        {
+            if (!on)
+            {
+                TrustLookupStore.Clear();
+                return null;
+            }
+            return await TrustLookupStore.RefreshAsync(ToolInventory.Current().Tools, () => AppSettings.Load().OnlineLookups);
+        });
+        ShowOnline(Selected);
+    }
+
     async partial void OnSelectedChanged(InstalledRow? value)
     {
+        ShowOnline(value);
         if (value?.ProgramFile is not { } file)
         {
             Signer = Text.Get("Installed_SignerUnknown");
@@ -275,6 +334,7 @@ public sealed partial class InstalledViewModel : ObservableObject
             return (InstalledAddOns.Extensions(probe.Extensions(), probe.CredentialUses(), DateTimeOffset.UtcNow), InstalledAddOns.Tools(snapshot), (DateTimeOffset?)snapshot.At,
                 snapshot.WingetPackages);
         });
+        lookups = isOnline ? await Task.Run(async () => await TrustLookupStore.RefreshAsync(ToolInventory.Current().Tools, () => AppSettings.Load().OnlineLookups)) : null;
         Apply();
     }
 
@@ -338,7 +398,7 @@ public sealed partial class InstalledViewModel : ObservableObject
             program.Entry.Folder ?? Text.Get("Installed_FolderUnknown"), icon, program.Entry.Publisher ?? Text.Get("Installed_PublisherUnknown"),
             program.Entry.ProgramFile,
             program.Entry.InstalledOn?.ToString("d", CultureInfo.CurrentCulture) ?? Text.Get("Installed_InstalledOnUnknown"),
-            InstalledFilter.IsNew(program.Entry, today), InstalledFilter.Mark(program.Entry, Mark), update, uninstall);
+            InstalledFilter.IsNew(program.Entry, today), InstalledFilter.Mark(program.Entry, Mark), Update: update, Uninstall: uninstall);
     }
 
     /// <summary>An extension or tool: no file, signature, icon or install date of its own here; "For" names its host or manager.</summary>
@@ -351,7 +411,7 @@ public sealed partial class InstalledViewModel : ObservableObject
             updated is null ? Text.Get("Installed_UseAddOnUnknown") : Text.Format("Installed_UseAddOn", updated),
             addOn.Reached.Count > 0 ? string.Join(", ", addOn.Reached) : Text.Get("Installed_ReachedNone"),
             Text.Get("Installed_FolderUnknown"), null, addOn.Publisher ?? Text.Get("Installed_PublisherUnknown"), null,
-            Text.Get("Installed_InstalledOnUnknown"), false, ProgramMark.None, update, uninstall);
+            Text.Get("Installed_InstalledOnUnknown"), false, ProgramMark.None, addOn.Tool, update, uninstall);
     }
 
     static string UseText(InstalledProgram program)

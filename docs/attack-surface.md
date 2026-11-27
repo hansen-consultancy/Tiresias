@@ -1,6 +1,6 @@
 # Attack surface: less software, less to trust
 
-Status: **first slice, log-on use, uninstall-entry checks, unused applications, the Installed and Startup lists, own builds, `tir doctor --surface`, per-item dismissals, trusted publishers and package updates, uninstalls and repairs built** (#34, #55, #98, #106, #108, #148); the rest is design. [Guided setup](guided-setup.md) phase 5: it builds on the
+Status: **first slice, log-on use, uninstall-entry checks, unused applications, the Installed and Startup lists, own builds, `tir doctor --surface`, per-item dismissals, trusted publishers, OSV lookups for global tools and package updates, uninstalls and repairs built** (#34, #55, #98, #105, #106, #108, #148); the rest is design. [Guided setup](guided-setup.md) phase 5: it builds on the
 findings `tir doctor` reports since phase 1 and the findings section, fixes and dismissals the app
 gets in phase 2.
 
@@ -125,6 +125,23 @@ Not a trust system of Tiresias's own. Existing sources, asked per package:
 names or what asked for which credential; and each finding says which source it came from. Offline,
 the checks still report what is installed, unused and unsigned.
 
+**Built: OSV for global tools** (#105). The Installed page's **Check global tools online**, off by
+default, asks [OSV.dev](https://osv.dev) (`POST api.osv.dev/v1/query`) about each global tool of the
+day's listing: its ecosystem (`NuGet`, `npm`, `PyPI`, `crates.io`), name and version, nothing else
+(`Osv.QueryJson`, pinned by a test); a tool without a version isn't asked about. Answers are kept in
+`trust-lookups.json` beside the keyring and asked again once a day old, by the app's background
+checks and when the Installed page loads; a tool no longer installed, or at another version, is
+forgotten, and an answer that doesn't come keeps the last one. Turning it off deletes the file, so no
+finding stands on an old answer. The checks only read that file (`IDoctorProbe.TrustLookups`), behind
+the `IAdvisorySource` seam, so the planner stays pure and tests need no network; `tir doctor` reads
+it too but never asks, and `tir doctor --surface` says per tool what was found, or "not checked
+online". A demo never goes online. An advisory's fix is the highest `fixed` among its version
+ranges that hold the installed version (from `introduced`), none when one of them has no fix, so
+the finding then suggests uninstalling; versions are compared loosely as dotted numbers. Turning
+lookups off while one is asking keeps its answers from being saved. Not built yet: deps.dev and Scorecard,
+the marketplaces, winget-pkgs, OSV for extensions and PowerShell modules, and the unverified or
+changed publisher finding.
+
 ## Findings
 
 Guided setup's rule needs no widening: a finding is any check with a fix, plus any delivery with a
@@ -144,7 +161,7 @@ guided setup already has for it, with that finding's position.
 | Finding | Raised when | Fix |
 |---|---|---|
 | Extension in a program that uses credentials | The host asked Tiresias for a credential in the last 90 days, and the extension's publisher is unverified or unknown, or it was last updated over two years ago | `RemoveExtension(host, id)`; or `UseThroughBroker(host, service)`, opening *What do you need?* (phase 3) at that service, to move the use out of the host |
-| Known vulnerability | OSV or the marketplace reports an advisory for the installed version | `Update(kind, id, fixed version)`, or `Uninstall` where no fixed version exists |
+| Known vulnerability | OSV or the marketplace reports an advisory for the installed version | `Update(kind, id, fixed version)`, or `Uninstall` where no fixed version exists. **Built for global tools** (#105): `UpdateGlobalTool` (the manager's update to the latest version, naming the version that fixes every advisory) or `UninstallGlobalTool` when one has no fix; both are copied, not run. Its reasons are its advisory ids, so a dismissal survives an update and comes back for a new advisory; trust in a publisher never hides it |
 | Unsigned binary on `PATH` or at startup | No Authenticode signature, or one that doesn't verify | `RevealFile(path)`: show where it came from; `Uninstall` if its source is known |
 | Not used in 90 days | Last use is known and older; never when last use is unknown | `Uninstall(kind, id)` |
 | Starts at log-on, rarely used | A user Run key, startup folder entry or scheduled task, and the program is unused | `DisableStartup(entry)`, keeping the program |
@@ -443,6 +460,9 @@ caches) qualifies. Detection reads names, folder listings and the file's owner, 
 anything or needs an administrator. Without developer tools the finding reads as before
 (`DoctorCheck.WithoutDeveloperTools`). Matching the repository's remote against owners the user
 marks as their own is not built.
+**OSV lookups for global tools are built** (#105), as [Trust](#trust) says: off by default, the
+"known vulnerability" finding under **What can reach them**, and the Installed panel's **Checked
+online** line for a global tool, beside the offline signer.
 **Dismissals per item and trusted publishers are built** (#108), as [Dismissals](#dismissals)
 says, and so are Home's two groups (#108): a check marked `DoctorCheck.Surface` (programs,
 extensions, log-on and uninstall entries, decoy incidents and blocks, the Docker engine and
@@ -460,6 +480,7 @@ dependencies' install scripts and waits before installing a new release. Its lin
 2. **Cross with credentials**: reach from the activity log, ranking, surface findings on Home,
    and the dismissals above, including trust per publisher.
 3. **Trust lookups** (opt-in): deps.dev, OSV, marketplaces, winget-pkgs, Authenticode, Scorecard.
+   OSV for global tools is built (#105).
 4. **Fixes**: approved uninstalls, updates, extension removal and startup changes.
 
 Later, outside phase 5: **Isolation**, the placeholder environments for containers and WSL, and the

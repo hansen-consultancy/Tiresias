@@ -71,7 +71,7 @@ public class SurfaceInventoryTests
             "    acme.helper 1.0.0, unknown publisher, updated unknown",
             "    beta.tool 2.0.0, Beta, updated 2026-11-09",
             "Global tools (listed 2026-11-19 05:00)",
-            "  dotnet: acme.cli 1.1.0",
+            "  dotnet: acme.cli 1.1.0, not checked online",
             "Starts at log-on",
             @"  Chat (Run key): C:\Chat\chat.exe, signed, last opened unknown",
             @"  Tray (Run key): C:\Tray\tray.exe, signature unchecked, used from the tray",

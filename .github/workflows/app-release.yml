@@ -79,6 +79,9 @@ jobs:
             dotnet publish src/Tiresias.Keyring -c Release -r $rid --self-contained -p:Version="$v" -o publish/$rid
             dotnet publish src/Tiresias.RecoveryHelper -c Release -r $rid -p:Version="$v" -o recovery/$rid
             cp recovery/$rid/tiresias-recovery.exe publish/$rid/
+            # The tir.exe the app puts on PATH, outside the install folder (#177).
+            dotnet publish src/Tiresias.TirShim -c Release -r $rid -p:Version="$v" -o shim/$rid
+            cp shim/$rid/tir-shim.exe publish/$rid/
             dotnet publish src/Tiresias.NuGetPlugin -c Release -r $rid --self-contained -p:Version="$v" -o publish/$rid
             dotnet publish src/Tiresias.Admin -c Release -r $rid --self-contained -p:PublishSingleFile=true -p:Version="$v" -o publish/$rid/admin
           done

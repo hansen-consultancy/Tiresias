@@ -76,9 +76,12 @@ static class FindingWatch
                 Hello = App.Current.Host.Keys.Hello,
                 FailingAlertSinks = App.Current.Alerts.Center.Failing,
             };
+            // The daily inventory (docs/attack-surface.md): lists the global tools when a day has passed, else reads them,
+            // then, when the user turned them on, asks about the ones whose answer is a day old, so the checks read fresh answers.
+            var tools = await Task.Run(() => ToolInventory.Current());
+            if (AppSettings.Load().OnlineLookups)
+                await TrustLookupStore.RefreshAsync(tools.Tools, () => AppSettings.Load().OnlineLookups);
             var checks = await Task.Run(async () => await Doctor.RunAsync(probe, await ReachMemory.ForRunAsync(probe, asked: false)));
-            // The daily inventory (docs/attack-surface.md): lists the global tools when a day has passed, else reads them.
-            await Task.Run(() => ToolInventory.Current());
             var dismissals = DismissalStore.Load();
             Home.LastFindings = FindingView.Of(checks, dismissals).Open.Count;
             var seen = ReadSeen();

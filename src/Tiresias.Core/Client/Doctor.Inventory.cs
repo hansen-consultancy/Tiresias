@@ -76,12 +76,14 @@ public sealed record ToolSnapshot(DateTimeOffset At, IReadOnlyList<GlobalTool> T
 }
 
 /// <summary>What <c>tir doctor --surface</c> lists: the inventory behind the attack surface findings, without judging it.</summary>
+/// <param name="Lookups">The opt-in online lookups' answers; <c>null</c> while they are off.</param>
 public sealed record SurfaceInventory(
     IReadOnlyList<InstalledExtension> Extensions,
     ToolSnapshot Tools,
     IReadOnlyList<StartupEntry> Startup,
     IReadOnlyList<CredentialUse> Uses,
-    IReadOnlyList<ProgramRun> Runs);
+    IReadOnlyList<ProgramRun> Runs,
+    TrustLookups? Lookups = null);
 
 public static partial class Doctor
 {
@@ -134,6 +136,17 @@ public static partial class Doctor
         }
     }
 
+    /// <summary>What the opt-in lookups said about a tool, for <c>tir doctor --surface</c>.</summary>
+    static string OnlineWords(GlobalTool tool, TrustLookups? lookups) =>
+        lookups is null ? "not checked online"
+        : PackageQuery.Of(tool) is not { } package ? "can't be checked online"
+        : lookups.For(package) switch
+        {
+            null => "not checked online yet",
+            { Advisories.Count: 0, At: var at } => $"no known vulnerability ({OsvSource}, {at:yyyy-MM-dd})",
+            { Advisories: var advisories, At: var at } => $"known vulnerabilities {string.Join(", ", advisories.Select(a => a.Id))} ({OsvSource}, {at:yyyy-MM-dd})",
+        };
+
     [GeneratedRegex(@"^(\S+) v(\S+?):?\s*$", RegexOptions.Multiline)]
     private static partial Regex CargoLine();
 
@@ -161,7 +174,7 @@ public static partial class Doctor
         if (inventory.Tools.Tools.Count == 0)
             yield return "  none found";
         foreach (var tool in inventory.Tools.Tools.OrderBy(t => t.Manager, StringComparer.Ordinal).ThenBy(t => t.Id, StringComparer.OrdinalIgnoreCase))
-            yield return $"  {tool.Manager}: {tool.Id} {tool.Version ?? "?"}";
+            yield return $"  {tool.Manager}: {tool.Id} {tool.Version ?? "?"}, {OnlineWords(tool, inventory.Lookups)}";
         yield return "Starts at log-on";
         if (inventory.Startup.Count == 0)
             yield return "  none found";

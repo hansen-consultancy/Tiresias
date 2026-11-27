@@ -15,12 +15,29 @@ its section below.
   `npm` global tool has **Update...**, and each has **Uninstall with *manager*...**. A program whose uninstaller is
   missing gets **Repair...**, which reinstalls the same version with winget. Each says exactly what
   will run and asks first; software installed for everyone asks Windows for an administrator.
+- **Check global tools for known vulnerabilities, if you want.** The Installed page has a new
+  **Check global tools online** switch, off unless you turn it on. Once a day it asks OSV.dev about
+  your `dotnet`, `npm`, `pipx` and `cargo` global tools, sending only each tool's name, version and
+  package manager. A tool with a known vulnerability becomes a finding on Home whose **Copy** button
+  copies the command that updates it (or uninstalls it when nothing fixes it), and the Installed
+  panel shows what was found for each tool. Turning the switch off forgets every answer.
 - **Package managers' safeguards are checked.** `tir doctor` and Home list each package manager
   and toolchain on your PC (npm, pnpm, Yarn, Bun, NuGet, pip, uv, Go, Cargo and Gradle), with its
   version, and say whether it runs dependencies' install scripts and whether it waits before
   installing a new release. When one is off, the finding's **Copy** button copies the command that
   turns it on, such as `npm config set min-release-age 7`. Only settings and versions are read and
-  shown, never a file's path or a registry.
+  shown, never a file's path or a registry. A minimum age set on a version too old to know it counts as
+  off, with the update to make.
+
+### Fixed
+
+- **Updates apply while `tir run` is open.** A program started with `tir run` kept `tir` running
+  from the app's install folder, so an update waited until it closed, and never applied when a
+  launcher restarted the program at once. `tir` on your PATH now runs a copy of itself kept in
+  `%LOCALAPPDATA%\Tiresias\tir`: a running `tir run` keeps working through an update, and the next
+  `tir` you start is the new version. The app moves your PATH entry to
+  `%LOCALAPPDATA%\Tiresias\bin` by itself; restart a launcher that runs `tir`, or sign out and in,
+  once after this update so it picks up the new PATH.
 
 ## [0.5.0] - 2026-11-25
 
