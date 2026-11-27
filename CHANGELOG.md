@@ -44,6 +44,13 @@ its section below.
   `tir` you start is the new version. The app moves your PATH entry to
   `%LOCALAPPDATA%\Tiresias\bin` by itself; restart a launcher that runs `tir`, or sign out and in,
   once after this update so it picks up the new PATH.
+- **Projects that call `Host.CreateDefaultBuilder` build again.** Adding
+  `Tiresias.Extensions.Configuration` to a project with a `Host.CreateDefaultBuilder(...)` call (a
+  worker service, for one) failed the build with `CS1593` in `Tiresias.UserSecretsInterceptors.g.cs`.
+  The call now compiles and its user secrets go through Tiresias like the other host builders'. The
+  `CS9159` nullability warning on `Host.CreateDefaultBuilder(args)` and
+  `Host.CreateApplicationBuilder(args)` is gone too, so a project that treats warnings as errors
+  builds.
 
 ## [0.5.0] - 2026-11-25
 

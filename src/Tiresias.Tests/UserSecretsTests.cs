@@ -399,12 +399,7 @@ public class UserSecretsInterceptorTests
         // only points at the secrets folder when that folder exists (with no folder there is nothing
         // to protect), so the test makes an empty one.
         var assembly = typeof(UserSecretsInterceptorTests).Assembly;
-        var id = assembly.GetCustomAttributes(typeof(Microsoft.Extensions.Configuration.UserSecrets.UserSecretsIdAttribute), false)
-            .Cast<Microsoft.Extensions.Configuration.UserSecrets.UserSecretsIdAttribute>().Single().UserSecretsId;
-        var folder = Path.GetDirectoryName(Microsoft.Extensions.Configuration.UserSecrets.PathHelper.GetSecretsPathFromSecretsId(id))!;
-        var created = !Directory.Exists(folder);
-        Directory.CreateDirectory(folder);
-        try
+        WithSecretsFolder(() =>
         {
             var builder = Microsoft.AspNetCore.Builder.WebApplication.CreateBuilder(new Microsoft.AspNetCore.Builder.WebApplicationOptions
             {
@@ -414,18 +409,62 @@ public class UserSecretsInterceptorTests
             var sources = ((IConfigurationBuilder)builder.Configuration).Sources;
             Assert.That(sources.Select(s => s.GetType().Name), Has.One.EqualTo("ProtectedUserSecretsSource"));
             Assert.That(sources.OfType<Microsoft.Extensions.Configuration.Json.JsonConfigurationSource>().Where(s => s.Path == SecretsFile.FileName), Is.Empty);
-        }
-        finally
+        });
+    }
+
+    [Test]
+    public void A_default_host_builders_own_user_secrets_are_swapped_too()
+    {
+        // Host.CreateDefaultBuilder only registers its defaults; they run when the host is built. The
+        // intercepted call site registers the swap right behind them, so a callback added afterwards
+        // sees the result.
+        var assembly = typeof(UserSecretsInterceptorTests).Assembly;
+        WithSecretsFolder(() =>
         {
-            if (created)
-                Directory.Delete(folder);
+            string[] args = ["--environment=Development", "--applicationName=" + assembly.GetName().Name];
+            IList<IConfigurationSource>? sources = null;
+            using var host = Microsoft.Extensions.Hosting.Host.CreateDefaultBuilder(args)
+                .ConfigureAppConfiguration((_, configuration) => sources = configuration.Sources)
+                .Build();
+
+            Assert.That(sources, Is.Not.Null);
+            Assert.That(sources!.Select(s => s.GetType().Name), Has.One.EqualTo("ProtectedUserSecretsSource"));
+            Assert.That(sources!.OfType<Microsoft.Extensions.Configuration.Json.JsonConfigurationSource>().Where(s => s.Path == SecretsFile.FileName), Is.Empty);
+        });
+    }
+
+    /// <summary>
+    /// Runs <paramref name="body"/> with this assembly's user secrets folder in place: the stock source a
+    /// host builder adds only points there when the folder exists.
+    /// </summary>
+    static void WithSecretsFolder(Action body)
+    {
+        var id = typeof(UserSecretsInterceptorTests).Assembly
+            .GetCustomAttributes(typeof(Microsoft.Extensions.Configuration.UserSecrets.UserSecretsIdAttribute), false)
+            .Cast<Microsoft.Extensions.Configuration.UserSecrets.UserSecretsIdAttribute>().Single().UserSecretsId;
+        var folder = Path.GetDirectoryName(Microsoft.Extensions.Configuration.UserSecrets.PathHelper.GetSecretsPathFromSecretsId(id))!;
+        lock (SecretsFolder)
+        {
+            var created = !Directory.Exists(folder);
+            Directory.CreateDirectory(folder);
+            try
+            {
+                body();
+            }
+            finally
+            {
+                if (created)
+                    Directory.Delete(folder);
+            }
         }
     }
+
+    static readonly object SecretsFolder = new();
 
     [Test]
     public void Generated_interceptors_compile_for_every_overload()
     {
-        const string source = """
+        var generated = CompileWithInterceptors("""
             using Microsoft.Extensions.Configuration;
             public class P
             {
@@ -441,24 +480,73 @@ public class UserSecretsInterceptorTests
                     b.AddUserSecrets("id", false);
                 }
             }
-            """;
+            """);
+        Assert.That(generated.Split("InterceptsLocationAttribute(1,").Length - 1, Is.EqualTo(7), generated);
+    }
+
+    [Test]
+    public void Generated_interceptors_compile_for_every_host_builder()
+    {
+        var generated = CompileWithInterceptors("""
+            using Microsoft.AspNetCore.Builder;
+            using Microsoft.Extensions.Hosting;
+            public class P
+            {
+                public static void Main(string[] args)
+                {
+                    Host.CreateDefaultBuilder();
+                    Host.CreateDefaultBuilder(args);
+                    Host.CreateApplicationBuilder();
+                    Host.CreateApplicationBuilder(args);
+                    Host.CreateApplicationBuilder(new HostApplicationBuilderSettings());
+                    WebApplication.CreateBuilder();
+                    WebApplication.CreateBuilder(args);
+                    WebApplication.CreateBuilder(new WebApplicationOptions());
+                }
+            }
+            """);
+        Assert.That(generated.Split("InterceptsLocationAttribute(1,").Length - 1, Is.EqualTo(8), generated);
+    }
+
+    [Test]
+    public void A_worker_that_only_creates_a_default_host_builder_compiles()
+    {
+        // The whole Program.cs of a new worker project, nullable enabled as the template has it.
+        var generated = CompileWithInterceptors("""
+            using Microsoft.Extensions.Hosting;
+            var host = Host.CreateDefaultBuilder(args).Build();
+            host.Run();
+            """);
+        Assert.That(generated, Does.Contain("Intercept0(string[]? @args)"));
+    }
+
+    /// <summary>
+    /// Compiles <paramref name="source"/> as a nullable-enabled app with the generator, fails on any
+    /// error or warning (a consumer may treat warnings as errors) and returns the generated file.
+    /// </summary>
+    static string CompileWithInterceptors(string source)
+    {
         var parse = new CSharpParseOptions(LanguageVersion.Preview)
             .WithFeatures([new("InterceptorsNamespaces", "Tiresias.Generated")]);
         var references = AppDomain.CurrentDomain.GetAssemblies()
             .Where(a => !a.IsDynamic && a.Location.Length > 0)
-            .Select(a => MetadataReference.CreateFromFile(a.Location))
-            .Append(MetadataReference.CreateFromFile(typeof(UserSecretsConfigurationExtensions).Assembly.Location))
-            .Append(MetadataReference.CreateFromFile(typeof(ProtectedUserSecretsExtensions).Assembly.Location));
+            .Select(a => a.Location)
+            .Append(typeof(UserSecretsConfigurationExtensions).Assembly.Location)
+            .Append(typeof(ProtectedUserSecretsExtensions).Assembly.Location)
+            .Append(typeof(Microsoft.Extensions.Hosting.Host).Assembly.Location)
+            .Append(typeof(Microsoft.Extensions.Hosting.IHostBuilder).Assembly.Location)
+            .Append(typeof(Microsoft.AspNetCore.Builder.WebApplication).Assembly.Location)
+            .Distinct()
+            .Select(location => MetadataReference.CreateFromFile(location));
         var compilation = CSharpCompilation.Create("app", [CSharpSyntaxTree.ParseText(source, parse)], references,
-            new CSharpCompilationOptions(OutputKind.ConsoleApplication));
+            new CSharpCompilationOptions(OutputKind.ConsoleApplication, nullableContextOptions: NullableContextOptions.Enable));
 
         var driver = CSharpGeneratorDriver.Create([new UserSecretsInterceptorGenerator().AsSourceGenerator()], parseOptions: parse);
         driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out var generatorDiagnostics);
 
         Assert.That(generatorDiagnostics, Is.Empty);
-        var errors = output.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).ToImmutableArray();
-        Assert.That(errors, Is.Empty, string.Join("\n", errors));
-        var generated = output.SyntaxTrees.Last().ToString();
-        Assert.That(generated.Split("InterceptsLocationAttribute(1,").Length - 1, Is.EqualTo(7), generated);
+        var problems = output.GetDiagnostics().Where(d => d.Severity >= DiagnosticSeverity.Warning).ToImmutableArray();
+        Assert.That(problems, Is.Empty, string.Join("\n", problems));
+        return output.SyntaxTrees.Last().ToString();
     }
 }
