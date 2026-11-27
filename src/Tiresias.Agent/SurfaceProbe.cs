@@ -333,6 +333,10 @@ static partial class SurfaceProbe
     public static IEnumerable<GlobalTool> GlobalTools() => DemoMode.On ? [] :
         Doctor.ToolManagers.SelectMany(m => Doctor.GlobalTools(m.Manager, Output(m.Manager, m.Arguments)));
 
+    /// <summary>What winget installed and what it would update, from its source's own listing; none without winget, and none in a demo.</summary>
+    public static IReadOnlyList<WingetPackage> WingetPackages() => DemoMode.On ? [] :
+        Packages.WingetList(Output(Packages.WingetListing.Manager, Packages.WingetListing.Arguments));
+
     /// <summary>What a fixed command prints. <c>npm</c> is a batch file, so it goes through <c>cmd</c>; no argument comes from the machine.</summary>
     static string? Output(string program, string[] arguments)
     {

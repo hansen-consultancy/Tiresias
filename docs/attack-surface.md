@@ -1,6 +1,6 @@
 # Attack surface: less software, less to trust
 
-Status: **first slice, log-on use, uninstall-entry checks, unused applications, the Installed and Startup lists, own builds, `tir doctor --surface`, per-item dismissals and trusted publishers built** (#34, #55, #98, #108, #148); the rest is design. [Guided setup](guided-setup.md) phase 5: it builds on the
+Status: **first slice, log-on use, uninstall-entry checks, unused applications, the Installed and Startup lists, own builds, `tir doctor --surface`, per-item dismissals, trusted publishers, OSV lookups for global tools and package updates, uninstalls and repairs built** (#34, #55, #98, #105, #106, #108, #148); the rest is design. [Guided setup](guided-setup.md) phase 5: it builds on the
 findings `tir doctor` reports since phase 1 and the findings section, fixes and dismissals the app
 gets in phase 2.
 
@@ -125,6 +125,23 @@ Not a trust system of Tiresias's own. Existing sources, asked per package:
 names or what asked for which credential; and each finding says which source it came from. Offline,
 the checks still report what is installed, unused and unsigned.
 
+**Built: OSV for global tools** (#105). The Installed page's **Check global tools online**, off by
+default, asks [OSV.dev](https://osv.dev) (`POST api.osv.dev/v1/query`) about each global tool of the
+day's listing: its ecosystem (`NuGet`, `npm`, `PyPI`, `crates.io`), name and version, nothing else
+(`Osv.QueryJson`, pinned by a test); a tool without a version isn't asked about. Answers are kept in
+`trust-lookups.json` beside the keyring and asked again once a day old, by the app's background
+checks and when the Installed page loads; a tool no longer installed, or at another version, is
+forgotten, and an answer that doesn't come keeps the last one. Turning it off deletes the file, so no
+finding stands on an old answer. The checks only read that file (`IDoctorProbe.TrustLookups`), behind
+the `IAdvisorySource` seam, so the planner stays pure and tests need no network; `tir doctor` reads
+it too but never asks, and `tir doctor --surface` says per tool what was found, or "not checked
+online". A demo never goes online. An advisory's fix is the highest `fixed` among its version
+ranges that hold the installed version (from `introduced`), none when one of them has no fix, so
+the finding then suggests uninstalling; versions are compared loosely as dotted numbers. Turning
+lookups off while one is asking keeps its answers from being saved. Not built yet: deps.dev and Scorecard,
+the marketplaces, winget-pkgs, OSV for extensions and PowerShell modules, and the unverified or
+changed publisher finding.
+
 ## Findings
 
 Guided setup's rule needs no widening: a finding is any check with a fix, plus any delivery with a
@@ -144,7 +161,7 @@ guided setup already has for it, with that finding's position.
 | Finding | Raised when | Fix |
 |---|---|---|
 | Extension in a program that uses credentials | The host asked Tiresias for a credential in the last 90 days, and the extension's publisher is unverified or unknown, or it was last updated over two years ago | `RemoveExtension(host, id)`; or `UseThroughBroker(host, service)`, opening *What do you need?* (phase 3) at that service, to move the use out of the host |
-| Known vulnerability | OSV or the marketplace reports an advisory for the installed version | `Update(kind, id, fixed version)`, or `Uninstall` where no fixed version exists |
+| Known vulnerability | OSV or the marketplace reports an advisory for the installed version | `Update(kind, id, fixed version)`, or `Uninstall` where no fixed version exists. **Built for global tools** (#105): `UpdateGlobalTool` (the manager's update to the latest version, naming the version that fixes every advisory) or `UninstallGlobalTool` when one has no fix; both are copied, not run. Its reasons are its advisory ids, so a dismissal survives an update and comes back for a new advisory; trust in a publisher never hides it |
 | Unsigned binary on `PATH` or at startup | No Authenticode signature, or one that doesn't verify | `RevealFile(path)`: show where it came from; `Uninstall` if its source is known |
 | Not used in 90 days | Last use is known and older; never when last use is unknown | `Uninstall(kind, id)` |
 | Starts at log-on, rarely used | A user Run key, startup folder entry or scheduled task, and the program is unused | `DisableStartup(entry)`, keeping the program |
@@ -163,7 +180,7 @@ the command. The new kinds:
   (`winget`, `dotnet tool`, `npm`, `pipx`, `code`). The app runs it only after approval, never from a scan, with an
   argument list, never a shell string, because the package id comes from the machine.
   Machine-wide software says it needs an administrator, and the app starts it elevated only when
-  asked.
+  asked. Built for winget, `dotnet tool` and npm (#106); `pipx` and `code` are not.
 - **`RemoveExtension`** uses the host's command where one exists (`code --uninstall-extension`).
   A browser has none, so the fix opens its extensions page instead.
 - **`DisableStartup`** turns a user Run key or startup folder entry off after approval the way
@@ -178,7 +195,7 @@ the command. The new kinds:
 - **`Repair`** is the installer's own reinstall of the installed version
   (`winget install --id <id> --exact --version <installed version> --force`); without
   `--version`, winget installs the latest. When winget no longer offers that version, the fix
-  says so and offers the latest instead. It is offered before `Uninstall` whenever the uninstaller is missing, since removing by hand
+  should say so and offer the latest instead; that is not built, winget's own error says it. It is offered before `Uninstall` whenever the uninstaller is missing, since removing by hand
   leaves shell extensions and services registered.
 - **`ReplaceWithWebApp`** is a guide, not a command: install the site as an app from Edge or
   Chrome (Start menu, taskbar, own window, notifications, listed and removed like any app), check
@@ -376,7 +393,7 @@ used" finding with `DisableStartup`, never for a program whose last use is unkno
 icon, or Tiresias itself. **Uninstall entries are checked** as well: user and machine entries
 against the disk, raising the gone, can't-be-uninstalled and stale-duplicate findings, with
 **Remove entry...** for the user's own entries and the commands for machine-wide ones; `Repair`
-names winget's command once the inventory knows the package id, and the steps until then.
+runs winget's command for a program winget installed (**Repair...**, after approval), and gives the steps for any other.
 **Unused applications are found**: an installed program whose folder had nothing opened in 90
 days (UserAssist, and with the admin tier the Background Activity Moderator and Prefetch), never one with no recorded run or one that runs unseen (a tray icon, a service,
 a driver, a log-on entry, a folder on `PATH`), nor one that used a credential. It is a finding with
@@ -403,7 +420,24 @@ reached most first; each global tool from the day's listing with its manager, an
 when it was listed. The search box matches them the same way. They have no signature, icon or
 folder of their own there. **Search online...** opens the browser with a web search for the name and version, on
 the user's click only; Tiresias itself sends nothing. Uninstalling goes through Settings, Apps, Installed apps
-(`UninstallApp`) until the inventory knows each program's installer command.
+(`UninstallApp`), except for what a package manager installed:
+**Package fixes are built** (#106). The day's listing of global tools also runs
+`winget list --source winget`, so it knows each winget program's package id and any newer version
+winget offers. That compares against winget's local copy of its catalog, which winget may refresh
+by downloading the whole catalog; nothing about what is installed leaves the machine, so it stays
+within the privacy rule above. No registry is asked which global tools are outdated (`npm outdated`
+would send every package's name, unattended). An uninstall entry is that winget program when
+exactly one row has its name and version. The selected program or tool then gets **Update to
+*version*...** for a winget program winget offers a newer version of, or **Update...** for a
+`dotnet` or npm tool, whose manager looks up the newest only when the user asks; and **Uninstall
+with *manager*...**. The "can't be uninstalled" finding gets **Repair...**. Each asks first, with
+the exact command, which is built by `Packages` from plain ids and versions only
+(`winget upgrade --id <id> --exact --version <v>`, `winget uninstall --id <id> --exact`,
+`dotnet tool update|uninstall --global <id>`, `npm install --global <id>@latest`,
+`npm uninstall --global <id>`), never a shell string. It runs in
+a console the user can watch and answer; a machine-wide program's command starts elevated, so
+Windows asks for an administrator, and on a managed PC machine-wide programs get none. Afterwards
+the listing is taken again and the page reloads. A demo runs nothing.
 **The Startup list is built** (#98), beside Installed: the user and machine Run keys and the
 Startup folder, entries turned off in Task Manager or Settings included (marked **Off**), and the
 scheduled tasks with a log-on trigger for anyone, the user or a group the user is in, read in process through the Task
@@ -426,6 +460,9 @@ caches) qualifies. Detection reads names, folder listings and the file's owner, 
 anything or needs an administrator. Without developer tools the finding reads as before
 (`DoctorCheck.WithoutDeveloperTools`). Matching the repository's remote against owners the user
 marks as their own is not built.
+**OSV lookups for global tools are built** (#105), as [Trust](#trust) says: off by default, the
+"known vulnerability" finding under **What can reach them**, and the Installed panel's **Checked
+online** line for a global tool, beside the offline signer.
 **Dismissals per item and trusted publishers are built** (#108), as [Dismissals](#dismissals)
 says, and so are Home's two groups (#108): a check marked `DoctorCheck.Surface` (programs,
 extensions, log-on and uninstall entries, decoy incidents and blocks, the Docker engine and
@@ -443,6 +480,7 @@ dependencies' install scripts and waits before installing a new release. Its lin
 2. **Cross with credentials**: reach from the activity log, ranking, surface findings on Home,
    and the dismissals above, including trust per publisher.
 3. **Trust lookups** (opt-in): deps.dev, OSV, marketplaces, winget-pkgs, Authenticode, Scorecard.
+   OSV for global tools is built (#105).
 4. **Fixes**: approved uninstalls, updates, extension removal and startup changes.
 
 Later, outside phase 5: **Isolation**, the placeholder environments for containers and WSL, and the

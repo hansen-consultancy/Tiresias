@@ -2266,6 +2266,69 @@ Close them, then choose the update in the tray menu again.</value>
   <data name="Installed_OpenSettings" xml:space="preserve">
     <value>Open Installed apps in Settings</value>
   </data>
+  <data name="Finding_FixRepair" xml:space="preserve">
+    <value>Repair...</value>
+  </data>
+  <data name="Package_UpdateTo" xml:space="preserve">
+    <value>Update to {0}…</value>
+  </data>
+  <data name="Package_UpdateNewest" xml:space="preserve">
+    <value>Update…</value>
+  </data>
+  <data name="Package_Uninstall" xml:space="preserve">
+    <value>Uninstall with {0}…</value>
+  </data>
+  <data name="Package_UpdateTip" xml:space="preserve">
+    <value>Runs the package manager that installed it, after you approve the exact command</value>
+  </data>
+  <data name="Package_UninstallTip" xml:space="preserve">
+    <value>Uninstalls it with the package manager that installed it, after you approve the exact command</value>
+  </data>
+  <data name="Package_UpdateHeading" xml:space="preserve">
+    <value>Update {0}?</value>
+  </data>
+  <data name="Package_UpdateBody" xml:space="preserve">
+    <value>Tiresias runs {0} in a window you can watch. The package manager fetches the newer version from the same place it installed this one from.</value>
+  </data>
+  <data name="Package_UpdateBodyAdmin" xml:space="preserve">
+    <value>Tiresias runs {0} in a window you can watch. The package manager fetches the newer version from the same place it installed this one from. It is installed for everyone, so Windows asks for an administrator first.</value>
+  </data>
+  <data name="Package_Update" xml:space="preserve">
+    <value>Update</value>
+  </data>
+  <data name="Package_UninstallHeading" xml:space="preserve">
+    <value>Uninstall {0}?</value>
+  </data>
+  <data name="Package_UninstallBody" xml:space="preserve">
+    <value>Tiresias runs {0} in a window you can watch. You can install it again later with the same package manager.</value>
+  </data>
+  <data name="Package_UninstallBodyAdmin" xml:space="preserve">
+    <value>Tiresias runs {0} in a window you can watch. You can install it again later with the same package manager. It is installed for everyone, so Windows asks for an administrator first.</value>
+  </data>
+  <data name="Package_UninstallAction" xml:space="preserve">
+    <value>Uninstall</value>
+  </data>
+  <data name="Package_RepairHeading" xml:space="preserve">
+    <value>Repair {0}?</value>
+  </data>
+  <data name="Package_RepairBody" xml:space="preserve">
+    <value>Tiresias runs {0} in a window you can watch: winget installs the same version over it, which puts its uninstaller back.</value>
+  </data>
+  <data name="Package_RepairBodyAdmin" xml:space="preserve">
+    <value>Tiresias runs {0} in a window you can watch: winget installs the same version over it, which puts its uninstaller back. It is installed for everyone, so Windows asks for an administrator first.</value>
+  </data>
+  <data name="Package_RepairAction" xml:space="preserve">
+    <value>Repair</value>
+  </data>
+  <data name="Package_Done" xml:space="preserve">
+    <value>{1} finished for {0}.</value>
+  </data>
+  <data name="Package_NotStarted" xml:space="preserve">
+    <value>{1} didn't run: the package manager wasn't found, or the administrator prompt was declined. You can run it yourself.</value>
+  </data>
+  <data name="Package_Failed" xml:space="preserve">
+    <value>{1} stopped with exit code {2}. Run it yourself to see why.</value>
+  </data>
   <data name="Finding_FixRemoveEntry" xml:space="preserve">
     <value>Remove entry...</value>
   </data>
@@ -2725,6 +2788,30 @@ Close them, then choose the update in the tray menu again.</value>
   </data>
   <data name="Installed_SearchOnlineTip" xml:space="preserve">
     <value>Opens your browser with a web search for this name and version</value>
+  </data>
+  <data name="Installed_ColOnline" xml:space="preserve">
+    <value>Checked online</value>
+  </data>
+  <data name="Installed_OnlineOff" xml:space="preserve">
+    <value>Not checked online. Turn on Check online to ask OSV.dev</value>
+  </data>
+  <data name="Installed_OnlineCantCheck" xml:space="preserve">
+    <value>Can't be checked online: no version, or a manager OSV.dev doesn't know</value>
+  </data>
+  <data name="Installed_OnlineNotYet" xml:space="preserve">
+    <value>Not checked yet: it will be within a few hours, or press Refresh</value>
+  </data>
+  <data name="Installed_OnlineClean" xml:space="preserve">
+    <value>No known vulnerability ({0}, {1})</value>
+  </data>
+  <data name="Installed_OnlineVulnerable" xml:space="preserve">
+    <value>Known vulnerabilities ({0}, {1}): {2}. Home says how to fix it</value>
+  </data>
+  <data name="Installed_Online" xml:space="preserve">
+    <value>Check global tools online</value>
+  </data>
+  <data name="Installed_OnlineTip" xml:space="preserve">
+    <value>Asks OSV.dev about known vulnerabilities in your global tools, once a day. Only each tool's name, version and package manager are sent: never a path, your name or what uses which credential</value>
   </data>
   <data name="Reach_Title" xml:space="preserve">
     <value>See what your containers, WSL and VMs expose</value>

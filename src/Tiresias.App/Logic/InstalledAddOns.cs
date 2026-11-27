@@ -5,7 +5,8 @@ namespace Tiresias.App.Logic;
 /// <summary>An extension or a global tool, as a row of the Installed page's Extensions and Global tools views.</summary>
 /// <param name="In">The program it runs inside (an extension's host), or the package manager that installed a tool.</param>
 /// <param name="Reached">What its host used through Tiresias in the last 90 days, sorted; empty for a tool, whose use isn't recorded.</param>
-public sealed record AddOn(string Name, string? Version, string In, string? Publisher, DateTimeOffset? Updated, IReadOnlyList<string> Reached);
+/// <param name="Tool">The global tool it is, which its manager can update and uninstall and the online lookups ask about; <c>null</c> for an extension.</param>
+public sealed record AddOn(string Name, string? Version, string In, string? Publisher, DateTimeOffset? Updated, IReadOnlyList<string> Reached, GlobalTool? Tool = null);
 
 /// <summary>What the Installed page lists beside programs (#107): read-only, no findings of its own.</summary>
 public static class InstalledAddOns
@@ -28,7 +29,7 @@ public static class InstalledAddOns
     /// <summary>The global tools of the day's listing, by manager and id; their publisher and use aren't known offline.</summary>
     public static IReadOnlyList<AddOn> Tools(ToolSnapshot snapshot) =>
         [.. snapshot.Tools.OrderBy(t => t.Manager, StringComparer.Ordinal).ThenBy(t => t.Id, StringComparer.OrdinalIgnoreCase)
-            .Select(t => new AddOn(t.Id, t.Version, t.Manager, null, null, []))];
+            .Select(t => new AddOn(t.Id, t.Version, t.Manager, null, null, [], t))];
 
     /// <summary>Every word typed must appear, in any case, in its name, version, host or manager, publisher or a service reached.</summary>
     public static IEnumerable<AddOn> Filter(IEnumerable<AddOn> addOns, string search)

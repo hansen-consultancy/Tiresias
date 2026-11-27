@@ -152,6 +152,12 @@ public interface IDoctorProbe
     /// <summary>Programs Windows starts at log-on, with whether each is signed.</summary>
     IEnumerable<StartupEntry> StartupEntries() => [];
 
+    /// <summary>The global tools of the last listing, read without listing again; empty when there is none.</summary>
+    IReadOnlyList<GlobalTool> GlobalTools() => [];
+
+    /// <summary>The opt-in online lookups' saved answers; <c>null</c> while they are off (docs/attack-surface.md#trust).</summary>
+    TrustLookups? TrustLookups => null;
+
     /// <summary>Who signed a local program file, when its signature verifies; <c>null</c> otherwise.</summary>
     Publisher? Signer(string path) => null;
 
@@ -170,6 +176,9 @@ public interface IDoctorProbe
 
     /// <summary>The uninstall registry entries, machine and user, each with whether its uninstaller and folder are on disk.</summary>
     IEnumerable<UninstallEntry> UninstallEntries() => [];
+
+    /// <summary>The programs winget installed, from the day's saved listing; never listed here, which takes seconds.</summary>
+    IReadOnlyList<WingetPackage> WingetPackages() => [];
 
     /// <summary>Whether a domain, Entra ID or device management manages this PC.</summary>
     Management Management => Management.None;
@@ -326,7 +335,8 @@ public static partial class Doctor
         checks.AddRange(Managed(management));
         var (judgedStartup, judgedInstalled) = Judged(management, startup, installed);
         checks.AddRange(Surface(AttackSurface(probe.Extensions(), judgedStartup, uses, otherBlocks, now, runs)));
-        checks.AddRange(Surface(UninstallEntries(judgedInstalled)));
+        checks.AddRange(Surface(KnownVulnerabilities(probe.GlobalTools(), probe.TrustLookups)));
+        checks.AddRange(Surface(UninstallEntries(judgedInstalled, probe.WingetPackages())));
         checks.AddRange(Surface(UnusedApplications(judgedInstalled, runs, uses, now, probe.Signer)));
         checks.AddRange(SupplyChain(probe.Toolchains()));
         return checks;

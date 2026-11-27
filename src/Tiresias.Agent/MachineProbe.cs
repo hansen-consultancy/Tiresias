@@ -235,6 +235,8 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     public IEnumerable<UninstallEntry> UninstallEntries() => SurfaceProbe.UninstallEntries();
 
+    public IReadOnlyList<WingetPackage> WingetPackages() => ToolInventory.Saved()?.WingetPackages ?? [];
+
     public Management Management => ManagementProbe.Read();
 
     public IEnumerable<string> BlockedPrograms() => SurfaceProbe.BlockedPrograms();
@@ -254,7 +256,12 @@ public sealed class MachineProbe(IEnumerable<string>? projectRoots = null) : IDo
 
     /// <summary>Everything the attack surface checks read, plus the global tools: today's listing, or a new one with <paramref name="refresh"/>.</summary>
     public SurfaceInventory Inventory(bool refresh = false) =>
-        new([.. Extensions()], ToolInventory.Current(refresh), [.. StartupEntries()], [.. CredentialUses()], [.. SurfaceProbe.ProgramRuns()]);
+        new([.. Extensions()], ToolInventory.Current(refresh), [.. StartupEntries()], [.. CredentialUses()], [.. SurfaceProbe.ProgramRuns()], TrustLookupStore.Load());
+
+    /// <summary>The last listing as it is: the checks don't wait seconds for package managers.</summary>
+    public IReadOnlyList<GlobalTool> GlobalTools() => ToolInventory.Saved()?.Tools ?? [];
+
+    public TrustLookups? TrustLookups => TrustLookupStore.Load();
 
     public IEnumerable<DecoyUseRecord> DecoyUses() => SurfaceProbe.DecoyUses();
 

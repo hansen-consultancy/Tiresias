@@ -92,6 +92,35 @@ static partial class Desktop
     }
 
     /// <summary>
+    /// Runs a package manager's command (<see cref="Tiresias.Client.PackageCommand"/>) in a console the
+    /// user can watch and answer, elevated when it changes software installed for everyone, and
+    /// returns its exit code; <c>null</c> when it didn't start or the administrator prompt was
+    /// declined. Never in a demo: the manager would change the real machine.
+    /// </summary>
+    public static async Task<int?> RunPackageAsync(Tiresias.Client.PackageCommand command)
+    {
+        if (DemoMode.On)
+            return 0;
+        var (program, arguments) = command.Start;
+        var start = new ProcessStartInfo(program) { UseShellExecute = true, Verb = command.Administrator ? "runas" : "" };
+        foreach (var argument in arguments)
+            start.ArgumentList.Add(argument);
+        try
+        {
+            using var process = Process.Start(start);
+            if (process is null)
+                return null;
+            await process.WaitForExitAsync();
+            return process.ExitCode;
+        }
+        catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            AppLog.Error(e, $"could not run {command.Text}");
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Turns one of the user's own log-on entries off the way Task Manager and Settings do, in
     /// <c>StartupApproved</c>, so Settings, Apps, Startup turns it back on. The entry itself stays.
     /// </summary>

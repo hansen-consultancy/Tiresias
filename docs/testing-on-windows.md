@@ -76,8 +76,12 @@ Things worth trying:
   back from paper.
 - **Run `tir agent` while the app runs.** It refuses and says the app is the agent.
 - **Open a new terminal and run `tir status`.** With the installed app, it works without setting
-  PATH: the app put its folder on your user PATH. A terminal that was already open keeps its old
-  PATH. The `App:` and `tir:` lines say which build answered and where each runs from.
+  PATH: the app put `%LOCALAPPDATA%\Tiresias\bin` on your user PATH. A terminal that was already
+  open keeps its old PATH. The `App:` and `tir:` lines say which build answered and where each
+  runs from: `tir` runs from its copy in `%LOCALAPPDATA%\Tiresias\tir\<version>`, not the install
+  folder.
+- **Update while `tir run -- ping -t 127.0.0.1` runs in another terminal.** The update applies,
+  the ping keeps going, and a new terminal's `tir status` names the new version.
 
 ## 3. Unlock and lock
 

@@ -48,10 +48,23 @@ public class UninstallEntryTests
     }
 
     [Test]
-    public void Repair_installs_the_same_version_with_winget_when_its_id_is_known()
+    public void Repair_installs_the_same_version_with_winget_when_winget_knows_the_program()
     {
-        Assert.That(new Repair("Acme", "2.3.1", "Acme.Tool").Instruction, Is.EqualTo("winget install --id Acme.Tool --exact --version 2.3.1 --force"));
+        var check = Doctor.UninstallEntries([Entry("Acme", "2.3.1", uninstallerExists: false)], [new("Acme", "Acme.Tool", "2.3.1", "2.4.0")]).Single();
+
+        Assert.That(check.Fix, Is.EqualTo(new PackageFix(PackageChange.Repair, "Acme",
+            new("winget", ["install", "--id", "Acme.Tool", "--exact", "--version", "2.3.1", "--force"]))));
+        Assert.That(check.Fix!.Instruction, Is.EqualTo("winget install --id Acme.Tool --exact --version 2.3.1 --force"));
         Assert.That(new Repair("Acme", "2.3.1").Instruction, Does.StartWith("reinstall Acme 2.3.1 over itself"));
+    }
+
+    [Test]
+    public void A_machine_wide_repair_needs_an_administrator()
+    {
+        var check = Doctor.UninstallEntries([Entry("Acme", "2.3.1", uninstallerExists: false, key: MachineKey)], [new("Acme", "Acme.Tool", "2.3.1")]).Single();
+
+        Assert.That(((PackageFix)check.Fix!).Command.Administrator, Is.True);
+        Assert.That(check.Fix.Instruction, Does.EndWith(", as an administrator"));
     }
 
     [Test]
@@ -108,9 +121,11 @@ public class UninstallEntryTests
     }
 
     [Test]
-    public void Repair_gets_a_button_only_with_a_command_to_copy()
+    public void Repair_runs_after_approval_with_winget_and_has_no_button_without_it()
     {
-        Assert.That(FindingView.Button(new Repair("Acme", "1.0", "Acme.Tool"))?.Action, Is.EqualTo(FixAction.CopyCommand));
+        var repair = Packages.Repair(new("Acme", "Acme.Tool", "1.0"), machine: false)!;
+
+        Assert.That(FindingView.Button(repair), Is.EqualTo((FixAction.RunPackage, "Finding_FixRepair")));
         Assert.That(FindingView.Button(new Repair("Acme", "1.0")), Is.Null);
     }
 
@@ -143,13 +158,13 @@ public class UninstallEntryTests
 
     [TestCase("Acme.Tool", "1.0 & calc")]
     [TestCase("Acme.Tool;calc", "1.0")]
+    [TestCase("Acme.Tool", "Unknown")]
     public void Repair_builds_no_winget_command_from_values_that_arent_plain(string id, string version)
     {
-        var repair = new Repair("Acme", version, id);
+        var check = Doctor.UninstallEntries([Entry("Acme", version, uninstallerExists: false)], [new("Acme", id, version)]).Single();
 
-        Assert.That(repair.Command, Is.Null);
-        Assert.That(repair.Instruction, Does.StartWith("reinstall Acme"));
-        Assert.That(FindingView.Button(repair), Is.Null);
+        Assert.That(check.Fix, Is.InstanceOf<Repair>());
+        Assert.That(check.Fix!.Instruction, Does.StartWith("reinstall Acme"));
     }
 
     [Test]

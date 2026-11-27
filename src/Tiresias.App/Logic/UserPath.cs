@@ -24,6 +24,26 @@ public static class UserPath
         return kept.Length == entries.Length ? null : string.Join(';', kept);
     }
 
+    /// <summary>
+    /// Moves <c>tir</c>'s entry from <paramref name="from"/> to <paramref name="to"/>: in its place when
+    /// <paramref name="from"/> is there, appended otherwise.
+    /// </summary>
+    /// <returns>The new value, or <c>null</c> when nothing changes.</returns>
+    public static string? Replace(string? path, string from, string to)
+    {
+        var entries = Split(path);
+        if (!entries.Any(e => Same(e, from)))
+            return With(path, to);
+        var moved = new List<string>();
+        foreach (var entry in entries)
+        {
+            var next = Same(entry, from) ? to : entry;
+            if (!Same(next, to) || !moved.Any(e => Same(e, to)))
+                moved.Add(next);
+        }
+        return string.Join(';', moved);
+    }
+
     /// <summary>The folder holding <c>tir.exe</c>: beside the app when installed, <c>..\cli</c> when published from source.</summary>
     /// <returns><c>null</c> when neither has it (a plain <c>dotnet run</c>).</returns>
     public static string? TirFolder(string appFolder, Func<string, bool> fileExists)

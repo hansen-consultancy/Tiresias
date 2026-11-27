@@ -9,14 +9,18 @@ namespace Tiresias.Client;
 public sealed record GlobalTool(string Manager, string Id, string? Version);
 
 /// <summary>
-/// The global tools as last listed and when. Listing them takes seconds, so the agent keeps one
-/// listing a day on disk (<c>inventory.json</c> beside the keyring) instead of one per doctor run.
-/// Package names and versions only: no paths, no user names.
+/// The global tools and winget's programs as last listed and when. Listing them takes seconds, so the
+/// agent keeps one listing a day on disk (<c>inventory.json</c> beside the keyring) instead of one per
+/// doctor run. Package names, ids and versions only: no paths, no user names.
 /// </summary>
-public sealed record ToolSnapshot(DateTimeOffset At, IReadOnlyList<GlobalTool> Tools)
+/// <param name="Winget">What <c>winget list --source winget</c> listed; <c>null</c> reads as none.</param>
+public sealed record ToolSnapshot(DateTimeOffset At, IReadOnlyList<GlobalTool> Tools, IReadOnlyList<WingetPackage>? Winget = null)
 {
     /// <summary>The file format; a change bumps it.</summary>
-    public const int Version = 1;
+    public const int Version = 2;
+
+    /// <summary>winget's programs, by name and version, which the uninstall entries are matched against (<see cref="Packages.Of"/>).</summary>
+    public IReadOnlyList<WingetPackage> WingetPackages => Winget ?? [];
 
     /// <summary>How old a listing may be before it is taken again.</summary>
     public static readonly TimeSpan MaxAge = TimeSpan.FromDays(1);
@@ -30,6 +34,7 @@ public sealed record ToolSnapshot(DateTimeOffset At, IReadOnlyList<GlobalTool> T
         version = Version,
         at = At,
         tools = Tools.Select(t => new { manager = t.Manager, id = t.Id, version = t.Version }),
+        winget = WingetPackages.Select(p => new { name = p.Name, id = p.Id, version = p.Version, available = p.Available }),
     });
 
     /// <summary>The listing in <paramref name="json"/>; <c>null</c> when it is missing, damaged or another version, so it is taken again.</summary>
@@ -53,7 +58,15 @@ public sealed record ToolSnapshot(DateTimeOffset At, IReadOnlyList<GlobalTool> T
                     return null;
                 list.Add(new(manager, id, Doctor.Text(tool, "version")));
             }
-            return new(taken, list);
+            List<WingetPackage> winget = [];
+            if (root.TryGetProperty("winget", out var packages) && packages.ValueKind == JsonValueKind.Array)
+                foreach (var package in packages.EnumerateArray())
+                {
+                    if (package.ValueKind != JsonValueKind.Object || Doctor.Text(package, "name") is not { } name || Doctor.Text(package, "id") is not { } packageId)
+                        return null;
+                    winget.Add(new(name, packageId, Doctor.Text(package, "version"), Doctor.Text(package, "available")));
+                }
+            return new(taken, list, winget);
         }
         catch (Exception e) when (e is JsonException or FormatException)
         {
@@ -63,12 +76,14 @@ public sealed record ToolSnapshot(DateTimeOffset At, IReadOnlyList<GlobalTool> T
 }
 
 /// <summary>What <c>tir doctor --surface</c> lists: the inventory behind the attack surface findings, without judging it.</summary>
+/// <param name="Lookups">The opt-in online lookups' answers; <c>null</c> while they are off.</param>
 public sealed record SurfaceInventory(
     IReadOnlyList<InstalledExtension> Extensions,
     ToolSnapshot Tools,
     IReadOnlyList<StartupEntry> Startup,
     IReadOnlyList<CredentialUse> Uses,
-    IReadOnlyList<ProgramRun> Runs);
+    IReadOnlyList<ProgramRun> Runs,
+    TrustLookups? Lookups = null);
 
 public static partial class Doctor
 {
@@ -121,6 +136,17 @@ public static partial class Doctor
         }
     }
 
+    /// <summary>What the opt-in lookups said about a tool, for <c>tir doctor --surface</c>.</summary>
+    static string OnlineWords(GlobalTool tool, TrustLookups? lookups) =>
+        lookups is null ? "not checked online"
+        : PackageQuery.Of(tool) is not { } package ? "can't be checked online"
+        : lookups.For(package) switch
+        {
+            null => "not checked online yet",
+            { Advisories.Count: 0, At: var at } => $"no known vulnerability ({OsvSource}, {at:yyyy-MM-dd})",
+            { Advisories: var advisories, At: var at } => $"known vulnerabilities {string.Join(", ", advisories.Select(a => a.Id))} ({OsvSource}, {at:yyyy-MM-dd})",
+        };
+
     [GeneratedRegex(@"^(\S+) v(\S+?):?\s*$", RegexOptions.Multiline)]
     private static partial Regex CargoLine();
 
@@ -148,7 +174,7 @@ public static partial class Doctor
         if (inventory.Tools.Tools.Count == 0)
             yield return "  none found";
         foreach (var tool in inventory.Tools.Tools.OrderBy(t => t.Manager, StringComparer.Ordinal).ThenBy(t => t.Id, StringComparer.OrdinalIgnoreCase))
-            yield return $"  {tool.Manager}: {tool.Id} {tool.Version ?? "?"}";
+            yield return $"  {tool.Manager}: {tool.Id} {tool.Version ?? "?"}, {OnlineWords(tool, inventory.Lookups)}";
         yield return "Starts at log-on";
         if (inventory.Startup.Count == 0)
             yield return "  none found";

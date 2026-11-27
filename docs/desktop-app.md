@@ -215,8 +215,21 @@ The goal is one command or one download, then a first-run wizard:
   for Windows on Arm, which then runs natively rather than emulated). It installs per user, with no
   admin rights, into `%LOCALAPPDATA%\TiresiasApp`, and `tir.exe` sits next to `Tiresias.exe`.
   Uninstalling deletes that folder only. The vault, Keyring and logs live in
-  `%LOCALAPPDATA%\Tiresias` and stay, so a reinstall unlocks the same secrets. The app puts that folder on the user
-  `PATH` at every start (so a moved install heals) and Velopack's uninstall hook takes it off.
+  `%LOCALAPPDATA%\Tiresias` and stay, so a reinstall unlocks the same secrets.
+- **`tir` on PATH runs outside the install folder (#177):** a `tir run` lasts as long as its
+  program, and a `tir` running from the install folder holds up every update. So at every start
+  the installed app copies its version folder to `%LOCALAPPDATA%\Tiresias\tir\<version>` (once per
+  version, into a staging folder renamed when whole) and puts only `%LOCALAPPDATA%\Tiresias\bin` on
+  the user `PATH`, in place of the install folder an older version put there. `bin\tir.exe` is a
+  small native shim (`src/Tiresias.TirShim`, shipped as `tir-shim.exe`) that runs the `tir.exe`
+  named in `bin\tir.path` with its own command line, console and working folder, and exits with
+  its code. The app points `tir.path` at the new copy, so a running `tir` keeps its own version
+  until it exits and the next one gets the new version. Killing the shim ends that `tir`, and what
+  it started keeps running, as when `tir` itself is killed. A changed shim moves the running one
+  aside (a running program can be renamed, not overwritten). Copies no program runs from or works
+  in are removed at the next start. Velopack's uninstall hook takes `bin` off `PATH` and removes
+  `bin` and the copies. A program started before the move keeps the `PATH` it was started with,
+  so a launcher that started before it runs `tir` from the install folder until it restarts.
   The installer also makes it start at sign-in (HKCU `Run`, `StartWithWindows.cs`), switchable on
   the status page and removed on uninstall, so apps that start at sign-in with sealed user secrets
   find the agent. Only an installed copy registers; a development build's folder goes stale.
