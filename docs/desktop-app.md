@@ -242,7 +242,8 @@ The goal is one command or one download, then a first-run wizard:
   An app older than 0.1.0-preview.5 can't hand over and is quit from its tray menu.
 - **When:** at start, then daily. A check that fails (no network, GitHub down) is logged and
   retried an hour later; the user sees nothing. A preview build follows preview releases, a stable
-  build only stable ones.
+  build only stable ones. **Check for updates**, in the tray menu and on About, asks now whatever
+  the daily limit says, then offers the update or says the running version is the latest.
 - **Silently:** a new version downloads in the background (a delta when possible). The tray menu
   then offers "Update to X available - restart to apply".
 - **Never in the way:** applying is always the user's click. It first shows the release notes,

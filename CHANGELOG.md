@@ -8,6 +8,12 @@ its section below.
 
 ## [Unreleased]
 
+### Added
+
+- **Check for updates when you want.** The tray menu and About have **Check for updates**, which asks
+  GitHub right away instead of waiting for the daily check, then offers the update or says you have
+  the latest version.
+
 ## [0.6.0] - 2026-11-27
 
 ### Added

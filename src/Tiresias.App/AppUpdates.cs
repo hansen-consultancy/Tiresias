@@ -16,12 +16,14 @@ namespace Tiresias.App;
 /// the wizard is open, and quits the normal way (ending the lease) before Velopack swaps the
 /// files. If applying fails, Velopack keeps the version that was running; it says nothing, so
 /// the app checks for what would block it before quitting and says so at the next start (#149).
+/// About and the tray can also ask now (<see cref="CheckNowAsync"/>), whatever the daily limit says.
 /// </summary>
 sealed class AppUpdates(App app, TrayController tray) : IDisposable
 {
     readonly DispatcherTimer timer = new() { Interval = UpdatePlan.Tick };
     UpdateManager? manager;
-    UpdateInfo? ready;
+    /// <summary>Downloaded, or already staged by Velopack at start: what "restart to apply" applies.</summary>
+    VelopackAsset? ready;
     bool checking;
 
     public static string CurrentVersion =>
@@ -38,7 +40,10 @@ sealed class AppUpdates(App app, TrayController tray) : IDisposable
         }
         ReportFailedApply();
         if (manager.UpdatePendingRestart is { } pending)
+        {
+            ready = pending;
             tray.OfferUpdate(pending.Version.ToString(), () => Offer(pending));
+        }
         timer.Tick += async (_, _) => await CheckAsync();
         timer.Start();
         _ = CheckAsync();
@@ -48,24 +53,68 @@ sealed class AppUpdates(App app, TrayController tray) : IDisposable
     {
         if (manager is null || checking || ready is not null || !UpdatePlan.IsDue(AppSettings.Load().LastUpdateCheck, DateTimeOffset.UtcNow))
             return;
+        await CheckCoreAsync();
+    }
+
+    /// <summary>
+    /// "Check for updates": asks GitHub now, then offers the update or says there is none. An update
+    /// already downloaded is offered without asking again.
+    /// </summary>
+    public async Task CheckNowAsync()
+    {
+        if (manager is null)
+        {
+            // A demo, or a build folder: nothing updates in place.
+            AskWindow.Tell(null, null, Text.Get("Update_Off"));
+            return;
+        }
+        if (ready is { } staged)
+        {
+            Offer(staged);
+            return;
+        }
+        if (checking)
+        {
+            AskWindow.Tell(null, null, Text.Get("Update_Checking"));
+            return;
+        }
+        switch (await CheckCoreAsync())
+        {
+            case true:
+                Offer(ready!);
+                break;
+            case false:
+                AskWindow.Tell(null, null, Text.Format("Update_Latest", CurrentVersion));
+                break;
+            default:
+                AskWindow.Tell(null, null, Text.Get("Update_CheckFailed"));
+                break;
+        }
+    }
+
+    /// <summary>Checks and downloads; <c>true</c> when an update is ready, <c>false</c> when there is none, <c>null</c> when the check failed.</summary>
+    async Task<bool?> CheckCoreAsync()
+    {
         checking = true;
         try
         {
-            var info = await manager.CheckForUpdatesAsync();
+            var info = await manager!.CheckForUpdatesAsync();
             if (info is not null)
             {
                 await manager.DownloadUpdatesAsync(info);
-                ready = info;
-                AppLog.Info($"update {info.TargetFullRelease.Version} downloaded");
-                tray.OfferUpdate(info.TargetFullRelease.Version.ToString(), () => Offer(info.TargetFullRelease));
+                var release = ready = info.TargetFullRelease;
+                AppLog.Info($"update {release.Version} downloaded");
+                tray.OfferUpdate(release.Version.ToString(), () => Offer(release));
             }
             (AppSettings.Load() with { LastUpdateCheck = DateTimeOffset.UtcNow }).Save();
+            return info is not null;
         }
         catch (Exception e) when (e is HttpRequestException or IOException or TaskCanceledException or InvalidOperationException
             or UnauthorizedAccessException or System.Text.Json.JsonException)
         {
-            // No network, GitHub unavailable, a rate limit: nothing for the user to do; the next tick tries again.
+            // No network, GitHub unavailable, a rate limit: the next tick tries again.
             AppLog.Error(e, "update check");
+            return null;
         }
         finally
         {
